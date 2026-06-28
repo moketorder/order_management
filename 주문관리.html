@@ -1,0 +1,2130 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MOKET 통합 주문관리 시스템 (사장님용)</title>
+    <!-- Pretendard Variable Font -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <style>
+        /* 현대적인 디자인 시스템 & 변수 선언 */
+        :root {
+            --bg-color: #f8fafc;
+            --card-color: #ffffff;
+            --text-main: #0f172a;
+            --text-sub: #64748b;
+            --primary: #10b981; /* Moket Green */
+            --primary-hover: #059669;
+            --primary-light: #ecfdf5;
+            --blue: #3b82f6;
+            --blue-light: #eff6ff;
+            --amber: #f59e0b;
+            --amber-light: #fffbeb;
+            --red: #ef4444;
+            --red-light: #fef2f2;
+            --purple: #8b5cf6;
+            --purple-light: #f5f3ff;
+            --radius-main: 16px;
+            --radius-sub: 10px;
+            --border: #e2e8f0;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            
+            /* 주문서와 연동되는 탭 스타일 색상 */
+            --moket-green: #4CAF20;
+            --nego-orange: #FF6D00;
+            --white: #FFFFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding-bottom: 110px;
+        }
+
+        /* 헤더 스타일 */
+        .header {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+
+        .header-title-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            font-size: 20px;
+            background: var(--primary-light);
+            padding: 6px;
+            border-radius: 10px;
+        }
+
+        .header h1 {
+            font-size: 17px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-sub);
+            font-weight: 700;
+            background: #f1f5f9;
+            padding: 9px 12px;
+            border-radius: var(--radius-sub);
+            box-sizing: border-box;
+            height: 38px;
+        }
+
+        .sync-dot {
+            width: 7px;
+            height: 7px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        /* 컨트롤 영역 (검색, 필터) */
+        .controls-card {
+            background: var(--card-color);
+            border-radius: var(--radius-main);
+            padding: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .search-wrapper {
+            flex: 2;
+            min-width: 200px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sub);
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+        }
+
+        .select-filter {
+            flex: 1;
+            min-width: 120px;
+            padding: 11px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sub);
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+            background-color: white;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .select-filter:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-common {
+            padding: 11px 16px;
+            border: none;
+            border-radius: var(--radius-sub);
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        /* 대분류 탭 (달) & 소분류 탭 (일) */
+        .tabs-section {
+            margin-bottom: 20px;
+            background: white;
+            padding: 10px 8px;
+            border-radius: var(--radius-main);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .main-tabs {
+            display: flex;
+            background: var(--white);
+            padding: 6px 4px 10px 4px;
+            gap: 8px;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .main-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .year-select {
+            padding: 7px 12px;
+            border-radius: 8px;
+            border: 1.5px solid var(--border);
+            background: white;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--text-main);
+            cursor: pointer;
+            outline: none;
+            flex-shrink: 0;
+            height: 38px;
+            align-self: center;
+        }
+
+        .main-tab-btn {
+            flex: 1;
+            flex-shrink: 0;
+            min-width: 80px;
+            padding: 7px 0;
+            border: none;
+            background: #f0f2f5;
+            color: #666;
+            font-size: 16px;
+            font-weight: 800;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: -0.02em;
+            text-align: center;
+        }
+
+        .main-tab-btn.active {
+            background: var(--nego-orange);
+            color: var(--white);
+            box-shadow: 0 4px 10px rgba(255, 109, 0, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .date-filter-container {
+            padding: 4px 4px;
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .date-filter-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .date-btn {
+            flex-shrink: 0;
+            padding: 7px 0;
+            width: 80px;
+            border-radius: 8px;
+            background: #fafafa;
+            color: #455464;
+            font-size: 16px;
+            font-weight: 800;
+            border: 1.5px solid #eee;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+        }
+
+        .date-btn.active {
+            background: var(--moket-green);
+            color: var(--white);
+            border-color: var(--moket-green);
+        }
+
+        /* 일괄 처리 바 (하단 슬라이드 업 바) */
+        .batch-action-bar {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%) translateY(100%);
+            width: 100%;
+            max-width: 800px;
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid var(--border);
+            border-radius: 20px 20px 0 0;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.12);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 2000;
+            box-sizing: border-box;
+        }
+
+        .batch-action-bar.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .batch-selection-info {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-container {
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .custom-checkbox {
+            width: 17px;
+            height: 17px;
+            border: 2px solid #cbd5e1;
+            border-radius: 4px;
+            margin-right: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            background: white;
+        }
+
+        input[type="checkbox"] {
+            display: none;
+        }
+
+        input[type="checkbox"]:checked + .custom-checkbox {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        input[type="checkbox"]:checked + .custom-checkbox::after {
+            content: '✓';
+            color: white;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .batch-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-batch {
+            padding: 7px 12px;
+            font-size: 12px;
+            border-radius: var(--radius-sub);
+            border: 1.5px solid var(--border);
+            background: white;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-batch:hover {
+            border-color: var(--text-main);
+        }
+
+        .btn-batch.type-stocked { border-color: var(--amber); color: var(--amber); }
+        .btn-batch.type-stocked:hover { background: var(--amber-light); }
+
+        .btn-batch.type-pickup { border-color: var(--purple); color: var(--purple); }
+        .btn-batch.type-pickup:hover { background: var(--purple-light); }
+
+        .btn-batch.type-delivery { border-color: var(--blue); color: var(--blue); }
+        .btn-batch.type-delivery:hover { background: var(--blue-light); }
+
+        .btn-batch.type-cancel { border-color: var(--red); color: var(--red); }
+        .btn-batch.type-cancel:hover { background: var(--red-light); }
+
+        .btn-batch.type-print { border-color: #2e7d32; color: #2e7d32; }
+        .btn-batch.type-print:hover { background: #e8f5e9; }
+
+        /* 주문내역 카드 리스트 */
+        .order-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .customer-card {
+            background: var(--card-color);
+            border-radius: var(--radius-main);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .customer-card.card-delivery {
+            background: var(--card-color);
+            border-color: rgba(16, 185, 129, 0.35);
+        }
+        .customer-card.card-delivery .card-header {
+            background: var(--primary-light) !important;
+            border-bottom-color: rgba(16, 185, 129, 0.2);
+        }
+        .customer-card.card-delivery .card-footer {
+            background: rgba(16, 185, 129, 0.03) !important;
+            border-top-color: rgba(16, 185, 129, 0.2);
+        }
+
+        .customer-card.card-pickup {
+            background: var(--card-color);
+            border-color: rgba(59, 130, 246, 0.35);
+        }
+        .customer-card.card-pickup .card-header {
+            background: var(--blue-light) !important;
+            border-bottom-color: rgba(59, 130, 246, 0.2);
+        }
+        .customer-card.card-pickup .card-footer {
+            background: rgba(59, 130, 246, 0.03) !important;
+            border-top-color: rgba(59, 130, 246, 0.2);
+        }
+
+        /* 카드 헤더 */
+        .card-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            background: #fcfdfe;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .customer-info-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .customer-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .customer-name {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        .customer-phone {
+            font-size: 13px;
+            color: var(--blue);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .customer-phone:hover {
+            text-decoration: underline;
+        }
+
+        .kakao-badge {
+            background: #fee500;
+            color: #191919;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 800;
+        }
+
+        .address-box {
+            font-size: 13px;
+            color: var(--text-sub);
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            margin-top: 3px;
+        }
+
+        .badge-shipping {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .badge-shipping.delivery {
+            background: var(--blue-light);
+            color: var(--blue);
+            border: 1px solid rgba(59, 130, 246, 0.15);
+        }
+
+        .badge-shipping.pickup {
+            background: var(--primary-light);
+            color: var(--primary);
+            border: 1px solid rgba(16, 185, 129, 0.15);
+        }
+
+        /* 카드 바디 (데스크톱 테이블 뷰) */
+        .desktop-only-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .desktop-only-table th {
+            background: #f8fafc;
+            padding: 10px 16px;
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-sub);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .desktop-only-table td {
+            padding: 12px 16px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        .item-name-cell {
+            font-weight: 700;
+        }
+
+        /* 모바일 카드 리스트 뷰 */
+        .mobile-only-list {
+            display: none;
+        }
+
+        .mobile-item-row {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .mobile-item-row:last-child {
+            border-bottom: none;
+        }
+
+        .mobile-item-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            gap: 10px;
+        }
+
+        .mobile-item-name {
+            font-weight: 700;
+            font-size: 14px;
+            flex: 1;
+        }
+
+        .qty-highlight {
+            color: var(--nego-orange);
+            font-size: 15px;
+            font-weight: 850;
+        }
+
+        .mobile-item-middle {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-sub);
+            margin-bottom: 10px;
+            background: #f8fafc;
+            padding: 6px 10px;
+            border-radius: var(--radius-sub);
+        }
+
+        .mobile-item-bottom {
+            display: flex;
+            gap: 4px;
+        }
+
+        .mobile-item-bottom .btn-action-sm {
+            flex: 1;
+            text-align: center;
+            padding: 7px 0;
+        }
+
+        /* 상태 배지 */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 800;
+            gap: 3px;
+        }
+
+        .status-badge.status-ready { background: #f1f5f9; color: var(--text-sub); }
+        .status-badge.status-stocked { background: var(--amber-light); color: var(--amber); }
+        .status-badge.status-pickup_done { background: var(--purple-light); color: var(--purple); }
+        .status-badge.status-delivery_done { background: var(--blue-light); color: var(--blue); }
+        .status-badge.status-canceled { background: var(--red-light); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.15); }
+
+        /* 취소 상품 행 스타일 */
+        .row-canceled {
+            opacity: 0.55;
+            background-color: #f8fafc;
+        }
+        .row-canceled .item-name-cell, 
+        .row-canceled .mobile-item-name,
+        .row-canceled td:not(:first-child) {
+            text-decoration: line-through;
+        }
+
+        /* 행 액션 버튼 */
+        .row-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .btn-action-sm {
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 800;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-action-sm:hover {
+            border-color: var(--text-main);
+        }
+
+        .btn-action-sm.btn-stocked { color: var(--amber); border-color: rgba(245, 158, 11, 0.25); }
+        .btn-action-sm.btn-stocked:hover { background: var(--amber-light); }
+
+        .btn-action-sm.btn-complete { color: var(--primary); border-color: rgba(16, 185, 129, 0.25); }
+        .btn-action-sm.btn-complete:hover { background: var(--primary-light); }
+
+        /* 카드 푸터 */
+        .card-footer {
+            padding: 12px 16px;
+            background: #fafbfc;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .total-amount-box {
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .total-price {
+            color: var(--red);
+            font-size: 16px;
+            font-weight: 900;
+            margin-left: 4px;
+        }
+
+        .customer-card-actions {
+            display: flex;
+            gap: 6px;
+        }
+        body.has-global-selection .customer-card-actions {
+            display: none !important;
+        }
+
+        /* 로더 오버레이 */
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        /* 토스트 메시지 */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--text-main);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 13px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+            z-index: 10000;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* 모바일 반응형 미디어 쿼리 */
+        @media (max-width: 768px) {
+            .desktop-only-table {
+                display: none !important;
+            }
+            .mobile-only-list {
+                display: block !important;
+            }
+            
+            /* 모바일 최적화 여백 및 크기 조정 */
+            .header {
+                padding: 10px 14px;
+            }
+            .header h1 {
+                font-size: 15px;
+            }
+            .sync-status {
+                padding: 9px 12px;
+                font-size: 12px;
+                border-radius: var(--radius-sub);
+                height: 34px;
+            }
+            .container {
+                padding: 10px;
+            }
+            .controls-card {
+                padding: 12px;
+                gap: 8px;
+                margin-bottom: 12px;
+            }
+            .search-wrapper {
+                flex-basis: 100%;
+            }
+            .select-filter {
+                flex: 1;
+                font-size: 12px;
+                padding: 9px 12px;
+            }
+            .btn-common {
+                padding: 9px 12px;
+                font-size: 12px;
+            }
+            .tabs-section {
+                padding: 8px 6px;
+                margin-bottom: 12px;
+            }
+            .main-tab-btn {
+                padding: 6px 0;
+                font-size: 14px;
+                min-width: 70px;
+            }
+            .date-btn {
+                flex-shrink: 0;
+                width: 70px;
+                height: auto;
+                font-size: 14px;
+                padding: 6px 0;
+            }
+            .batch-action-bar {
+                padding: 12px 16px;
+                border-radius: 16px 16px 0 0;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+                left: 0;
+                transform: translateY(100%);
+                width: 100%;
+                max-width: 100%;
+            }
+            .batch-action-bar.show {
+                transform: translateY(0);
+            }
+            .batch-buttons {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 5px;
+            }
+            .btn-batch {
+                padding: 8px 4px;
+                font-size: 11px;
+                text-align: center;
+                display: flex;
+                justify-content: center;
+                border-radius: 6px;
+            }
+            .card-header {
+                padding: 12px;
+            }
+            .customer-name {
+                font-size: 15px;
+            }
+            .address-box {
+                font-size: 12px;
+            }
+            .card-footer {
+                padding: 10px 12px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            .total-amount-box {
+                text-align: right;
+            }
+            .customer-card-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 5px;
+            }
+            body.has-global-selection .customer-card-actions {
+                display: none !important;
+            }
+            .customer-card-actions button {
+                padding: 8px 0;
+                font-size: 10px;
+                text-align: center;
+                display: flex;
+                justify-content: center;
+                border-radius: 6px;
+            }
+        }
+
+        /* 영수증 및 프린트 레이아웃 */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                background: white;
+                color: black;
+                padding-bottom: 0;
+            }
+
+            .container {
+                padding: 0;
+                max-width: 100%;
+            }
+
+            .customer-card {
+                box-shadow: none;
+                border: 1px solid black;
+                margin-bottom: 20px;
+                page-break-inside: avoid;
+            }
+
+            .card-header {
+                background: white;
+                border-bottom: 1px solid black;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 로더 오버레이 -->
+    <div class="loader-overlay" id="loader">
+        <div class="spinner"></div>
+        <div class="loader-text" id="loader-text">처리 중입니다...</div>
+    </div>
+
+    <!-- 토스트 메시지 -->
+    <div class="toast" id="toast"></div>
+
+    <!-- 헤더 -->
+    <div class="header no-print">
+        <div class="header-title-group">
+            <h1>MOKET 주문관리</h1>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <div class="sync-status">
+                <span class="sync-dot"></span>
+                <span id="sync-time-text">대기 중</span>
+            </div>
+            <button class="btn-common btn-primary" style="padding: 9px 12px;" onclick="fetchOrders()">🔄 새로고침</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 컨트롤 필터 바 -->
+        <div class="controls-card no-print">
+            <div class="search-wrapper">
+                <input type="text" id="searchInput" class="search-input" placeholder="고객명, 연락처, 상품명 실시간 검색..." onkeyup="handleFilterChange()">
+            </div>
+            <select id="filterShipping" class="select-filter" onchange="handleFilterChange()">
+                <option value="all">수령방법 전체</option>
+                <option value="배달주문">🚚 배달주문</option>
+                <option value="매장픽업">📍 매장픽업</option>
+            </select>
+            <select id="filterStatus" class="select-filter" onchange="handleFilterChange()">
+                <option value="all">상태 전체</option>
+                <option value="대기">🔘 대기</option>
+                <option value="입고">🟡 입고 완료</option>
+                <option value="픽업">🟣 픽업 완료</option>
+                <option value="배달완료">🟢 배달 완료</option>
+            </select>
+            <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV 내보내기</button>
+        </div>
+
+        <!-- 분류 탭 (대분류: 달 / 소분류: 일) -->
+        <div class="tabs-section">
+            <div class="main-tabs" id="month-tabs">
+                <!-- 월 탭 동적 로드 -->
+            </div>
+            <div class="date-filter-container" id="day-tabs">
+                <!-- 일 탭 동적 로드 -->
+            </div>
+        </div>
+
+        <!-- 일괄 처리 툴바 -->
+        <div class="batch-action-bar no-print">
+            <div class="batch-selection-info">
+                <label class="checkbox-container">
+                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                    <span class="custom-checkbox"></span>
+                    <span id="selection-count-text">0개 항목 선택됨</span>
+                </label>
+            </div>
+            <div class="batch-buttons">
+                <button class="btn-batch type-stocked" onclick="handleBatchUpdate('입고')">🟡 입고완료</button>
+                <button class="btn-batch type-pickup" onclick="handleBatchUpdate('픽업')">🟣 픽업완료</button>
+                <button class="btn-batch type-delivery" onclick="handleBatchUpdate('배달완료')">🟢 배달완료</button>
+                <button class="btn-batch type-cancel" onclick="handleBatchUpdate('취소')">🔴 취소</button>
+                <button class="btn-batch type-print" onclick="printSelectedCards()">🖨️ 인쇄</button>
+            </div>
+        </div>
+
+        <!-- 주문 목록 카드 영역 -->
+        <div class="order-list-container" id="order-list-container">
+            <!-- 주문 목록 동적 렌더링 -->
+        </div>
+    </div>
+
+    <script>
+        const FIREBASE_DB_URL = "https://moketdb-default-rtdb.asia-southeast1.firebasedatabase.app/";
+
+        let rawOrders = []; // 원본 주문 데이터 리스트
+        let selectedItems = new Set(); // 체크박스로 선택된 항목들 (phone|orderKey 조합)
+        
+        // 날짜/시간 비교를 위한 문자열 파싱 헬퍼
+        function parseTimestampToDate(ts) {
+            if (!ts) return new Date(0);
+            let match = ts.match(/(\d+)년\s*(\d+)월\s*(\d+)일.*?(\d+):(\d+):(\d+)/);
+            if (match) {
+                return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]), parseInt(match[4]), parseInt(match[5]), parseInt(match[6]));
+            }
+            match = ts.match(/(\d+)년\s*(\d+)월\s*(\d+)일/);
+            if (match) {
+                return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+            }
+            match = ts.match(/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/);
+            if (match) {
+                return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]), parseInt(match[4]), parseInt(match[5]), parseInt(match[6]));
+            }
+            match = ts.match(/(\d+)-(\d+)-(\d+)/);
+            if (match) {
+                return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+            }
+            return new Date(ts);
+        }
+
+        let currentYear = "";  // 현재 선택된 년도
+        let currentMonth = ""; // 현재 선택된 월
+        let currentDay = ""; // 현재 선택된 일
+
+        // 1. 주문 데이터 받아오기
+        async function fetchOrders() {
+            showLoader("주문 데이터를 가져오는 중...");
+            try {
+                const response = await fetch(`${FIREBASE_DB_URL}orders.json?t=${Date.now()}`);
+                if (!response.ok) throw new Error("Firebase 연결 실패");
+                const data = await response.json() || {};
+                
+                // 데이터 평탄화
+                rawOrders = [];
+                for (const phone in data) {
+                    for (const orderKey in data[phone]) {
+                        const it = data[phone][orderKey];
+                        
+                        const isCanceled = (it.canceled === true || String(it.canceled).toUpperCase() === "TRUE");
+                        const isDelivered = (it.delivered === true || String(it.delivered).toUpperCase() === "TRUE");
+                        const isReceived = (it.received === true || String(it.received).toUpperCase() === "TRUE");
+                        const isStocked = (it.isStocked === true || String(it.isStocked).toUpperCase() === "TRUE");
+
+                        let calculatedStatus = "대기";
+                        if (isCanceled) calculatedStatus = "취소";
+                        else if (isDelivered) calculatedStatus = "배달완료";
+                        else if (isReceived) calculatedStatus = "픽업";
+                        else if (isStocked) calculatedStatus = "입고";
+
+                        rawOrders.push({
+                            phone,
+                            orderKey,
+                            ...it,
+                            status: calculatedStatus
+                        });
+                    }
+                }
+                
+                // 타임스탬프 기준 최신순 정렬 (한글 포맷 대응 안전한 파싱)
+                rawOrders.sort((a, b) => parseTimestampToDate(b.timestamp) - parseTimestampToDate(a.timestamp));
+                
+                // 동기화 상태 갱신
+                const now = new Date();
+                document.getElementById('sync-time-text').innerText = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 동기화됨`;
+                
+                // 선택 초기화
+                selectedItems.clear();
+                updateSelectionCountText();
+                
+                // 탭 구축 및 렌더링
+                buildDateTabs();
+                
+            } catch (e) {
+                console.error(e);
+                showToast("데이터를 로드하지 못했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // 날짜 파싱 헬퍼
+        function getOrderDateInfo(item) {
+            let dateStr = item.pickupDate || "";
+            
+            // 만약 pickupDate가 "과일", "야채", "기타" 등의 카테고리명이거나 비어있으면 timestamp를 기준일로 삼음
+            const isCategoryString = dateStr === "과일" || dateStr === "야채" || dateStr === "기타";
+            if (!dateStr || dateStr.trim() === "" || isCategoryString) {
+                if (item.timestamp) {
+                    dateStr = item.timestamp;
+                }
+            }
+            
+            // "2026년 4월 21일" 또는 "2026년 4월 14일" 패턴 매칭
+            let match = dateStr.match(/(\d+)년\s*(\d+)월\s*(\d+)일/);
+            if (match) {
+                const m = parseInt(match[2]) + "월";
+                const d = parseInt(match[3]) + "일";
+                let year = match[1];
+                if (year.length === 2) year = "20" + year;
+                return { month: m, day: d, dateStr: `${year}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}` };
+            }
+            
+            // "2026-04-21" 패턴 매칭 (Fallback)
+            match = dateStr.match(/(\d+)-(\d+)-(\d+)/);
+            if (match) {
+                const m = parseInt(match[2]) + "월";
+                const d = parseInt(match[3]) + "일";
+                let year = match[1];
+                if (year.length === 2) year = "20" + year;
+                return { month: m, day: d, dateStr: `${year}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}` };
+            }
+
+            return { month: "기타", day: "기타", dateStr: "기타" };
+        }
+
+        // 2. 월/일 분류 탭 구축
+        function buildDateTabs(isUserAction = false) {
+            // 1. 모든 고유 년도 추출
+            const years = new Set();
+            rawOrders.forEach(item => {
+                const info = getOrderDateInfo(item);
+                if (info.dateStr && info.dateStr !== "기타") {
+                    const y = info.dateStr.split('-')[0] + "년";
+                    years.add(y);
+                }
+            });
+            if (years.size === 0) {
+                years.add(new Date().getFullYear() + "년");
+            }
+            const sortedYears = [...years].sort((a, b) => parseInt(b) - parseInt(a));
+
+            if (!currentYear) {
+                const todayYear = new Date().getFullYear() + "년";
+                currentYear = sortedYears.includes(todayYear) ? todayYear : sortedYears[0];
+            }
+
+            // 2. 선택된 년도에 해당하는 데이터의 월 목록 추출
+            const months = new Set();
+            rawOrders.forEach(item => {
+                const info = getOrderDateInfo(item);
+                if (info.dateStr && info.dateStr !== "기타") {
+                    const itemYear = info.dateStr.split('-')[0] + "년";
+                    if (itemYear === currentYear) {
+                        months.add(info.month);
+                    }
+                } else if (currentYear === "기타" || sortedYears.length === 1) {
+                    months.add(info.month);
+                }
+            });
+
+            const sortedMonths = [...months].sort((a, b) => {
+                if (a === "기타") return 1;
+                if (b === "기타") return -1;
+                return parseInt(b) - parseInt(a); // 내림차순 정렬
+            });
+
+            // 월 탭 그리기
+            const monthContainer = document.getElementById('month-tabs');
+            monthContainer.innerHTML = '';
+
+            // 년도 선택 셀렉트 박스 추가
+            const yearSelect = document.createElement('select');
+            yearSelect.className = 'year-select';
+            yearSelect.onchange = (e) => {
+                currentYear = e.target.value;
+                currentMonth = "";
+                currentDay = "";
+                buildDateTabs(true);
+            };
+            sortedYears.forEach(y => {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.text = y;
+                opt.selected = (y === currentYear);
+                yearSelect.appendChild(opt);
+            });
+            monthContainer.appendChild(yearSelect);
+
+            if (sortedMonths.length === 0) {
+                const msg = document.createElement('div');
+                msg.style = 'font-weight:700; color:var(--text-sub); padding:10px; display:inline-block;';
+                msg.innerText = '이 년도에는 주문 내역이 없습니다.';
+                monthContainer.appendChild(msg);
+                document.getElementById('day-tabs').innerHTML = '';
+                document.getElementById('order-list-container').innerHTML = '<div style="text-align:center; padding:100px; font-weight:800; color:var(--text-sub);">표시할 주문 내역이 없습니다.</div>';
+                return;
+            }
+
+            // 오늘 또는 가장 최근 날짜를 기본값으로 설정 (초기 진입 시)
+            if (!currentMonth) {
+                const todayObj = new Date();
+                const todayMonthStr = (todayObj.getMonth() + 1) + "월";
+                const todayYearStr = todayObj.getFullYear() + "년";
+                
+                // 해당 년도의 날짜들 목록 추출
+                let uniqueDates = [...new Set(rawOrders.filter(it => {
+                    const info = getOrderDateInfo(it);
+                    return info.dateStr && info.dateStr !== "기타" && (info.dateStr.split('-')[0] + "년") === currentYear;
+                }).map(it => getOrderDateInfo(it).dateStr))];
+                
+                uniqueDates.sort((a, b) => a.localeCompare(b));
+                
+                let defaultDateStr = "";
+                const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
+                
+                if (currentYear === todayYearStr && uniqueDates.includes(todayStr)) {
+                    defaultDateStr = todayStr;
+                } else if (uniqueDates.length > 0) {
+                    if (currentYear === todayYearStr) {
+                        const futureDates = uniqueDates.filter(d => d > todayStr);
+                        defaultDateStr = futureDates.length > 0 ? futureDates[0] : uniqueDates[uniqueDates.length - 1];
+                    } else {
+                        defaultDateStr = uniqueDates[uniqueDates.length - 1];
+                    }
+                }
+
+                if (defaultDateStr) {
+                    const parts = defaultDateStr.split("-");
+                    currentMonth = parseInt(parts[1]) + "월";
+                    currentDay = parseInt(parts[2]) + "일";
+                } else {
+                    currentMonth = sortedMonths.includes(todayMonthStr) ? todayMonthStr : (sortedMonths[0] || "기타");
+                    currentDay = "";
+                }
+            }
+
+            sortedMonths.forEach(month => {
+                const btn = document.createElement('button');
+                btn.className = `main-tab-btn ${month === currentMonth ? 'active' : ''}`;
+                btn.innerText = month;
+                btn.onclick = () => {
+                    currentMonth = month;
+                    currentDay = ""; // 월 변경 시 일 초기화
+                    buildDateTabs(true); // 일 탭 재구성 (사용자 액션 플래그 true)
+                };
+                monthContainer.appendChild(btn);
+
+                // 활성화된 월 탭 스크롤
+                if (month === currentMonth && isUserAction) {
+                    setTimeout(() => {
+                        btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                    }, 50);
+                }
+            });
+
+            // 일 탭 그리기
+            buildDayTabs(isUserAction);
+        }
+
+        function buildDayTabs(isUserAction = false) {
+            const days = new Set();
+            rawOrders.forEach(item => {
+                const info = getOrderDateInfo(item);
+                const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
+                if (itemYear === currentYear && info.month === currentMonth) {
+                    days.add(info.day);
+                }
+            });
+
+            const sortedDays = [...days].sort((a, b) => {
+                if (a === "기타") return 1;
+                if (b === "기타") return -1;
+                return parseInt(b) - parseInt(a); // 내림차순 정렬
+            });
+
+            const dayContainer = document.getElementById('day-tabs');
+            dayContainer.innerHTML = '';
+
+            const todayObj = new Date();
+            const todayDayStr = todayObj.getDate() + "일";
+
+            if (!currentDay || !sortedDays.includes(currentDay)) {
+                currentDay = sortedDays.includes(todayDayStr) ? todayDayStr : (sortedDays[0] || "");
+            }
+
+            sortedDays.forEach(day => {
+                const btn = document.createElement('button');
+                btn.className = `date-btn ${day === currentDay ? 'active' : ''}`;
+                btn.innerText = day;
+                btn.onclick = () => {
+                    currentDay = day;
+                    buildDayTabs(true); // 사용자 액션 플래그 true
+                };
+                dayContainer.appendChild(btn);
+
+                // 활성화된 일 탭 스크롤
+                if (day === currentDay && isUserAction) {
+                    setTimeout(() => {
+                        btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                    }, 50);
+                }
+            });
+
+            // 주문 목록 그리기
+            renderFilteredOrders();
+        }
+
+        // 3. 필터링 및 렌더링
+        function renderFilteredOrders() {
+            try {
+                const search = document.getElementById('searchInput').value.toLowerCase().trim();
+                const shippingFilter = document.getElementById('filterShipping').value;
+                const statusFilter = document.getElementById('filterStatus').value;
+
+                // 1단계: 날짜(년/월/일) 매칭 필터 (검색어가 비어있을 때만 날짜 필터링 적용)
+                let filtered = [];
+                if (search !== "") {
+                    filtered = [...rawOrders];
+                } else {
+                    filtered = rawOrders.filter(item => {
+                        const info = getOrderDateInfo(item);
+                        const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
+                        return itemYear === currentYear && info.month === currentMonth && info.day === currentDay;
+                    });
+                }
+
+                // 2단계: 수령방법 및 검색 키워드 필터
+                filtered = filtered.filter(item => {
+                    const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && item.address.trim() !== "")) ? '배달주문' : '매장픽업';
+                    const matchShipping = shippingFilter === 'all' || actualShippingMethod === shippingFilter;
+                    
+                    let matchStatus = true;
+                    const status = item.status || "대기";
+                    if (statusFilter !== 'all') {
+                        if (statusFilter === '대기') matchStatus = status === '대기';
+                        else if (statusFilter === '입고') matchStatus = status === '입고';
+                        else if (statusFilter === '픽업') matchStatus = status === '픽업';
+                        else if (statusFilter === '배달완료') matchStatus = status === '배달완료';
+                    }
+
+                    const matchSearch = search === "" || 
+                        (item.name || "").toLowerCase().includes(search) ||
+                        (item.phone || "").includes(search) ||
+                        (item.item || "").toLowerCase().includes(search) ||
+                        (item.address || "").toLowerCase().includes(search);
+
+                    return matchShipping && matchStatus && matchSearch;
+                });
+
+                // 3단계: 고객별(이름 + 연락처 + 수령방법)로 그룹화
+                const grouped = {};
+                filtered.forEach(item => {
+                    const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && item.address.trim() !== "")) ? '배달주문' : '매장픽업';
+                    const customerKey = `${item.name}_${item.phone}_${actualShippingMethod}`;
+                    if (!grouped[customerKey]) {
+                        grouped[customerKey] = {
+                            name: item.name,
+                            phone: item.phone,
+                            shippingMethod: actualShippingMethod,
+                            address: item.address || "",
+                            addressDetail: item.addressDetail || "",
+                            entrance: item.entrance || "",
+                            cashReceipt: item.cashReceipt || "미발행",
+                            cashReceiptType: item.cashReceiptType || "",
+                            cashReceiptPhone: item.cashReceiptPhone || "",
+                            kakaoName: item.kakaoName || "",
+                            totalPrice: 0,
+                            items: []
+                        };
+                    }
+                    grouped[customerKey].items.push(item);
+                    const isCanceled = (item.canceled === true || item.canceled === "true");
+                    if (!isCanceled) {
+                        grouped[customerKey].totalPrice += parseInt(item.total || 0);
+                    }
+                });
+
+                const isCardFullyCanceled = (card) => {
+                    return card.items.every(item => item.canceled === true || item.canceled === "true");
+                };
+
+                const customersList = Object.values(grouped).sort((a, b) => {
+                    const aCanceled = isCardFullyCanceled(a);
+                    const bCanceled = isCardFullyCanceled(b);
+                    
+                    if (aCanceled && !bCanceled) return 1;
+                    if (!aCanceled && bCanceled) return -1;
+                    
+                    const aTime = parseTimestampToDate(a.items[0]?.timestamp);
+                    const bTime = parseTimestampToDate(b.items[0]?.timestamp);
+                    return bTime - aTime; // 내림차순 정렬 (최신 주문이 위로)
+                });
+
+                // UI 그리기
+                const listContainer = document.getElementById('order-list-container');
+                listContainer.innerHTML = '';
+
+                if (customersList.length === 0) {
+                    listContainer.innerHTML = '<div style="text-align:center; padding:80px; font-weight:800; color:var(--text-sub);">조건에 일치하는 주문 내역이 없습니다.</div>';
+                    return;
+                }
+
+                customersList.forEach(customer => {
+                    const customerItems = customer.items;
+                    const allSelected = customerItems.every(it => selectedItems.has(customer.phone + "|" + it.orderKey));
+                    const anySelected = customerItems.some(it => selectedItems.has(customer.phone + "|" + it.orderKey));
+                    
+                    const isDelivery = customer.shippingMethod === '배달주문';
+                    const shippingClass = isDelivery ? 'card-delivery' : 'card-pickup';
+
+                    const card = document.createElement('div');
+                    card.className = `customer-card ${shippingClass} ${anySelected ? 'has-selection' : ''}`;
+
+                    // 상품목록 로드 (데스크톱 및 모바일 테이블/카드 템플릿)
+                    let desktopRowsHtml = '';
+                    let mobileRowsHtml = '';
+                    
+                    customerItems.forEach(it => {
+                        const isCanceled = (it.canceled === true || it.canceled === "true");
+                        const status = it.status || "대기";
+                        let badgeClass = "status-ready";
+                        let badgeLabel = "🔘 대기";
+
+                        if (isCanceled) { badgeClass = "status-canceled"; badgeLabel = "🔴 취소"; }
+                        else if (status === '입고') { badgeClass = "status-stocked"; badgeLabel = "🟡 입고 완료"; }
+                        else if (status === '픽업') { badgeClass = "status-pickup_done"; badgeLabel = "🟣 픽업 완료"; }
+                        else if (status === '배달완료') { badgeClass = "status-delivery_done"; badgeLabel = "🟢 배달 완료"; }
+
+                        const isCanceledOrCompleted = isCanceled || status === '픽업' || status === '배달완료';
+
+                        // 1. 데스크톱용 행 템플릿
+                        desktopRowsHtml += `
+                            <tr class="${isCanceledOrCompleted ? 'row-canceled' : ''}">
+                                <td style="width:40px;">
+                                    <label class="checkbox-container">
+                                        <input type="checkbox" class="item-checkbox" data-phone="${customer.phone}" data-key="${it.orderKey}" ${selectedItems.has(customer.phone + "|" + it.orderKey) ? 'checked' : ''} onchange="handleItemSelect(this)">
+                                        <span class="custom-checkbox"></span>
+                                    </label>
+                                </td>
+                                <td class="item-name-cell">${it.item}</td>
+                                <td style="width:70px;"><strong class="qty-highlight">${it.qty}</strong>개</td>
+                                <td style="width:100px;">${parseInt(it.price || 0).toLocaleString()}원</td>
+                                <td style="width:100px;"><strong>${parseInt(it.total || 0).toLocaleString()}원</strong></td>
+                                <td style="width:120px; text-align:center;">
+                                    <span class="status-badge ${badgeClass}">${badgeLabel}</span>
+                                </td>
+                            </tr>
+                        `;
+
+                        // 2. 모바일용 행 템플릿 (카드 세부 리스트)
+                        mobileRowsHtml += `
+                            <div class="mobile-item-row ${isCanceledOrCompleted ? 'row-canceled' : ''}">
+                                <div class="mobile-item-top">
+                                    <label class="checkbox-container">
+                                        <input type="checkbox" class="item-checkbox" data-phone="${customer.phone}" data-key="${it.orderKey}" ${selectedItems.has(customer.phone + "|" + it.orderKey) ? 'checked' : ''} onchange="handleItemSelect(this)">
+                                        <span class="custom-checkbox"></span>
+                                    </label>
+                                    <span class="mobile-item-name">${it.item}</span>
+                                    <span class="status-badge ${badgeClass}">${badgeLabel}</span>
+                                </div>
+                                <div class="mobile-item-middle">
+                                    <span>수량: <strong class="qty-highlight">${it.qty}</strong>개</span>
+                                    <span>단가: ${parseInt(it.price || 0).toLocaleString()}원</span>
+                                    <span>합계: <strong>${parseInt(it.total || 0).toLocaleString()}원</strong></span>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    card.innerHTML = `
+                        <div class="card-header">
+                            <div style="display: flex; align-items: flex-start; gap: 8px;">
+                                <label class="checkbox-container" style="margin-top: 3px;">
+                                    <input type="checkbox" class="customer-checkbox" data-phone="${customer.phone}" ${allSelected ? 'checked' : ''} onchange="handleCustomerSelect(this)">
+                                    <span class="custom-checkbox"></span>
+                                </label>
+                                <div class="customer-info-group">
+                                    <div class="customer-meta">
+                                        <span class="customer-name">${customer.name}</span>
+                                        <a href="tel:${customer.phone}" class="customer-phone">${customer.phone}</a>
+                                        ${customer.kakaoName ? `<span class="kakao-badge">💬 ${customer.kakaoName}</span>` : ''}
+                                    </div>
+                                    
+                                    ${isDelivery ? `
+                                        <div class="address-box">
+                                            <div><strong>🏡 주소:</strong> ${customer.address} ${customer.addressDetail}</div>
+                                            ${customer.entrance ? `<div><strong>🚪 공동현관:</strong> ${customer.entrance}</div>` : ''}
+                                        </div>
+                                    ` : `
+                                        <div class="address-box" style="color:var(--amber);">
+                                            <strong>📍 매장 픽업 예정</strong>
+                                        </div>
+                                    `}
+                                    
+                                    ${customer.cashReceipt === '발행' ? `
+                                        <div style="font-size:11px; color:var(--text-sub); margin-top:2px;">
+                                            <strong>🧾 현금영수증:</strong> ${customer.cashReceiptType} (${customer.cashReceiptPhone})
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-body">
+                            <!-- 데스크톱 전용 테이블 -->
+                            <table class="desktop-only-table">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>상품명</th>
+                                        <th>수량</th>
+                                        <th>단가</th>
+                                        <th>합계</th>
+                                        <th>상태</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${desktopRowsHtml}
+                                </tbody>
+                            </table>
+                            
+                            <!-- 모바일 전용 목록 -->
+                            <div class="mobile-only-list">
+                                ${mobileRowsHtml}
+                            </div>
+                        </div>
+                        
+                        <div class="card-footer">
+                            <div class="total-amount-box">
+                                총 주문액 <span class="total-price">${customer.totalPrice.toLocaleString()}원</span>
+                            </div>
+                        </div>
+                    `;
+                    listContainer.appendChild(card);
+                });
+
+                // "전체 선택" 체크박스 상태 갱신
+                updateSelectAllCheckboxState(filtered);
+            } catch (e) {
+                showToast("렌더링 오류: " + e.toString());
+                console.error("렌더링 오류 상세:", e);
+            }
+        }
+
+        // 4. 필터 및 체크박스 이벤트 핸들러
+        function handleFilterChange() {
+            selectedItems.clear();
+            updateSelectionCountText();
+            renderFilteredOrders();
+        }
+
+        function handleItemSelect(checkbox) {
+            const key = checkbox.dataset.phone + "|" + checkbox.dataset.key;
+            if (checkbox.checked) {
+                selectedItems.add(key);
+            } else {
+                selectedItems.delete(key);
+            }
+            
+            // 고객별 전체 체크박스 및 카드 활성화 상태 업데이트
+            const card = checkbox.closest('.customer-card');
+            const itemCbs = card.querySelectorAll('.item-checkbox');
+            const checkedCount = [...itemCbs].filter(cb => cb.checked).length;
+            
+            const customerCb = card.querySelector('.customer-checkbox');
+            if (customerCb) {
+                customerCb.checked = (checkedCount === itemCbs.length);
+            }
+            card.classList.toggle('has-selection', checkedCount > 0);
+            
+            updateSelectionCountText();
+            
+            // 전체 선택 체크박스 상태 업데이트
+            const allItemCbs = document.querySelectorAll('.item-checkbox');
+            const allChecked = [...allItemCbs].every(cb => cb.checked);
+            document.getElementById('selectAllCheckbox').checked = allChecked && allItemCbs.length > 0;
+        }
+
+        function handleCustomerSelect(checkbox) {
+            const card = checkbox.closest('.customer-card');
+            const isChecked = checkbox.checked;
+            
+            const itemCheckboxes = card.querySelectorAll('.item-checkbox');
+            itemCheckboxes.forEach(cb => {
+                cb.checked = isChecked;
+                const key = cb.dataset.phone + "|" + cb.dataset.key;
+                if (isChecked) {
+                    selectedItems.add(key);
+                } else {
+                    selectedItems.delete(key);
+                }
+            });
+            
+            card.classList.toggle('has-selection', isChecked);
+            updateSelectionCountText();
+            
+            // 전체 선택 체크박스 상태 업데이트
+            const allItemCbs = document.querySelectorAll('.item-checkbox');
+            const allChecked = [...allItemCbs].every(cb => cb.checked);
+            document.getElementById('selectAllCheckbox').checked = allChecked && allItemCbs.length > 0;
+        }
+
+        function toggleSelectAll(selectAllCheckbox) {
+            const isChecked = selectAllCheckbox.checked;
+            
+            // 모든 상품 선택
+            const itemCheckboxes = document.querySelectorAll('.item-checkbox');
+            itemCheckboxes.forEach(cb => {
+                cb.checked = isChecked;
+                const key = cb.dataset.phone + "|" + cb.dataset.key;
+                if (isChecked) {
+                    selectedItems.add(key);
+                } else {
+                    selectedItems.delete(key);
+                }
+            });
+            
+            // 모든 고객 체크박스 선택
+            const customerCheckboxes = document.querySelectorAll('.customer-checkbox');
+            customerCheckboxes.forEach(cb => {
+                cb.checked = isChecked;
+            });
+            
+            // 모든 카드 활성화
+            const cards = document.querySelectorAll('.customer-card');
+            cards.forEach(card => {
+                card.classList.toggle('has-selection', isChecked);
+            });
+            
+            updateSelectionCountText();
+        }
+
+        function updateSelectionCountText() {
+            const count = selectedItems.size;
+            document.getElementById('selection-count-text').innerText = `${count}개 항목 선택됨`;
+            
+            const batchBar = document.querySelector('.batch-action-bar');
+            if (batchBar) {
+                if (count > 0) {
+                    batchBar.classList.add('show');
+                    document.body.classList.add('has-global-selection');
+                } else {
+                    batchBar.classList.remove('show');
+                    document.body.classList.remove('has-global-selection');
+                }
+            }
+        }
+
+        function updateSelectAllCheckboxState(currentItems) {
+            const selectAllCb = document.getElementById('selectAllCheckbox');
+            if (currentItems.length === 0) {
+                selectAllCb.checked = false;
+                return;
+            }
+            const allSelected = currentItems.every(it => selectedItems.has(it.phone + "|" + it.orderKey));
+            selectAllCb.checked = allSelected;
+        }
+
+        // 5. 구글 스프레드시트 상태 동기화 헬퍼
+        async function syncStatusToGoogleSheets(phone, timestamp, item, status) {
+            try {
+                const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbw6F-D5UhJTkLafBv4uOs5_lUD61ervXveLCcZ6ROHNYhFbEi_vJUamKHUjHE9wGeaY/exec';
+                const payload = {
+                    header: 'status_update',
+                    phone: phone,
+                    timestamp: timestamp,
+                    item: item,
+                    status: status
+                };
+                
+                // 구글 시트 동기화는 백그라운드에서 비동기로 실행
+                fetch(GAS_API_URL, {
+                    method: 'POST',
+                    redirect: 'follow',
+                    body: JSON.stringify(payload)
+                }).then(res => res.json())
+                  .then(data => console.log('GAS status sync result:', data))
+                  .catch(err => console.error('GAS status sync error:', err));
+            } catch (e) {
+                console.error('GAS sync error:', e);
+            }
+        }
+
+        function getStatusPatchBody(status) {
+            const isCancelAction = status === '취소';
+            if (isCancelAction) {
+                return { canceled: true };
+            }
+            
+            const patchBody = { status: status, canceled: false };
+            if (status === '입고' || status === '입고완료') {
+                patchBody.isStocked = true;
+                patchBody.received = false;
+                patchBody.delivered = false;
+            } else if (status === '픽업' || status === '픽업완료') {
+                patchBody.isStocked = true;
+                patchBody.received = true;
+                patchBody.delivered = false;
+            } else if (status === '배달완료') {
+                patchBody.isStocked = true;
+                patchBody.received = false;
+                patchBody.delivered = true;
+            } else if (status === '대기' || status === '미입고') {
+                patchBody.isStocked = false;
+                patchBody.received = false;
+                patchBody.delivered = false;
+            }
+            return patchBody;
+        }
+
+        // 6. 단일/일괄 상태 변경 실행 (Firebase PUT/PATCH 및 구글 시트 동기화)
+        async function updateSingleItemStatus(phone, orderKey, newStatus) {
+            showLoader("상태 업데이트 중...");
+            const cleanPhone = phone.replace(/\D/g, "");
+            const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
+            
+            try {
+                const patchBody = getStatusPatchBody(newStatus);
+                const res = await fetch(url, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(patchBody)
+                });
+                
+                if (!res.ok) throw new Error("Firebase 전송 실패");
+                
+                showToast(`상태를 [${newStatus}]로 변경 완료했습니다.`);
+                
+                // 로컬 데이터 갱신
+                const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
+                if (target) {
+                    Object.assign(target, patchBody);
+                    syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
+                }
+                
+                renderFilteredOrders();
+            } catch (e) {
+                console.error(e);
+                showToast("업데이트 오류가 발생했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function updateCustomerAllItems(phone, newStatus) {
+            showLoader(`이 고객 전체 상품 [${newStatus}] 업데이트 중...`);
+            const cleanPhone = phone.replace(/\D/g, "");
+            
+            const customerItems = rawOrders.filter(it => it.phone === phone);
+            
+            try {
+                const patchBody = getStatusPatchBody(newStatus);
+                const promises = customerItems.map(it => {
+                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${it.orderKey}.json`;
+                    return fetch(url, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(patchBody)
+                    });
+                });
+                
+                await Promise.all(promises);
+                
+                showToast("이 고객의 모든 상품 상태가 변경되었습니다.");
+                
+                // 로컬 데이터 일괄 갱신
+                customerItems.forEach(it => {
+                    Object.assign(it, patchBody);
+                    syncStatusToGoogleSheets(it.phone, it.timestamp, it.item, newStatus);
+                });
+                
+                renderFilteredOrders();
+            } catch (e) {
+                console.error(e);
+                showToast("업데이트에 실패했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function handleBatchUpdate(newStatus) {
+            if (selectedItems.size === 0) {
+                showToast("선택된 주문 항목이 없습니다.");
+                return;
+            }
+
+            showLoader(`선택 항목 [${newStatus}] 일괄 처리 중...`);
+            
+            try {
+                const patchBody = getStatusPatchBody(newStatus);
+                const promises = [];
+                selectedItems.forEach(itemInfo => {
+                    const [phone, orderKey] = itemInfo.split("|");
+                    const cleanPhone = phone.replace(/\D/g, "");
+                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
+                    
+                    const p = fetch(url, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(patchBody)
+                    }).then(res => {
+                        if (res.ok) {
+                            const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
+                            if (target) {
+                                Object.assign(target, patchBody);
+                                syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
+                            }
+                        }
+                    });
+                    promises.push(p);
+                });
+                
+                await Promise.all(promises);
+                
+                showToast(`${selectedItems.size}개 주문 항목의 상태를 일괄 변경했습니다.`);
+                selectedItems.clear();
+                updateSelectionCountText();
+                renderFilteredOrders();
+            } catch (e) {
+                console.error(e);
+                showToast("일괄 처리에 실패했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // 6. CSV 내보내기 헬퍼 (일별 / 월별 선택)
+        function exportToCSV(type = 'day') {
+            let filtered = [];
+            
+            if (type === 'month') {
+                filtered = rawOrders.filter(item => {
+                    const info = getOrderDateInfo(item);
+                    const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
+                    return itemYear === currentYear && info.month === currentMonth;
+                });
+            } else {
+                filtered = rawOrders.filter(item => {
+                    const info = getOrderDateInfo(item);
+                    const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
+                    return itemYear === currentYear && info.month === currentMonth && info.day === currentDay;
+                });
+            }
+
+            if (filtered.length === 0) {
+                showToast("출력할 내역이 없습니다.");
+                return;
+            }
+
+            let yearStr = "";
+            const firstInfo = getOrderDateInfo(filtered[0]);
+            if (firstInfo.dateStr && firstInfo.dateStr !== "기타") {
+                yearStr = firstInfo.dateStr.split('-')[0] + "년_";
+            } else {
+                yearStr = new Date().getFullYear() + "년_";
+            }
+
+            const fileName = type === 'month' 
+                ? `moket_orders_${yearStr}${currentMonth}.csv`
+                : `moket_orders_${yearStr}${currentMonth}_${currentDay}.csv`;
+
+            let csvContent = "\ufeff"; // 한글 깨짐 방지 BOM
+            // 헤더 정의
+            const headers = [
+                "주문일시", "주문자명", "연락처", "카톡닉네임", "카톡실명", "카톡연락처", 
+                "연령대", "성별", "수령방법", "배달주소", "상세주소", "공동현관키", 
+                "상품명", "단가", "수량", "총금액", "픽업예정일", 
+                "현금영수증발행", "현금영수증구분", "현금영수증연락처", 
+                "상태", "입고여부", "수령여부(픽업)", "배달완료", "취소여부", "현장판매"
+            ];
+            csvContent += headers.join(",") + "\n";
+
+            filtered.forEach(it => {
+                const row = [
+                    it.timestamp || "",
+                    it.name || "",
+                    it.phone || "",
+                    it.kakaoName || "",
+                    it.kakaoRealName || "",
+                    it.kakaoPhone || "",
+                    it.ageGroup || "",
+                    it.gender || "",
+                    it.shippingMethod || "",
+                    (it.address || "").replace(/"/g, '""').replace(/,/g, ' '),
+                    (it.addressDetail || "").replace(/"/g, '""').replace(/,/g, ' '),
+                    (it.entrance || "").replace(/"/g, '""').replace(/,/g, ' '),
+                    (it.item || "").replace(/"/g, '""').replace(/,/g, ' '),
+                    it.price || 0,
+                    it.qty || 0,
+                    it.total || 0,
+                    it.pickupDate || "",
+                    it.cashReceipt || "미발행",
+                    it.cashReceiptType || "",
+                    it.cashReceiptPhone || "",
+                    it.status || "대기",
+                    it.isStocked ? "O" : "X",
+                    it.received ? "O" : "X",
+                    it.delivered ? "O" : "X",
+                    it.canceled ? "O" : "X",
+                    it.onSite ? "O" : "X"
+                ];
+                
+                // 각 항목의 값들을 큰따옴표로 감싸서 CSV 형식에 맞춤
+                const formattedRow = row.map(val => `"${String(val).replace(/"/g, '""')}"`);
+                csvContent += formattedRow.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 6.5 선택된 주문 카드 인쇄 헬퍼
+        function printSelectedCards() {
+            if (selectedItems.size === 0) {
+                showToast("선택된 주문 항목이 없습니다.");
+                return;
+            }
+
+            // 1. 선택된 항목들을 고객별로 그룹화
+            const grouped = {};
+            rawOrders.forEach(item => {
+                const key = item.phone + "|" + item.orderKey;
+                if (selectedItems.has(key)) {
+                    const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                    if (isCanceled) return; // 취소된 상품은 인쇄 대상에서 제외
+
+                    const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && item.address.trim() !== "")) ? '배달주문' : '매장픽업';
+                    const customerKey = `${item.name}_${item.phone}_${actualShippingMethod}`;
+                    if (!grouped[customerKey]) {
+                        grouped[customerKey] = {
+                            name: item.name,
+                            phone: item.phone,
+                            shippingMethod: actualShippingMethod,
+                            address: item.address || "",
+                            addressDetail: item.addressDetail || "",
+                            entrance: item.entrance || "",
+                            kakaoName: item.kakaoName || "",
+                            totalPrice: 0,
+                            items: []
+                        };
+                    }
+                    grouped[customerKey].items.push(item);
+                    grouped[customerKey].totalPrice += parseInt(item.total || 0);
+                }
+            });
+
+            // 2. 프린트용 HTML 빌드
+            let printHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>선택 주문 인쇄</title>
+                    <style>
+                        body {
+                            font-family: 'Pretendard', -apple-system, sans-serif;
+                            background: white;
+                            color: black;
+                            padding: 20px;
+                            margin: 0;
+                        }
+                        .print-card {
+                            border: 2px solid #333;
+                            border-radius: 8px;
+                            padding: 15px;
+                            margin-bottom: 25px;
+                            page-break-inside: avoid;
+                        }
+                        .card-header {
+                            border-bottom: 2px solid #333;
+                            padding-bottom: 10px;
+                            margin-bottom: 12px;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: flex-start;
+                        }
+                        .customer-info h2 {
+                            margin: 0 0 5px 0;
+                            font-size: 20px;
+                        }
+                        .customer-info p {
+                            margin: 2px 0;
+                            font-size: 14px;
+                        }
+                        .shipping-badge {
+                            font-weight: bold;
+                            padding: 4px 8px;
+                            border-radius: 4px;
+                            border: 1px solid #333;
+                            font-size: 14px;
+                        }
+                        .shipping-delivery {
+                            background: #e3f2fd;
+                            color: #0d47a1;
+                        }
+                        .shipping-pickup {
+                            background: #e8f5e9;
+                            color: #1b5e20;
+                        }
+                        .address-box {
+                            background: #f5f5f5;
+                            padding: 8px;
+                            border-radius: 4px;
+                            margin-top: 8px;
+                            font-size: 14px;
+                            border: 1px dashed #bbb;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-top: 10px;
+                        }
+                        th, td {
+                            border-bottom: 1px solid #ddd;
+                            padding: 8px;
+                            text-align: left;
+                            font-size: 14px;
+                        }
+                        th {
+                            background: #f0f0f0;
+                            font-weight: bold;
+                        }
+                        .text-right {
+                            text-align: right;
+                        }
+                        .card-footer {
+                            margin-top: 15px;
+                            border-top: 2px solid #333;
+                            padding-top: 10px;
+                            text-align: right;
+                            font-size: 16px;
+                            font-weight: bold;
+                        }
+                    </style>
+                </head>
+                <body>
+            `;
+
+            Object.values(grouped).forEach(customer => {
+                const isDelivery = customer.shippingMethod === '배달주문';
+                const badgeClass = isDelivery ? 'shipping-delivery' : 'shipping-pickup';
+                
+                printHtml += `
+                    <div class="print-card">
+                        <div class="card-header">
+                            <div class="customer-info">
+                                <h2>${customer.name} (☎ ${customer.phone})</h2>
+                                ${customer.kakaoName ? `<p>카톡명: ${customer.kakaoName}</p>` : ''}
+                                ${isDelivery ? `
+                                    <div class="address-box">
+                                        <strong>배송지:</strong> ${customer.address} ${customer.addressDetail}<br>
+                                        <strong>공동현관키:</strong> ${customer.entrance || '없음'}
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="shipping-badge ${badgeClass}">
+                                ${customer.shippingMethod}
+                            </div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>상품명</th>
+                                    <th class="text-right" style="width: 50px;">수량</th>
+                                    <th class="text-right" style="width: 100px;">금액</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                customer.items.forEach(it => {
+                    printHtml += `
+                        <tr>
+                            <td>${it.item}</td>
+                            <td class="text-right">${it.qty}</td>
+                            <td class="text-right">${parseInt(it.total || 0).toLocaleString()}원</td>
+                        </tr>
+                    `;
+                });
+
+                printHtml += `
+                            </tbody>
+                        </table>
+                        <div class="card-footer">
+                            합계금액: ${customer.totalPrice.toLocaleString()}원
+                        </div>
+                    </div>
+                `;
+            });
+
+            printHtml += `
+                </body>
+                </html>
+            `;
+
+            const printWindow = window.open("", "_blank");
+            printWindow.document.write(printHtml);
+            printWindow.document.close();
+            printWindow.focus();
+            
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 300);
+        }
+
+        // 7. 유틸리티 UI 컴포넌트 (로더, 토스트)
+        function showLoader(text = "처리 중...") {
+            document.getElementById('loader-text').innerText = text;
+            document.getElementById('loader').style.display = 'flex';
+        }
+
+        function hideLoader() {
+            document.getElementById('loader').style.display = 'none';
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // 초기 시작
+        window.onload = fetchOrders;
+    </script>
+</body>
+
+</html>
