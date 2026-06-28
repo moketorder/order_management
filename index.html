@@ -129,13 +129,19 @@
             border: 1px solid var(--border);
             margin-bottom: 20px;
             display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            align-items: center;
         }
 
         .search-wrapper {
-            flex: 2;
-            min-width: 200px;
+            flex: 1;
             position: relative;
         }
 
@@ -157,8 +163,8 @@
 
         .select-filter {
             flex: 1;
-            min-width: 120px;
-            padding: 11px 14px;
+            min-width: 100px;
+            padding: 11px 10px;
             border: 1.5px solid var(--border);
             border-radius: var(--radius-sub);
             font-size: 13px;
@@ -790,7 +796,8 @@
                 margin-bottom: 12px;
             }
             .search-wrapper {
-                flex-basis: 100%;
+                flex: 2;
+                min-width: 150px;
             }
             .select-filter {
                 flex: 1;
@@ -939,22 +946,31 @@
     <div class="container">
         <!-- 컨트롤 필터 바 -->
         <div class="controls-card no-print">
-            <div class="search-wrapper">
-                <input type="text" id="searchInput" class="search-input" placeholder="고객명, 연락처, 상품명 실시간 검색..." onkeyup="handleFilterChange()">
+            <div class="controls-row">
+                <select id="filterDateRange" class="select-filter" style="width: 76px; min-width: 76px; flex-shrink: 0; padding-left: 4px; padding-right: 4px;" onchange="handleFilterChange()">
+                    <option value="all" selected>🔍 전체</option>
+                    <option value="month">🔍 월</option>
+                    <option value="day">🔍 일</option>
+                </select>
+                <div class="search-wrapper">
+                    <input type="text" id="searchInput" class="search-input" placeholder="고객명, 연락처, 상품명 실시간 검색..." onkeyup="handleFilterChange()">
+                </div>
             </div>
-            <select id="filterShipping" class="select-filter" onchange="handleFilterChange()">
-                <option value="all">수령방법 전체</option>
-                <option value="배달주문">🚚 배달주문</option>
-                <option value="매장픽업">📍 매장픽업</option>
-            </select>
-            <select id="filterStatus" class="select-filter" onchange="handleFilterChange()">
-                <option value="all">상태 전체</option>
-                <option value="대기">🔘 대기</option>
-                <option value="입고">🟡 입고 완료</option>
-                <option value="픽업">🟣 픽업 완료</option>
-                <option value="배달완료">🟢 배달 완료</option>
-            </select>
-            <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV 내보내기</button>
+            <div class="controls-row">
+                <select id="filterShipping" class="select-filter" onchange="handleFilterChange()">
+                    <option value="all">수령방법</option>
+                    <option value="배달주문">🚚 배달주문</option>
+                    <option value="매장픽업">📍 매장픽업</option>
+                </select>
+                <select id="filterStatus" class="select-filter" onchange="handleFilterChange()">
+                    <option value="all">상태</option>
+                    <option value="대기">🔘 대기</option>
+                    <option value="입고">🟡 입고 완료</option>
+                    <option value="픽업">🟣 픽업 완료</option>
+                    <option value="배달완료">🟢 배달 완료</option>
+                </select>
+                <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV 내보내기</button>
+            </div>
         </div>
 
         <!-- 분류 탭 (대분류: 달 / 소분류: 일) -->
@@ -1302,12 +1318,29 @@
                 const search = document.getElementById('searchInput').value.toLowerCase().trim();
                 const shippingFilter = document.getElementById('filterShipping').value;
                 const statusFilter = document.getElementById('filterStatus').value;
+                const searchRange = document.getElementById('filterDateRange').value;
 
-                // 1단계: 날짜(년/월/일) 매칭 필터 (검색어가 비어있을 때만 날짜 필터링 적용)
+                // 1단계: 날짜(년/월/일) 매칭 필터
                 let filtered = [];
                 if (search !== "") {
-                    filtered = [...rawOrders];
+                    // 검색어가 있을 때: 검색 범위(전체/월/일)에 맞게 필터링 적용
+                    if (searchRange === "all") {
+                        filtered = [...rawOrders];
+                    } else if (searchRange === "month") {
+                        filtered = rawOrders.filter(item => {
+                            const info = getOrderDateInfo(item);
+                            const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
+                            return itemYear === currentYear && info.month === currentMonth;
+                        });
+                    } else { // "day"
+                        filtered = rawOrders.filter(item => {
+                            const info = getOrderDateInfo(item);
+                            const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
+                            return itemYear === currentYear && info.month === currentMonth && info.day === currentDay;
+                        });
+                    }
                 } else {
+                    // 검색어가 없을 때: 기본으로 현재 선택된 일자 탭 데이터를 보여줌
                     filtered = rawOrders.filter(item => {
                         const info = getOrderDateInfo(item);
                         const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
@@ -1534,6 +1567,7 @@
         }
 
         // 4. 필터 및 체크박스 이벤트 핸들러
+
         function handleFilterChange() {
             selectedItems.clear();
             updateSelectionCountText();
