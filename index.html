@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MOKET 통합 주문관리 시스템 (사장님용)</title>
+    <title>MOKET 주문관리 (사장님용)</title>
     <!-- Pretendard Variable Font -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
     <style>
@@ -408,6 +408,23 @@
 
         .btn-batch.type-print { border-color: #2e7d32; color: #2e7d32; }
         .btn-batch.type-print:hover { background: #e8f5e9; }
+
+        .btn-batch.type-paid { border-color: #2e7d32; color: #2e7d32; }
+        .btn-batch.type-paid:hover { background: #e8f5e9; }
+
+        .paid-badge {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1.5px solid #c8e6c9;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            margin-left: 6px;
+        }
 
         /* 주문내역 카드 리스트 */
         .order-list-container {
@@ -970,6 +987,7 @@
                     <option value="배달완료">🟢 배달 완료</option>
                 </select>
                 <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV 내보내기</button>
+                <button class="btn-common" style="border: 1.5px solid #d32f2f; background: #fff5f5; color: #d32f2f; font-weight: 700;" onclick="deleteCanceledOrders()">🗑️ 취소주문 삭제</button>
             </div>
         </div>
 
@@ -997,6 +1015,7 @@
                 <button class="btn-batch type-pickup" onclick="handleBatchUpdate('픽업')">🟣 픽업완료</button>
                 <button class="btn-batch type-delivery" onclick="handleBatchUpdate('배달완료')">🟢 배달완료</button>
                 <button class="btn-batch type-cancel" onclick="handleBatchUpdate('취소')">🔴 취소</button>
+                <button class="btn-batch type-paid" onclick="handleBatchPaidUpdate()">💵 입금완료</button>
                 <button class="btn-batch type-print" onclick="printSelectedCards()">🖨️ 인쇄</button>
             </div>
         </div>
@@ -1503,6 +1522,7 @@
                                         <span class="customer-name">${customer.name}</span>
                                         <a href="tel:${customer.phone}" class="customer-phone">${customer.phone}</a>
                                         ${customer.kakaoName ? `<span class="kakao-badge">💬 ${customer.kakaoName}</span>` : ''}
+                                        ${customer.items.some(it => it.paid === true || it.paid === "true") ? `<span class="paid-badge">💵 입금완료</span>` : ''}
                                     </div>
                                     
                                     ${isDelivery ? `
@@ -1849,6 +1869,92 @@
             }
         }
 
+        async function handleBatchPaidUpdate() {
+            if (selectedItems.size === 0) {
+                showToast("선택된 주문 항목이 없습니다.");
+                return;
+            }
+
+            showLoader("선택 항목 [입금완료] 일괄 처리 중...");
+            
+            try {
+                const patchBody = { paid: true };
+                const promises = [];
+                selectedItems.forEach(itemInfo => {
+                    const [phone, orderKey] = itemInfo.split("|");
+                    const cleanPhone = phone.replace(/\D/g, "");
+                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
+                    
+                    const p = fetch(url, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(patchBody)
+                    }).then(res => {
+                        if (res.ok) {
+                            const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
+                            if (target) {
+                                target.paid = true;
+                            }
+                        }
+                    });
+                    promises.push(p);
+                });
+                
+                await Promise.all(promises);
+                
+                showToast(`${selectedItems.size}개 주문 항목의 입금을 확인했습니다.`);
+                selectedItems.clear();
+                updateSelectionCountText();
+                renderFilteredOrders();
+            } catch (e) {
+                console.error(e);
+                showToast("입금 완료 처리 중 오류가 발생했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function deleteCanceledOrders() {
+            const canceledOrders = [];
+            rawOrders.forEach(item => {
+                const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                if (isCanceled) {
+                    canceledOrders.push(item);
+                }
+            });
+
+            if (canceledOrders.length === 0) {
+                showToast("삭제할 취소된 주문이 없습니다.");
+                return;
+            }
+
+            if (!confirm(`정말로 취소된 주문 ${canceledOrders.length}건을 DB에서 영구 삭제하시겠습니까?`)) {
+                return;
+            }
+
+            showLoader("취소된 주문을 DB에서 삭제하는 중...");
+            try {
+                const promises = canceledOrders.map(async (item) => {
+                    const cleanPhone = item.phone.replace(/\D/g, "");
+                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${item.orderKey}.json`;
+                    const res = await fetch(url, { method: 'DELETE' });
+                    if (!res.ok) {
+                        throw new Error(`주문 삭제 실패: ${item.name} (${item.phone})`);
+                    }
+                });
+
+                await Promise.all(promises);
+                showToast(`취소된 주문 ${canceledOrders.length}건이 성공적으로 삭제되었습니다.`);
+                
+                await fetchOrders();
+            } catch (e) {
+                showToast("삭제 오류: " + e.toString());
+                console.error(e);
+            } finally {
+                hideLoader();
+            }
+        }
+
         // 6. CSV 내보내기 헬퍼 (일별 / 월별 선택)
         function exportToCSV(type = 'day') {
             let filtered = [];
@@ -1983,85 +2089,111 @@
                 <html>
                 <head>
                     <meta charset="utf-8">
-                    <title>선택 주문 인쇄</title>
+                    <title>주문 영수증 인쇄</title>
                     <style>
+                        @page {
+                            size: 80mm auto;
+                            margin: 0;
+                        }
                         body {
                             font-family: 'Pretendard', -apple-system, sans-serif;
                             background: white;
                             color: black;
-                            padding: 20px;
-                            margin: 0;
+                            width: 72mm;
+                            margin: 0 auto;
+                            padding: 4mm 2mm;
+                            box-sizing: border-box;
                         }
                         .print-card {
-                            border: 2px solid #333;
-                            border-radius: 8px;
-                            padding: 15px;
-                            margin-bottom: 25px;
+                            page-break-after: always;
                             page-break-inside: avoid;
+                            border: none;
+                            padding: 0 0 10mm 0;
+                            margin: 0;
+                        }
+                        .print-card:last-child {
+                            page-break-after: avoid;
                         }
                         .card-header {
-                            border-bottom: 2px solid #333;
-                            padding-bottom: 10px;
-                            margin-bottom: 12px;
+                            border-bottom: 1px dashed #333;
+                            padding-bottom: 6px;
+                            margin-bottom: 8px;
                             display: flex;
-                            justify-content: space-between;
+                            flex-direction: column;
                             align-items: flex-start;
                         }
+                        .customer-info {
+                            width: 100%;
+                        }
                         .customer-info h2 {
-                            margin: 0 0 5px 0;
-                            font-size: 20px;
+                            margin: 0 0 4px 0;
+                            font-size: 15px;
+                            font-weight: 800;
                         }
                         .customer-info p {
                             margin: 2px 0;
-                            font-size: 14px;
+                            font-size: 11px;
                         }
                         .shipping-badge {
                             font-weight: bold;
-                            padding: 4px 8px;
-                            border-radius: 4px;
+                            display: inline-block;
+                            margin-top: 4px;
+                            padding: 2px 6px;
                             border: 1px solid #333;
-                            font-size: 14px;
+                            font-size: 11px;
+                            border-radius: 3px;
                         }
                         .shipping-delivery {
-                            background: #e3f2fd;
-                            color: #0d47a1;
+                            background: #e3f2fd !important;
+                            color: #0d47a1 !important;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
                         }
                         .shipping-pickup {
-                            background: #e8f5e9;
-                            color: #1b5e20;
+                            background: #e8f5e9 !important;
+                            color: #1b5e20 !important;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
                         }
                         .address-box {
-                            background: #f5f5f5;
-                            padding: 8px;
+                            background: #f5f5f5 !important;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                            padding: 6px;
                             border-radius: 4px;
-                            margin-top: 8px;
-                            font-size: 14px;
+                            margin-top: 6px;
+                            font-size: 11px;
                             border: 1px dashed #bbb;
+                            width: 100%;
+                            box-sizing: border-box;
                         }
                         table {
                             width: 100%;
                             border-collapse: collapse;
-                            margin-top: 10px;
+                            margin-top: 6px;
                         }
                         th, td {
-                            border-bottom: 1px solid #ddd;
-                            padding: 8px;
+                            border-bottom: 1px dashed #ddd;
+                            padding: 6px 2px;
                             text-align: left;
-                            font-size: 14px;
+                            font-size: 11px;
+                            word-break: break-all;
                         }
                         th {
-                            background: #f0f0f0;
+                            background: #f0f0f0 !important;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
                             font-weight: bold;
                         }
                         .text-right {
                             text-align: right;
                         }
                         .card-footer {
-                            margin-top: 15px;
-                            border-top: 2px solid #333;
-                            padding-top: 10px;
+                            margin-top: 8px;
+                            border-top: 1px dashed #333;
+                            padding-top: 6px;
                             text-align: right;
-                            font-size: 16px;
+                            font-size: 13px;
                             font-weight: bold;
                         }
                     </style>
