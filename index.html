@@ -782,6 +782,15 @@
             opacity: 1;
         }
 
+        .button-row {
+            flex-wrap: nowrap !important;
+        }
+        .button-row .btn-common {
+            flex: 1;
+            justify-content: center;
+            white-space: nowrap;
+        }
+
         /* 모바일 반응형 미디어 쿼리 */
         @media (max-width: 768px) {
             .desktop-only-table {
@@ -827,6 +836,11 @@
             .btn-common {
                 padding: 9px 12px;
                 font-size: 12px;
+            }
+            .button-row .btn-common {
+                padding: 9px 4px !important;
+                font-size: 11px !important;
+                gap: 4px !important;
             }
             .tabs-section {
                 padding: 8px 6px;
@@ -1398,12 +1412,12 @@
         <div class="controls-card no-print">
             <div class="controls-row">
                 <select id="filterDateRange" class="select-filter" style="width: 76px; min-width: 76px; flex-shrink: 0; padding-left: 4px; padding-right: 4px;" onchange="handleFilterChange()">
-                    <option value="all" selected>🔍 전체</option>
-                    <option value="month">🔍 월</option>
+                    <option value="all">🔍 전체</option>
+                    <option value="month" selected>🔍 월</option>
                     <option value="day">🔍 일</option>
                 </select>
                 <div class="search-wrapper">
-                    <input type="text" id="searchInput" class="search-input" placeholder="고객명, 연락처, 상품명 실시간 검색..." onkeyup="handleFilterChange()">
+                    <input type="text" id="searchInput" class="search-input" placeholder="고객명, 연락처, 카톡명, 실명, 주소, 상품명 검색..." onkeyup="handleFilterChange()">
                 </div>
             </div>
             <div class="controls-row">
@@ -1420,10 +1434,10 @@
                     <option value="배달완료">🟢 배달 완료</option>
                 </select>
             </div>
-            <div class="controls-row">
-                <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV 내보내기</button>
-                <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 오늘 주문현황</button>
+            <div class="controls-row button-row">
+                <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
                 <button class="btn-common" style="border: 1.5px solid #d32f2f; background: #fff5f5; color: #d32f2f; font-weight: 700;" onclick="deleteCanceledOrders()">🗑️ 취소주문 삭제</button>
+                <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV</button>
             </div>
         </div>
 
@@ -1821,7 +1835,10 @@
                         (item.name || "").toLowerCase().includes(search) ||
                         (item.phone || "").includes(search) ||
                         (item.item || "").toLowerCase().includes(search) ||
-                        (item.address || "").toLowerCase().includes(search);
+                        (item.address || "").toLowerCase().includes(search) ||
+                        (item.addressDetail || "").toLowerCase().includes(search) ||
+                        (item.kakaoName || "").toLowerCase().includes(search) ||
+                        (item.kakaoRealName || "").toLowerCase().includes(search);
 
                     return matchShipping && matchStatus && matchSearch;
                 });
@@ -2445,11 +2462,12 @@
             let completedPickupCustomers = 0;
 
             Object.entries(customerGroups).forEach(([key, items]) => {
-                // 입금 여부: 취소 안된 품목 중, 배달완료나 픽업완료가 아니면서 미입금 상태인 항목이 하나라도 있는지 확인
+                // 입금 여부: 취소 안된 품목 중, 배달완료나 픽업완료가 아니면서 미입금 상태이고 픽업 주문이 아닌 항목이 하나라도 있는지 확인
                 const hasUnpaid = items.some(it => {
                     const isPaid = (it.paid === true || it.paid === "true");
                     const isCompleted = (it.status === '배달완료' || it.status === '픽업');
-                    return !isPaid && !isCompleted;
+                    const actualShippingMethod = (it.shippingMethod === '배달주문' || (it.shippingMethod !== '매장픽업' && it.address && it.address.trim() !== "")) ? '배달주문' : '매장픽업';
+                    return !isPaid && !isCompleted && actualShippingMethod !== '매장픽업';
                 });
 
                 if (hasUnpaid) {
@@ -2584,7 +2602,12 @@
             });
 
             const dateTitle = `${currentYear || ''} ${currentMonth || ''} ${currentDay || ''}`.trim() || '전체';
-            const nonCanceledOrders = targetOrders.filter(it => !(it.canceled === true || it.canceled === "true"));
+            const nonCanceledOrders = targetOrders.filter(it => {
+                const isCanceled = (it.canceled === true || it.canceled === "true");
+                if (isCanceled) return false;
+                const actualShippingMethod = (it.shippingMethod === '배달주문' || (it.shippingMethod !== '매장픽업' && it.address && it.address.trim() !== "")) ? '배달주문' : '매장픽업';
+                return actualShippingMethod !== '매장픽업';
+            });
             
             // 고객별 그룹화
             const customerGroups = {};
@@ -2632,7 +2655,9 @@
                         name: customerName,
                         phone: customerPhone,
                         amount: totalAmount,
-                        items: unpaidItemsSummary
+                        items: unpaidItemsSummary,
+                        kakaoName: firstItem.kakaoName || "",
+                        kakaoRealName: firstItem.kakaoRealName || ""
                     });
                 }
             });
@@ -2658,7 +2683,7 @@
                     desktopRows += `
                         <tr>
                             <td>
-                                <div class="unpaid-table-name">${user.name}</div>
+                                <div class="unpaid-table-name">${user.name}${user.kakaoName ? ` <span class="kakao-badge">💬 ${user.kakaoName}${user.kakaoRealName ? ` (${user.kakaoRealName})` : ''}</span>` : ''}</div>
                                 <div class="unpaid-table-phone"><a href="tel:${user.phone}" class="unpaid-phone-link blurred" onclick="revealPhone(event, this)">📞 ${user.phone}</a></div>
                             </td>
                             <td class="unpaid-table-items">${user.items}</td>
@@ -2669,7 +2694,7 @@
                     mobileCards += `
                         <div class="unpaid-mobile-card">
                             <div class="unpaid-card-row">
-                                <span class="unpaid-card-name">${user.name}</span>
+                                <span class="unpaid-card-name">${user.name}${user.kakaoName ? ` <span class="kakao-badge">💬 ${user.kakaoName}${user.kakaoRealName ? ` (${user.kakaoRealName})` : ''}</span>` : ''}</span>
                                 <span class="unpaid-card-amount">${user.amount.toLocaleString()}원</span>
                             </div>
                             <div class="unpaid-card-row">
