@@ -1464,7 +1464,8 @@
                 <select id="filterDateRange" class="select-filter" style="width: 76px; min-width: 76px; flex-shrink: 0; padding-left: 4px; padding-right: 4px;" onchange="handleFilterChange()">
                     <option value="all">🔍 전체</option>
                     <option value="month">🔍 월</option>
-                    <option value="day" selected>🔍 일</option>
+                    <option value="week" selected>🔍 주</option>
+                    <option value="day">🔍 일</option>
                 </select>
                 <div class="search-wrapper">
                     <input type="text" id="searchInput" class="search-input" style="padding-right: 35px;" placeholder="고객명, 연락처, 카톡명, 실명, 주소, 상품명 검색..." onkeyup="handleFilterChange()">
@@ -1864,6 +1865,24 @@
                             const info = getOrderDateInfo(item);
                             const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
                             return itemYear === currentYear && info.month === currentMonth;
+                        });
+                    } else if (searchRange === "week") {
+                        const todayStart = new Date();
+                        todayStart.setHours(0, 0, 0, 0);
+                        const minTime = todayStart.getTime() - (7 * 24 * 60 * 60 * 1000);
+                        const maxTime = todayStart.getTime() + (7 * 24 * 60 * 60 * 1000) + (24 * 60 * 60 * 1000 - 1);
+                        
+                        filtered = rawOrders.filter(item => {
+                            const info = getOrderDateInfo(item);
+                            if (!info.dateStr || info.dateStr === "기타") return false;
+                            
+                            const parts = info.dateStr.split('-');
+                            if (parts.length === 3) {
+                                const itemDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                                const itemTime = itemDate.getTime();
+                                return itemTime >= minTime && itemTime <= maxTime;
+                            }
+                            return false;
                         });
                     } else { // "day"
                         filtered = rawOrders.filter(item => {
