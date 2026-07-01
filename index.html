@@ -161,6 +161,32 @@
             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
         }
 
+        .clear-search-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: var(--text-sub);
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            transition: var(--transition);
+            padding: 0;
+            line-height: 1;
+            z-index: 10;
+        }
+        .clear-search-btn:hover {
+            background-color: #f0f0f0;
+            color: var(--text-main);
+        }
+
         .select-filter {
             flex: 1;
             min-width: 100px;
@@ -1441,7 +1467,8 @@
                     <option value="day" selected>🔍 일</option>
                 </select>
                 <div class="search-wrapper">
-                    <input type="text" id="searchInput" class="search-input" placeholder="고객명, 연락처, 카톡명, 실명, 주소, 상품명 검색..." onkeyup="handleFilterChange()">
+                    <input type="text" id="searchInput" class="search-input" style="padding-right: 35px;" placeholder="고객명, 연락처, 카톡명, 실명, 주소, 상품명 검색..." onkeyup="handleFilterChange()">
+                    <button id="clearSearchBtn" class="clear-search-btn" onclick="clearSearch()">&times;</button>
                 </div>
             </div>
             <div class="controls-row">
@@ -1815,6 +1842,13 @@
         function renderFilteredOrders() {
             try {
                 const search = document.getElementById('searchInput').value.toLowerCase().trim();
+                
+                // X 버튼 토글
+                const clearBtn = document.getElementById('clearSearchBtn');
+                if (clearBtn) {
+                    clearBtn.style.display = search !== "" ? "flex" : "none";
+                }
+
                 const shippingFilter = document.getElementById('filterShipping').value;
                 const statusFilter = document.getElementById('filterStatus').value;
                 const searchRange = document.getElementById('filterDateRange').value;
@@ -1907,12 +1941,46 @@
                     return card.items.every(item => item.canceled === true || item.canceled === "true");
                 };
 
+                const extractDong = (card) => {
+                    const fullAddress = `${card.address || ''} ${card.addressDetail || ''}`;
+                    // 1. "101동" 패턴 매칭
+                    let match = fullAddress.match(/([0-9]+)\s*동/);
+                    if (match) return parseInt(match[1]);
+                    // 2. "101-202" 또는 "101 - 202" 패턴 매칭
+                    match = fullAddress.match(/([0-9]+)\s*-\s*[0-9]+/);
+                    if (match) return parseInt(match[1]);
+                    // 3. 문자열 동 (A동, 가동 등)
+                    match = fullAddress.match(/([a-zA-Z가-힣]+)\s*동/);
+                    if (match) return match[1];
+                    return null;
+                };
+
                 const customersList = Object.values(grouped).sort((a, b) => {
                     const aCanceled = isCardFullyCanceled(a);
                     const bCanceled = isCardFullyCanceled(b);
                     
                     if (aCanceled && !bCanceled) return 1;
                     if (!aCanceled && bCanceled) return -1;
+                    
+                    // 만약 검색어가 존재한다면 동별 내림차순 정렬 적용
+                    if (search !== "") {
+                        const aDong = extractDong(a);
+                        const bDong = extractDong(b);
+                        
+                        if (aDong !== null && bDong !== null) {
+                            if (typeof aDong === 'number' && typeof bDong === 'number') {
+                                if (aDong !== bDong) return bDong - aDong; // 동 내림차순 (예: 103동 -> 102동 -> 101동)
+                            } else {
+                                // 문자열 비교 (A동, B동 등)
+                                const comp = String(bDong).localeCompare(String(aDong));
+                                if (comp !== 0) return comp;
+                            }
+                        } else if (aDong !== null) {
+                            return -1; // 동 정보가 있는 카드가 위로
+                        } else if (bDong !== null) {
+                            return 1;
+                        }
+                    }
                     
                     const getLatestTime = (card) => {
                         if (!card.items || card.items.length === 0) return 0;
@@ -2080,6 +2148,14 @@
             selectedItems.clear();
             updateSelectionCountText();
             renderFilteredOrders();
+        }
+
+        function clearSearch() {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.value = '';
+                handleFilterChange();
+            }
         }
 
         function handleItemSelect(checkbox) {
@@ -2480,11 +2556,30 @@
             // 취소 제외 주문 목록
             const nonCanceledOrders = targetOrders.filter(it => !(it.canceled === true || it.canceled === "true"));
             
-            // 1. 총 주문수량
-            const totalQty = nonCanceledOrders.reduce((sum, it) => sum + parseInt(it.qty || 0), 0);
-            
-            // 2. 총 주문금액
-            const totalAmount = nonCanceledOrders.reduce((sum, it) => sum + parseInt(it.total || 0), 0);
+            // 1. 총 주문수량 및 2. 총 주문금액 계산 (배달/픽업 분류 포함)
+            let totalQty = 0;
+            let totalAmount = 0;
+            let deliveryQty = 0;
+            let pickupQty = 0;
+            let deliveryAmount = 0;
+            let pickupAmount = 0;
+
+            nonCanceledOrders.forEach(it => {
+                const actualShippingMethod = (it.shippingMethod === '배달주문' || (it.shippingMethod !== '매장픽업' && it.address && it.address.trim() !== "")) ? '배달주문' : '매장픽업';
+                const qty = parseInt(it.qty || 0);
+                const total = parseInt(it.total || 0);
+                
+                totalQty += qty;
+                totalAmount += total;
+                
+                if (actualShippingMethod === '배달주문') {
+                    deliveryQty += qty;
+                    deliveryAmount += total;
+                } else {
+                    pickupQty += qty;
+                    pickupAmount += total;
+                }
+            });
             
             // 3. 품목별 주문수량합계
             const itemQuantities = {};
@@ -2583,10 +2678,16 @@
                             <div class="summary-stat-card card-purple">
                                 <div class="stat-label">총 주문수량</div>
                                 <div class="stat-value">${totalQty.toLocaleString()}개</div>
+                                <div class="stat-sub-value" style="font-size: 13px; margin-top: 4px; opacity: 0.85; font-weight: 600; color: var(--purple);">
+                                    (배달 ${deliveryCustomers}건 / 픽업 ${pickupCustomers}건)
+                                </div>
                             </div>
                             <div class="summary-stat-card card-green">
                                 <div class="stat-label">총 주문금액</div>
                                 <div class="stat-value">${totalAmount.toLocaleString()}원</div>
+                                <div class="stat-sub-value" style="font-size: 13px; margin-top: 4px; opacity: 0.85; font-weight: 600; color: var(--primary);">
+                                    (배달 ${deliveryAmount.toLocaleString()}원 / 픽업 ${pickupAmount.toLocaleString()}원)
+                                </div>
                             </div>
                         </div>
 
