@@ -316,9 +316,8 @@
             border-radius: 20px 20px 0 0;
             padding: 16px 24px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
+            flex-direction: column;
+            gap: 12px;
             box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.12);
             transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             z-index: 2000;
@@ -374,9 +373,36 @@
             font-weight: 900;
         }
 
+        .batch-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .batch-summary-info {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .batch-summary-qty {
+            color: var(--nego-orange);
+            font-size: 15px;
+            font-weight: 850;
+        }
+
+        .batch-summary-amount {
+            color: var(--red);
+            font-size: 15px;
+            font-weight: 850;
+        }
+
         .batch-buttons {
             display: flex;
             gap: 6px;
+            justify-content: flex-end;
+            width: 100%;
         }
 
         .btn-batch {
@@ -1413,8 +1439,8 @@
             <div class="controls-row">
                 <select id="filterDateRange" class="select-filter" style="width: 76px; min-width: 76px; flex-shrink: 0; padding-left: 4px; padding-right: 4px;" onchange="handleFilterChange()">
                     <option value="all">🔍 전체</option>
-                    <option value="month" selected>🔍 월</option>
-                    <option value="day">🔍 일</option>
+                    <option value="month">🔍 월</option>
+                    <option value="day" selected>🔍 일</option>
                 </select>
                 <div class="search-wrapper">
                     <input type="text" id="searchInput" class="search-input" placeholder="고객명, 연락처, 카톡명, 실명, 주소, 상품명 검색..." onkeyup="handleFilterChange()">
@@ -1422,16 +1448,17 @@
             </div>
             <div class="controls-row">
                 <select id="filterShipping" class="select-filter" onchange="handleFilterChange()">
-                    <option value="all">수령방법</option>
+                    <option value="all" selected>수령방법</option>
                     <option value="배달주문">🚚 배달주문</option>
-                    <option value="매장픽업">📍 매장픽업</option>
+                    <option value="매장픽업">📍 픽업주문</option>
                 </select>
                 <select id="filterStatus" class="select-filter" onchange="handleFilterChange()">
-                    <option value="all">상태</option>
+                    <option value="all" selected>상태</option>
                     <option value="대기">🔘 대기</option>
                     <option value="입고">🟡 입고 완료</option>
                     <option value="픽업">🟣 픽업 완료</option>
                     <option value="배달완료">🟢 배달 완료</option>
+                    <option value="미입금">🔴 미입금</option>
                 </select>
             </div>
             <div class="controls-row button-row">
@@ -1453,12 +1480,17 @@
 
         <!-- 일괄 처리 툴바 -->
         <div class="batch-action-bar no-print">
-            <div class="batch-selection-info">
-                <label class="checkbox-container">
-                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
-                    <span class="custom-checkbox"></span>
-                    <span id="selection-count-text">0개 항목 선택됨</span>
-                </label>
+            <div class="batch-top-row">
+                <div class="batch-selection-info">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                        <span class="custom-checkbox"></span>
+                        <span id="selection-count-text">0개 항목 선택됨</span>
+                    </label>
+                </div>
+                <div class="batch-summary-info" id="batch-summary-info">
+                    선택 수량: <strong id="batch-total-qty" class="batch-summary-qty">0</strong>개&nbsp;&nbsp;|&nbsp;&nbsp;합계: <strong id="batch-total-amount" class="batch-summary-amount">0</strong>원
+                </div>
             </div>
             <div class="batch-buttons">
                 <button class="btn-batch type-stocked" onclick="handleBatchUpdate('입고')">🟡 입고완료</button>
@@ -1829,6 +1861,7 @@
                         else if (statusFilter === '입고') matchStatus = status === '입고';
                         else if (statusFilter === '픽업') matchStatus = status === '픽업';
                         else if (statusFilter === '배달완료') matchStatus = status === '배달완료';
+                        else if (statusFilter === '미입금') matchStatus = (actualShippingMethod === '배달주문') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true");
                     }
 
                     const matchSearch = search === "" || 
@@ -1989,7 +2022,7 @@
                                         </div>
                                     ` : `
                                         <div class="address-box" style="color:var(--amber);">
-                                            <strong>📍 매장 픽업 예정</strong>
+                                            <strong>📍 픽업 예정</strong>
                                         </div>
                                     `}
                                     
@@ -2135,6 +2168,24 @@
         function updateSelectionCountText() {
             const count = selectedItems.size;
             document.getElementById('selection-count-text').innerText = `${count}개 항목 선택됨`;
+            
+            // 선택된 항목들의 수량 및 합계 계산
+            let totalQty = 0;
+            let totalAmount = 0;
+            
+            selectedItems.forEach(key => {
+                const [phone, orderKey] = key.split('|');
+                const item = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
+                if (item) {
+                    totalQty += parseInt(item.qty || 0);
+                    totalAmount += parseInt(item.total || 0);
+                }
+            });
+            
+            const qtyEl = document.getElementById('batch-total-qty');
+            const amountEl = document.getElementById('batch-total-amount');
+            if (qtyEl) qtyEl.innerText = totalQty.toLocaleString();
+            if (amountEl) amountEl.innerText = totalAmount.toLocaleString();
             
             const batchBar = document.querySelector('.batch-action-bar');
             if (batchBar) {
@@ -2561,7 +2612,7 @@
                                 <div class="details-box">
                                     <div class="details-title">📍 수령/배달 (픽업 상태)</div>
                                     <div class="details-row">
-                                        <span>매장 픽업</span>
+                                        <span>픽업 주문</span>
                                         <span class="badge-info">${pickupCustomers}명</span>
                                     </div>
                                     <div class="details-row" style="font-size:11px; color:var(--text-sub); margin-top:-2px; margin-bottom:6px;">
@@ -2946,33 +2997,23 @@
                         }
                         .customer-info h2 {
                             margin: 0 0 4px 0;
-                            font-size: 15px;
+                            font-size: 17px;
                             font-weight: 800;
                         }
                         .customer-info p {
                             margin: 2px 0;
-                            font-size: 11px;
+                            font-size: 13px;
                         }
-                        .shipping-badge {
+                        .shipping-type {
                             font-weight: bold;
-                            display: inline-block;
-                            margin-top: 4px;
-                            padding: 2px 6px;
-                            border: 1px solid #333;
-                            font-size: 11px;
-                            border-radius: 3px;
+                            font-size: 13px;
+                            margin-bottom: 4px;
                         }
                         .shipping-delivery {
-                            background: #e3f2fd !important;
                             color: #0d47a1 !important;
-                            -webkit-print-color-adjust: exact;
-                            print-color-adjust: exact;
                         }
                         .shipping-pickup {
-                            background: #e8f5e9 !important;
                             color: #1b5e20 !important;
-                            -webkit-print-color-adjust: exact;
-                            print-color-adjust: exact;
                         }
                         .address-box {
                             background: #f5f5f5 !important;
@@ -2981,7 +3022,7 @@
                             padding: 6px;
                             border-radius: 4px;
                             margin-top: 6px;
-                            font-size: 11px;
+                            font-size: 13px;
                             border: 1px dashed #bbb;
                             width: 100%;
                             box-sizing: border-box;
@@ -2995,7 +3036,7 @@
                             border-bottom: 1px dashed #ddd;
                             padding: 6px 2px;
                             text-align: left;
-                            font-size: 11px;
+                            font-size: 13px;
                             word-break: break-all;
                         }
                         th {
@@ -3012,7 +3053,7 @@
                             border-top: 1px dashed #333;
                             padding-top: 6px;
                             text-align: right;
-                            font-size: 13px;
+                            font-size: 15px;
                             font-weight: bold;
                         }
                     </style>
@@ -3024,12 +3065,16 @@
                 const isDelivery = customer.shippingMethod === '배달주문';
                 const badgeClass = isDelivery ? 'shipping-delivery' : 'shipping-pickup';
                 
+                const cleanPhone = customer.phone.replace(/\D/g, "");
+                const displayPhone = cleanPhone.slice(-4);
+                const displayMethod = customer.shippingMethod === '매장픽업' ? '픽업주문' : customer.shippingMethod;
+                
                 printHtml += `
                     <div class="print-card">
                         <div class="card-header">
                             <div class="customer-info">
-                                <h2>${customer.name} (☎ ${customer.phone})</h2>
-                                ${customer.kakaoName ? `<p>카톡명: ${customer.kakaoName}${customer.kakaoRealName ? ` (${customer.kakaoRealName})` : ''}</p>` : ''}
+                                <div class="shipping-type ${badgeClass}">[${displayMethod}]</div>
+                                <h2>${customer.name} (☎ ${displayPhone})</h2>
                                 ${isDelivery ? `
                                     <div class="address-box">
                                         <strong>배송지:</strong> ${customer.address} ${customer.addressDetail}<br>
@@ -3037,16 +3082,13 @@
                                     </div>
                                 ` : ''}
                             </div>
-                            <div class="shipping-badge ${badgeClass}">
-                                ${customer.shippingMethod}
-                            </div>
                         </div>
                         <table>
                             <thead>
                                 <tr>
                                     <th>상품명</th>
-                                    <th class="text-right" style="width: 50px;">수량</th>
-                                    <th class="text-right" style="width: 100px;">금액</th>
+                                    <th class="text-right" style="width: 35px;">수량</th>
+                                    <th class="text-right" style="width: 75px;">금액</th>
                                 </tr>
                             </thead>
                             <tbody>
