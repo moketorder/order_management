@@ -1430,6 +1430,12 @@
                 padding: 16px;
             }
         }
+        .order-time-label {
+            font-size: 11px;
+            color: #888888;
+            font-weight: normal;
+            margin-left: 5px;
+        }
     </style>
 </head>
 
@@ -1560,6 +1566,18 @@
                 return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
             }
             return new Date(ts);
+        }
+
+        // 주문시간 포맷 헬퍼 (월/일 00:00)
+        function formatOrderTime(ts) {
+            if (!ts) return "";
+            const date = parseTimestampToDate(ts);
+            if (isNaN(date.getTime()) || date.getTime() === 0) return "";
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            const hh = String(date.getHours()).padStart(2, '0');
+            const mm = String(date.getMinutes()).padStart(2, '0');
+            return `(${m}/${d} ${hh}:${mm})`;
         }
 
         let currentYear = "";  // 현재 선택된 년도
@@ -2096,7 +2114,7 @@
                                         <span class="custom-checkbox"></span>
                                     </label>
                                 </td>
-                                <td class="item-name-cell">${it.item}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}</td>
+                                <td class="item-name-cell">${it.item} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}</td>
                                 <td style="width:70px;"><strong class="qty-highlight">${it.qty}</strong>개</td>
                                 <td style="width:100px;">${parseInt(it.price || 0).toLocaleString()}원</td>
                                 <td style="width:100px;"><strong>${parseInt(it.total || 0).toLocaleString()}원</strong></td>
@@ -2114,7 +2132,7 @@
                                         <input type="checkbox" class="item-checkbox" data-phone="${customer.phone}" data-key="${it.orderKey}" ${selectedItems.has(customer.phone + "|" + it.orderKey) ? 'checked' : ''} onchange="handleItemSelect(this)">
                                         <span class="custom-checkbox"></span>
                                     </label>
-                                    <span class="mobile-item-name">${it.item}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}</span>
+                                    <span class="mobile-item-name">${it.item} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}</span>
                                     <span class="status-badge ${badgeClass}">${badgeLabel}</span>
                                 </div>
                                 <div class="mobile-item-middle">
