@@ -1004,6 +1004,11 @@
                 background: white;
                 border-bottom: 1px solid black;
             }
+
+            .address-box {
+                font-size: 17px !important;
+                color: black !important;
+            }
         }
 
         /* 오늘 주문현황 모달 스타일 */
@@ -1550,6 +1555,17 @@
         let rawOrders = []; // 원본 주문 데이터 리스트
         let customerMemos = {}; // 고객 메모 데이터 딕셔너리
         let selectedItems = new Set(); // 체크박스로 선택된 항목들 (phone|orderKey 조합)
+
+        // [신규] 주소의 시 단위 이하 주소 포맷 유틸
+        function formatShortAddress(address) {
+            if (!address) return "";
+            const addrStr = String(address).trim();
+            const match = addrStr.match(/^(?:.*?\s)?(?:[^\s]*?시)\s(.*)$/);
+            if (match && match[1]) {
+                return match[1].trim();
+            }
+            return addrStr;
+        }
         
         // 날짜/시간 비교를 위한 문자열 파싱 헬퍼
         function parseTimestampToDate(ts) {
@@ -2196,7 +2212,7 @@
                                     
                                     ${isDelivery ? `
                                         <div class="address-box">
-                                            <div><strong>🏡 주소:</strong> ${customer.address} ${customer.addressDetail}</div>
+                                            <div><strong>🏡 주소:</strong> ${formatShortAddress(customer.address)} ${customer.addressDetail}</div>
                                             ${customer.entrance ? `<div><strong>🚪 공동현관:</strong> ${customer.entrance}</div>` : ''}
                                         </div>
                                     ` : `
@@ -3273,7 +3289,7 @@
                             padding: 6px;
                             border-radius: 4px;
                             margin-top: 6px;
-                            font-size: 13px;
+                            font-size: 17px;
                             border: 1px dashed #bbb;
                             width: 100%;
                             box-sizing: border-box;
@@ -3328,7 +3344,8 @@
                                 <h2>${customer.name} (☎ ${displayPhone})</h2>
                                 ${isDelivery ? `
                                     <div class="address-box">
-                                        <strong>배송지:</strong> ${customer.address} ${customer.addressDetail}<br>
+                                        <strong>배송지:</strong> ${formatShortAddress(customer.address)}<br>
+                                        <strong>상세주소:</strong> ${customer.addressDetail}<br>
                                         <strong>공동현관키:</strong> ${customer.entrance || '없음'}
                                     </div>
                                 ` : ''}
