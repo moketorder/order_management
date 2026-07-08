@@ -1712,7 +1712,7 @@
         <div class="segment-control three-cols" style="display: grid; grid-template-columns: repeat(3, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px;">
             <div class="segment-btn admin-nav-btn active" data-tab="orders" onclick="switchAdminTab('orders')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 주문 관리</div>
             <div class="segment-btn admin-nav-btn" data-tab="product-upload" onclick="switchAdminTab('product-upload')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📦 상품 등록</div>
-            <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 상품 목록 (<span id="product-count">0</span>)</div>
+            <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 상품 목록 <span id="product-count" style="display: none;">(0)</span></div>
         </div>
     </div>
 
@@ -4616,8 +4616,13 @@
             switchAdminTab('product-upload');
 
             document.getElementById('form-card-title').innerText = `✏️ 상품 수정: ${prod.name}`;
-            document.getElementById('submitBtn').innerText = "💾 수정 완료";
-            document.getElementById('cancelBtn').style.display = "block";
+            
+            // 버튼 ID 바인딩 교정 (submitBtn -> btn-submit-form, cancelBtn -> btn-cancel-edit)
+            const submitBtn = document.getElementById('btn-submit-form');
+            if (submitBtn) submitBtn.innerText = "💾 수정 완료";
+            
+            const cancelBtn = document.getElementById('btn-cancel-edit');
+            if (cancelBtn) cancelBtn.style.display = "block";
 
             let tabType = "reserve";
             const mKey = prod.matchKey || "";
@@ -4643,8 +4648,11 @@
             stockInput.value = isUnlimited ? '9999' : rawStock;
             stockInput.disabled = isUnlimited;
 
-            document.getElementById('showToday').checked = (prod.showToday !== false);
-            document.getElementById('showReserve').checked = (prod.showReserve !== false);
+            const chkToday = document.getElementById('showToday');
+            if (chkToday) chkToday.checked = (prod.showToday !== false);
+            
+            const chkReserve = document.getElementById('showReserve');
+            if (chkReserve) chkReserve.checked = (prod.showReserve !== false);
 
             if (tabType === 'reserve') {
                 document.getElementById('categoryValue').value = prod.date || "";
@@ -4674,8 +4682,12 @@
             uploadEditProductKey = null;
 
             document.getElementById('form-card-title').innerText = "✨ 신규 상품 등록";
-            document.getElementById('submitBtn').innerText = "🚀 상품 등록 완료";
-            document.getElementById('cancelBtn').style.display = "none";
+            
+            const submitBtn = document.getElementById('btn-submit-form');
+            if (submitBtn) submitBtn.innerText = "📤 등록 완료";
+            
+            const cancelBtn = document.getElementById('btn-cancel-edit');
+            if (cancelBtn) cancelBtn.style.display = "none";
 
             document.getElementById('productForm').reset();
             document.getElementById('unlimitedStock').checked = false;
