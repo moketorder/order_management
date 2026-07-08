@@ -2517,7 +2517,11 @@
                     });
 
                     const cleanPhone = customer.phone.replace(/\D/g, "");
-                    const memo = customerMemos[cleanPhone] || "";
+                    const baseKey = (!cleanPhone) ? ((customer.name || "무명").trim() + "_비인증") : cleanPhone;
+                    const orderTime = customer.items[0] ? customer.items[0].timestamp : "";
+                    // [개선] 연락처와 주문 생성 일시(timestamp)를 결합한 유니크 키로 메모를 매핑하여, 동일 고객의 다른 일자 주문 카드 간 메모 복제 전파를 완벽 방지
+                    const memoKey = baseKey + "_" + orderTime.replace(/\s+/g, "");
+                    const memo = customerMemos[memoKey] || "";
                     
                     let memoHtml = "";
                     if (memo) {
@@ -2527,13 +2531,13 @@
                                     <strong style="font-size: 11px; background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;">📝 메모</strong>
                                     <span class="memo-text">${memo}</span>
                                 </div>
-                                <button class="btn-action-sm no-print" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #d97706; border-color: rgba(217, 119, 6, 0.25);" onclick="editCustomerMemo('${customer.phone}')">수정</button>
+                                <button class="btn-action-sm no-print" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #d97706; border-color: rgba(217, 119, 6, 0.25);" onclick="editCustomerMemo('${customer.name}', '${customer.phone}', '${orderTime}')">수정</button>
                             </div>
                         `;
                     } else {
                         memoHtml = `
                             <div class="memo-section no-print" style="margin-left: auto;">
-                                <button class="btn-action-sm" style="font-size: 11px; padding: 3px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editCustomerMemo('${customer.phone}')">📝 메모 추가</button>
+                                <button class="btn-action-sm" style="font-size: 11px; padding: 3px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editCustomerMemo('${customer.name}', '${customer.phone}', '${orderTime}')">📝 메모 추가</button>
                             </div>
                         `;
                     }
@@ -2820,15 +2824,21 @@
         }
 
         // [신규] 고객별 메모 수정 기능
-        async function editCustomerMemo(phone) {
+        // [신규] 고객별 메모 수정 기능 (비인증/번호 유실 고객의 복제 현상 완벽 해결)
+        // [신규] 고객별 메모 수정 기능 (비인증 및 날짜별 개별 주문 카드 단위 격리 메모 적용)
+        async function editCustomerMemo(name, phone, orderTime) {
             const cleanPhone = phone.replace(/\D/g, "");
-            const currentMemo = customerMemos[cleanPhone] || "";
+            const baseKey = (!cleanPhone) ? ((name || "무명").trim() + "_비인증") : cleanPhone;
+            const memoKey = baseKey + "_" + orderTime.replace(/\s+/g, "");
+            const currentMemo = customerMemos[memoKey] || "";
             const newMemo = prompt(`고객 메모를 입력해 주세요:\n(빈 칸으로 두고 확인 누르면 메모가 삭제됩니다.)`, currentMemo);
             if (newMemo === null) return; // 취소
             
             showLoader("메모 저장 중...");
             try {
-                const url = `${FIREBASE_DB_URL}customer_memos/${cleanPhone}.json`;
+                // Firebase 특수문자 금지 규칙 방어 치환
+                const dbKey = memoKey.replace(/[\.\#\$\[\]\/]/g, "_").trim();
+                const url = `${FIREBASE_DB_URL}customer_memos/${dbKey}.json`;
                 const method = newMemo.trim() === "" ? "DELETE" : "PUT";
                 const body = newMemo.trim() === "" ? null : JSON.stringify(newMemo.trim());
                 
@@ -2841,9 +2851,9 @@
                 if (!res.ok) throw new Error("Firebase 메모 저장 실패");
                 
                 if (newMemo.trim() === "") {
-                    delete customerMemos[cleanPhone];
+                    delete customerMemos[memoKey];
                 } else {
-                    customerMemos[cleanPhone] = newMemo.trim();
+                    customerMemos[memoKey] = newMemo.trim();
                 }
                 
                 showToast("메모가 저장되었습니다.");
