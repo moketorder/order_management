@@ -1725,8 +1725,8 @@
                     <select id="filterDateRange" class="select-filter" style="width: 76px; min-width: 76px; flex-shrink: 0; padding-left: 4px; padding-right: 4px;" onchange="handleFilterChange()">
                         <option value="all">🔍 전체</option>
                         <option value="month">🔍 월</option>
-                        <option value="week" selected>🔍 주</option>
-                        <option value="day">🔍 일</option>
+                        <option value="week">🔍 주</option>
+                        <option value="day" selected>🔍 일</option>
                     </select>
                     <div class="search-wrapper">
                         <input type="text" id="searchInput" class="search-input" style="padding-right: 35px;" placeholder="고객명, 연락처, 카톡명, 실명, 주소, 상품명 검색..." onkeyup="handleSearchInput()">
@@ -1876,15 +1876,17 @@
                                     <div style="font-size: 32px; margin-bottom: 8px;">📸</div>
                                     <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">사진 첨부하기</div>
                                     <div style="font-size: 12px; color: var(--text-sub);">여기를 탭하여 사진 선택</div>
-                                    <input type="file" id="productImages" accept="image/*" multiple style="display: none;" onchange="handleFileSelect(event)">
+                                    <input type="file" id="imageFile" accept="image/*" multiple style="display: none;" onchange="handleFileSelection(event)">
                                 </div>
                                 
                                 <!-- 첨부 이미지 리스트 -->
-                                <div class="image-preview-list" id="previewList" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px;"></div>
+                                <div id="imageListContainer" style="display: none; margin-top: 12px;">
+                                    <div id="selectedFilesList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                                </div>
                             </div>
 
                             <button type="submit" class="btn-submit" id="btn-submit-form" style="width: 100%; height: 50px; background: var(--text-main); color: white; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-top: 24px; transition: var(--transition);">📤 등록 완료</button>
-                            <button type="button" class="btn-cancel" id="btn-cancel-edit" onclick="cancelEditMode()" style="display: none; width: 100%; height: 50px; background: white; border: 1.5px solid var(--border); color: var(--text-sub); border-radius: var(--radius-sm); font-size: 15px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; margin-top: 8px; transition: var(--transition);">취소</button>
+                            <button type="button" class="btn-cancel" id="btn-cancel-edit" onclick="exitEditMode()" style="display: none; width: 100%; height: 50px; background: white; border: 1.5px solid var(--border); color: var(--text-sub); border-radius: var(--radius-sm); font-size: 15px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; margin-top: 8px; transition: var(--transition);">취소</button>
                         </form>
                     </div>
                 </div>
@@ -1917,7 +1919,7 @@
                 </div>
 
                 <!-- 일괄 처리 툴바 -->
-                <div class="batch-action-bar no-print" id="upload-batch-bar" style="position: fixed; bottom: 0; left: 50%; transform: translateX(-50%) translateY(100%); width: 100%; max-width: 480px; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(16px); border-top: 1px solid var(--border); border-radius: 20px 20px 0 0; padding: 16px 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 -10px 35px rgba(0,0,0,0.12); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 2000; box-sizing: border-box;">
+                <div class="batch-action-bar no-print" id="upload-batch-bar">
                     <div class="batch-top-row">
                         <div class="batch-selection-info">
                             <span id="upload-selection-count-text">0개 상품 선택됨</span>
@@ -2669,12 +2671,6 @@
         }
 
         function handleSearchInput() {
-            const searchInput = document.getElementById('searchInput');
-            const filterDateRange = document.getElementById('filterDateRange');
-            // [수정] 검색창에 입력이 있는 상태인 경우, 자동으로 검색 대상을 '전체(all)'로 갱신하여 과거/미래 고객이 누락되지 않게 보장
-            if (searchInput && searchInput.value.trim() !== "" && filterDateRange) {
-                filterDateRange.value = 'all';
-            }
             selectedItems.clear();
             updateSelectionCountText();
             renderFilteredOrders();
@@ -2684,11 +2680,6 @@
             const searchInput = document.getElementById('searchInput');
             if (searchInput) {
                 searchInput.value = '';
-                // [수정] 검색어를 지웠을 때는 기본 검색 범위인 '주(week)'로 자동 원복하여 당일/당주 위주의 편안한 본래 화면으로 복귀
-                const filterDateRange = document.getElementById('filterDateRange');
-                if (filterDateRange) {
-                    filterDateRange.value = 'week';
-                }
                 handleFilterChange();
             }
         }
@@ -4371,6 +4362,19 @@
                     const item = document.createElement('div');
                     item.className = 'product-item';
                     
+                    // 배송 유형(당일배송/예약배송)별 탭 노출 여부 판정
+                    let isVisible = true;
+                    if (uploadManageDeliveryType === 'today') {
+                        isVisible = prod.showToday !== undefined ? (prod.showToday === true || prod.showToday === 'true') : (prod.show !== false && prod.show !== 'false');
+                    } else {
+                        isVisible = prod.showReserve !== undefined ? (prod.showReserve === true || prod.showReserve === 'true') : (prod.show !== false && prod.show !== 'false');
+                    }
+
+                    if (!isVisible) {
+                        item.style.opacity = '0.6';
+                        item.style.background = '#f8fafc';
+                    }
+
                     const isChecked = uploadSelectedProductIndices.has(index);
                     if (isChecked) {
                         item.style.borderColor = 'var(--primary)';
@@ -4385,17 +4389,25 @@
                     const hasImage = prod.images && prod.images.length > 0;
                     const imgUrl = hasImage ? `https://lh3.googleusercontent.com/d/${prod.images[0]}=s220` : '';
 
-                    const hideBadge = (prod.hide === true) ? `<span style="font-size:10px; font-weight:bold; background:#f1f5f9; color:#64748b; padding:2px 6px; border-radius:4px; margin-left:6px;">숨김</span>` : '';
+                    const statusBadge = (!isVisible) 
+                        ? `<span style="font-size: 10px; font-weight: 800; background: #fee2e2; color: #ef4444; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🙈 숨김</span>`
+                        : `<span style="font-size: 10px; font-weight: 800; background: #dcfce7; color: #22c55e; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">👁️ 노출중</span>`;
 
                     item.innerHTML = `
-                        <input type="checkbox" id="chk_prod_${index}" ${isChecked ? 'checked' : ''} onchange="toggleSelectProduct(${index})" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); margin-right: 4px;">
+                        <label class="checkbox-container" style="display: none; margin-right: 8px; flex-shrink: 0;">
+                            <input type="checkbox" id="chk_prod_${index}" ${isChecked ? 'checked' : ''} onchange="toggleSelectProduct(${index})">
+                            <span class="custom-checkbox" style="margin-right: 0; width: 18px; height: 18px;"></span>
+                        </label>
                         ${hasImage ? `<img src="${imgUrl}" class="product-img">` : `<div class="product-img" style="display:flex; align-items:center; justify-content:center; font-size:16px;">📦</div>`}
-                        <div class="product-info" onclick="toggleSelectProduct(${index})" style="cursor: pointer; min-width: 0;">
-                            <div class="product-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                ${prod.name} ${hideBadge}
+                        <div class="product-info" onclick="toggleSelectProduct(${index})" style="cursor: pointer; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                            <div class="product-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700;">
+                                ${prod.name}
                             </div>
-                            <div class="product-meta">
-                                ${parseInt(prod.price).toLocaleString()}원 | ${stockText}
+                            <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                <span>${parseInt(prod.price).toLocaleString()}원</span>
+                                <span style="color: var(--text-sub);">|</span>
+                                <span>${stockText}</span>
+                                ${statusBadge}
                             </div>
                         </div>
                         <div class="product-actions">
@@ -4403,6 +4415,48 @@
                             <button class="btn-action action-delete" onclick="deleteProduct(${index})">삭제</button>
                         </div>
                     `;
+
+                    // 길게 누르기(롱프레스) 이벤트 핸들링
+                    let pressTimer;
+                    let isLongPress = false;
+                    
+                    const startPress = (e) => {
+                        // 버튼이나 체크박스를 누른 경우 롱프레스 비동작
+                        if (e.target.closest('button') || e.target.closest('.checkbox-container')) {
+                            return;
+                        }
+                        isLongPress = false;
+                        pressTimer = setTimeout(() => {
+                            isLongPress = true;
+                            if (navigator.vibrate) navigator.vibrate(50);
+                            toggleSelectProduct(index);
+                        }, 750);
+                    };
+                    
+                    const cancelPress = (e) => {
+                        if (pressTimer) clearTimeout(pressTimer);
+                    };
+                    
+                    item.addEventListener('touchstart', startPress, { passive: true });
+                    item.addEventListener('touchend', (e) => {
+                        if (isLongPress) {
+                            e.preventDefault();
+                        }
+                        cancelPress();
+                    });
+                    item.addEventListener('touchmove', cancelPress, { passive: true });
+                    
+                    item.addEventListener('mousedown', startPress);
+                    item.addEventListener('mouseup', cancelPress);
+                    item.addEventListener('mouseleave', cancelPress);
+                    item.addEventListener('click', (e) => {
+                        if (isLongPress) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            isLongPress = false;
+                        }
+                    }, true);
+
                     container.appendChild(item);
                 });
             });
@@ -4437,10 +4491,21 @@
             try {
                 let updatedList = [...uploadProducts];
                 uploadSelectedProductIndices.forEach(idx => {
-                    updatedList[idx] = {
-                        ...updatedList[idx],
-                        hide: !visible
-                    };
+                    if (uploadManageDeliveryType === 'today') {
+                        updatedList[idx] = {
+                            ...updatedList[idx],
+                            showToday: visible
+                        };
+                    } else {
+                        updatedList[idx] = {
+                            ...updatedList[idx],
+                            showReserve: visible
+                        };
+                    }
+                    // 하위 호환성을 위해 hide 값도 동기화 (둘 다 숨겨지면 hide: true, 둘 중 하나라도 노출되면 hide: false)
+                    const isTodayShow = updatedList[idx].showToday !== false;
+                    const isReserveShow = updatedList[idx].showReserve !== false;
+                    updatedList[idx].hide = (!isTodayShow && !isReserveShow);
                 });
 
                 const writeRes = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
