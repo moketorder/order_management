@@ -1772,7 +1772,7 @@
                         <label class="checkbox-container">
                             <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
                             <span class="custom-checkbox"></span>
-                            <span id="selection-count-text">0개 항목 선택됨</span>
+                            <span id="selection-count-text">0개 고객카드 선택됨</span>
                         </label>
                     </div>
                     <div class="batch-summary-info" id="batch-summary-info">
@@ -2767,8 +2767,22 @@
         }
 
         function updateSelectionCountText() {
-            const count = selectedItems.size;
-            document.getElementById('selection-count-text').innerText = `${count}개 항목 선택됨`;
+            // 선택된 항목들의 고객 카드 키 집합 계산 (고객카드별 기준)
+            const selectedCards = new Set();
+            selectedItems.forEach(key => {
+                const [phone, orderKey] = key.split('|');
+                const item = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
+                if (item) {
+                    const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && item.address.trim() !== "")) ? '배달주문' : '매장픽업';
+                    const info = getOrderDateInfo(item);
+                    const dateStr = info.dateStr || "기타";
+                    const customerKey = `${item.name}_${item.phone}_${actualShippingMethod}_${dateStr}`;
+                    selectedCards.add(customerKey);
+                }
+            });
+            
+            const count = selectedCards.size;
+            document.getElementById('selection-count-text').innerText = `${count}개 고객카드 선택됨`;
             
             // 선택된 항목들의 수량 및 합계 계산
             let totalQty = 0;
@@ -4614,8 +4628,15 @@
                 };
 
                 let updatedProducts = [...uploadProducts];
+                let isStockChanged = false;
+                let oldProd = null;
 
                 if (uploadIsEditMode && uploadEditProductKey !== null) {
+                    oldProd = uploadProducts[uploadEditProductKey];
+                    const oldStock = (oldProd.stock === undefined || oldProd.stock === null) ? "" : oldProd.stock;
+                    if (String(stock) !== String(oldStock) || oldProd.name !== name || oldProd.matchKey !== matchKey) {
+                        isStockChanged = true;
+                    }
                     updatedProducts[uploadEditProductKey] = {
                         ...uploadProducts[uploadEditProductKey],
                         ...productObj
@@ -4627,13 +4648,42 @@
                             hideLoader();
                             return;
                         }
+                        oldProd = updatedProducts[dupIndex];
+                        const oldStock = (oldProd.stock === undefined || oldProd.stock === null) ? "" : oldProd.stock;
+                        if (String(stock) !== String(oldStock) || oldProd.name !== name || oldProd.matchKey !== matchKey) {
+                            isStockChanged = true;
+                        }
                         updatedProducts[dupIndex] = {
                             ...updatedProducts[dupIndex],
                             ...productObj
                         };
                     } else {
                         updatedProducts.push(productObj);
+                        isStockChanged = true;
                     }
+                }
+
+                // [신규] 상품 재고 정보가 수정되거나 식별자가 변경된 경우, 전역 재고 변동분(global_stock) 초기화 조치
+                if (isStockChanged) {
+                    const newAdjKey = fGetAdjKey(matchKey, name);
+                    const adjValue = isUnlimited ? "unlimited" : 0;
+                    
+                    // 만약 상품명이나 날짜(키)가 변경되었다면 기존 키의 조정값 삭제
+                    if (oldProd && (oldProd.name !== name || oldProd.matchKey !== matchKey)) {
+                        const oldAdjKey = fGetAdjKey(oldProd.matchKey, oldProd.name);
+                        await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(oldAdjKey)}.json`, {
+                            method: 'DELETE'
+                        }).catch(e => console.error("기존 재고 변동분 삭제 실패:", e));
+                        delete uploadGlobalAdjustments[oldAdjKey];
+                    }
+                    
+                    // Firebase 조정값 0 또는 무제한으로 리셋 (절대 수량 수정)
+                    await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(newAdjKey)}.json`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(adjValue)
+                    });
+                    uploadGlobalAdjustments[newAdjKey] = adjValue;
                 }
 
                 const writeRes = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
@@ -4677,6 +4727,13 @@
                 });
 
                 if (!res.ok) throw new Error("Firebase 삭제 동기화 실패");
+
+                // Firebase 재고 조정값도 함께 제거
+                const adjKey = fGetAdjKey(prod.matchKey, prod.name);
+                await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
+                    method: 'DELETE'
+                }).catch(e => console.error("상품 삭제에 따른 재고 조정값 삭제 실패:", e));
+                delete uploadGlobalAdjustments[adjKey];
 
                 uploadProducts = updatedList;
                 document.getElementById('product-count').innerText = uploadProducts.length;
