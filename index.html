@@ -1901,7 +1901,7 @@
                     <!-- 배송 유형 대분류 필터 탭 -->
                     <div class="segment-control two-cols" id="manage-delivery-type-tabs" style="margin-bottom: 12px; display: grid; grid-template-columns: 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px;">
                         <div class="segment-btn active" data-manage-delivery-type="today" onclick="selectManageDeliveryType('today')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 당일구매</div>
-                        <div class="segment-btn" data-manage-delivery-type="reserve" onclick="selectManageDeliveryType('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📅 예약구매</div>
+                        <div class="segment-btn" data-manage-delivery-type="reserve" onclick="selectManageDeliveryType('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 예약구매</div>
                     </div>
                     <!-- 상품 목록 대분류 필터 탭 -->
                     <div class="segment-control five-cols" id="manage-category-tabs" style="margin-bottom: 12px; display: grid; background: #e2e8f0; padding: 4px; border-radius: 12px;">
@@ -2488,7 +2488,7 @@
                             header.innerHTML = `🗑️ ${dateLabel} (전체 취소 건)`;
                         } else {
                             header.style = "font-size: 14px; font-weight: 800; color: #4b5563; margin: 25px 0 12px 0; padding: 6px 12px; background-color: #f3f4f6; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); width: auto;";
-                            header.innerHTML = `📅 ${dateLabel}`;
+                            header.innerHTML = `🗓️ ${dateLabel}`;
                         }
                         listContainer.appendChild(header);
                         lastDateHeader = headerKey;
@@ -3705,7 +3705,7 @@
                             padding: 6px;
                             border-radius: 4px;
                             margin-top: 6px;
-                            font-size: 17px;
+                            font-size: 20px;
                             border: 1px dashed #bbb;
                             width: 100%;
                             box-sizing: border-box;
@@ -3752,6 +3752,12 @@
                 const displayPhone = cleanPhone.slice(-4);
                 const displayMethod = customer.shippingMethod === '매장픽업' ? '픽업주문' : customer.shippingMethod;
                 
+                // 고객별 메모 추출
+                const baseKey = (!cleanPhone) ? ((customer.name || "무명").trim() + "_비인증") : cleanPhone;
+                const orderTime = customer.items[0] ? customer.items[0].timestamp : "";
+                const memoKey = baseKey + "_" + orderTime.replace(/\s+/g, "");
+                const memo = customerMemos[memoKey] || "";
+                
                 printHtml += `
                     <div class="print-card">
                         <div class="card-header">
@@ -3763,6 +3769,11 @@
                                         <strong>배송지:</strong> ${formatShortAddress(customer.address)}<br>
                                         <strong>상세주소:</strong> ${customer.addressDetail}<br>
                                         <strong>공동현관키:</strong> ${customer.entrance || '없음'}
+                                    </div>
+                                ` : ''}
+                                ${memo ? `
+                                    <div style="background: #fffbeb !important; border: 1px dashed #fcd34d; padding: 6px; border-radius: 4px; margin-top: 6px; font-size: 15px; -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; width: 100%;">
+                                        <strong>📝 메모:</strong> ${memo}
                                     </div>
                                 ` : ''}
                             </div>
@@ -4368,7 +4379,7 @@
                 else if (mKey === "야채_예약") displayTitle = "🥬 예약 야채";
                 else if (mKey === "기타_예약") displayTitle = "📦 예약 기타";
                 else if (/^\d{4}-\d{2}-\d{2}$/.test(mKey)) {
-                    displayTitle = `📅 공동구매 수령일: ${mKey}`;
+                    displayTitle = `🗓️ 공동구매 수령일: ${mKey}`;
                 }
                 groupTitle.innerText = displayTitle;
                 container.appendChild(groupTitle);
