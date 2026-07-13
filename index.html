@@ -1745,7 +1745,8 @@
                         <option value="입고">🟡 입고 완료</option>
                         <option value="픽업">🟣 픽업 완료</option>
                         <option value="배달완료">🟢 배달 완료</option>
-                        <option value="미입금">🔴 미입금</option>
+                        <option value="배달미입금">🔴 배달 미입금</option>
+                        <option value="픽업미입금">🔴 픽업 미입금</option>
                     </select>
                 </div>
                 <div class="controls-row button-row">
@@ -1939,6 +1940,8 @@
 
         let rawOrders = []; // 원본 주문 데이터 리스트
         let customerMemos = {}; // 고객 메모 데이터 딕셔너리
+        let fixedMemos = {}; // 고객 고정 메모 데이터 딕셔너리
+        let customerOrderSequences = {}; // 고객별 누적 주문 시퀀스 매핑
         let selectedItems = new Set(); // 체크박스로 선택된 항목들 (phone|orderKey 조합)
 
         // [신규] 주소의 시 단위 이하 주소 포맷 유틸
@@ -1994,9 +1997,10 @@
         async function fetchOrders() {
             showLoader("주문 데이터를 가져오는 중...");
             try {
-                const [response, memoRes] = await Promise.all([
+                const [response, memoRes, fixedMemoRes] = await Promise.all([
                     fetch(`${FIREBASE_DB_URL}orders.json?t=${Date.now()}`),
-                    fetch(`${FIREBASE_DB_URL}customer_memos.json?t=${Date.now()}`).catch(e => { console.error("Firebase Memos 로드 실패:", e); return null; })
+                    fetch(`${FIREBASE_DB_URL}customer_memos.json?t=${Date.now()}`).catch(e => { console.error("Firebase Memos 로드 실패:", e); return null; }),
+                    fetch(`${FIREBASE_DB_URL}fixed_memos.json?t=${Date.now()}`).catch(e => { console.error("Firebase Fixed Memos 로드 실패:", e); return null; })
                 ]);
                 if (!response.ok) throw new Error("Firebase 연결 실패");
                 const data = await response.json() || {};
@@ -2005,6 +2009,12 @@
                     customerMemos = await memoRes.json() || {};
                 } else {
                     customerMemos = {};
+                }
+
+                if (fixedMemoRes && fixedMemoRes.ok) {
+                    fixedMemos = await fixedMemoRes.json() || {};
+                } else {
+                    fixedMemos = {};
                 }
                 
                 // 데이터 평탄화
@@ -2035,6 +2045,30 @@
                 
                 // 타임스탬프 기준 최신순 정렬 (한글 포맷 대응 안전한 파싱)
                 rawOrders.sort((a, b) => parseTimestampToDate(b.timestamp) - parseTimestampToDate(a.timestamp));
+                
+                // 고객별 누적 주문 횟수(시퀀스) 계산
+                customerOrderSequences = {};
+                rawOrders.forEach(item => {
+                    const cleanPhone = (item.phone || "").replace(/\D/g, "");
+                    const customerKey = (!cleanPhone) ? (((item.name || "무명").trim()) + "_비인증") : cleanPhone;
+                    const ts = item.timestamp || "";
+                    const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                    if (isCanceled) return;
+
+                    if (!customerOrderSequences[customerKey]) {
+                        customerOrderSequences[customerKey] = new Set();
+                    }
+                    if (ts) {
+                        customerOrderSequences[customerKey].add(ts);
+                    }
+                });
+
+                for (const customerKey in customerOrderSequences) {
+                    const tsArray = Array.from(customerOrderSequences[customerKey]).sort((a, b) => {
+                        return parseKRDate(a) - parseKRDate(b);
+                    });
+                    customerOrderSequences[customerKey] = tsArray;
+                }
                 
                 // 동기화 상태 갱신
                 const now = new Date();
@@ -2345,8 +2379,16 @@
                         else if (statusFilter === '입고') matchStatus = status === '입고';
                         else if (statusFilter === '픽업') matchStatus = status === '픽업';
                         else if (statusFilter === '배달완료') matchStatus = status === '배달완료';
-                        else if (statusFilter === '미입금') matchStatus = (actualShippingMethod === '배달주문') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '배달완료' && status !== '픽업';
+                        else if (statusFilter === '배달미입금') matchStatus = (actualShippingMethod === '배달주문') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '배달완료';
+                        else if (statusFilter === '픽업미입금') matchStatus = (actualShippingMethod === '매장픽업') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '픽업';
                     }
+
+                    const cleanPhone = (item.phone || "").replace(/\D/g, "");
+                    const baseKey = (!cleanPhone) ? (((item.name || "무명").trim()) + "_비인증") : cleanPhone;
+                    const orderTime = item.timestamp || "";
+                    const memoKey = baseKey + "_" + orderTime.replace(/\s+/g, "");
+                    const orderMemo = customerMemos[memoKey] || "";
+                    const fixedMemo = fixedMemos[baseKey] || "";
 
                     const matchSearch = search === "" || 
                         (item.name || "").toLowerCase().includes(search) ||
@@ -2355,7 +2397,9 @@
                         (item.address || "").toLowerCase().includes(search) ||
                         (item.addressDetail || "").toLowerCase().includes(search) ||
                         (item.kakaoName || "").toLowerCase().includes(search) ||
-                        (item.kakaoRealName || "").toLowerCase().includes(search);
+                        (item.kakaoRealName || "").toLowerCase().includes(search) ||
+                        orderMemo.toLowerCase().includes(search) ||
+                        fixedMemo.toLowerCase().includes(search);
 
                     return matchShipping && matchStatus && matchSearch;
                 });
@@ -2562,28 +2606,56 @@
                     const cleanPhone = customer.phone.replace(/\D/g, "");
                     const baseKey = (!cleanPhone) ? ((customer.name || "무명").trim() + "_비인증") : cleanPhone;
                     const orderTime = customer.items[0] ? customer.items[0].timestamp : "";
-                    // [개선] 연락처와 주문 생성 일시(timestamp)를 결합한 유니크 키로 메모를 매핑하여, 동일 고객의 다른 일자 주문 카드 간 메모 복제 전파를 완벽 방지
                     const memoKey = baseKey + "_" + orderTime.replace(/\s+/g, "");
-                    const memo = customerMemos[memoKey] || "";
                     
-                    let memoHtml = "";
-                    if (memo) {
-                        memoHtml = `
-                            <div class="memo-section" style="width: 100%; margin-top: 8px; padding: 6px 10px; background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 6px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    const orderMemo = customerMemos[memoKey] || "";
+                    const fixedMemo = fixedMemos[baseKey] || "";
+                    
+                    let memoHtml = `<div style="display:flex; flex-direction:column; width:100%; gap:6px; margin-top:8px;">`;
+                    
+                    // 1. 주문별 메모
+                    if (orderMemo) {
+                        memoHtml += `
+                            <div class="memo-section" style="width: 100%; padding: 4px 8px; background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 6px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; box-sizing: border-box;">
                                 <div style="color: #b45309; text-align: left; word-break: break-all; display: flex; align-items: flex-start; gap: 4px;">
-                                    <strong style="font-size: 11px; background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;">📝 메모</strong>
-                                    <span class="memo-text">${memo}</span>
+                                    <strong style="font-size: 11px; background: #fef3c7; color: #b45309; padding: 2px 5px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;">📝 주문메모</strong>
+                                    <span class="memo-text">${orderMemo}</span>
                                 </div>
                                 <button class="btn-action-sm no-print" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #d97706; border-color: rgba(217, 119, 6, 0.25);" onclick="editCustomerMemo('${customer.name}', '${customer.phone}', '${orderTime}')">수정</button>
                             </div>
                         `;
                     } else {
-                        memoHtml = `
-                            <div class="memo-section no-print" style="margin-left: auto;">
-                                <button class="btn-action-sm" style="font-size: 11px; padding: 3px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editCustomerMemo('${customer.name}', '${customer.phone}', '${orderTime}')">📝 메모 추가</button>
+                        memoHtml += `
+                            <div class="memo-section no-print" style="margin-right: auto;">
+                                <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editCustomerMemo('${customer.name}', '${customer.phone}', '${orderTime}')">📝 주문메모 추가</button>
                             </div>
                         `;
                     }
+                    
+                    // 2. 고객 고정 메모
+                    if (fixedMemo) {
+                        memoHtml += `
+                            <div class="fixed-memo-section" style="width: 100%; padding: 4px 8px; background: #f0fdf4; border: 1px dashed #86efac; border-radius: 6px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; box-sizing: border-box;">
+                                <div style="color: #166534; text-align: left; word-break: break-all; display: flex; align-items: flex-start; gap: 4px;">
+                                    <strong style="font-size: 11px; background: #dcfce7; color: #166534; padding: 2px 5px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;">📌 고정메모</strong>
+                                    <span class="memo-text">${fixedMemo}</span>
+                                </div>
+                                <button class="btn-action-sm no-print" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #16a34a; border-color: rgba(22, 163, 74, 0.25);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">수정</button>
+                            </div>
+                        `;
+                    } else {
+                        memoHtml += `
+                            <div class="fixed-memo-section no-print" style="margin-right: auto;">
+                                <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">📌 고정메모 추가</button>
+                            </div>
+                        `;
+                    }
+                    
+                    const tsSeq = customerOrderSequences[baseKey] || [];
+                    const orderIndex = tsSeq.indexOf(orderTime);
+                    const orderSeqNumber = orderIndex !== -1 ? (orderIndex + 1) : 1;
+                    const totalOrderCount = tsSeq.length;
+                    const seqBadge = `<span style="font-size:11px; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px; display:inline-block; vertical-align:middle;">${orderSeqNumber}번째 주문 (총 ${totalOrderCount}회)</span>`;
 
                     card.innerHTML = `
                         <div class="card-header">
@@ -2593,9 +2665,10 @@
                                     <span class="custom-checkbox"></span>
                                 </label>
                                 <div class="customer-info-group">
-                                    <div class="customer-meta">
+                                    <div class="customer-meta" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
                                         <span class="customer-name">${customer.name}</span>
-                                        <a href="tel:${customer.phone}" class="customer-phone">${customer.phone}</a>
+                                        ${seqBadge}
+                                        <a href="tel:${customer.phone}" class="customer-phone" style="margin-left: 0;">${customer.phone}</a>
                                         ${customer.kakaoName ? `<span class="kakao-badge">💬 ${customer.kakaoName}${customer.kakaoRealName ? ` (${customer.kakaoRealName})` : ''}</span>` : ''}
                                     </div>
                                     
@@ -2919,6 +2992,45 @@
             }
         }
 
+        // [신규] 고객별 고정 메모 수정 기능
+        async function editFixedMemo(name, phone) {
+            const cleanPhone = phone.replace(/\D/g, "");
+            const baseKey = (!cleanPhone) ? ((name || "무명").trim() + "_비인증") : cleanPhone;
+            const currentMemo = fixedMemos[baseKey] || "";
+            const newMemo = prompt(`고객의 고정 메모(모든 주문 카드에 항상 표시)를 입력해 주세요:\n(빈 칸으로 두고 확인 누르면 메모가 삭제됩니다.)`, currentMemo);
+            if (newMemo === null) return; // 취소
+            
+            showLoader("고정 메모 저장 중...");
+            try {
+                const dbKey = baseKey.replace(/[\.\#\$\[\]\/]/g, "_").trim();
+                const url = `${FIREBASE_DB_URL}fixed_memos/${dbKey}.json`;
+                const method = newMemo.trim() === "" ? "DELETE" : "PUT";
+                const body = newMemo.trim() === "" ? null : JSON.stringify(newMemo.trim());
+                
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body
+                });
+                
+                if (!res.ok) throw new Error("Firebase 고정 메모 저장 실패");
+                
+                if (newMemo.trim() === "") {
+                    delete fixedMemos[baseKey];
+                } else {
+                    fixedMemos[baseKey] = newMemo.trim();
+                }
+                
+                showToast("고정 메모가 저장되었습니다.");
+                renderFilteredOrders();
+            } catch (e) {
+                console.error(e);
+                showToast("고정 메모 저장 실패: " + e.toString());
+            } finally {
+                hideLoader();
+            }
+        }
+
         // 6. 단일/일괄 상태 변경 실행 (Firebase PUT/PATCH 및 구글 시트 동기화)
         async function updateSingleItemStatus(phone, orderKey, newStatus) {
             showLoader("상태 업데이트 중...");
@@ -3186,7 +3298,8 @@
 
             // 4. 입금완료 / 미입금 고객 수 계산
             let paidCustomers = 0;
-            let unpaidCustomers = 0;
+            let unpaidDeliveryCustomers = 0;
+            let unpaidPickupCustomers = 0;
             
             // 5. 픽업 / 배달 고객 수 계산 및 완료 상태
             let pickupCustomers = 0;
@@ -3194,24 +3307,27 @@
             let completedPickupCustomers = 0;
 
             Object.entries(customerGroups).forEach(([key, items]) => {
-                // 입금 여부: 취소 안된 품목 중, 배달완료나 픽업완료가 아니면서 미입금 상태이고 픽업 주문이 아닌 항목이 하나라도 있는지 확인
+                const firstItem = items[0];
+                const actualShippingMethod = (firstItem.shippingMethod === '배달주문' || (firstItem.shippingMethod !== '매장픽업' && firstItem.address && firstItem.address.trim() !== "")) ? '배달주문' : '매장픽업';
+
+                // 입금 여부: 취소 안된 품목 중, 배달완료나 픽업완료가 아니면서 미입금 상태인 항목이 하나라도 있는지 확인
                 const hasUnpaid = items.some(it => {
                     const isPaid = (it.paid === true || it.paid === "true");
                     const isCompleted = (it.status === '배달완료' || it.status === '픽업');
-                    const actualShippingMethod = (it.shippingMethod === '배달주문' || (it.shippingMethod !== '매장픽업' && it.address && it.address.trim() !== "")) ? '배달주문' : '매장픽업';
-                    return !isPaid && !isCompleted && actualShippingMethod !== '매장픽업';
+                    return !isPaid && !isCompleted;
                 });
 
                 if (hasUnpaid) {
-                    unpaidCustomers++;
+                    if (actualShippingMethod === '배달주문') {
+                        unpaidDeliveryCustomers++;
+                    } else {
+                        unpaidPickupCustomers++;
+                    }
                 } else {
                     paidCustomers++;
                 }
 
-                // 수령방법: 배달주문 여부 판별
-                const firstItem = items[0];
-                const actualShippingMethod = (firstItem.shippingMethod === '배달주문' || (firstItem.shippingMethod !== '매장픽업' && firstItem.address && firstItem.address.trim() !== "")) ? '배달주문' : '매장픽업';
-                
+                // 수령방법: 배달/픽업 고객 수 계산
                 if (actualShippingMethod === '매장픽업') {
                     pickupCustomers++;
                     // 픽업완료 여부: 취소 안된 모든 품목의 상태가 '픽업'인지 판별
@@ -3285,10 +3401,16 @@
                                         <span>입금완료</span>
                                         <span class="badge-success">${paidCustomers}명</span>
                                     </div>
+                                    <div class="details-row" style="border-top:1px dashed #eee; padding-top:6px; margin-top:6px;">
+                                        <span style="font-weight:700; color:#b45309;">🚚 배달 미입금</span>
+                                        <button class="badge-warning" style="display: inline-flex; align-items: center; gap: 2px; background:#fff7ed; border-color:#fed7aa; color:#c2410c;" onclick="showUnpaidListModal('배달')">
+                                            ${unpaidDeliveryCustomers}명 <span style="font-size: 8px;">🔍</span>
+                                        </button>
+                                    </div>
                                     <div class="details-row">
-                                        <span>미입금</span>
-                                        <button class="badge-warning" style="display: inline-flex; align-items: center; gap: 2px;" onclick="showUnpaidListModal()">
-                                            ${unpaidCustomers}명 <span style="font-size: 8px;">🔍</span>
+                                        <span style="font-weight:700; color:#3b82f6;">📍 픽업 미입금</span>
+                                        <button class="badge-warning" style="display: inline-flex; align-items: center; gap: 2px; background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8;" onclick="showUnpaidListModal('픽업')">
+                                            ${unpaidPickupCustomers}명 <span style="font-size: 8px;">🔍</span>
                                         </button>
                                     </div>
                                 </div>
@@ -3326,7 +3448,7 @@
         }
 
         // 미입금자 상세 리스트 모달 표시
-        function showUnpaidListModal() {
+        function showUnpaidListModal(type = '배달') {
             // 현재 선택된 일자 탭 데이터를 기본으로 가져옴
             const targetOrders = rawOrders.filter(item => {
                 const info = getOrderDateInfo(item);
@@ -3344,7 +3466,11 @@
                 const isCanceled = (it.canceled === true || it.canceled === "true");
                 if (isCanceled) return false;
                 const actualShippingMethod = (it.shippingMethod === '배달주문' || (it.shippingMethod !== '매장픽업' && it.address && it.address.trim() !== "")) ? '배달주문' : '매장픽업';
-                return actualShippingMethod !== '매장픽업';
+                if (type === '배달') {
+                    return actualShippingMethod === '배달주문';
+                } else {
+                    return actualShippingMethod === '매장픽업';
+                }
             });
             
             // 고객별 그룹화
@@ -3449,7 +3575,7 @@
             modal.innerHTML = `
                 <div class="unpaid-modal-content">
                     <div class="unpaid-modal-header">
-                        <h2>🔴 ${dateTitle} 미입금 상세 내역</h2>
+                        <h2>🔴 ${dateTitle} ${type} 미입금 상세 내역</h2>
                         <button class="unpaid-modal-close" onclick="closeUnpaidModal()">&times;</button>
                     </div>
                     <div class="unpaid-modal-body">
@@ -3757,6 +3883,7 @@
                 const orderTime = customer.items[0] ? customer.items[0].timestamp : "";
                 const memoKey = baseKey + "_" + orderTime.replace(/\s+/g, "");
                 const memo = customerMemos[memoKey] || "";
+                const fixedMemo = fixedMemos[baseKey] || "";
                 
                 printHtml += `
                     <div class="print-card">
@@ -3773,7 +3900,12 @@
                                 ` : ''}
                                 ${memo ? `
                                     <div style="background: #fffbeb !important; border: 1px dashed #fcd34d; padding: 6px; border-radius: 4px; margin-top: 6px; font-size: 15px; -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; width: 100%;">
-                                        <strong>📝 메모:</strong> ${memo}
+                                        <strong>📝 주문메모:</strong> ${memo}
+                                    </div>
+                                ` : ''}
+                                ${fixedMemo ? `
+                                    <div style="background: #f0fdf4 !important; border: 1px dashed #86efac; padding: 6px; border-radius: 4px; margin-top: 6px; font-size: 15px; -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; width: 100%;">
+                                        <strong>📌 고정메모:</strong> ${fixedMemo}
                                     </div>
                                 ` : ''}
                             </div>
@@ -4711,6 +4843,7 @@
                 showToast(uploadIsEditMode ? "상품 수정이 완료되었습니다!" : "새로운 상품이 성공적으로 등록되었습니다!");
                 
                 exitEditMode();
+                await loadProductsFromServer(); // [수정] 서버에서 최신 재고 조정값(global_stock) 다시 불러오기
                 buildManageCategoryTabs();
                 buildSubTabs();
                 switchAdminTab('product-list');
@@ -4750,6 +4883,7 @@
                 document.getElementById('product-count').innerText = uploadProducts.length;
                 
                 showToast("상품이 성공적으로 삭제되었습니다.");
+                await loadProductsFromServer(); // [수정] 서버에서 최신 상태 다시 로드
                 buildManageCategoryTabs();
                 buildSubTabs();
                 renderProductsList();
