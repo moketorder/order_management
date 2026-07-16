@@ -1958,23 +1958,24 @@
         // 날짜/시간 비교를 위한 문자열 파싱 헬퍼
         function parseTimestampToDate(ts) {
             if (!ts) return new Date(0);
-            let match = ts.match(/(\d+)년\s*(\d+)월\s*(\d+)일.*?(\d+):(\d+):(\d+)/);
+            const tsStr = String(ts);
+            let match = tsStr.match(/(\d+)년\s*(\d+)월\s*(\d+)일.*?(\d+):(\d+):(\d+)/);
             if (match) {
                 return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]), parseInt(match[4]), parseInt(match[5]), parseInt(match[6]));
             }
-            match = ts.match(/(\d+)년\s*(\d+)월\s*(\d+)일/);
+            match = tsStr.match(/(\d+)년\s*(\d+)월\s*(\d+)일/);
             if (match) {
                 return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
             }
-            match = ts.match(/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/);
+            match = tsStr.match(/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/);
             if (match) {
                 return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]), parseInt(match[4]), parseInt(match[5]), parseInt(match[6]));
             }
-            match = ts.match(/(\d+)-(\d+)-(\d+)/);
+            match = tsStr.match(/(\d+)-(\d+)-(\d+)/);
             if (match) {
                 return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
             }
-            return new Date(ts);
+            return new Date(tsStr);
         }
 
         // 주문시간 포맷 헬퍼 (월/일 00:00)
@@ -2049,9 +2050,9 @@
                 // 고객별 누적 주문 횟수(시퀀스) 계산
                 customerOrderSequences = {};
                 rawOrders.forEach(item => {
-                    const cleanPhone = (item.phone || "").replace(/\D/g, "");
-                    const customerKey = (!cleanPhone) ? (((item.name || "무명").trim()) + "_비인증") : cleanPhone;
-                    const ts = item.timestamp || "";
+                    const cleanPhone = String(item.phone || "").replace(/\D/g, "");
+                    const customerKey = (!cleanPhone) ? (((String(item.name || "무명")).trim()) + "_비인증") : cleanPhone;
+                    const ts = String(item.timestamp || "");
                     const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
                     if (isCanceled) return;
 
@@ -2091,13 +2092,13 @@
 
         // 날짜 파싱 헬퍼
         function getOrderDateInfo(item) {
-            let dateStr = item.pickupDate || "";
+            let dateStr = String(item.pickupDate || "").trim();
             
             // [수정] 날짜 형식에 매칭되지 않는 모든 텍스트(카테고리명 등) 또는 빈 값이면 timestamp를 기준일로 삼음 (고객 검색 누락 완벽 해결)
             const hasValidDateFormat = /(\d+)년\s*(\d+)월\s*(\d+)일|(\d+)-(\d+)-(\d+)/.test(dateStr);
-            if (!hasValidDateFormat || !dateStr || dateStr.trim() === "") {
+            if (!hasValidDateFormat || dateStr === "") {
                 if (item.timestamp) {
-                    dateStr = item.timestamp;
+                    dateStr = String(item.timestamp).trim();
                 }
             }
             
@@ -2369,7 +2370,7 @@
 
                 // 2단계: 수령방법 및 검색 키워드 필터
                 filtered = filtered.filter(item => {
-                    const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && item.address.trim() !== "")) ? '배달주문' : '매장픽업';
+                    const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
                     const matchShipping = shippingFilter === 'all' || actualShippingMethod === shippingFilter;
                     
                     let matchStatus = true;
@@ -2383,21 +2384,29 @@
                         else if (statusFilter === '픽업미입금') matchStatus = (actualShippingMethod === '매장픽업') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '픽업';
                     }
 
-                    const cleanPhone = (item.phone || "").replace(/\D/g, "");
-                    const baseKey = (!cleanPhone) ? (((item.name || "무명").trim()) + "_비인증") : cleanPhone;
-                    const orderTime = item.timestamp || "";
+                    const phoneStr = String(item.phone || "");
+                    const nameStr = String(item.name || "");
+                    const itemStr = String(item.item || "");
+                    const addressStr = String(item.address || "");
+                    const addressDetailStr = String(item.addressDetail || "");
+                    const kakaoNameStr = String(item.kakaoName || "");
+                    const kakaoRealNameStr = String(item.kakaoRealName || "");
+
+                    const cleanPhone = phoneStr.replace(/\D/g, "");
+                    const baseKey = (!cleanPhone) ? ((nameStr.trim()) + "_비인증") : cleanPhone;
+                    const orderTime = String(item.timestamp || "");
                     const memoKey = baseKey + "_" + orderTime.replace(/\s+/g, "");
                     const orderMemo = customerMemos[memoKey] || "";
                     const fixedMemo = fixedMemos[baseKey] || "";
 
                     const matchSearch = search === "" || 
-                        (item.name || "").toLowerCase().includes(search) ||
-                        (item.phone || "").includes(search) ||
-                        (item.item || "").toLowerCase().includes(search) ||
-                        (item.address || "").toLowerCase().includes(search) ||
-                        (item.addressDetail || "").toLowerCase().includes(search) ||
-                        (item.kakaoName || "").toLowerCase().includes(search) ||
-                        (item.kakaoRealName || "").toLowerCase().includes(search) ||
+                        nameStr.toLowerCase().includes(search) ||
+                        phoneStr.includes(search) ||
+                        itemStr.toLowerCase().includes(search) ||
+                        addressStr.toLowerCase().includes(search) ||
+                        addressDetailStr.toLowerCase().includes(search) ||
+                        kakaoNameStr.toLowerCase().includes(search) ||
+                        kakaoRealNameStr.toLowerCase().includes(search) ||
                         orderMemo.toLowerCase().includes(search) ||
                         fixedMemo.toLowerCase().includes(search);
 
@@ -2603,7 +2612,7 @@
                         `;
                     });
 
-                    const cleanPhone = customer.phone.replace(/\D/g, "");
+                    const cleanPhone = String(customer.phone || "").replace(/\D/g, "");
                     const baseKey = (!cleanPhone) ? ((customer.name || "무명").trim() + "_비인증") : cleanPhone;
                     const orderTime = customer.items[0] ? customer.items[0].timestamp : "";
                     const memoKey = baseKey + "_" + orderTime.replace(/\s+/g, "");
@@ -2953,7 +2962,7 @@
         // [신규] 고객별 메모 수정 기능 (비인증/번호 유실 고객의 복제 현상 완벽 해결)
         // [신규] 고객별 메모 수정 기능 (비인증 및 날짜별 개별 주문 카드 단위 격리 메모 적용)
         async function editCustomerMemo(name, phone, orderTime) {
-            const cleanPhone = phone.replace(/\D/g, "");
+            const cleanPhone = String(phone || "").replace(/\D/g, "");
             const baseKey = (!cleanPhone) ? ((name || "무명").trim() + "_비인증") : cleanPhone;
             const memoKey = baseKey + "_" + orderTime.replace(/\s+/g, "");
             const currentMemo = customerMemos[memoKey] || "";
@@ -2994,7 +3003,7 @@
 
         // [신규] 고객별 고정 메모 수정 기능
         async function editFixedMemo(name, phone) {
-            const cleanPhone = phone.replace(/\D/g, "");
+            const cleanPhone = String(phone || "").replace(/\D/g, "");
             const baseKey = (!cleanPhone) ? ((name || "무명").trim() + "_비인증") : cleanPhone;
             const currentMemo = fixedMemos[baseKey] || "";
             const newMemo = prompt(`고객의 고정 메모(모든 주문 카드에 항상 표시)를 입력해 주세요:\n(빈 칸으로 두고 확인 누르면 메모가 삭제됩니다.)`, currentMemo);
@@ -3034,7 +3043,7 @@
         // 6. 단일/일괄 상태 변경 실행 (Firebase PUT/PATCH 및 구글 시트 동기화)
         async function updateSingleItemStatus(phone, orderKey, newStatus) {
             showLoader("상태 업데이트 중...");
-            const cleanPhone = phone.replace(/\D/g, "");
+            const cleanPhone = String(phone || "").replace(/\D/g, "");
             const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
             
             try {
@@ -3067,7 +3076,7 @@
 
         async function updateCustomerAllItems(phone, newStatus) {
             showLoader(`이 고객 전체 상품 [${newStatus}] 업데이트 중...`);
-            const cleanPhone = phone.replace(/\D/g, "");
+            const cleanPhone = String(phone || "").replace(/\D/g, "");
             
             const customerItems = rawOrders.filter(it => it.phone === phone);
             
@@ -3114,7 +3123,7 @@
                 const promises = [];
                 selectedItems.forEach(itemInfo => {
                     const [phone, orderKey] = itemInfo.split("|");
-                    const cleanPhone = phone.replace(/\D/g, "");
+                    const cleanPhone = String(phone || "").replace(/\D/g, "");
                     const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
                     
                     const p = fetch(url, {
@@ -3160,7 +3169,7 @@
                 const promises = [];
                 selectedItems.forEach(itemInfo => {
                     const [phone, orderKey] = itemInfo.split("|");
-                    const cleanPhone = phone.replace(/\D/g, "");
+                    const cleanPhone = String(phone || "").replace(/\D/g, "");
                     const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
                     
                     const p = fetch(url, {
@@ -3213,7 +3222,7 @@
             showLoader("취소된 주문을 DB에서 삭제하는 중...");
             try {
                 const promises = canceledOrders.map(async (item) => {
-                    const cleanPhone = item.phone.replace(/\D/g, "");
+                    const cleanPhone = String(item.phone || "").replace(/\D/g, "");
                     const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${item.orderKey}.json`;
                     const res = await fetch(url, { method: 'DELETE' });
                     if (!res.ok) {
@@ -3881,7 +3890,7 @@
                 const isDelivery = customer.shippingMethod === '배달주문';
                 const badgeClass = isDelivery ? 'shipping-delivery' : 'shipping-pickup';
                 
-                const cleanPhone = customer.phone.replace(/\D/g, "");
+                const cleanPhone = String(customer.phone || "").replace(/\D/g, "");
                 const displayPhone = cleanPhone.slice(-4);
                 const displayMethod = customer.shippingMethod === '매장픽업' ? '픽업주문' : customer.shippingMethod;
                 
