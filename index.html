@@ -1994,10 +1994,7 @@
                                     <label style="font-size:12px;">상품 한줄소개 (중간 소제목)</label>
                                     <input type="text" id="gen-input-desc" style="padding: 8px; font-size: 13px;" oninput="syncFormToQueue()">
                                 </div>
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label style="font-size:12px;">보관방법 (하단 왼쪽)</label>
-                                    <input type="text" id="gen-input-storage" style="padding: 8px; font-size: 13px;" oninput="syncFormToQueue()">
-                                </div>
+
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label style="font-size:12px;">가격 (하단 오른쪽)</label>
                                     <input type="text" id="gen-input-price" style="padding: 8px; font-size: 13px;" oninput="syncFormToQueue()">
@@ -2044,7 +2041,6 @@
                 </div>
             </div>
         </div>
-    </div>
 
     <script>
         const FIREBASE_DB_URL = "https://moketdb-default-rtdb.asia-southeast1.firebasedatabase.app/";
@@ -4487,7 +4483,7 @@
                 // 1. 이미지 ID 추출
                 let imgId = "";
                 if (prod.images && prod.images.length > 0) {
-                    imgId = prod.images[0];
+                    imgId = String(prod.images[0] || "");
                 }
                 
                 // 2. 날짜 / 픽업 정보 추출
@@ -4501,32 +4497,38 @@
                         const day = dayNames[dt.getDay()];
                         dateStr = `${m}월 ${d}일 (${day}) 픽업`;
                     } else {
-                        dateStr = prod.date + " 픽업";
+                        dateStr = String(prod.date) + " 픽업";
                     }
                 } else if (prod.matchKey) {
-                    if (prod.matchKey.includes("냉동") || prod.matchKey.includes("냉장") || prod.matchKey.includes("상온") || prod.matchKey.includes("실온")) {
+                    const mKey = String(prod.matchKey);
+                    if (mKey.includes("냉동") || mKey.includes("냉장") || mKey.includes("상온") || mKey.includes("실온")) {
                         dateStr = "당일구매";
                     } else {
-                        dateStr = prod.matchKey;
+                        dateStr = mKey;
                     }
                 }
                 
                 // 3. 상품 설명 가공 (중제목/한줄소개)
                 let subtitle = "";
                 if (prod.desc) {
-                    const descLinesRaw = prod.desc.split(/\r?\n/).map(l => l.trim());
+                    const descStr = String(prod.desc);
+                    const descLinesRaw = descStr.split(/\r?\n/).map(l => l.trim());
                     subtitle = (descLinesRaw[6] || descLinesRaw[0] || "").trim();
                     // 이모지 제거
                     subtitle = subtitle.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDC00-\uDFFF])/g, '').trim();
                 }
 
                 // 중복 추가 방지
-                const exists = generatorQueue.some(item => item.name === prod.name && item.date === dateStr);
+                const prodName = String(prod.name || "");
+                const exists = generatorQueue.some(item => item.name === prodName && item.date === dateStr);
                 if (!exists) {
+                    const rawPrice = String(prod.price || "").replace(/\D/g, "");
+                    const formattedPrice = rawPrice ? parseInt(rawPrice).toLocaleString() : "0";
+                    
                     generatorQueue.push({
                         date: dateStr,
-                        name: prod.name,
-                        price: parseInt(prod.price || 0).toLocaleString(),
+                        name: prodName,
+                        price: formattedPrice,
                         desc: subtitle,
                         imgId: imgId,
                         posX: 0,
