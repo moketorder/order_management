@@ -1872,7 +1872,7 @@
 
                             <!-- 상품 사진 업로드 -->
                             <div class="form-group">
-                                <label>상품 사진 (최대 5장)</label>
+                                <label>상품 사진 (최대 10장)</label>
                                 <div class="file-upload-zone" id="uploadZone" onclick="triggerFileInput()" style="border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 24px; text-align: center; cursor: pointer; background: #fafafa; transition: var(--transition);">
                                     <div style="font-size: 32px; margin-bottom: 8px;">📸</div>
                                     <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">사진 첨부하기</div>
@@ -1910,6 +1910,13 @@
                     </div>
                     <!-- 상품 목록 소분류 하위 탭 -->
                     <div id="sub-products-list-tabs" class="sub-tabs-container" style="display: none; margin-bottom: 12px;"></div>
+                    
+                    <!-- 상품 검색창 -->
+                    <div class="search-box-container" style="margin-bottom: 12px; position: relative;">
+                        <input type="text" id="product-search-input" placeholder="🔍 상품명을 입력하여 검색..." oninput="onProductSearchInput(this.value)" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; box-sizing: border-box; outline: none; transition: var(--transition);">
+                        <button type="button" onclick="clearProductSearch(); renderProductsList();" id="btn-clear-product-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 18px; color: var(--text-sub); cursor: pointer; line-height: 1;">&times;</button>
+                    </div>
+                    
                     <div class="card" style="padding: 10px;">
                         <div id="products-list-container">
                             <div style="text-align: center; padding: 40px 0; color: var(--text-sub); font-size: 13px;">
@@ -4046,6 +4053,7 @@
         let uploadThumbnailIndex = -1;
         let uploadGlobalAdjustments = {};
         let uploadSelectedProductIndices = new Set();
+        let productSearchKeyword = "";
 
         // 탭 전환 (주문 관리 / 상품 관리 전체 전환)
         function switchAdminTab(tabName) {
@@ -4059,6 +4067,7 @@
             
             uploadSelectedProductIndices.clear();
             updateBatchBar();
+            clearProductSearch();
             
             if (tabName === 'orders') {
                 ordersTab.style.display = 'block';
@@ -4103,6 +4112,7 @@
             
             uploadSelectedProductIndices.clear();
             updateBatchBar();
+            clearProductSearch();
             buildManageCategoryTabs();
             buildSubTabs();
             renderProductsList();
@@ -4141,6 +4151,7 @@
             });
             uploadSelectedProductIndices.clear();
             updateBatchBar();
+            clearProductSearch();
             buildSubTabs();
             renderProductsList();
         }
@@ -4330,6 +4341,27 @@
             }
         }
 
+        function onProductSearchInput(value) {
+            productSearchKeyword = value;
+            const clearBtn = document.getElementById('btn-clear-product-search');
+            if (clearBtn) {
+                clearBtn.style.display = value ? 'block' : 'none';
+            }
+            renderProductsList();
+        }
+
+        function clearProductSearch() {
+            const input = document.getElementById('product-search-input');
+            if (input) {
+                input.value = '';
+            }
+            const clearBtn = document.getElementById('btn-clear-product-search');
+            if (clearBtn) {
+                clearBtn.style.display = 'none';
+            }
+            productSearchKeyword = '';
+        }
+
         function triggerFileInput() {
             document.getElementById('imageFile').click();
         }
@@ -4338,13 +4370,33 @@
             const files = event.target.files;
             if (!files || files.length === 0) return;
             
+            const currentCount = uploadSelectedFiles.length;
+            const limit = 10;
+            
+            if (currentCount >= limit) {
+                showToast("사진은 최대 10장까지만 등록 가능합니다.");
+                event.target.value = '';
+                return;
+            }
+            
+            let added = 0;
+            let truncated = false;
             for (let i = 0; i < files.length; i++) {
-                uploadSelectedFiles.push({
-                    file: files[i],
-                    id: null,
-                    isExisting: false,
-                    displayName: files[i].name
-                });
+                if (uploadSelectedFiles.length < limit) {
+                    uploadSelectedFiles.push({
+                        file: files[i],
+                        id: null,
+                        isExisting: false,
+                        displayName: files[i].name
+                    });
+                    added++;
+                } else {
+                    truncated = true;
+                }
+            }
+            
+            if (truncated) {
+                showToast(`사진은 최대 10장까지만 등록 가능하여 일부 사진이 제외되었습니다.`);
             }
             
             if (uploadSelectedFiles.length > 0 && uploadThumbnailIndex === -1) {
@@ -4512,8 +4564,18 @@
                 }
             }
 
+            // 상품 검색어 필터링
+            const hasKeyword = (typeof productSearchKeyword !== 'undefined' && productSearchKeyword && productSearchKeyword.trim() !== "");
+            if (hasKeyword) {
+                const keyword = productSearchKeyword.trim().toLowerCase();
+                filteredProducts = filteredProducts.filter(({ prod }) => 
+                    String(prod.name || "").toLowerCase().includes(keyword)
+                );
+            }
+
             if (filteredProducts.length === 0) {
-                container.innerHTML = `<div style="text-align: center; padding: 40px 0; color: var(--text-sub); font-size: 13px;">해당 카테고리에 등록된 상품이 없습니다.</div>`;
+                const msg = hasKeyword ? "검색 결과와 일치하는 상품이 없습니다." : "해당 카테고리에 등록된 상품이 없습니다.";
+                container.innerHTML = `<div style="text-align: center; padding: 40px 0; color: var(--text-sub); font-size: 13px;">${msg}</div>`;
                 return;
             }
 
@@ -4556,6 +4618,22 @@
                 }
                 groupTitle.innerText = displayTitle;
                 container.appendChild(groupTitle);
+
+                // 숨김 상품은 밑으로 정렬하고, 노출 여부가 같으면 가나다순으로 정렬
+                grouped[mKey].sort((a, b) => {
+                    const isVisibleA = uploadManageDeliveryType === 'today'
+                        ? (a.prod.showToday !== undefined ? (a.prod.showToday === true || a.prod.showToday === 'true') : (a.prod.show !== false && a.prod.show !== 'false'))
+                        : (a.prod.showReserve !== undefined ? (a.prod.showReserve === true || a.prod.showReserve === 'true') : (a.prod.show !== false && a.prod.show !== 'false'));
+                        
+                    const isVisibleB = uploadManageDeliveryType === 'today'
+                        ? (b.prod.showToday !== undefined ? (b.prod.showToday === true || b.prod.showToday === 'true') : (b.prod.show !== false && b.prod.show !== 'false'))
+                        : (b.prod.showReserve !== undefined ? (b.prod.showReserve === true || b.prod.showReserve === 'true') : (b.prod.show !== false && b.prod.show !== 'false'));
+
+                    if (isVisibleA && !isVisibleB) return -1;
+                    if (!isVisibleA && isVisibleB) return 1;
+
+                    return String(a.prod.name || "").localeCompare(String(b.prod.name || ""), 'ko');
+                });
 
                 grouped[mKey].forEach(({ prod, index }) => {
                     const item = document.createElement('div');
