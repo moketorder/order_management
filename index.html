@@ -3896,7 +3896,8 @@
                 
                 // 고객별 메모 추출
                 const baseKey = (!cleanPhone) ? ((customer.name || "무명").trim() + "_비인증") : cleanPhone;
-                const orderTime = customer.items[0] ? customer.items[0].timestamp : "";
+                const rawOrderTime = customer.items[0] ? customer.items[0].timestamp : "";
+                const orderTime = rawOrderTime ? String(rawOrderTime) : "";
                 const memoKey = baseKey + "_" + orderTime.replace(/\s+/g, "");
                 const memo = customerMemos[memoKey] || "";
                 const fixedMemo = fixedMemos[baseKey] || "";
@@ -3968,26 +3969,34 @@
             });
 
             printHtml += `
-                <script>
-                    window.onafterprint = () => {
-                        window.close();
-                    };
-                    setTimeout(() => {
-                        window.focus();
-                        window.print();
-                    }, 250);
-                <\/script>
                 </body>
                 </html>
             `;
 
-            const printWindow = window.open("", "_blank");
-            if (!printWindow) {
-                alert("팝업 차단기를 해제해 주세요.");
-                return;
+            // 3. 임시 iframe 생성하여 인쇄 처리 (팝업 차단 및 file:// 프로토콜 보안 에러 방지)
+            let printIframe = document.getElementById("print-iframe");
+            if (!printIframe) {
+                printIframe = document.createElement("iframe");
+                printIframe.id = "print-iframe";
+                printIframe.style.position = "fixed";
+                printIframe.style.left = "-9999px";
+                printIframe.style.top = "-9999px";
+                printIframe.style.width = "0";
+                printIframe.style.height = "0";
+                printIframe.style.border = "none";
+                document.body.appendChild(printIframe);
             }
-            printWindow.document.write(printHtml);
-            printWindow.document.close();
+
+            const doc = printIframe.contentWindow.document;
+            doc.open();
+            doc.write(printHtml);
+            doc.close();
+
+            // 리소스가 렌더링될 수 있도록 약간의 대기 후 인쇄 실행
+            setTimeout(() => {
+                printIframe.contentWindow.focus();
+                printIframe.contentWindow.print();
+            }, 250);
         }
 
         // 7. 유틸리티 UI 컴포넌트 (로더, 토스트)
