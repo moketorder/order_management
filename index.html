@@ -4145,30 +4145,27 @@
                 </html>
             `;
 
-            // 3. 임시 iframe 생성하여 인쇄 처리 (팝업 차단 및 file:// 프로토콜 보안 에러 방지)
-            let printIframe = document.getElementById("print-iframe");
-            if (!printIframe) {
-                printIframe = document.createElement("iframe");
-                printIframe.id = "print-iframe";
-                printIframe.style.position = "fixed";
-                printIframe.style.left = "-9999px";
-                printIframe.style.top = "-9999px";
-                printIframe.style.width = "0";
-                printIframe.style.height = "0";
-                printIframe.style.border = "none";
-                document.body.appendChild(printIframe);
+            // 3. 새 창을 생성하여 인쇄 처리 (일부 영수증 프린터의 iframe 인쇄 드라이버 오류 우회)
+            const printWindow = window.open("", "_blank", "width=700,height=800");
+            if (!printWindow) {
+                showToast("인쇄 팝업창이 차단되었습니다. 브라우저 설정에서 팝업 허용을 해주세요.");
+                return;
             }
 
-            const doc = printIframe.contentWindow.document;
-            doc.open();
-            doc.write(printHtml);
-            doc.close();
+            printWindow.document.open();
+            printWindow.document.write(printHtml);
+            printWindow.document.close();
 
-            // 리소스가 렌더링될 수 있도록 약간의 대기 후 인쇄 실행
+            // 리소스 렌더링 대기 및 인쇄 실행 후 창 닫기
             setTimeout(() => {
-                printIframe.contentWindow.focus();
-                printIframe.contentWindow.print();
-            }, 250);
+                try {
+                    printWindow.focus();
+                    printWindow.print();
+                    printWindow.close();
+                } catch (e) {
+                    console.error("인쇄 오류:", e);
+                }
+            }, 300);
         }
 
         // 7. 유틸리티 UI 컴포넌트 (로더, 토스트)
