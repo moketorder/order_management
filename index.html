@@ -977,6 +977,20 @@
                 justify-content: center;
                 border-radius: 6px;
             }
+            .generator-workspace {
+                grid-template-columns: 1fr !important;
+                gap: 20px;
+            }
+            .gen-preview-section {
+                width: 100% !important;
+                box-sizing: border-box;
+            }
+            .admin-nav-btn {
+                font-size: 11px !important;
+                padding: 10px 2px !important;
+                white-space: nowrap !important;
+                letter-spacing: -0.8px !important;
+            }
         }
 
         /* 영수증 및 프린트 레이아웃 */
@@ -1683,6 +1697,41 @@
             color: var(--text-main) !important;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
+
+        /* 섬네일 생성기 스타일 추가 및 반응형 패치 */
+        #tab-admin-thumbnail-generator .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        #tab-admin-thumbnail-generator label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-sub);
+        }
+        #tab-admin-thumbnail-generator input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sub);
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+            transition: var(--transition);
+        }
+        #tab-admin-thumbnail-generator input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+        }
+        #tab-admin-thumbnail-generator input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            border: 1.5px dashed var(--border);
+            border-radius: var(--radius-sub);
+            background: #f8fafc;
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -1957,19 +2006,21 @@
                         <div class="generator-workspace" style="display: grid; grid-template-columns: 1fr 340px; gap: 20px;">
                             <!-- 미리보기 영역 -->
                             <div class="gen-preview-section" style="display: flex; flex-direction: column; align-items: center; background: #f1f5f9; border-radius: var(--radius-sm); padding: 16px; min-width: 0;">
-                                <div id="gen-thumbnail-preview" style="width: 400px; height: 400px; position: relative; background: var(--primary); overflow: hidden; display: flex; flex-direction: column; user-select: none; border: 6px solid var(--primary); box-sizing: border-box; font-family: 'Pretendard', sans-serif;">
-                                    <div class="gen-pickup-header" id="gen-preview-date" style="background: var(--primary); color: white; text-align: center; padding: 6px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; z-index: 10; position: relative;">날짜 픽업</div>
-                                    <div class="gen-content-area" style="flex: 1; display: flex; flex-direction: column; position: relative; z-index: 5; background: #fdf3e7; padding: 5px; overflow: hidden;">
-                                        <div class="gen-title-box" style="text-align: center; margin-bottom: 4px; padding: 4px 0 0 0; width: 100%; box-sizing: border-box; background-color: transparent;">
-                                            <div class="gen-preview-name" id="gen-preview-name" style="font-size: 24px; font-weight: 900; color: #222; letter-spacing: -1px; line-height: 1.1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; text-align: center; gap: 3px;">상품명</div>
-                                            <div class="gen-preview-desc" id="gen-preview-desc" style="font-size: 18px; font-weight: 700; color: #666; margin: 3px 0 4px 0; letter-spacing: -0.5px; line-height: 1.1; opacity: 0.85; white-space: nowrap; overflow: hidden; width: 100%; text-align: center;">한줄 설명</div>
-                                        </div>
-                                        <div class="gen-image-frame" style="width: 100%; aspect-ratio: 1 / 1; border: 5px solid #FF6D00; border-radius: 16px; position: relative; overflow: hidden; background: #fff; box-sizing: border-box; margin-top: 1px; flex-shrink: 1; min-height: 0; cursor: grab;">
-                                            <img id="gen-bg-image" src="" alt="Thumbnail Image" style="position: absolute; width: 120%; height: auto; min-height: 100%; min-width: 100%; display: block; top: 0; left: 0; z-index: 1; transform-origin: center center;">
-                                            <div class="gen-footer-overlay" style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 72px; background: rgba(255, 255, 255, 0.85); z-index: 20; display: flex; justify-content: center; align-items: center; padding: 0 18px; gap: 8px;">
-                                                <div class="gen-price-right" style="display: flex; align-items: center; gap: 3px;">
-                                                    <span class="gen-price-val" id="gen-preview-price" style="font-size: 50px; font-weight: 900; letter-spacing: -2px; line-height: 1; color: #FF6D00; white-space: nowrap; text-shadow: -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 4px 4px 0 var(--primary);">0</span>
-                                                    <span class="gen-price-unit" style="font-size: 30px; font-weight: 900; color: #FF6D00; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 2px 2px 0 var(--primary); margin-left: 0px;">원</span>
+                                <div id="gen-preview-wrapper" style="width: 100%; height: 400px; display: flex; justify-content: center; align-items: center; position: relative; overflow: visible;">
+                                    <div id="gen-thumbnail-preview" style="width: 400px; height: 400px; position: relative; background: var(--primary); overflow: hidden; display: flex; flex-direction: column; user-select: none; border: 6px solid var(--primary); box-sizing: border-box; font-family: 'Pretendard', sans-serif; flex-shrink: 0;">
+                                        <div class="gen-pickup-header" id="gen-preview-date" style="background: var(--primary); color: white; text-align: center; padding: 6px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; z-index: 10; position: relative;">날짜 픽업</div>
+                                        <div class="gen-content-area" style="flex: 1; display: flex; flex-direction: column; position: relative; z-index: 5; background: #fdf3e7; padding: 5px; overflow: hidden;">
+                                            <div class="gen-title-box" style="text-align: center; margin-bottom: 4px; padding: 4px 0 0 0; width: 100%; box-sizing: border-box; background-color: transparent;">
+                                                <div class="gen-preview-name" id="gen-preview-name" style="font-size: 24px; font-weight: 900; color: #222; letter-spacing: -1px; line-height: 1.1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; text-align: center; gap: 3px;">상품명</div>
+                                                <div class="gen-preview-desc" id="gen-preview-desc" style="font-size: 18px; font-weight: 700; color: #666; margin: 3px 0 4px 0; letter-spacing: -0.5px; line-height: 1.1; opacity: 0.85; white-space: nowrap; overflow: hidden; width: 100%; text-align: center;">한줄 설명</div>
+                                            </div>
+                                            <div class="gen-image-frame" style="width: 100%; aspect-ratio: 1 / 1; border: 5px solid #FF6D00; border-radius: 16px; position: relative; overflow: hidden; background: #fff; box-sizing: border-box; margin-top: 1px; flex-shrink: 1; min-height: 0; cursor: grab;">
+                                                <img id="gen-bg-image" src="" alt="Thumbnail Image" style="position: absolute; width: 120%; height: auto; min-height: 100%; min-width: 100%; display: block; top: 0; left: 0; z-index: 1; transform-origin: center center;">
+                                                <div class="gen-footer-overlay" style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 72px; background: rgba(255, 255, 255, 0.85); z-index: 20; display: flex; justify-content: center; align-items: center; padding: 0 18px; gap: 8px;">
+                                                    <div class="gen-price-right" style="display: flex; align-items: center; gap: 3px;">
+                                                        <span class="gen-price-val" id="gen-preview-price" style="font-size: 50px; font-weight: 900; letter-spacing: -2px; line-height: 1; color: #FF6D00; white-space: nowrap; text-shadow: -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 4px 4px 0 var(--primary);">0</span>
+                                                        <span class="gen-price-unit" style="font-size: 30px; font-weight: 900; color: #FF6D00; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 2px 2px 0 var(--primary); margin-left: 0px;">원</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1977,33 +2028,33 @@
                                 </div>
                                 
                                 <div style="font-size: 11px; color: var(--text-sub); margin-top: 8px; text-align: center; line-height: 1.4;">
-                                    💡 <b>마우스 드래그/휠</b>로 이미지 위치 이동 및 확대/축소가 가능합니다.
+                                    💡 <b>마우스/터치 드래그 및 휠/핀치</b>로 이미지 이동 및 확대/축소가 가능합니다.
                                 </div>
                             </div>
                             
                             <!-- 입력 폼 영역 -->
                             <div class="gen-form-section" style="display: flex; flex-direction: column; gap: 12px;">
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label style="font-size:12px;">픽업일/날짜 (상단 타이틀)</label>
-                                    <input type="text" id="gen-input-date" style="padding: 8px; font-size: 13px;" oninput="syncFormToQueue()">
+                                <div class="form-group">
+                                    <label>픽업일/날짜 (상단 타이틀)</label>
+                                    <input type="text" id="gen-input-date" oninput="syncFormToQueue()">
                                 </div>
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label style="font-size:12px;">상품명 (중간 대제목)</label>
-                                    <input type="text" id="gen-input-name" style="padding: 8px; font-size: 13px;" oninput="syncFormToQueue()">
+                                <div class="form-group">
+                                    <label>상품명 (중간 대제목)</label>
+                                    <input type="text" id="gen-input-name" oninput="syncFormToQueue()">
                                 </div>
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label style="font-size:12px;">상품 한줄소개 (중간 소제목)</label>
-                                    <input type="text" id="gen-input-desc" style="padding: 8px; font-size: 13px;" oninput="syncFormToQueue()">
+                                <div class="form-group">
+                                    <label>상품 한줄소개 (중간 소제목)</label>
+                                    <input type="text" id="gen-input-desc" oninput="syncFormToQueue()">
                                 </div>
 
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label style="font-size:12px;">가격 (하단 오른쪽)</label>
-                                    <input type="text" id="gen-input-price" style="padding: 8px; font-size: 13px;" oninput="syncFormToQueue()">
+                                <div class="form-group">
+                                    <label>가격 (하단 오른쪽)</label>
+                                    <input type="text" id="gen-input-price" oninput="syncFormToQueue()">
                                 </div>
                                 
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label style="font-size:12px;">배경 이미지 대체 (로컬 파일)</label>
-                                    <input type="file" id="gen-input-file" accept="image/*" onchange="handleGenFileSelect(event)" style="font-size: 11px;">
+                                <div class="form-group">
+                                    <label>배경 이미지 대체 (로컬 파일)</label>
+                                    <input type="file" id="gen-input-file" accept="image/*" onchange="handleGenFileSelect(event)">
                                 </div>
                             </div>
                         </div>
@@ -4548,12 +4599,44 @@
             }
         }
 
-        // ------------------ 섬네일 생성기 스크립트 ------------------
+        // ------------------ Thumbnail Generator Script ------------------
         let isGenDragging = false;
         let genStartX, genStartY;
         let genTranslateX = 0, genTranslateY = 0;
         let genScale = 1.2;
         
+        function resizeThumbnailPreview() {
+            const preview = document.getElementById('gen-thumbnail-preview');
+            const wrapper = document.getElementById('gen-preview-wrapper');
+            const container = document.querySelector('.gen-preview-section');
+            if (!preview || !wrapper || !container) return;
+            
+            // Reset and compute size
+            preview.style.transform = 'none';
+            wrapper.style.height = '400px';
+            wrapper.style.width = '100%';
+            
+            const containerWidth = container.clientWidth - 32; // exclude padding 16px * 2
+            const previewWidth = 400;
+            
+            if (containerWidth < previewWidth) {
+                const scale = containerWidth / previewWidth;
+                preview.style.transform = scale();
+                preview.style.transformOrigin = 'center center';
+                wrapper.style.height = ${400 * scale}px;
+            } else {
+                preview.style.transform = 'none';
+                wrapper.style.height = '400px';
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            const generatorTab = document.getElementById('tab-admin-thumbnail-generator');
+            if (generatorTab && generatorTab.style.display !== 'none') {
+                resizeThumbnailPreview();
+            }
+        });
+
         function initThumbnailGeneratorTab() {
             const bgImg = document.getElementById('gen-bg-image');
             const imgFrame = bgImg.parentElement;
@@ -4597,6 +4680,61 @@
                         generatorQueue[generatorActiveIdx].scale = genScale;
                     }
                 }, { passive: false });
+
+                // Touch drag and pinch zoom support
+                let initialTouchDist = 0;
+                let initialScale = 1.2;
+                
+                imgFrame.addEventListener('touchstart', (e) => {
+                    if (e.touches.length === 1) {
+                        isGenDragging = true;
+                        genStartX = e.touches[0].clientX - genTranslateX;
+                        genStartY = e.touches[0].clientY - genTranslateY;
+                        bgImg.style.transition = 'none';
+                    } else if (e.touches.length === 2) {
+                        isGenDragging = false;
+                        initialTouchDist = Math.hypot(
+                            e.touches[0].clientX - e.touches[1].clientX,
+                            e.touches[0].clientY - e.touches[1].clientY
+                        );
+                        initialScale = genScale;
+                        bgImg.style.transition = 'none';
+                    }
+                }, { passive: true });
+                
+                imgFrame.addEventListener('touchmove', (e) => {
+                    if (e.touches.length === 1 && isGenDragging) {
+                        if (e.cancelable) e.preventDefault();
+                        genTranslateX = e.touches[0].clientX - genStartX;
+                        genTranslateY = e.touches[0].clientY - genStartY;
+                        updateGenImgTransform();
+                        
+                        if (generatorActiveIdx >= 0 && generatorQueue[generatorActiveIdx]) {
+                            generatorQueue[generatorActiveIdx].posX = genTranslateX;
+                            generatorQueue[generatorActiveIdx].posY = genTranslateY;
+                        }
+                    } else if (e.touches.length === 2) {
+                        if (e.cancelable) e.preventDefault();
+                        const dist = Math.hypot(
+                            e.touches[0].clientX - e.touches[1].clientX,
+                            e.touches[0].clientY - e.touches[1].clientY
+                        );
+                        if (initialTouchDist > 0) {
+                            const factor = dist / initialTouchDist;
+                            genScale = Math.min(Math.max(0.5, initialScale * factor), 5);
+                            updateGenImgTransform();
+                            if (generatorActiveIdx >= 0 && generatorQueue[generatorActiveIdx]) {
+                                generatorQueue[generatorActiveIdx].scale = genScale;
+                            }
+                        }
+                    }
+                }, { passive: false });
+                
+                imgFrame.addEventListener('touchend', () => {
+                    isGenDragging = false;
+                    initialTouchDist = 0;
+                    bgImg.style.transition = 'transform 0.1s ease-out';
+                });
             }
             
             updateGeneratorQueueUI();
@@ -4606,8 +4744,10 @@
             } else {
                 clearGeneratorPreview();
             }
+
+            // Mobile responsive size adjustment
+            setTimeout(resizeThumbnailPreview, 50);
         }
-        
         function updateGenImgTransform() {
             const bgImg = document.getElementById('gen-bg-image');
             if (bgImg) {
@@ -4870,20 +5010,41 @@
         
         async function captureGenThumbnailToBlob() {
             const preview = document.getElementById('gen-thumbnail-preview');
+            const wrapper = document.getElementById('gen-preview-wrapper');
             adjustGenTitleFontSize();
             adjustGenDescFontSize();
             
-            const canvas = await html2canvas(preview, {
-                useCORS: true,
-                scale: 2.0, 
-                width: 400,
-                height: 400,
-                backgroundColor: '#ffffff',
-                scrollX: 0,
-                scrollY: -window.scrollY
-            });
+            // html2canvas 캡처 시 transform 영향을 받지 않도록 일시 해제
+            const originalTransform = preview.style.transform;
+            const originalTransformOrigin = preview.style.transformOrigin;
+            let originalWrapperHeight = "";
+            if (wrapper) {
+                originalWrapperHeight = wrapper.style.height;
+                wrapper.style.height = '400px';
+            }
+            preview.style.transform = 'none';
+            preview.style.transformOrigin = 'initial';
             
-            return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+            try {
+                const canvas = await html2canvas(preview, {
+                    useCORS: true,
+                    scale: 2.0, 
+                    width: 400,
+                    height: 400,
+                    backgroundColor: '#ffffff',
+                    scrollX: 0,
+                    scrollY: -window.scrollY
+                });
+                
+                return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+            } finally {
+                // 기존 transform 상태 복원
+                preview.style.transform = originalTransform;
+                preview.style.transformOrigin = originalTransformOrigin;
+                if (wrapper) {
+                    wrapper.style.height = originalWrapperHeight;
+                }
+            }
         }
 
         function triggerFileInput() {
@@ -5689,3 +5850,4 @@
 </body>
 
 </html>
+
