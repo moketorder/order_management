@@ -1840,6 +1840,7 @@
                     <button class="btn-batch type-delivery" onclick="handleBatchUpdate('배달완료')">🟢 배달완료</button>
                     <button class="btn-batch type-cancel" onclick="handleBatchUpdate('취소')">🔴 취소</button>
                     <button class="btn-batch type-paid" onclick="handleBatchPaidUpdate()">💵 입금완료</button>
+                    <button class="btn-batch type-photo" onclick="handleBatchDeliveryPhoto()" style="border-color: #0284c7; color: #0284c7; background: white;">?벝 ?꾨즺?ъ쭊</button>
                     <button class="btn-batch type-print" onclick="printSelectedCards()">🖨️ 인쇄</button>
                 </div>
             </div>
@@ -2208,6 +2209,21 @@
                         else if (isReceived) calculatedStatus = "픽업";
                         else if (isStocked) calculatedStatus = "입고";
 
+                        if (it.deliveryPhoto && it.deliveryPhotoTime) {
+                            const photoAge = Date.now() - parseInt(it.deliveryPhotoTime);
+                            if (photoAge > 7 * 24 * 60 * 60 * 1000) {
+                                const cleanPhone = String(phone).replace(/\D/g, "");
+                                fetch(`${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ deliveryPhoto: null, deliveryPhotoTime: null })
+                                }).catch(e => console.error("諛곕떖?ъ쭊 媛鍮꾩? 而щ젆???ㅽ뙣:", e));
+                                
+                                delete it.deliveryPhoto;
+                                delete it.deliveryPhotoTime;
+                            }
+                        }
+                        
                         rawOrders.push({
                             phone,
                             orderKey,
@@ -2482,6 +2498,7 @@
 
         // 3. 필터링 및 렌더링
         function renderFilteredOrders() {
+            window.deliveryPhotos = {};
             try {
                 const search = document.getElementById('searchInput').value.toLowerCase().trim();
                 
@@ -2734,6 +2751,9 @@
                     let mobileRowsHtml = '';
                     
                     customerItems.forEach(it => {
+                        if (it.deliveryPhoto) {
+                            window.deliveryPhotos[it.phone + "_" + it.orderKey] = it.deliveryPhoto;
+                        }
                         const isCanceled = (it.canceled === true || it.canceled === "true");
                         const status = it.status || "대기";
                         let badgeClass = "status-ready";
@@ -2850,6 +2870,7 @@
                                     <div class="customer-meta" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
                                         <span class="customer-name">${customer.name}</span>
                                         ${seqBadge}
+                                        ${customerItems.some(it => it.deliveryPhoto) ? `<span class="photo-view-badge" style="font-size:11px; background:#f0fdf4; color:#16a34a; padding:2px 6px; border-radius:4px; font-weight:bold; cursor:pointer; margin-left:6px; display:inline-block; vertical-align:middle; border:1px solid #bcf0da;" onclick="viewDeliveryPhoto('${customer.phone}_${customerItems.find(it => it.deliveryPhoto).orderKey}')">?벝 諛곕떖?ъ쭊</span>` : '}
                                         <a href="tel:${customer.phone}" class="customer-phone" style="margin-left: 0;">${customer.phone}</a>
                                         ${customer.kakaoName ? `<span class="kakao-badge">💬 ${customer.kakaoName}${customer.kakaoRealName ? ` (${customer.kakaoRealName})` : ''}</span>` : ''}
                                     </div>
@@ -4141,7 +4162,15 @@
             });
 
             printHtml += `
-                </body>
+                <!-- 諛곕떖 ?ъ쭊 ?곸꽭 紐⑤떖 -->
+    <div id="photo-modal" class="modal no-print" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center;" onclick="closePhotoModal()">
+        <div class="modal-content" style="background-color: #fefefe; padding: 20px; border-radius: 16px; width: 90%; max-width: 500px; text-align: center; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+            <span onclick="closePhotoModal()" style="position: absolute; right: 16px; top: 10px; color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+            <h3 style="margin-top: 0; font-size: 16px; font-weight: 800; color: #1e293b; margin-bottom: 15px;">?벝 諛곕떖 ?꾨즺 ?ъ쭊</h3>
+            <img id="photo-modal-img" src="" style="width: 100%; max-height: 450px; object-fit: contain; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc;">
+        </div>
+    </div>
+</body>
                 </html>
             `;
 
@@ -5897,6 +5926,132 @@
         }
 
         // 초기 시작
+        function resizeAndCompressImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        const max_width = 800;
+                        if (width > max_width) {
+                            height = Math.round((height * max_width) / width);
+                            width = max_width;
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        resolve(dataUrl);
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function handleBatchDeliveryPhoto() {
+            if (selectedItems.size === 0) {
+                showToast("?좏깮??二쇰Ц ??ぉ???놁뒿?덈떎.");
+                return;
+            }
+            let photoInput = document.getElementById("batch-photo-input");
+            if (!photoInput) {
+                photoInput = document.createElement("input");
+                photoInput.id = "batch-photo-input";
+                photoInput.type = "file";
+                photoInput.accept = "image/*";
+                photoInput.capture = "environment";
+                photoInput.style.display = "none";
+                photoInput.onchange = handleDeliveryPhotoUpload;
+                document.body.appendChild(photoInput);
+            }
+            photoInput.click();
+        }
+
+        async function handleDeliveryPhotoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            showLoader("?ъ쭊 理쒖쟻??諛??낅줈??以?..");
+            try {
+                const compressedBase64 = await resizeAndCompressImage(file);
+                const promises = [];
+                const itemsToUpdate = [];
+                rawOrders.forEach(it => {
+                    const key = it.phone + "|" + it.orderKey;
+                    if (selectedItems.has(key)) {
+                        const cleanPhone = String(it.phone || "").replace(/\D/g, "");
+                        const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${it.orderKey}.json`;
+                        const patchBody = {
+                            status: "諛곕떖?꾨즺",
+                            canceled: false,
+                            isStocked: true,
+                            received: false,
+                            delivered: true,
+                            deliveryPhoto: compressedBase64,
+                            deliveryPhotoTime: Date.now()
+                        };
+                        itemsToUpdate.push({ item: it, patchBody: patchBody });
+                        promises.push(
+                            fetch(url, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(patchBody)
+                            })
+                        );
+                    }
+                });
+                if (promises.length === 0) {
+                    showToast("?낅뜲?댄듃?????덈뒗 ??ぉ???놁뒿?덈떎.");
+                    hideLoader();
+                    return;
+                }
+                await Promise.all(promises);
+                itemsToUpdate.forEach(info => {
+                    Object.assign(info.item, info.patchBody);
+                    syncStatusToGoogleSheets(info.item.phone, info.item.timestamp, info.item.item, "諛곕떖?꾨즺");
+                });
+                showToast("諛곕떖?꾨즺 ?ъ쭊???깅줉?섏뿀?쇰ŉ, 諛곕떖?꾨즺 ?곹깭濡?蹂寃쎈릺?덉뒿?덈떎.");
+                selectedItems.clear();
+                const selectAllChk = document.getElementById('selectAllCheckbox');
+                if (selectAllChk) selectAllChk.checked = false;
+                updateBatchBar();
+                renderFilteredOrders();
+            } catch (e) {
+                console.error(e);
+                showToast("?ъ쭊 ?낅줈??以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.");
+            } finally {
+                hideLoader();
+                event.target.value = "";
+            }
+        }
+
+        function viewDeliveryPhoto(photoKey) {
+            const photoData = window.deliveryPhotos ? window.deliveryPhotos[photoKey] : null;
+            if (!photoData) {
+                showToast("?ъ쭊 ?곗씠?곕? 遺덈윭?????놁뒿?덈떎.");
+                return;
+            }
+            const modal = document.getElementById("photo-modal");
+            const modalImg = document.getElementById("photo-modal-img");
+            if (modal && modalImg) {
+                modalImg.src = photoData;
+                modal.style.display = "flex";
+            }
+        }
+
+        function closePhotoModal() {
+            const modal = document.getElementById("photo-modal");
+            if (modal) {
+                modal.style.display = "none";
+            }
+        }
+
         window.onload = function() {
             fetchOrders();
             
@@ -5910,9 +6065,19 @@
             }
         };
     </script>
+<!-- 諛곕떖 ?ъ쭊 ?곸꽭 紐⑤떖 -->
+    <div id="photo-modal" class="modal no-print" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center;" onclick="closePhotoModal()">
+        <div class="modal-content" style="background-color: #fefefe; padding: 20px; border-radius: 16px; width: 90%; max-width: 500px; text-align: center; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+            <span onclick="closePhotoModal()" style="position: absolute; right: 16px; top: 10px; color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+            <h3 style="margin-top: 0; font-size: 16px; font-weight: 800; color: #1e293b; margin-bottom: 15px;">?벝 諛곕떖 ?꾨즺 ?ъ쭊</h3>
+            <img id="photo-modal-img" src="" style="width: 100%; max-height: 450px; object-fit: contain; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc;">
+        </div>
+    </div>
 </body>
 
 </html>
+
+
 
 
 
