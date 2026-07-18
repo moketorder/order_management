@@ -2012,13 +2012,16 @@
                                         <div class="gen-content-area" style="flex: 1; display: flex; flex-direction: column; position: relative; z-index: 5; background: #fdf3e7; padding: 5px; overflow: hidden;">
                                             <div class="gen-title-box" style="text-align: center; margin-bottom: 4px; padding: 4px 0 0 0; width: 100%; box-sizing: border-box; background-color: transparent;">
                                                 <div class="gen-preview-name" id="gen-preview-name" style="font-size: 24px; font-weight: 900; color: #222; letter-spacing: -1px; line-height: 1.1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; text-align: center; gap: 3px;">상품명</div>
-                                                <div class="gen-preview-desc" id="gen-preview-desc" style="font-size: 18px; font-weight: 700; color: #666; margin: 3px 0 4px 0; letter-spacing: -0.5px; line-height: 1.1; opacity: 0.85; white-space: nowrap; overflow: hidden; width: 100%; text-align: center;">한줄 설명</div>
+                                                <div class="gen-preview-desc" id="gen-preview-desc" style="display: none;">한줄 설명</div>
                                             </div>
                                             <div class="gen-image-frame" style="width: 100%; aspect-ratio: 1 / 1; border: 5px solid #FF6D00; border-radius: 16px; position: relative; overflow: hidden; background: #fff; box-sizing: border-box; margin-top: 1px; flex-shrink: 1; min-height: 0; cursor: grab;">
                                                 <img id="gen-bg-image" src="" alt="Thumbnail Image" style="position: absolute; width: 120%; height: auto; min-height: 100%; min-width: 100%; display: block; top: 0; left: 0; z-index: 1; transform-origin: center center;">
                                                 <div class="gen-footer-overlay" style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 72px; background: rgba(255, 255, 255, 0.85); z-index: 20; display: flex; justify-content: center; align-items: center; padding: 0 18px; gap: 8px;">
+                                                    <!-- 보관방법 배지 (절대 위치로 왼쪽 배치) -->
+                                                    <div id="gen-preview-storage" style="position: absolute; left: 16px; padding: 4px 10px; border-radius: 8px; font-size: 15px; font-weight: 900; color: white; display: none; align-items: center; justify-content: center; letter-spacing: -0.5px; box-shadow: 1px 1px 3px rgba(0,0,0,0.15); text-shadow: none;">보관방법</div>
+                                                    
                                                     <div class="gen-price-right" style="display: flex; align-items: center; gap: 3px;">
-                                                        <span class="gen-price-val" id="gen-preview-price" style="font-size: 50px; font-weight: 900; letter-spacing: -2px; line-height: 1; color: #FF6D00; white-space: nowrap; text-shadow: -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 4px 4px 0 var(--primary);">0</span>
+                                                        <span class="gen-price-val" id="gen-preview-price" style="font-size: 50px; font-weight: 900; letter-spacing: -1.7px; line-height: 1; color: #FF6D00; white-space: nowrap; text-shadow: -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 4px 4px 0 var(--primary);">0</span>
                                                         <span class="gen-price-unit" style="font-size: 30px; font-weight: 900; color: #FF6D00; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 2px 2px 0 var(--primary); margin-left: 0px;">원</span>
                                                     </div>
                                                 </div>
@@ -2042,7 +2045,7 @@
                                     <label>상품명 (중간 대제목)</label>
                                     <input type="text" id="gen-input-name" oninput="syncFormToQueue()">
                                 </div>
-                                <div class="form-group">
+                                <div class="form-group" style="display: none;">
                                     <label>상품 한줄소개 (중간 소제목)</label>
                                     <input type="text" id="gen-input-desc" oninput="syncFormToQueue()">
                                 </div>
@@ -4582,6 +4585,7 @@
                         name: prodName,
                         price: formattedPrice,
                         desc: subtitle,
+                        fullDesc: prod.desc || "",
                         imgId: imgId,
                         posX: 0,
                         posY: 0,
@@ -4761,7 +4765,7 @@
             if (!el || !container) return;
             let size = 24; 
             el.style.fontSize = size + 'px';
-            while ((el.scrollWidth > container.clientWidth || el.scrollHeight > container.clientHeight) && size > 12) {
+            while ((el.scrollWidth > container.clientWidth || el.scrollHeight > container.clientHeight) && size > 16) {
                 size -= 1;
                 el.style.fontSize = size + 'px';
             }
@@ -4855,6 +4859,10 @@
             document.getElementById('gen-preview-price').innerText = '0';
             document.getElementById('gen-bg-image').src = '';
             
+            // 보관방법 배지 숨김
+            const storageBadge = document.getElementById('gen-preview-storage');
+            if (storageBadge) storageBadge.style.display = "none";
+            
             document.getElementById('gen-input-date').value = '';
             document.getElementById('gen-input-name').value = '';
             document.getElementById('gen-input-desc').value = '';
@@ -4895,15 +4903,40 @@
             const nameVal = item.name || "";
             const nameTarget = document.getElementById('gen-preview-name');
             const tagMatch = nameVal.match(/^(\[.*?\](?:\s*\[.*?\])*)/);
+            
+            // 상품명 스타일 - 줄바꿈 및 최소 폰트 보장 스타일링 적용 (템플릿 리터럴 회피)
+            const textStyle = 'font-size:1em; word-break:keep-all; word-wrap:break-word; line-height:1.2; width:100%; text-align:center;';
             if (tagMatch) {
                 const tags = tagMatch[1];
                 const rest = nameVal.substring(tags.length).trim();
-                nameTarget.innerHTML = `<div style="font-size:0.95em; color:#FF6D00; font-weight:900; margin-bottom:2px;">${tags}</div><div style="font-size:1em;">${rest}</div>`;
+                nameTarget.innerHTML = '<div style="font-size:0.95em; color:#FF6D00; font-weight:900; margin-bottom:2px;">' + tags + '</div><div style="' + textStyle + '">' + rest + '</div>';
             } else {
-                nameTarget.innerHTML = `<div style="font-size:1em;">${nameVal}</div>`;
+                nameTarget.innerHTML = '<div style="' + textStyle + '">' + nameVal + '</div>';
             }
             
+            // 한줄소개 제거에 대응해 DOM 내용은 비우지 않되 프리뷰 텍스트는 숨김
             document.getElementById('gen-preview-desc').innerText = item.desc || "";
+            
+            // 보관방법 자동 판별 및 배지 업데이트
+            const storageBadge = document.getElementById('gen-preview-storage');
+            if (storageBadge) {
+                const searchText = String(item.fullDesc || item.desc || item.name || "");
+                if (searchText.indexOf("냉동") !== -1) {
+                    storageBadge.innerText = "냉동보관";
+                    storageBadge.style.background = "#3b82f6"; // 파란색
+                    storageBadge.style.display = "flex";
+                } else if (searchText.indexOf("냉장") !== -1) {
+                    storageBadge.innerText = "냉장보관";
+                    storageBadge.style.background = "#10b981"; // 초록색
+                    storageBadge.style.display = "flex";
+                } else if (searchText.indexOf("실온") !== -1 || searchText.indexOf("상온") !== -1) {
+                    storageBadge.innerText = "실온보관";
+                    storageBadge.style.background = "#f59e0b"; // 주황색
+                    storageBadge.style.display = "flex";
+                } else {
+                    storageBadge.style.display = "none";
+                }
+            }
             
             const priceVal = String(item.price || "").replace(/\D/g, "");
             const formattedPrice = priceVal ? parseInt(priceVal).toLocaleString() : "0";
@@ -4911,7 +4944,7 @@
             
             setTimeout(() => {
                 adjustGenTitleFontSize();
-                adjustGenDescFontSize();
+                // 한줄소개는 폰트조절 생략
             }, 50);
         }
         
