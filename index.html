@@ -2044,7 +2044,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label>상품명 (중간 대제목)</label>
-                                    <input type="text" id="gen-input-name" oninput="syncFormToQueue()">
+                                    <textarea id="gen-input-name" oninput="syncFormToQueue()" rows="2" style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sub); font-size: 13px; font-weight: 600; outline: none; transition: var(--transition); resize: vertical; font-family: inherit;"></textarea>
                                 </div>
                                 <div class="form-group" style="display: none;">
                                     <label>상품 한줄소개 (중간 소제목)</label>
@@ -2054,6 +2054,16 @@
                                 <div class="form-group">
                                     <label>가격 (하단 오른쪽)</label>
                                     <input type="text" id="gen-input-price" oninput="syncFormToQueue()">
+                                </div>
+                                <div class="form-group">
+                                    <label>보관방법 (하단 왼쪽 배지)</label>
+                                    <select id="gen-input-storage" onchange="syncFormToQueue()" style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sub); font-size: 13px; font-weight: 600; outline: none; transition: var(--transition); background: white; cursor: pointer; font-family: inherit;">
+                                        <option value="auto">🔍 자동 판별 (상품 설명 분석)</option>
+                                        <option value="frozen">❄️ 냉동보관</option>
+                                        <option value="fridge">💧 냉장보관</option>
+                                        <option value="room">☀️ 실온보관</option>
+                                        <option value="none">❌ 표시 안함</option>
+                                    </select>
                                 </div>
                                 
                                 <div class="form-group">
@@ -4587,6 +4597,7 @@
                         price: formattedPrice,
                         desc: subtitle,
                         fullDesc: prod.desc || "",
+                        storageType: "auto",
                         imgId: imgId,
                         posX: 0,
                         posY: 0,
@@ -4868,6 +4879,7 @@
             document.getElementById('gen-input-name').value = '';
             document.getElementById('gen-input-desc').value = '';
             document.getElementById('gen-input-price').value = '';
+            document.getElementById('gen-input-storage').value = 'auto';
         }
         
         function applyGeneratorItemToPreview(item) {
@@ -4877,6 +4889,7 @@
             document.getElementById('gen-input-name').value = item.name || "";
             document.getElementById('gen-input-desc').value = item.desc || "";
             document.getElementById('gen-input-price').value = String(item.price || "").replace(/\D/g, "");
+            document.getElementById('gen-input-storage').value = item.storageType || "auto";
             
             // 프리뷰 HTML 동기화
             renderGenPreviewHtml(item);
@@ -4909,33 +4922,51 @@
             const textStyle = 'font-size:1em; font-weight:900; word-break:keep-all; word-wrap:break-word; line-height:1.2; width:100%; text-align:center;';
             if (tagMatch) {
                 const tags = tagMatch[1];
-                const rest = nameVal.substring(tags.length).trim();
+                const rest = nameVal.substring(tags.length).trim().replace(/\n/g, '<br>');
                 nameTarget.innerHTML = '<div style="font-size:0.95em; color:#FF6D00; font-weight:900; margin-bottom:2px;">' + tags + '</div><div style="' + textStyle + '">' + rest + '</div>';
             } else {
-                nameTarget.innerHTML = '<div style="' + textStyle + '">' + nameVal + '</div>';
+                const rest = nameVal.replace(/\n/g, '<br>');
+                nameTarget.innerHTML = '<div style="' + textStyle + '">' + rest + '</div>';
             }
             
             // 한줄소개 제거에 대응해 DOM 내용은 비우지 않되 프리뷰 텍스트는 숨김
             document.getElementById('gen-preview-desc').innerText = item.desc || "";
             
-            // 보관방법 자동 판별 및 배지 업데이트
+            // 보관방법 배지 업데이트
             const storageBadge = document.getElementById('gen-preview-storage');
             if (storageBadge) {
-                const searchText = String(item.fullDesc || item.desc || item.name || "");
-                if (searchText.indexOf("냉동") !== -1) {
+                const type = item.storageType || "auto";
+                if (type === "frozen") {
                     storageBadge.innerText = "냉동보관";
                     storageBadge.style.background = "#3b82f6"; // 파란색
                     storageBadge.style.display = "flex";
-                } else if (searchText.indexOf("냉장") !== -1) {
+                } else if (type === "fridge") {
                     storageBadge.innerText = "냉장보관";
                     storageBadge.style.background = "#10b981"; // 초록색
                     storageBadge.style.display = "flex";
-                } else if (searchText.indexOf("실온") !== -1 || searchText.indexOf("상온") !== -1) {
+                } else if (type === "room") {
                     storageBadge.innerText = "실온보관";
                     storageBadge.style.background = "#f59e0b"; // 주황색
                     storageBadge.style.display = "flex";
-                } else {
+                } else if (type === "none") {
                     storageBadge.style.display = "none";
+                } else {
+                    const searchText = String(item.fullDesc || item.desc || item.name || "");
+                    if (searchText.indexOf("냉동") !== -1) {
+                        storageBadge.innerText = "냉동보관";
+                        storageBadge.style.background = "#3b82f6"; // 파란색
+                        storageBadge.style.display = "flex";
+                    } else if (searchText.indexOf("냉장") !== -1) {
+                        storageBadge.innerText = "냉장보관";
+                        storageBadge.style.background = "#10b981"; // 초록색
+                        storageBadge.style.display = "flex";
+                    } else if (searchText.indexOf("실온") !== -1 || searchText.indexOf("상온") !== -1) {
+                        storageBadge.innerText = "실온보관";
+                        storageBadge.style.background = "#f59e0b"; // 주황색
+                        storageBadge.style.display = "flex";
+                    } else {
+                        storageBadge.style.display = "none";
+                    }
                 }
             }
             
@@ -4956,6 +4987,7 @@
             item.date = document.getElementById('gen-input-date').value;
             item.name = document.getElementById('gen-input-name').value;
             item.desc = document.getElementById('gen-input-desc').value;
+            item.storageType = document.getElementById('gen-input-storage').value;
             
             const rawPrice = document.getElementById('gen-input-price').value.replace(/\D/g, "");
             item.price = rawPrice ? parseInt(rawPrice).toLocaleString() : "";
@@ -5884,6 +5916,7 @@
 </body>
 
 </html>
+
 
 
 
