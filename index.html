@@ -2482,6 +2482,34 @@
             renderFilteredOrders();
         }
 
+        // [신규] 주소 별칭(아파트명) 매핑 헬퍼
+        function getAddressAliases(address) {
+            if (!address) return [];
+            const normalizedAddr = String(address).replace(/\s+/g, ""); // 모든 공백 제거
+            const aliases = [];
+            
+            // 주소 키워드와 대응되는 아파트 별칭 정의
+            const mapping = {
+                "선동433": ["푸르지오", "미사강변2차푸르지오", "미사강변2차", "미사강변도시24단지"],
+                "선동436": ["더샵", "리버포레", "미사강변더샵리버포레"],
+                "선동427": ["자이", "센트럴자이", "미사강변센트럴자이"],
+                "선동430": ["자이", "리버뷰자이", "미사강변리버뷰자이"],
+                "선동434": ["베라체", "21단지", "미사강변도시21단지"],
+                "선동435": ["리버나인", "9단지", "미사강변도시9단지"],
+                "선동432": ["칸타빌", "리버스위트칸타빌"],
+                "망월동1100": ["골든센트로", "28단지"],
+                "망월동1110": ["부영", "사랑으로", "31단지"],
+                "망월동1090": ["센트럴포레", "29단지"]
+            };
+            
+            for (const key in mapping) {
+                if (normalizedAddr.includes(key)) {
+                    aliases.push(...mapping[key]);
+                }
+            }
+            return aliases;
+        }
+
         // 3. 필터링 및 렌더링
         function renderFilteredOrders() {
             window.deliveryPhotos = {};
@@ -2575,12 +2603,16 @@
                     const orderMemo = customerMemos[memoKey] || "";
                     const fixedMemo = fixedMemos[baseKey] || "";
 
+                    const addressAliases = getAddressAliases(addressStr + " " + addressDetailStr);
+                    const matchAlias = addressAliases.some(alias => alias.toLowerCase().includes(search));
+
                     const matchSearch = search === "" || 
                         nameStr.toLowerCase().includes(search) ||
                         phoneStr.includes(search) ||
                         itemStr.toLowerCase().includes(search) ||
                         addressStr.toLowerCase().includes(search) ||
                         addressDetailStr.toLowerCase().includes(search) ||
+                        matchAlias || // 아파트 별칭 검색 매칭 추가
                         kakaoNameStr.toLowerCase().includes(search) ||
                         kakaoRealNameStr.toLowerCase().includes(search) ||
                         orderMemo.toLowerCase().includes(search) ||
@@ -2639,6 +2671,20 @@
                     return null;
                 };
 
+                const extractHo = (card) => {
+                    const fullAddress = `${card.address || ''} ${card.addressDetail || ''}`;
+                    // 1. "202호" 패턴 매칭
+                    let match = fullAddress.match(/([0-9]+)\s*호/);
+                    if (match) return parseInt(match[1]);
+                    // 2. "101-202" 또는 "101 - 202" 패턴 매칭
+                    match = fullAddress.match(/[0-9]+\s*-\s*([0-9]+)/);
+                    if (match) return parseInt(match[1]);
+                    // 3. 뒤쪽에 단독 숫자가 있는 경우 (예: "101동 202" -> 호수로 인식)
+                    match = fullAddress.match(/\b([0-9]+)\b\s*$/);
+                    if (match) return parseInt(match[1]);
+                    return null;
+                };
+
                 const customersList = Object.values(grouped).sort((a, b) => {
                     const aCanceled = isCardFullyCanceled(a);
                     const bCanceled = isCardFullyCanceled(b);
@@ -2653,17 +2699,36 @@
                         return b.dateStr.localeCompare(a.dateStr);
                     }
 
-                    // 만약 검색어가 존재한다면 동별 내림차순 정렬 적용
+                    // 만약 검색어가 존재한다면 동/호수 오름차순 정렬 적용
                     if (search !== "") {
                         const aDong = extractDong(a);
                         const bDong = extractDong(b);
                         
                         if (aDong !== null && bDong !== null) {
+                            let compDong = 0;
                             if (typeof aDong === 'number' && typeof bDong === 'number') {
-                                if (aDong !== bDong) return bDong - aDong; // 동 내림차순
+                                compDong = aDong - bDong; // 동 오름차순
                             } else {
-                                const comp = String(bDong).localeCompare(String(aDong));
-                                if (comp !== 0) return comp;
+                                compDong = String(aDong).localeCompare(String(bDong)); // 문자열 동 오름차순
+                            }
+                            
+                            if (compDong !== 0) {
+                                return compDong;
+                            } else {
+                                // 동이 같을 경우 호수 오름차순 정렬
+                                const aHo = extractHo(a);
+                                const bHo = extractHo(b);
+                                if (aHo !== null && bHo !== null) {
+                                    if (typeof aHo === 'number' && typeof bHo === 'number') {
+                                        return aHo - bHo; // 호수 오름차순
+                                    } else {
+                                        return String(aHo).localeCompare(String(bHo));
+                                    }
+                                } else if (aHo !== null) {
+                                    return -1;
+                                } else if (bHo !== null) {
+                                    return 1;
+                                }
                             }
                         } else if (aDong !== null) {
                             return -1;
@@ -3296,13 +3361,29 @@
                 return;
             }
 
+            const itemsToProcess = [];
+            selectedItems.forEach(itemInfo => {
+                const [phone, orderKey] = itemInfo.split("|");
+                const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
+                const isCanceled = target && (target.canceled === true || target.canceled === "true" || String(target.canceled).toUpperCase() === "TRUE");
+                
+                if (isCanceled && newStatus !== '대기') {
+                    return; // '대기'로 되돌리는 경우 외에 취소된 주문은 제외
+                }
+                itemsToProcess.push({ phone, orderKey, target });
+            });
+
+            if (itemsToProcess.length === 0) {
+                showToast("선택된 항목 중 변경 가능한 주문이 없습니다. (취소된 주문은 대기로만 변경 가능)");
+                return;
+            }
+
             showLoader(`선택 항목 [${newStatus}] 일괄 처리 중...`);
             
             try {
                 const patchBody = getStatusPatchBody(newStatus);
                 const promises = [];
-                selectedItems.forEach(itemInfo => {
-                    const [phone, orderKey] = itemInfo.split("|");
+                itemsToProcess.forEach(({ phone, orderKey, target }) => {
                     const cleanPhone = String(phone || "").replace(/\D/g, "");
                     const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
                     
@@ -3312,7 +3393,6 @@
                         body: JSON.stringify(patchBody)
                     }).then(res => {
                         if (res.ok) {
-                            const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
                             if (target) {
                                 Object.assign(target, patchBody);
                                 syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
@@ -3324,7 +3404,7 @@
                 
                 await Promise.all(promises);
                 
-                showToast(`${selectedItems.size}개 주문 항목의 상태를 일괄 변경했습니다.`);
+                showToast(`${itemsToProcess.length}개 주문 항목의 상태를 일괄 변경했습니다.`);
                 selectedItems.clear();
                 updateSelectionCountText();
                 renderFilteredOrders();
@@ -3342,13 +3422,28 @@
                 return;
             }
 
+            const itemsToProcess = [];
+            selectedItems.forEach(itemInfo => {
+                const [phone, orderKey] = itemInfo.split("|");
+                const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
+                const isCanceled = target && (target.canceled === true || target.canceled === "true" || String(target.canceled).toUpperCase() === "TRUE");
+                
+                if (!isCanceled) {
+                    itemsToProcess.push({ phone, orderKey, target });
+                }
+            });
+
+            if (itemsToProcess.length === 0) {
+                showToast("선택된 항목 중 입금완료 처리할 수 있는 주문이 없습니다. (취소된 주문 제외)");
+                return;
+            }
+
             showLoader("선택 항목 [입금완료] 일괄 처리 중...");
             
             try {
                 const patchBody = { paid: true };
                 const promises = [];
-                selectedItems.forEach(itemInfo => {
-                    const [phone, orderKey] = itemInfo.split("|");
+                itemsToProcess.forEach(({ phone, orderKey, target }) => {
                     const cleanPhone = String(phone || "").replace(/\D/g, "");
                     const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
                     
@@ -3358,7 +3453,6 @@
                         body: JSON.stringify(patchBody)
                     }).then(res => {
                         if (res.ok) {
-                            const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
                             if (target) {
                                 target.paid = true;
                             }
@@ -3369,7 +3463,7 @@
                 
                 await Promise.all(promises);
                 
-                showToast(`${selectedItems.size}개 주문 항목의 입금을 확인했습니다.`);
+                showToast(`${itemsToProcess.length}개 주문 항목의 입금을 확인했습니다.`);
                 selectedItems.clear();
                 updateSelectionCountText();
                 renderFilteredOrders();
@@ -3954,6 +4048,11 @@
             });
 
             // 2. 프린트용 HTML 빌드
+            if (Object.keys(grouped).length === 0) {
+                showToast("인쇄 가능한 주문 항목이 없습니다. (취소, 배달완료, 픽업완료 주문 제외)");
+                return;
+            }
+
             let printHtml = `
                 <!DOCTYPE html>
                 <html>
@@ -5765,6 +5864,21 @@
                 return;
             }
 
+            const itemsToProcess = [];
+            selectedItems.forEach(itemKey => {
+                const [phone, orderKey] = itemKey.split("|");
+                const orderItem = rawOrders.find(o => o.phone === phone && o.orderKey === orderKey);
+                const isCanceled = orderItem && (orderItem.canceled === true || orderItem.canceled === "true" || String(orderItem.canceled).toUpperCase() === "TRUE");
+                if (!isCanceled) {
+                    itemsToProcess.push({ phone, orderKey, orderItem });
+                }
+            });
+
+            if (itemsToProcess.length === 0) {
+                showToast("선택된 항목 중 완료사진을 등록할 수 있는 주문이 없습니다. (취소된 주문 제외)");
+                return;
+            }
+
             // 파일 선택창 띄우기
             const fileInput = document.createElement('input');
             fileInput.type = 'file';
@@ -5811,8 +5925,7 @@
                     const promises = [];
                     const nowTime = Date.now();
                     
-                    selectedItems.forEach(itemKey => {
-                        const [phone, orderKey] = itemKey.split("|");
+                    itemsToProcess.forEach(({ phone, orderKey, orderItem }) => {
                         const cleanPhone = String(phone).replace(/\D/g, "");
                         
                         // Firebase 업데이트 본문 설정
@@ -5831,7 +5944,6 @@
                             if (!res.ok) throw new Error("업데이트 실패");
                             
                             // 로컬 메모리 동기화 및 구글 시트 동기화
-                            const orderItem = rawOrders.find(o => o.phone === phone && o.orderKey === orderKey);
                             if (orderItem) {
                                 orderItem.status = "배달완료";
                                 orderItem.delivered = true;
@@ -5844,10 +5956,51 @@
                     });
 
                     await Promise.all(promises);
+
+                    // 2. 고객별로 그룹화하여 첫 번째 고객에 대해 SMS 메시지 전송
+                    const smsGrouped = {};
+                    itemsToProcess.forEach(({ phone, orderKey, orderItem }) => {
+                        const cleanPhone = String(phone).replace(/\D/g, "");
+                        if (!smsGrouped[cleanPhone]) {
+                            smsGrouped[cleanPhone] = {
+                                phone: cleanPhone,
+                                name: orderItem ? orderItem.name : "고객",
+                                items: []
+                            };
+                        }
+                        if (orderItem) {
+                            smsGrouped[cleanPhone].items.push(orderItem.item);
+                        }
+                    });
+
+                    const firstGroupKey = Object.keys(smsGrouped)[0];
+                    if (firstGroupKey) {
+                        const targetCust = smsGrouped[firstGroupKey];
+                        const customerName = targetCust.name;
+                        const firstItemName = targetCust.items[0] || "상품";
+                        const itemCount = targetCust.items.length;
+                        
+                        let productText = "";
+                        if (itemCount >= 2) {
+                            productText = `${firstItemName} 외 ${itemCount - 1}개`;
+                        } else {
+                            productText = firstItemName;
+                        }
+                        
+                        const messageText = `[모켓] ${customerName}님, 주문하신 상품(${productText})의 배달이 완료되었습니다. 변질 우려가 있으니 바로 수령하여 냉장고 보관 부탁드립니다.`;
+                        
+                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                        const separator = isIOS ? '&' : '?';
+                        const smsUrl = `sms:${targetCust.phone}${separator}body=${encodeURIComponent(messageText)}`;
+                        
+                        setTimeout(() => {
+                            window.location.href = smsUrl;
+                        }, 800);
+                    }
                     
                     // 선택 영역 초기화 및 목록 갱신
                     selectedItems.clear();
-                    updateBatchActionBar();
+                    updateBatchBar();
                     renderFilteredOrders();
                     showToast("📸 배달 사진 등록 및 배달완료 처리 완료!");
                 } catch (err) {
