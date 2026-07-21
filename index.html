@@ -1013,9 +1013,18 @@
         }
 
         /* 영수증 및 프린트 레이아웃 */
+        .print-only {
+            display: none;
+        }
         @media print {
-            .no-print {
+            .no-print, body > *:not(.print-only) {
                 display: none !important;
+            }
+
+            .print-only {
+                display: block !important;
+                width: 72mm !important;
+                margin: 0 auto !important;
             }
 
             body {
@@ -4364,22 +4373,26 @@
                 </html>
             `;
 
-            // 3. 임시 팝업 창을 띄워 인쇄 처리 (인쇄 오류 방지 및 사용자 수동 닫기 가능)
-            const printWindow = window.open('', '_blank', 'width=450,height=800,scrollbars=yes');
-            if (!printWindow) {
-                showToast("⚠️ 브라우저 팝업 차단이 활성화되어 있어 인쇄 창을 열지 못했습니다. 팝업을 허용한 후 다시 시도해 주세요.");
-                return;
+            // 3. 현재 창의 인쇄 영역을 활용하여 인쇄 처리 (팝업 차단 및 모바일/PC 브라우저 호환성 에러 완벽 해결)
+            let printArea = document.getElementById("print-area");
+            if (!printArea) {
+                printArea = document.createElement("div");
+                printArea.id = "print-area";
+                printArea.className = "print-only";
+                document.body.appendChild(printArea);
             }
 
-            printWindow.document.open();
-            printWindow.document.write(printHtml);
-            printWindow.document.close();
+            printArea.innerHTML = printHtml;
 
-            // 리소스 렌더링 후 포커스를 주고 인쇄 대화 상자 실행 (인쇄 창은 사용자가 직접 닫음)
+            // 브라우저의 인쇄 대화상자 실행 (인쇄 미리보기 화면이 나타나며, 사용자가 끄기 전까지 꺼지지 않음)
             setTimeout(() => {
-                printWindow.focus();
-                printWindow.print();
-            }, 300);
+                window.print();
+            }, 100);
+
+            // 인쇄 완료 또는 취소 후 인쇄 영역 자동 정리
+            window.onafterprint = () => {
+                printArea.innerHTML = '';
+            };
         }
 
         // 7. 유틸리티 UI 컴포넌트 (로더, 토스트)
@@ -6151,6 +6164,9 @@
             <img id="photo-modal-img" src="" style="width: 100%; max-height: 450px; object-fit: contain; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc;">
         </div>
     </div>
+
+    <!-- 인쇄용 숨김 영역 (CSS @media print가 활성화될 때만 나타남) -->
+    <div id="print-area" class="print-only"></div>
 </body>
 
 </html>
