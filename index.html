@@ -4131,6 +4131,41 @@
             document.body.removeChild(link);
         }
 
+        // [신규] 아파트 이름만 추출하는 헬퍼 함수 (아파트가 없는 경우 짧은 배송지 주소 유지)
+        function extractApartmentName(address) {
+            if (!address) return "";
+            const normalized = String(address).replace(/\s+/g, "");
+            
+            // 1. 지번/동 매칭 매칭 우선 확인
+            if (normalized.includes("선동433")) return "푸르지오";
+            if (normalized.includes("선동436")) return "더샵";
+            if (normalized.includes("선동427")) return "자이";
+            if (normalized.includes("선동430")) return "리버뷰자이";
+            if (normalized.includes("선동434")) return "베라체";
+            if (normalized.includes("선동435")) return "리버나인";
+            if (normalized.includes("선동432")) return "칸타빌";
+            if (normalized.includes("망월동1100")) return "골든센트로";
+            if (normalized.includes("망월동1110")) return "부영";
+            if (normalized.includes("망월동1090")) return "센트럴포레";
+            
+            // 2. 키워드 매칭
+            const keywords = [
+                "푸르지오", "더샵", "자이", "베라체", "리버나인", "칸타빌", "골든센트로", "부영", "센트럴포레",
+                "아데나", "신안인스빌", "동원", "호반", "루나리움", "힐스테이트", "디에트르", "아이파크",
+                "e편한", "이편한", "리버뷰자이", "센트럴자이", "리버포레", "롯데캐슬", "스타힐스", "서희스타힐스"
+            ];
+            
+            for (const keyword of keywords) {
+                if (normalized.includes(keyword)) {
+                    if (keyword === "이편한" || keyword === "e편한") return "e편한세상";
+                    return keyword;
+                }
+            }
+            
+            // 3. 찾지 못했다면 포맷팅된 짧은 주소 반환
+            return formatShortAddress(address);
+        }
+
         // 6.5 선택된 주문 카드 인쇄 헬퍼
         function printSelectedCards() {
             if (selectedItems.size === 0) {
@@ -4246,7 +4281,7 @@
                         .address-text {
                             padding: 4px 0;
                             margin-top: 6px;
-                            font-size: 19px;
+                            font-size: 16px;
                             font-weight: 900;
                             width: 100%;
                             line-height: 1.3;
@@ -4310,7 +4345,7 @@
                                 <h2>${customer.name} (☎ ${displayPhone})</h2>
                                 ${isDelivery ? `
                                     <div class="address-text">
-                                        배송지: ${formatShortAddress(customer.address)}<br>
+                                        배송지: ${extractApartmentName(customer.address)}<br>
                                         상세주소: ${customer.addressDetail}<br>
                                         공동현관키: ${customer.entrance || '없음'}
                                     </div>
