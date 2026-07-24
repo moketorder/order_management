@@ -1013,46 +1013,138 @@
         }
 
         /* 영수증 및 프린트 레이아웃 */
+        /* 영수증 및 프린트 레이아웃 */
         .print-only {
-            display: none;
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+            width: 0;
+            height: 0;
+            overflow: hidden;
         }
         @media print {
+            @page {
+                margin: 0;
+            }
+            
             .no-print, body > *:not(.print-only) {
                 display: none !important;
             }
-
+ 
             .print-only {
                 display: block !important;
+                position: static !important;
+                left: 0 !important;
+                top: 0 !important;
                 width: 72mm !important;
+                height: auto !important;
+                overflow: visible !important;
                 margin: 0 auto !important;
             }
-
+ 
             body {
-                background: white;
-                color: black;
-                padding-bottom: 0;
-            }
-
-            .container {
-                padding: 0;
-                max-width: 100%;
-            }
-
-            .customer-card {
-                box-shadow: none;
-                border: 1px solid black;
-                margin-bottom: 20px;
-                page-break-inside: avoid;
-            }
-
-            .card-header {
-                background: white;
-                border-bottom: 1px solid black;
-            }
-
-            .address-box {
-                font-size: 17px !important;
+                background: white !important;
                 color: black !important;
+                padding-bottom: 0 !important;
+                width: 72mm !important;
+                margin: 0 auto !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* 영수증 전용 스타일 */
+            .print-card {
+                page-break-after: always;
+                page-break-inside: avoid;
+                border: none;
+                padding: 4mm 2mm 10mm 2mm;
+                margin: 0;
+                box-sizing: border-box;
+                width: 72mm;
+            }
+            .print-card:last-child {
+                page-break-after: avoid;
+            }
+            .print-card .card-header {
+                padding-bottom: 6px;
+                margin-bottom: 8px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                background: white !important;
+                border-bottom: none !important;
+            }
+            .print-card .customer-info {
+                width: 100%;
+            }
+            .print-card .customer-info h2 {
+                margin: 4px 0 4px 0;
+                font-size: 17px;
+                font-weight: 900;
+                color: #000;
+            }
+            .print-card .customer-info p {
+                margin: 2px 0;
+                font-size: 13px;
+            }
+            .print-card .shipping-type {
+                font-weight: 900;
+                font-size: 13px;
+                margin-bottom: 4px;
+                padding: 2px 6px;
+                border: 2px solid #000;
+                display: inline-block;
+                border-radius: 3px;
+            }
+            .print-card .shipping-delivery {
+                background: #000 !important;
+                color: #fff !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .print-card .shipping-pickup {
+                background: #fff !important;
+                color: #000 !important;
+            }
+            .print-card .address-text {
+                padding: 4px 0;
+                margin-top: 6px;
+                font-size: 16px;
+                font-weight: 900;
+                width: 100%;
+                line-height: 1.3;
+                box-sizing: border-box;
+                word-break: break-all;
+            }
+            .print-card table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 6px;
+                border-bottom: 1.5px solid #000;
+            }
+            .print-card th, .print-card td {
+                padding: 6px 2px;
+                text-align: left;
+                font-size: 13px;
+                word-break: break-all;
+                color: black !important;
+            }
+            .print-card th {
+                background: none !important;
+                border-top: 1.5px solid #000;
+                border-bottom: 1.5px solid #000;
+                font-weight: bold;
+            }
+            .print-card .text-right {
+                text-align: right;
+            }
+            .print-card .card-footer {
+                margin-top: 8px;
+                padding-top: 6px;
+                text-align: right;
+                font-size: 15px;
+                font-weight: bold;
+                background: none !important;
+                border-top: none !important;
             }
         }
 
@@ -1726,6 +1818,53 @@
             background: var(--card-color) !important;
             color: var(--text-main) !important;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* 마우스 포인터 가시성 개선 (흰색 마우스 포인터가 안 보일 때 검은색 테두리 대비 포인터 적용) */
+        @media (pointer: fine) {
+            body, 
+            html {
+                cursor: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgdmlld0JveD0iMCAwIDI4IDI4Ij48cGF0aCBmaWxsPSIjMDAwMDAwIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVqb2luPSJtaXRlciIgZD0iTTIsMiBMMiwyMCBMOC41LDE0LjUgTDEzLDI0IEwxNywyMiBMMTIuNSwxMi41IEwyMCwxMi41IFoiLz48L3N2Zz4=") 2 2, default !important;
+            }
+
+            /* 클릭 가능한 링크, 버튼, 선택 상자 등은 검은색 손가락 포인터 적용 */
+            a, 
+            button, 
+            select, 
+            .btn-common, 
+            .main-tab-btn, 
+            .date-btn, 
+            .checkbox-container, 
+            .custom-checkbox, 
+            .clear-search-btn, 
+            [role="button"], 
+            .cursor-pointer, 
+            input[type="button"], 
+            input[type="submit"], 
+            .segment-btn, 
+            .btn-batch, 
+            .btn-action-sm,
+            .summary-modal-close,
+            .unpaid-modal-close,
+            .unpaid-phone-link,
+            .btn-modal-close,
+            .image-upload-box,
+            .btn-submit,
+            .btn-cancel,
+            .btn-action,
+            .sub-tab-btn,
+            .admin-nav-btn {
+                cursor: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgdmlld0JveD0iMCAwIDI4IDI4Ij48cGF0aCBmaWxsPSIjMDAwMDAwIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgZD0iTTE2LDIgYTIsMiAwIDAgLDAgLTIsMiB2OC41IGEwLjUsMC41IDAgMCwxIC0xLDAgdi0zIGExLjUsMS41IDAgMCwwIC0zLDAgdjMgYTAuNSwwLjUgMCAwLDEgLTEsMCB2LTEuNSBhMS41LDEuNSAwIDAsMCAtMywwIHY4IGE4LDggMCAwLDAgOCw4IGE4LDggMCAwLDAgOCwtOCB2LTUuNSBhMS41LDEuNSAwIDAsMCAtMywwIHYxLjUgYTAuNSwwLjUgMCAwLDEgLTEsMCB2LTcuNSBhMS41LDEuNSAwIDAsMCAtMywwIHY1LjUgYTAuNSwwLjUgMCAwLDEgLTEsMCB2LTEwIGEyLDIgMCAwLDAgLTIsLTIgeiIvPjwvc3ZnPg==") 14 2, pointer !important;
+            }
+
+            /* 텍스트 입력창은 시스템 텍스트 커서(I-beam) 유지 */
+            input[type="text"], 
+            input[type="number"], 
+            input[type="search"], 
+            input[type="tel"], 
+            textarea {
+                cursor: text !important;
+            }
         }
     </style>
 </head>
@@ -3964,11 +4103,16 @@
             sub.style.fontWeight = '700';
             sub.style.color = '#64748b';
             
+            // 1단계 화면 (전화 걸기 / 문자 보내기)
+            const firstViewDiv = document.createElement('div');
+            firstViewDiv.style.display = 'flex';
+            firstViewDiv.style.flexDirection = 'column';
+            firstViewDiv.style.gap = '10px';
+            
             const callBtn = document.createElement('button');
             callBtn.innerText = '📞 전화 걸기';
             callBtn.style.width = '100%';
             callBtn.style.padding = '12px';
-            callBtn.style.marginBottom = '10px';
             callBtn.style.border = 'none';
             callBtn.style.borderRadius = '10px';
             callBtn.style.backgroundColor = '#10b981';
@@ -3985,7 +4129,6 @@
             smsBtn.innerText = '💬 문자 보내기';
             smsBtn.style.width = '100%';
             smsBtn.style.padding = '12px';
-            smsBtn.style.marginBottom = '10px';
             smsBtn.style.border = '1.5px solid #cbd5e1';
             smsBtn.style.borderRadius = '10px';
             smsBtn.style.backgroundColor = '#fff';
@@ -3993,10 +4136,6 @@
             smsBtn.style.fontSize = '15px';
             smsBtn.style.fontWeight = '800';
             smsBtn.style.cursor = 'pointer';
-            smsBtn.onclick = () => {
-                window.location.href = `sms:${cleanPhone}`;
-                modal.remove();
-            };
             
             const cancelBtn = document.createElement('button');
             cancelBtn.innerText = '취소';
@@ -4011,14 +4150,139 @@
             cancelBtn.style.cursor = 'pointer';
             cancelBtn.onclick = () => modal.remove();
             
+            firstViewDiv.appendChild(callBtn);
+            firstViewDiv.appendChild(smsBtn);
+            firstViewDiv.appendChild(cancelBtn);
+            
+            // 2단계 화면 (문자 안내 타입 선택)
+            const secondViewDiv = document.createElement('div');
+            secondViewDiv.style.display = 'none';
+            secondViewDiv.style.flexDirection = 'column';
+            secondViewDiv.style.gap = '10px';
+            
+            const pickupSmsBtn = document.createElement('button');
+            pickupSmsBtn.innerText = '📝 픽업안내 복사 & 문자';
+            pickupSmsBtn.style.width = '100%';
+            pickupSmsBtn.style.padding = '12px';
+            pickupSmsBtn.style.border = 'none';
+            pickupSmsBtn.style.borderRadius = '10px';
+            pickupSmsBtn.style.backgroundColor = '#8b5cf6'; // purple
+            pickupSmsBtn.style.color = '#fff';
+            pickupSmsBtn.style.fontSize = '14px';
+            pickupSmsBtn.style.fontWeight = '800';
+            pickupSmsBtn.style.cursor = 'pointer';
+            pickupSmsBtn.onclick = () => {
+                const text = `[상품픽업안내]\n안녕하세요 고객님~!\n모켓입니다😃\n\n주문하신 상품이 매장에 입고된지 며칠이 지나서 제품 수령예정이신지 여쭤보려 문자 드렸습니다.\n\n주문서 주문내역에서 입고완료된 상품 확인하신 후 픽업 가능여부 답변 주시면 감사하겠습니다~🙇‍♂️`;
+                copyTextAndSms(text, cleanPhone, "픽업안내");
+                modal.remove();
+            };
+            
+            const depositSmsBtn = document.createElement('button');
+            depositSmsBtn.innerText = '💵 입금안내 복사 & 문자';
+            depositSmsBtn.style.width = '100%';
+            depositSmsBtn.style.padding = '12px';
+            depositSmsBtn.style.border = 'none';
+            depositSmsBtn.style.borderRadius = '10px';
+            depositSmsBtn.style.backgroundColor = '#f59e0b'; // amber
+            depositSmsBtn.style.color = '#fff';
+            depositSmsBtn.style.fontSize = '14px';
+            depositSmsBtn.style.fontWeight = '800';
+            depositSmsBtn.style.cursor = 'pointer';
+            depositSmsBtn.onclick = () => {
+                const text = `안녕하세요~!\n모켓입니다 😃\n먼저 배달주문해주셔서 감사드립니다.\n\n다만 아직 입금확인이 안되어 연락드렸습니다.\n\n혹시 입금하셨으면 입금자명 알려주시면 감사하겠습니다🙇‍♂️`;
+                copyTextAndSms(text, cleanPhone, "입금안내");
+                modal.remove();
+            };
+
+            const generalSmsBtn = document.createElement('button');
+            generalSmsBtn.innerText = '💬 일반 문자 보내기';
+            generalSmsBtn.style.width = '100%';
+            generalSmsBtn.style.padding = '12px';
+            generalSmsBtn.style.border = '1.5px solid #cbd5e1';
+            generalSmsBtn.style.borderRadius = '10px';
+            generalSmsBtn.style.backgroundColor = '#fff';
+            generalSmsBtn.style.color = '#334155';
+            generalSmsBtn.style.fontSize = '14px';
+            generalSmsBtn.style.fontWeight = '800';
+            generalSmsBtn.style.cursor = 'pointer';
+            generalSmsBtn.onclick = () => {
+                window.location.href = `sms:${cleanPhone}`;
+                modal.remove();
+            };
+            
+            const backBtn = document.createElement('button');
+            backBtn.innerText = '⬅️ 뒤로 가기';
+            backBtn.style.width = '100%';
+            backBtn.style.padding = '10px';
+            backBtn.style.border = 'none';
+            backBtn.style.borderRadius = '10px';
+            backBtn.style.backgroundColor = '#f1f5f9';
+            backBtn.style.color = '#64748b';
+            backBtn.style.fontSize = '14px';
+            backBtn.style.fontWeight = '700';
+            backBtn.style.cursor = 'pointer';
+            backBtn.onclick = () => {
+                secondViewDiv.style.display = 'none';
+                firstViewDiv.style.display = 'flex';
+                title.innerText = '연락 방법 선택';
+            };
+            
+            secondViewDiv.appendChild(pickupSmsBtn);
+            secondViewDiv.appendChild(depositSmsBtn);
+            secondViewDiv.appendChild(generalSmsBtn);
+            secondViewDiv.appendChild(backBtn);
+            
+            smsBtn.onclick = () => {
+                firstViewDiv.style.display = 'none';
+                secondViewDiv.style.display = 'flex';
+                title.innerText = '문자 안내 타입 선택';
+            };
+            
             container.appendChild(title);
             container.appendChild(sub);
-            container.appendChild(callBtn);
-            container.appendChild(smsBtn);
-            container.appendChild(cancelBtn);
+            container.appendChild(firstViewDiv);
+            container.appendChild(secondViewDiv);
             
             modal.appendChild(container);
             document.body.appendChild(modal);
+        }
+
+        // 클립보드 복사 및 문자 발송 실행 유틸 함수
+        function copyTextAndSms(text, phone, typeLabel) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast(`${typeLabel} 문구가 복사되었습니다. 붙여넣기 하세요!`);
+                    setTimeout(() => {
+                        window.location.href = `sms:${phone}`;
+                    }, 600);
+                }).catch(err => {
+                    fallbackCopyAndSms(text, phone, typeLabel);
+                });
+            } else {
+                fallbackCopyAndSms(text, phone, typeLabel);
+            }
+        }
+
+        function fallbackCopyAndSms(text, phone, typeLabel) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.top = '0';
+            textarea.style.left = '0';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast(`${typeLabel} 문구가 복사되었습니다. 붙여넣기 하세요!`);
+            } catch (err) {
+                console.error("클립보드 복사 실패", err);
+                showToast("복사 실패. 수동으로 복사해주세요.");
+            }
+            document.body.removeChild(textarea);
+            setTimeout(() => {
+                window.location.href = `sms:${phone}`;
+            }, 600);
         }
 
         function revealPhone(event, element, phone) {
@@ -4211,116 +4475,7 @@
                 return;
             }
 
-            let printHtml = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="utf-8">
-                    <title>주문 영수증 인쇄</title>
-                    <style>
-                        @page {
-                            margin: 0;
-                        }
-                        body {
-                            font-family: 'Pretendard', -apple-system, sans-serif;
-                            background: white;
-                            color: black;
-                            width: 72mm;
-                            margin: 0 auto;
-                            padding: 4mm 2mm;
-                            box-sizing: border-box;
-                        }
-                        .print-card {
-                            page-break-after: always;
-                            page-break-inside: avoid;
-                            border: none;
-                            padding: 0 0 10mm 0;
-                            margin: 0;
-                        }
-                        .print-card:last-child {
-                            page-break-after: avoid;
-                        }
-                        .card-header {
-                            padding-bottom: 6px;
-                            margin-bottom: 8px;
-                            display: flex;
-                            flex-direction: column;
-                            align-items: flex-start;
-                        }
-                        .customer-info {
-                            width: 100%;
-                        }
-                        .customer-info h2 {
-                            margin: 4px 0 4px 0;
-                            font-size: 17px;
-                            font-weight: 900;
-                            color: #000;
-                        }
-                        .customer-info p {
-                            margin: 2px 0;
-                            font-size: 13px;
-                        }
-                        .shipping-type {
-                            font-weight: 900;
-                            font-size: 13px;
-                            margin-bottom: 4px;
-                            padding: 2px 6px;
-                            border: 2px solid #000;
-                            display: inline-block;
-                            border-radius: 3px;
-                        }
-                        .shipping-delivery {
-                            background: #000 !important;
-                            color: #fff !important;
-                            -webkit-print-color-adjust: exact;
-                            print-color-adjust: exact;
-                        }
-                        .shipping-pickup {
-                            background: #fff !important;
-                            color: #000 !important;
-                        }
-                        .address-text {
-                            padding: 4px 0;
-                            margin-top: 6px;
-                            font-size: 16px;
-                            font-weight: 900;
-                            width: 100%;
-                            line-height: 1.3;
-                            box-sizing: border-box;
-                            word-break: break-all;
-                        }
-                        table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            margin-top: 6px;
-                            border-bottom: 1.5px solid #000;
-                        }
-                        th, td {
-                            padding: 6px 2px;
-                            text-align: left;
-                            font-size: 13px;
-                            word-break: break-all;
-                        }
-                        th {
-                            background: none !important;
-                            border-top: 1.5px solid #000;
-                            border-bottom: 1.5px solid #000;
-                            font-weight: bold;
-                        }
-                        .text-right {
-                            text-align: right;
-                        }
-                        .card-footer {
-                            margin-top: 8px;
-                            padding-top: 6px;
-                            text-align: right;
-                            font-size: 15px;
-                            font-weight: bold;
-                        }
-                    </style>
-                </head>
-                <body>
-            `;
+            let printHtml = '';
 
             Object.values(grouped).forEach(customer => {
                 const isDelivery = customer.shippingMethod === '배달주문';
@@ -4403,11 +4558,6 @@
                     </div>
                 `;
             });
-
-            printHtml += `
-                </body>
-                </html>
-            `;
 
             // 3. 현재 창의 인쇄 영역을 활용하여 인쇄 처리 (팝업 차단 및 모바일/PC 브라우저 호환성 에러 완벽 해결)
             let printArea = document.getElementById("print-area");
