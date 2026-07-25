@@ -2101,6 +2101,7 @@
                         <button class="btn-batch type-show" onclick="handleBatchVisibility(true)" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">👁️ 노출</button>
                         <button class="btn-batch type-hide" onclick="handleBatchVisibility(false)" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">🙈 숨김</button>
                         <button class="btn-batch type-print" onclick="switchAdminTab('thumbnail-generator')" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition); color: #d97706; border-color: rgba(217, 119, 6, 0.25);">🎨 섬네일</button>
+                        <button class="btn-batch type-duplicate" onclick="handleBatchDuplicate()" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition); color: #2563eb; border-color: rgba(37, 99, 235, 0.25);">👯 복제</button>
                     </div>
             </div>
         </div>
@@ -2997,16 +2998,36 @@
                     let fixedMemoHtml = '';
                     if (fixedMemo) {
                         fixedMemoHtml += `
-                            <div class="fixed-memo-section" style="width: 100%; padding: 4px 8px; background: #f0fdf4; border: 1px dashed #86efac; border-radius: 6px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; box-sizing: border-box;">
-                                <div style="color: #166534; text-align: left; word-break: break-all; display: flex; align-items: flex-start; gap: 4px;">
-                                    <strong style="font-size: 11px; background: #dcfce7; color: #166534; padding: 2px 5px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;">📌 고정메모</strong>
+                            <div class="fixed-memo-section" style="width: 100%; padding: 4px 8px; background: #fff7ed; border: 1px dashed #fed7aa; border-radius: 6px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; box-sizing: border-box;">
+                                <div style="color: #c2410c; text-align: left; word-break: break-all; display: flex; align-items: flex-start; gap: 4px;">
+                                    <strong style="font-size: 11px; background: #ffedd5; color: #c2410c; padding: 2px 5px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;">📌 고정메모</strong>
                                     <span class="memo-text">${fixedMemo}</span>
                                 </div>
-                                <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #16a34a; border-color: rgba(22, 163, 74, 0.25);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">수정</button>
+                                <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #c2410c; border-color: rgba(194, 65, 12, 0.25);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">수정</button>
                             </div>
                         `;
                     } else {
                         fixedMemoHtml += `
+                            <div style="margin-right: auto;">
+                                <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">📌 고정메모 추가</button>
+                            </div>
+                        `;
+                    }
+
+                    // 3. 인쇄용 고객 고정 메모 (인쇄 시 노출되지만 수정 버튼은 숨김)
+                    let printableFixedMemoHtml = '';
+                    if (fixedMemo) {
+                        printableFixedMemoHtml = `
+                            <div class="fixed-memo-section" style="width: 100%; padding: 4px 8px; background: #fff7ed; border: 1px dashed #fed7aa; border-radius: 6px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; box-sizing: border-box;">
+                                <div style="color: #c2410c; text-align: left; word-break: break-all; display: flex; align-items: flex-start; gap: 4px;">
+                                    <strong style="font-size: 11px; background: #ffedd5; color: #c2410c; padding: 2px 5px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;">📌 고정메모</strong>
+                                    <span class="memo-text">${fixedMemo}</span>
+                                </div>
+                                <button class="btn-action-sm no-print" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #c2410c; border-color: rgba(194, 65, 12, 0.25);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">수정</button>
+                            </div>
+                        `;
+                    } else {
+                        printableFixedMemoHtml = `
                             <div style="margin-right: auto;">
                                 <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">📌 고정메모 추가</button>
                             </div>
@@ -3036,7 +3057,7 @@
                                     
                                     <!-- 둘째줄: 카톡이름, 주문횟수, 배달사진버튼 -->
                                     <div class="info-row-2" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
-                                        ${customer.kakaoName ? `<span class="kakao-badge" style="font-size:11px; background:#eff6ff; color:#1d4ed8; padding:2px 6px; border-radius:4px; font-weight:bold; border:1px solid #bfdbfe; display:inline-block;">💬 ${customer.kakaoName}${customer.kakaoRealName ? ` (${customer.kakaoRealName})` : ''}</span>` : ''}
+                                        ${customer.kakaoName ? `<span class="kakao-badge" style="display:inline-block; vertical-align:middle;">💬 ${customer.kakaoName}${customer.kakaoRealName ? ` (${customer.kakaoRealName})` : ''}</span>` : ''}
                                         ${seqBadge}
                                         ${customerItems.some(it => it.deliveryPhoto) ? `<span class="photo-view-badge" style="font-size:11px; background:#f0fdf4; color:#16a34a; padding:2px 6px; border-radius:4px; font-weight:bold; cursor:pointer; display:inline-block; border:1px solid #bcf0da;" onclick="viewDeliveryPhoto('${customer.phone}_${customerItems.find(it => it.deliveryPhoto)?.orderKey}')">📸 배달사진</span>` : ''}
                                     </div>
@@ -3098,6 +3119,7 @@
                                     <span class="total-price">${customer.totalPrice.toLocaleString()}원</span>
                                 </div>
                             </div>
+                            ${printableFixedMemoHtml ? `<div style="display:flex; flex-direction:column; width:100%; gap:6px; margin-top:8px;">${printableFixedMemoHtml}</div>` : ''}
                             ${orderMemoHtml ? `<div style="display:flex; flex-direction:column; width:100%; gap:6px; margin-top:8px;">${orderMemoHtml}</div>` : ''}
                         </div>
                     `;
@@ -4682,8 +4704,9 @@
                 uploadManageTab = 'all';
             }
             
-            uploadSelectedProductIndices.clear();
-            updateBatchBar();
+            // 다른 카테고리로 이동 시 선택 상태를 기억하도록 초기화 로직 제거
+            // uploadSelectedProductIndices.clear();
+            // updateBatchBar();
             clearProductSearch();
             buildManageCategoryTabs();
             buildSubTabs();
@@ -4721,8 +4744,9 @@
             document.querySelectorAll('#manage-category-tabs .segment-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.manageTab === tab);
             });
-            uploadSelectedProductIndices.clear();
-            updateBatchBar();
+            // 다른 카테고리로 이동 시 선택 상태를 기억하도록 초기화 로직 제거
+            // uploadSelectedProductIndices.clear();
+            // updateBatchBar();
             clearProductSearch();
             buildSubTabs();
             renderProductsList();
@@ -4733,8 +4757,9 @@
             document.querySelectorAll('.sub-tab-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.subTab === subTab);
             });
-            uploadSelectedProductIndices.clear();
-            updateBatchBar();
+            // 다른 카테고리로 이동 시 선택 상태를 기억하도록 초기화 로직 제거
+            // uploadSelectedProductIndices.clear();
+            // updateBatchBar();
             renderProductsList();
         }
 
@@ -5792,6 +5817,79 @@
             }
         }
 
+        // [신규] 선택 상품 일괄 복제 처리 함수
+        async function handleBatchDuplicate() {
+            if (uploadSelectedProductIndices.size === 0) return;
+            
+            if (!confirm(`선택한 ${uploadSelectedProductIndices.size}개의 상품을 복제하시겠습니까?`)) {
+                return;
+            }
+            
+            showLoader("👯 상품 복제 중...");
+            try {
+                let updatedProducts = [...uploadProducts];
+                const newAdjustments = [];
+                
+                // 선택된 상품 인덱스를 정렬하여 차례대로 복사 (순서 유지)
+                const sortedIndices = [...uploadSelectedProductIndices].sort((a, b) => a - b);
+                
+                for (const idx of sortedIndices) {
+                    const original = uploadProducts[idx];
+                    
+                    // 새로운 복제본 상품 객체 구성 (이름 뒤에 '(복사본)' 추가)
+                    const copyObj = {
+                        ...original,
+                        name: original.name + " (복사본)",
+                        updatedAt: Date.now()
+                    };
+                    
+                    updatedProducts.push(copyObj);
+                    
+                    // 재고 정보 연계용 키 생성 및 초기 0값 설정
+                    const isUnlimited = (copyObj.stock === undefined || copyObj.stock === null || copyObj.stock === "");
+                    const adjKey = fGetAdjKey(copyObj.matchKey, copyObj.name);
+                    const adjValue = isUnlimited ? "unlimited" : 0;
+                    
+                    newAdjustments.push({ key: adjKey, value: adjValue });
+                }
+                
+                // 1. Firebase 전역 재고 변동분(global_stock) 동적 할당
+                for (const adj of newAdjustments) {
+                    await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adj.key)}.json`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(adj.value)
+                    }).catch(e => console.error("복제본 재고 초기화 실패:", e));
+                }
+                
+                // 2. Firebase 상품 정보(published_products) 리스트 등록
+                const writeRes = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedProducts)
+                });
+                
+                if (!writeRes.ok) throw new Error("복제 상품 데이터베이스 반영 실패");
+                
+                uploadProducts = updatedProducts;
+                document.getElementById('product-count').innerText = uploadProducts.length;
+                
+                // 선택 정보 리셋
+                uploadSelectedProductIndices.clear();
+                updateBatchBar();
+                showToast(`${newAdjustments.length}개의 상품 복제가 완료되었습니다!`);
+                await loadProductsFromServer(); // 최신 데이터 다시 받아오기
+                buildManageCategoryTabs();
+                buildSubTabs();
+                renderProductsList();
+            } catch (e) {
+                console.error("상품 복제 처리 에러:", e);
+                showToast("복제 실패: " + e.toString());
+            } finally {
+                hideLoader();
+            }
+        }
+
         async function submitForm(event) {
             event.preventDefault();
 
@@ -6144,6 +6242,20 @@
             } else if (tabParam === 'product-upload') {
                 switchAdminTab('product-upload');
             }
+
+            // [신규] PC 환경에서 가로 스크롤 탭 컨테이너 마우스 휠 스크롤 지원
+            const horizontalScrollIds = ['sub-products-list-tabs', 'month-tabs', 'day-tabs'];
+            horizontalScrollIds.forEach(id => {
+                const container = document.getElementById(id);
+                if (container) {
+                    container.addEventListener('wheel', function(e) {
+                        if (e.deltaY !== 0) {
+                            e.preventDefault();
+                            container.scrollLeft += e.deltaY;
+                        }
+                    }, { passive: false });
+                }
+            });
         };
 
         // 배달 완료 사진 일괄 업로드 핸들러
