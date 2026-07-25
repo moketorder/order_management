@@ -2972,12 +2972,11 @@
                     
                     const orderMemo = customerMemos[memoKey] || "";
                     const fixedMemo = fixedMemos[baseKey] || "";
-                    
-                    let memoHtml = `<div style="display:flex; flex-direction:column; width:100%; gap:6px; margin-top:8px;">`;
-                    
+
                     // 1. 주문별 메모
+                    let orderMemoHtml = '';
                     if (orderMemo) {
-                        memoHtml += `
+                        orderMemoHtml += `
                             <div class="memo-section" style="width: 100%; padding: 4px 8px; background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 6px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; box-sizing: border-box;">
                                 <div style="color: #b45309; text-align: left; word-break: break-all; display: flex; align-items: flex-start; gap: 4px;">
                                     <strong style="font-size: 11px; background: #fef3c7; color: #b45309; padding: 2px 5px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;">📝 주문메모</strong>
@@ -2987,7 +2986,7 @@
                             </div>
                         `;
                     } else {
-                        memoHtml += `
+                        orderMemoHtml += `
                             <div class="memo-section no-print" style="margin-right: auto;">
                                 <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editCustomerMemo('${customer.name}', '${customer.phone}', '${orderTime}')">📝 주문메모 추가</button>
                             </div>
@@ -2995,19 +2994,20 @@
                     }
                     
                     // 2. 고객 고정 메모
+                    let fixedMemoHtml = '';
                     if (fixedMemo) {
-                        memoHtml += `
+                        fixedMemoHtml += `
                             <div class="fixed-memo-section" style="width: 100%; padding: 4px 8px; background: #f0fdf4; border: 1px dashed #86efac; border-radius: 6px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; box-sizing: border-box;">
                                 <div style="color: #166534; text-align: left; word-break: break-all; display: flex; align-items: flex-start; gap: 4px;">
                                     <strong style="font-size: 11px; background: #dcfce7; color: #166534; padding: 2px 5px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;">📌 고정메모</strong>
                                     <span class="memo-text">${fixedMemo}</span>
                                 </div>
-                                <button class="btn-action-sm no-print" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #16a34a; border-color: rgba(22, 163, 74, 0.25);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">수정</button>
+                                <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #16a34a; border-color: rgba(22, 163, 74, 0.25);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">수정</button>
                             </div>
                         `;
                     } else {
-                        memoHtml += `
-                            <div class="fixed-memo-section no-print" style="margin-right: auto;">
+                        fixedMemoHtml += `
+                            <div style="margin-right: auto;">
                                 <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">📌 고정메모 추가</button>
                             </div>
                         `;
@@ -3017,36 +3017,43 @@
                     const orderIndex = tsSeq.indexOf(orderTime);
                     const orderSeqNumber = orderIndex !== -1 ? (orderIndex + 1) : 1;
                     const totalOrderCount = tsSeq.length;
-                    const seqBadge = `<span style="font-size:11px; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-weight:bold; margin-left:6px; display:inline-block; vertical-align:middle;">${orderSeqNumber}번째 주문 (총 ${totalOrderCount}회)</span>`;
+                    const seqBadge = `<span style="font-size:11px; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-weight:bold; display:inline-block;">${orderSeqNumber}번째 주문 (총 ${totalOrderCount}회)</span>`;
                     const orderKeysStr = customerItems.map(it => it.orderKey).join(',');
-
+ 
                     card.innerHTML = `
                         <div class="card-header">
-                            <div style="display: flex; align-items: flex-start; gap: 8px;">
-                                <label class="checkbox-container" style="margin-top: 3px;">
+                            <div style="display: flex; align-items: flex-start; gap: 8px; width: 100%;">
+                                <label class="checkbox-container" style="margin-top: 3px; flex-shrink: 0;">
                                     <input type="checkbox" class="customer-checkbox" data-phone="${customer.phone}" ${allSelected ? 'checked' : ''} onchange="handleCustomerSelect(this)">
                                     <span class="custom-checkbox"></span>
                                 </label>
-                                <div class="customer-info-group">
-                                    <div class="customer-meta" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
-                                        <span class="customer-name">${customer.name}</span>
-                                        ${seqBadge}
-                                        ${customerItems.some(it => it.deliveryPhoto) ? `<span class="photo-view-badge" style="font-size:11px; background:#f0fdf4; color:#16a34a; padding:2px 6px; border-radius:4px; font-weight:bold; cursor:pointer; margin-left:6px; display:inline-block; vertical-align:middle; border:1px solid #bcf0da;" onclick="viewDeliveryPhoto('${customer.phone}_${customerItems.find(it => it.deliveryPhoto)?.orderKey}')">📸 배달사진</span>` : ''}
-                                        <a href="#" onclick="handlePhoneClick(event, '${customer.phone}')" class="customer-phone" style="margin-left: 0;">${customer.phone}</a>
-                                        ${customer.kakaoName ? `<span class="kakao-badge">💬 ${customer.kakaoName}${customer.kakaoRealName ? ` (${customer.kakaoRealName})` : ''}</span>` : ''}
+                                <div class="customer-info-group" style="display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0;">
+                                    <!-- 첫째줄: 닉네임, 전화번호 -->
+                                    <div class="info-row-1" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                        <span class="customer-name" style="font-size: 15px; font-weight: 800; color: var(--text);">${customer.name}</span>
+                                        <a href="#" onclick="handlePhoneClick(event, '${customer.phone}')" class="customer-phone" style="font-size: 13px; color: var(--blue); text-decoration: none; font-weight: 700; margin-left: 0;">${customer.phone}</a>
                                     </div>
                                     
+                                    <!-- 둘째줄: 카톡이름, 주문횟수, 배달사진버튼 -->
+                                    <div class="info-row-2" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
+                                        ${customer.kakaoName ? `<span class="kakao-badge" style="font-size:11px; background:#eff6ff; color:#1d4ed8; padding:2px 6px; border-radius:4px; font-weight:bold; border:1px solid #bfdbfe; display:inline-block;">💬 ${customer.kakaoName}${customer.kakaoRealName ? ` (${customer.kakaoRealName})` : ''}</span>` : ''}
+                                        ${seqBadge}
+                                        ${customerItems.some(it => it.deliveryPhoto) ? `<span class="photo-view-badge" style="font-size:11px; background:#f0fdf4; color:#16a34a; padding:2px 6px; border-radius:4px; font-weight:bold; cursor:pointer; display:inline-block; border:1px solid #bcf0da;" onclick="viewDeliveryPhoto('${customer.phone}_${customerItems.find(it => it.deliveryPhoto)?.orderKey}')">📸 배달사진</span>` : ''}
+                                    </div>
+                                    
+                                    <!-- 셋째줄: 고정메모 추가 버튼 및 고정메모 (인쇄 시 제외) -->
+                                    <div class="info-row-3 no-print" style="display: flex; flex-direction: column; width: 100%; gap: 4px;">
+                                        ${fixedMemoHtml}
+                                    </div>
+                                    
+                                    <!-- 그다음 배달일때는 주소 -->
                                     ${isDelivery ? `
-                                        <div class="address-box">
+                                        <div class="address-box" style="margin-top: 2px;">
                                             <div><strong>🏡 주소:</strong> ${formatShortAddress(customer.address)}</div>
                                             <div><strong>🏢 상세주소:</strong> ${customer.addressDetail}</div>
                                             ${customer.entrance ? `<div><strong>🚪 공동현관:</strong> ${customer.entrance}</div>` : ''}
                                         </div>
-                                    ` : `
-                                        <div class="address-box" style="color:var(--amber);">
-                                            <strong>📍 픽업 예정</strong>
-                                        </div>
-                                    `}
+                                    ` : ''}
                                     
                                     ${customer.cashReceipt === '발행' ? `
                                         <div style="font-size:11px; color:var(--text-sub); margin-top:2px;">
@@ -3091,7 +3098,7 @@
                                     <span class="total-price">${customer.totalPrice.toLocaleString()}원</span>
                                 </div>
                             </div>
-                            ${memoHtml}
+                            ${orderMemoHtml ? `<div style="display:flex; flex-direction:column; width:100%; gap:6px; margin-top:8px;">${orderMemoHtml}</div>` : ''}
                         </div>
                     `;
                     listContainer.appendChild(card);
