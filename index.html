@@ -1739,20 +1739,29 @@
         }
         #tab-admin-products .product-actions {
             display: flex;
-            gap: 6px;
+            flex-direction: column;
+            gap: 4px;
+            flex-shrink: 0;
+            justify-content: center;
         }
         #tab-admin-products .btn-action {
             border: none;
-            padding: 5px 9px;
-            font-size: 11px;
+            padding: 3px 6px;
+            font-size: 10px;
             font-weight: 700;
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
             transition: var(--transition);
+            text-align: center;
+            white-space: nowrap;
         }
         #tab-admin-products .action-edit {
             background: #e0f2fe;
             color: #0369a1;
+        }
+        #tab-admin-products .action-duplicate {
+            background: #f3e8ff;
+            color: #7c3aed;
         }
         #tab-admin-products .action-delete {
             background: var(--red-light);
@@ -2101,7 +2110,6 @@
                         <button class="btn-batch type-show" onclick="handleBatchVisibility(true)" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">👁️ 노출</button>
                         <button class="btn-batch type-hide" onclick="handleBatchVisibility(false)" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">🙈 숨김</button>
                         <button class="btn-batch type-print" onclick="switchAdminTab('thumbnail-generator')" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition); color: #d97706; border-color: rgba(217, 119, 6, 0.25);">🎨 섬네일</button>
-                        <button class="btn-batch type-duplicate" onclick="handleBatchDuplicate()" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition); color: #2563eb; border-color: rgba(37, 99, 235, 0.25);">👯 복제</button>
                     </div>
             </div>
         </div>
@@ -5748,6 +5756,7 @@
                         </div>
                         <div class="product-actions">
                             <button class="btn-action action-edit" onclick="editProduct(${index})">수정</button>
+                            <button class="btn-action action-duplicate" onclick="duplicateSingleProduct(${index})">복제</button>
                             <button class="btn-action action-delete" onclick="deleteProduct(${index})">삭제</button>
                         </div>
                     `;
@@ -5867,50 +5876,35 @@
             }
         }
 
-        // [신규] 선택 상품 일괄 복제 처리 함수
-        async function handleBatchDuplicate() {
-            if (uploadSelectedProductIndices.size === 0) return;
-            
-            if (!confirm(`선택한 ${uploadSelectedProductIndices.size}개의 상품을 복제하시겠습니까?`)) {
-                return;
-            }
+        // [신규] 단일 상품 복제 처리 함수
+        async function duplicateSingleProduct(index) {
+            const prod = uploadProducts[index];
+            if (!confirm(`'${prod.name}' 상품을 복제하시겠습니까?`)) return;
             
             showLoader("👯 상품 복제 중...");
             try {
                 let updatedProducts = [...uploadProducts];
-                const newAdjustments = [];
                 
-                // 선택된 상품 인덱스를 정렬하여 차례대로 복사 (순서 유지)
-                const sortedIndices = [...uploadSelectedProductIndices].sort((a, b) => a - b);
+                // 새로운 복제본 상품 객체 구성 (이름 뒤에 '(복사본)' 추가)
+                const copyObj = {
+                    ...prod,
+                    name: prod.name + " (복사본)",
+                    updatedAt: Date.now()
+                };
                 
-                for (const idx of sortedIndices) {
-                    const original = uploadProducts[idx];
-                    
-                    // 새로운 복제본 상품 객체 구성 (이름 뒤에 '(복사본)' 추가)
-                    const copyObj = {
-                        ...original,
-                        name: original.name + " (복사본)",
-                        updatedAt: Date.now()
-                    };
-                    
-                    updatedProducts.push(copyObj);
-                    
-                    // 재고 정보 연계용 키 생성 및 초기 0값 설정
-                    const isUnlimited = (copyObj.stock === undefined || copyObj.stock === null || copyObj.stock === "");
-                    const adjKey = fGetAdjKey(copyObj.matchKey, copyObj.name);
-                    const adjValue = isUnlimited ? "unlimited" : 0;
-                    
-                    newAdjustments.push({ key: adjKey, value: adjValue });
-                }
+                updatedProducts.push(copyObj);
                 
-                // 1. Firebase 전역 재고 변동분(global_stock) 동적 할당
-                for (const adj of newAdjustments) {
-                    await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adj.key)}.json`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(adj.value)
-                    }).catch(e => console.error("복제본 재고 초기화 실패:", e));
-                }
+                // 재고 정보 연계용 키 생성 및 초기 0값 설정
+                const isUnlimited = (copyObj.stock === undefined || copyObj.stock === null || copyObj.stock === "");
+                const adjKey = fGetAdjKey(copyObj.matchKey, copyObj.name);
+                const adjValue = isUnlimited ? "unlimited" : 0;
+                
+                // 1. Firebase 전역 재고 변동분(global_stock) 초기화
+                await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(adjValue)
+                });
                 
                 // 2. Firebase 상품 정보(published_products) 리스트 등록
                 const writeRes = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
@@ -5924,10 +5918,7 @@
                 uploadProducts = updatedProducts;
                 document.getElementById('product-count').innerText = uploadProducts.length;
                 
-                // 선택 정보 리셋
-                uploadSelectedProductIndices.clear();
-                updateBatchBar();
-                showToast(`${newAdjustments.length}개의 상품 복제가 완료되었습니다!`);
+                showToast("상품 복제가 완료되었습니다!");
                 await loadProductsFromServer(); // 최신 데이터 다시 받아오기
                 buildManageCategoryTabs();
                 buildSubTabs();
