@@ -1914,6 +1914,7 @@
                     <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
                     <button class="btn-common" style="border: 1.5px solid #d32f2f; background: #fff5f5; color: #d32f2f; font-weight: 700;" onclick="deleteCanceledOrders()">🗑️ 취소주문 삭제</button>
                     <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV</button>
+                    <button id="btnToggleAllDates" class="btn-common" style="border: 1.5px solid var(--border); background:white; color: var(--text-sub); font-weight: 700;" onclick="toggleAllDates()">📅 전체 날짜 보기</button>
                 </div>
             </div>
 
@@ -2130,8 +2131,8 @@
                             <div id="gen-thumbnail-preview" style="width: 500px; height: 500px; position: relative; background: var(--moket-green); overflow: hidden; display: flex; flex-direction: column; user-select: none; border: 8px solid var(--moket-green); box-sizing: border-box; font-family: 'Pretendard Variable', 'Pretendard', sans-serif;">
                                 <div class="gen-pickup-header" id="gen-preview-date" style="background: var(--moket-green); color: white; display: flex; align-items: center; justify-content: center; height: 52px; font-size: 35px; font-weight: 900; letter-spacing: -1.5px; z-index: 10; position: relative; box-sizing: border-box;">날짜 픽업</div>
                                 <div class="gen-content-area" style="flex: 1; display: flex; flex-direction: column; position: relative; z-index: 5; background: #fdf3e7; padding: 6px; overflow: hidden;">
-                                    <div class="gen-title-box" style="text-align: center; margin-bottom: 5px; padding: 4px 0; width: 100%; height: auto; box-sizing: border-box; background-color: transparent; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                                        <div class="gen-preview-name" id="gen-preview-name" style="font-size: 44px; font-weight: 900; color: #222; letter-spacing: -1.5px; line-height: 1.1; display: block; width: 100%; text-align: center; word-break: keep-all;">상품명</div>
+                                    <div class="gen-title-box" style="text-align: center; margin-bottom: 5px; padding: 12px 24px; width: 100%; height: auto; box-sizing: border-box; background-color: transparent; display: block; overflow: hidden;">
+                                        <div class="gen-preview-name" id="gen-preview-name" style="font-size: 40px; font-weight: 900; color: #222; letter-spacing: -1.5px; line-height: 1.1; display: block; width: 100%; text-align: center; word-break: keep-all;">상품명</div>
                                     </div>
                                     <div class="gen-image-frame" style="width: 100%; flex: 1; min-height: 0; border: 7px solid #FF6D00; border-radius: 20px; position: relative; overflow: hidden; background: #fff; box-sizing: border-box; margin-top: 2px; flex-shrink: 0; cursor: grab;">
                                         <img id="gen-bg-image" src="" alt="Thumbnail Image" style="position: absolute; width: 120%; height: auto; min-height: 100%; min-width: 100%; display: block; top: 0; left: 0; z-index: 1; transform-origin: center center;">
@@ -2304,17 +2305,26 @@
                         const it = data[phone][orderKey];
                         
                         // 7일 지난 배달 완료 사진 가비지 컬렉션 (DB 용량 확보)
-                        if (it.deliveryPhoto && it.deliveryPhotoTime) {
+                        const hasPhoto = it.deliveryPhotoExists || it.deliveryPhoto;
+                        if (hasPhoto && it.deliveryPhotoTime) {
                             const photoAge = Date.now() - parseInt(it.deliveryPhotoTime);
                             if (photoAge > 7 * 24 * 60 * 60 * 1000) {
                                 const cleanPhone = String(phone).replace(/\D/g, "");
+                                
+                                // orders 노드에서 플래그/사진 속성 제거
                                 fetch(`${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ deliveryPhoto: null, deliveryPhotoTime: null })
-                                }).catch(e => console.error("배달사진 가비지 컬렉션 실패:", e));
+                                    body: JSON.stringify({ deliveryPhoto: null, deliveryPhotoExists: null, deliveryPhotoTime: null })
+                                }).catch(e => console.error("배달사진 메타 GC 실패:", e));
+                                
+                                // delivery_photos 노드에서 실제 이미지 데이터 제거
+                                fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`, {
+                                    method: 'DELETE'
+                                }).catch(e => console.error("배달사진 이미지 GC 실패:", e));
                                 
                                 delete it.deliveryPhoto;
+                                delete it.deliveryPhotoExists;
                                 delete it.deliveryPhotoTime;
                             }
                         }
@@ -2420,15 +2430,52 @@
             return { month: "기타", day: "기타", dateStr: "기타" };
         }
 
+        // 오늘 날짜 기준 ±15일 여부 판별 헬퍼
+        function isWithin15Days(dateStr) {
+            if (!dateStr || dateStr === "기타") return false;
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return false;
+            const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const diffTime = Math.abs(date - today);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays <= 15;
+        }
+
+        let showAllDates = false;
+        function toggleAllDates() {
+            showAllDates = !showAllDates;
+            const btn = document.getElementById('btnToggleAllDates');
+            if (btn) {
+                if (showAllDates) {
+                    btn.innerText = "📅 최근 15일만 보기";
+                    btn.style.background = "#eff6ff";
+                    btn.style.borderColor = "#3b82f6";
+                    btn.style.color = "#3b82f6";
+                } else {
+                    btn.innerText = "📅 전체 날짜 보기";
+                    btn.style.background = "white";
+                    btn.style.borderColor = "var(--border)";
+                    btn.style.color = "var(--text-sub)";
+                }
+            }
+            buildDateTabs(true);
+        }
+
         // 2. 월/일 분류 탭 구축
         function buildDateTabs(isUserAction = false) {
+            const searchVal = document.getElementById('searchInput').value.trim();
+            
             // 1. 모든 고유 년도 추출
             const years = new Set();
             rawOrders.forEach(item => {
                 const info = getOrderDateInfo(item);
                 if (info.dateStr && info.dateStr !== "기타") {
-                    const y = info.dateStr.split('-')[0] + "년";
-                    years.add(y);
+                    if (showAllDates || searchVal !== "" || isWithin15Days(info.dateStr)) {
+                        const y = info.dateStr.split('-')[0] + "년";
+                        years.add(y);
+                    }
                 }
             });
             if (years.size === 0) {
@@ -2448,7 +2495,9 @@
                 if (info.dateStr && info.dateStr !== "기타") {
                     const itemYear = info.dateStr.split('-')[0] + "년";
                     if (itemYear === currentYear) {
-                        months.add(info.month);
+                        if (showAllDates || searchVal !== "" || isWithin15Days(info.dateStr)) {
+                            months.add(info.month);
+                        }
                     }
                 } else if (currentYear === "기타" || sortedYears.length === 1) {
                     months.add(info.month);
@@ -2502,7 +2551,9 @@
                 // 해당 년도의 날짜들 목록 추출
                 let uniqueDates = [...new Set(rawOrders.filter(it => {
                     const info = getOrderDateInfo(it);
-                    return info.dateStr && info.dateStr !== "기타" && (info.dateStr.split('-')[0] + "년") === currentYear;
+                    return info.dateStr && info.dateStr !== "기타" && 
+                           (info.dateStr.split('-')[0] + "년") === currentYear &&
+                           (showAllDates || searchVal !== "" || isWithin15Days(info.dateStr));
                 }).map(it => getOrderDateInfo(it).dateStr))];
                 
                 uniqueDates.sort((a, b) => a.localeCompare(b));
@@ -2555,12 +2606,15 @@
         }
 
         function buildDayTabs(isUserAction = false) {
+            const searchVal = document.getElementById('searchInput').value.trim();
             const days = new Set();
             rawOrders.forEach(item => {
                 const info = getOrderDateInfo(item);
                 const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
                 if (itemYear === currentYear && info.month === currentMonth) {
-                    days.add(info.day);
+                    if (showAllDates || searchVal !== "" || isWithin15Days(info.dateStr)) {
+                        days.add(info.day);
+                    }
                 }
             });
 
@@ -3072,7 +3126,7 @@
                                     <div class="info-row-2" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
                                         ${customer.kakaoName ? `<span class="kakao-badge" style="display:inline-block; vertical-align:middle;">💬 ${customer.kakaoName}${customer.kakaoRealName ? ` (${customer.kakaoRealName})` : ''}</span>` : ''}
                                         ${seqBadge}
-                                        ${customerItems.some(it => it.deliveryPhoto) ? `<span class="photo-view-badge" style="font-size:11px; background:#f0fdf4; color:#16a34a; padding:2px 6px; border-radius:4px; font-weight:bold; cursor:pointer; display:inline-block; border:1px solid #bcf0da;" onclick="viewDeliveryPhoto('${customer.phone}_${customerItems.find(it => it.deliveryPhoto)?.orderKey}')">📸 배달사진</span>` : ''}
+                                        ${customerItems.some(it => it.deliveryPhotoExists || it.deliveryPhoto) ? `<span class="photo-view-badge" style="font-size:11px; background:#f0fdf4; color:#16a34a; padding:2px 6px; border-radius:4px; font-weight:bold; cursor:pointer; display:inline-block; border:1px solid #bcf0da;" onclick="viewDeliveryPhoto('${customer.phone}', '${customerItems.find(it => it.deliveryPhotoExists || it.deliveryPhoto)?.orderKey}')">📸 배달사진</span>` : ''}
                                     </div>
                                     
                                     <!-- 셋째줄: 고정메모 추가 버튼 및 고정메모 (인쇄 시 제외) -->
@@ -3336,7 +3390,7 @@
         function getStatusPatchBody(status) {
             const isCancelAction = status === '취소';
             if (isCancelAction) {
-                return { canceled: true, deliveryPhoto: null, deliveryPhotoTime: null };
+                return { canceled: true, deliveryPhoto: null, deliveryPhotoExists: null, deliveryPhotoTime: null };
             }
             
             const patchBody = { status: status, canceled: false };
@@ -3360,6 +3414,7 @@
 
             if (status !== '배달완료') {
                 patchBody.deliveryPhoto = null;
+                patchBody.deliveryPhotoExists = null;
                 patchBody.deliveryPhotoTime = null;
             }
             return patchBody;
@@ -3534,6 +3589,13 @@
                 });
                 
                 if (!res.ok) throw new Error("Firebase 전송 실패");
+
+                // 배달 완료가 아니면 delivery_photos 경로 이미지 제거
+                if (newStatus !== '배달완료') {
+                    fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`, {
+                        method: 'DELETE'
+                    }).catch(e => console.error("배달사진 이미지 삭제 실패:", e));
+                }
                 
                 showToast(`상태를 [${newStatus}]로 변경 완료했습니다.`);
                 
@@ -3563,11 +3625,18 @@
                 const patchBody = getStatusPatchBody(newStatus);
                 const promises = customerItems.map(it => {
                     const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${it.orderKey}.json`;
-                    return fetch(url, {
+                    const p = fetch(url, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(patchBody)
                     });
+                    
+                    if (newStatus !== '배달완료') {
+                        fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${it.orderKey}.json`, {
+                            method: 'DELETE'
+                        }).catch(e => console.error("배달사진 이미지 삭제 실패:", e));
+                    }
+                    return p;
                 });
                 
                 await Promise.all(promises);
@@ -3630,6 +3699,11 @@
                             if (target) {
                                 Object.assign(target, patchBody);
                                 syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
+                            }
+                            if (newStatus !== '배달완료') {
+                                fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`, {
+                                    method: 'DELETE'
+                                }).catch(e => console.error("배달사진 이미지 삭제 실패:", e));
                             }
                         }
                     });
@@ -5144,7 +5218,7 @@
         function adjustGenTitleFontSize() {
             const el = document.getElementById('gen-preview-name');
             if (el) {
-                el.style.fontSize = '44px';
+                el.style.fontSize = '40px';
             }
         }
         
@@ -6348,11 +6422,12 @@
                     itemsToProcess.forEach(({ phone, orderKey, orderItem }) => {
                         const cleanPhone = String(phone).replace(/\D/g, "");
                         
-                        // Firebase 업데이트 본문 설정
+                        // Firebase 업데이트 본문 설정 (메타데이터만 orders 노드에 저장)
                         const updates = {
                             status: "배달완료",
                             delivered: true,
-                            deliveryPhoto: base64Data,
+                            deliveryPhoto: null, // 혹시 기존 이미지가 있었다면 지움
+                            deliveryPhotoExists: true,
                             deliveryPhotoTime: nowTime
                         };
                         
@@ -6363,11 +6438,19 @@
                         }).then(async (res) => {
                             if (!res.ok) throw new Error("업데이트 실패");
                             
+                            // 실제 고용량 이미지 데이터는 delivery_photos 노드에 별도 저장
+                            await fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ photo: base64Data })
+                            });
+
                             // 로컬 메모리 동기화 및 구글 시트 동기화
                             if (orderItem) {
                                 orderItem.status = "배달완료";
                                 orderItem.delivered = true;
-                                orderItem.deliveryPhoto = base64Data;
+                                orderItem.deliveryPhoto = null;
+                                orderItem.deliveryPhotoExists = true;
                                 orderItem.deliveryPhotoTime = nowTime;
                                 syncStatusToGoogleSheets(phone, orderItem.timestamp, orderItem.item, "배달완료");
                             }
@@ -6435,12 +6518,35 @@
         }
 
         // 사진 팝업 모달 함수
-        function viewDeliveryPhoto(photoKey) {
-            const photoData = window.deliveryPhotos ? window.deliveryPhotos[photoKey] : null;
+        async function viewDeliveryPhoto(phone, orderKey) {
+            const photoKey = phone + "_" + orderKey;
+            let photoData = window.deliveryPhotos ? window.deliveryPhotos[photoKey] : null;
+            
+            if (!photoData) {
+                showLoader("📸 배달 사진 로딩 중...");
+                try {
+                    const cleanPhone = String(phone).replace(/\D/g, "");
+                    const res = await fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.photo) {
+                            photoData = data.photo;
+                            if (!window.deliveryPhotos) window.deliveryPhotos = {};
+                            window.deliveryPhotos[photoKey] = photoData; // 로컬 메모리에 캐싱
+                        }
+                    }
+                } catch (e) {
+                    console.error("배달 사진 가져오기 실패:", e);
+                } finally {
+                    hideLoader();
+                }
+            }
+            
             if (!photoData) {
                 showToast("사진 데이터를 찾을 수 없습니다.");
                 return;
             }
+            
             const modal = document.getElementById("photo-modal");
             const modalImg = document.getElementById("photo-modal-img");
             if (modal && modalImg) {
