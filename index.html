@@ -3077,7 +3077,7 @@
                                 <td style="width:100px;">${parseInt(it.price || 0).toLocaleString()}원</td>
                                 <td style="width:100px;"><strong>${parseInt(it.total || 0).toLocaleString()}원</strong></td>
                                 <td style="width:120px; text-align:center;">
-                                    <span class="status-badge ${badgeClass}">${badgeLabel}</span>
+                                    <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${customer.phone}', '${it.orderKey}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
                                 </td>
                             </tr>
                         `;
@@ -3091,7 +3091,7 @@
                                         <span class="custom-checkbox"></span>
                                     </label>
                                     <span class="mobile-item-name">${it.item} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}</span>
-                                    <span class="status-badge ${badgeClass}">${badgeLabel}</span>
+                                    <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${customer.phone}', '${it.orderKey}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
                                 </div>
                                 <div class="mobile-item-middle">
                                     <span>수량: <strong class="qty-highlight">${it.qty}</strong>개</span>
@@ -3682,22 +3682,45 @@
                         return oDateInfo.dateStr === targetDateStr;
                     });
 
-                    const promises = targetOrdersToChange.map(order => {
-                        const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${order.orderKey}.json`;
-                        const updatePayload = { pickupDate: trimmedDate };
+                    const promises = [];
+                    targetOrdersToChange.forEach(order => {
+                        const updatePayload = { pickupDate: trimmedDate, date: trimmedDate };
                         // 만약 기존 matchKey가 날짜 형태(YYYY-MM-DD)였다면 새 날짜로 함께 업데이트
                         if (order.matchKey && order.matchKey.match(/^\d{4}-\d{2}-\d{2}$/)) {
                             updatePayload.matchKey = trimmedDate;
                         }
-                        return fetch(url, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(updatePayload)
+
+                        // 로컬 메모리 상태 즉시 업데이트
+                        order.pickupDate = trimmedDate;
+                        order.date = trimmedDate;
+
+                        // Firebase 패치 (DB에 저장된 실제 최상위 phone 키와 cleanPhone 키 모두 전송하여 이탈 방지)
+                        const targetPhones = new Set([cleanPhone]);
+                        if (order.phone) targetPhones.add(String(order.phone).trim());
+                        
+                        targetPhones.forEach(pKey => {
+                            const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${order.orderKey}.json`;
+                            promises.push(
+                                fetch(url, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(updatePayload)
+                                })
+                            );
                         });
                     });
                     
                     await Promise.all(promises);
                     showToast("📅 주문 날짜가 정상적으로 변경되었습니다.");
+
+                    // 변경된 새 날짜 탭으로 UI 활성 탭 자동 전환
+                    if (trimmedDate && /^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
+                        const parts = trimmedDate.split('-');
+                        currentYear = parseInt(parts[0]) + "년";
+                        currentMonth = parseInt(parts[1]) + "월";
+                        currentDay = parseInt(parts[2]) + "일";
+                    }
+
                     await fetchOrders();
 
                     // 날짜 변경 후 이전 날짜 및 새 날짜에 대해 배달비 자동 부과/제거 로직 호출
@@ -3868,7 +3891,14 @@
             );
             if (!isDelivery) return;
 
-            // 3. 이미 취소되지 않은 배달비 항목이 존재하는지 확인
+            // 3. 명시적으로 취소 처리된 배달비 항목이 존재하는지 확인 (사용자/관리자가 배달비를 직접 취소한 경우 재부과 금지)
+            const hasCanceledDeliveryFee = customerDayOrders.some(o => 
+                o.item === '배달비' && 
+                (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE")
+            );
+            if (hasCanceledDeliveryFee) return;
+
+            // 4. 이미 취소되지 않은 활성 배달비 항목이 존재하는지 확인
             const hasActiveDeliveryFee = customerDayOrders.some(o => 
                 o.item === '배달비' && 
                 !(o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE")
@@ -3995,33 +4025,99 @@
             }
         }
 
+        // 개별 품목 클릭 시 상태 변경 팝업 모달
+        function openItemStatusModal(phone, orderKey, itemName, currentStatus, isCanceled) {
+            const existing = document.getElementById('item-status-select-modal');
+            if (existing) existing.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'item-status-select-modal';
+            modal.style = `
+                position: fixed; z-index: 10000; left: 0; top: 0; width: 100vw; height: 100vh;
+                background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+                backdrop-filter: blur(4px);
+            `;
+
+            const options = [
+                { status: '대기', label: '🔘 대기 (기본 상태)', color: '#64748b', bg: '#f1f5f9' },
+                { status: '입고', label: '🟡 입고 완료', color: '#d97706', bg: '#fffbeb' },
+                { status: '픽업', label: '🟣 픽업 완료', color: '#7c3aed', bg: '#f5f3ff' },
+                { status: '배달완료', label: '🟢 배달 완료', color: '#059669', bg: '#ecfdf5' },
+                { status: '취소', label: '🔴 주문 취소', color: '#dc2626', bg: '#fef2f2' }
+            ];
+
+            let optionsHtml = '';
+            options.forEach(opt => {
+                const isActive = (isCanceled && opt.status === '취소') || (!isCanceled && currentStatus === opt.status);
+                optionsHtml += `
+                    <button type="button" onclick="selectItemStatus('${phone}', '${orderKey}', '${opt.status}')" style="
+                        width: 100%; padding: 12px 16px; margin-bottom: 8px; border-radius: 10px;
+                        border: 1.5px solid ${isActive ? opt.color : '#e2e8f0'};
+                        background: ${isActive ? opt.bg : '#ffffff'}; color: ${opt.color};
+                        font-size: 15px; font-weight: 800; cursor: pointer; text-align: left;
+                        display: flex; align-items: center; justify-content: space-between;
+                    ">
+                        <span>${opt.label}</span>
+                        ${isActive ? '<span style="font-size:12px; background:'+opt.color+'; color:#fff; padding:2px 6px; border-radius:4px;">현재상태</span>' : ''}
+                    </button>
+                `;
+            });
+
+            modal.innerHTML = `
+                <div style="background: white; padding: 24px; border-radius: 16px; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); box-sizing: border-box;">
+                    <h3 style="margin: 0 0 6px 0; font-size: 16px; font-weight: 800; color: #0f172a; text-align: center;">상품 상태 변경</h3>
+                    <p style="margin: 0 0 16px 0; font-size: 13px; color: #64748b; text-align: center; font-weight: 600; word-break: break-all;">[${itemName}]</p>
+                    <div>${optionsHtml}</div>
+                    <button type="button" onclick="document.getElementById('item-status-select-modal').remove()" style="
+                        width: 100%; padding: 10px; border: 1px solid #cbd5e1; background: #f8fafc; color: #64748b;
+                        font-size: 14px; font-weight: 700; border-radius: 8px; cursor: pointer; margin-top: 4px;
+                    ">닫기</button>
+                </div>
+            `;
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            document.body.appendChild(modal);
+        }
+
+        function selectItemStatus(phone, orderKey, newStatus) {
+            const modal = document.getElementById('item-status-select-modal');
+            if (modal) modal.remove();
+            updateSingleItemStatus(phone, orderKey, newStatus);
+        }
+
         // 6. 단일/일괄 상태 변경 실행 (Firebase PUT/PATCH 및 구글 시트 동기화)
         async function updateSingleItemStatus(phone, orderKey, newStatus) {
             showLoader("상태 업데이트 중...");
             const cleanPhone = String(phone || "").replace(/\D/g, "");
-            const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
+            const target = rawOrders.find(it => (it.phone === phone || String(it.phone).replace(/\D/g, "") === cleanPhone) && it.orderKey === orderKey) || rawOrders.find(it => it.orderKey === orderKey);
+            
+            const targetPhones = new Set([cleanPhone]);
+            if (phone) targetPhones.add(String(phone).trim());
+            if (target && target.phone) targetPhones.add(String(target.phone).trim());
             
             try {
                 const patchBody = getStatusPatchBody(newStatus);
-                const res = await fetch(url, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(patchBody)
+                const promises = [];
+                targetPhones.forEach(pKey => {
+                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${orderKey}.json`;
+                    promises.push(
+                        fetch(url, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(patchBody)
+                        })
+                    );
+                    
+                    if (newStatus !== '배달완료') {
+                        fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(pKey)}/${orderKey}.json`, {
+                            method: 'DELETE'
+                        }).catch(e => console.error("배달사진 이미지 삭제 실패:", e));
+                    }
                 });
                 
-                if (!res.ok) throw new Error("Firebase 전송 실패");
-
-                // 배달 완료가 아니면 delivery_photos 경로 이미지 제거
-                if (newStatus !== '배달완료') {
-                    fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`, {
-                        method: 'DELETE'
-                    }).catch(e => console.error("배달사진 이미지 삭제 실패:", e));
-                }
-                
+                await Promise.all(promises);
                 showToast(`상태를 [${newStatus}]로 변경 완료했습니다.`);
                 
                 // 로컬 데이터 갱신
-                const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
                 if (target) {
                     Object.assign(target, patchBody);
                     syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
