@@ -3679,7 +3679,7 @@
                     const targetDateInfo = getOrderDateInfo(matchingOrder);
                     const targetDateStr = targetDateInfo.dateStr; // 이전 날짜 (예: "2026-07-27")
                     
-                    // 이 고객의 동일 날짜 주문들 또는 현재 카드에 포함된 주문들을 전체 검색하여 누락 없이 대상 목록 구성
+                    // 선택한 카드에 속한 주문들(orderKeys)을 정확히 타겟으로 변경 대상 구성
                     const targetOrdersToChange = rawOrders.filter(o => {
                         const oCleanPhone = String(o.phone || "").replace(/\D/g, "");
                         const targetCleanPhone = String(phone || "").replace(/\D/g, "");
@@ -3692,12 +3692,7 @@
                             
                         if (!isSameCustomer) return false;
                         
-                        // 1. 현재 카드에 표시되어 전달된 주문 키에 포함되는가? (배달비 등 날짜 형식이 아닌 특수 상품 누락 방지)
-                        if (orderKeys.includes(o.orderKey)) return true;
-                        
-                        // 2. 또는 동일 날짜의 주문인가? (취소 건 등 포함)
-                        const oDateInfo = getOrderDateInfo(o);
-                        return oDateInfo.dateStr === targetDateStr;
+                        return orderKeys.includes(o.orderKey);
                     });
 
                     const promises = [];
