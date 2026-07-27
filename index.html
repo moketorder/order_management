@@ -2469,9 +2469,11 @@
 
         // 날짜 파싱 헬퍼
         function getOrderDateInfo(item) {
-            let dateStr = String(item.pickupDate || "").trim();
+            if (!item) return { month: "기타", day: "기타", dateStr: "기타" };
+
+            let dateStr = String(item.pickupDate || item.date || item.matchKey || "").trim();
             
-            // [수정] 날짜 형식에 매칭되지 않는 모든 텍스트(카테고리명 등) 또는 빈 값이면 timestamp를 기준일로 삼음 (고객 검색 누락 완벽 해결)
+            // [수정] 날짜 형식에 매칭되지 않는 모든 텍스트(카테고리명 등) 또는 빈 값이면 timestamp를 기준일로 삼음
             const hasValidDateFormat = /(\d+)년\s*(\d+)월\s*(\d+)일|(\d+)-(\d+)-(\d+)/.test(dateStr);
             if (!hasValidDateFormat || dateStr === "") {
                 if (item.timestamp) {
@@ -3664,22 +3666,21 @@
 
         // [신규] 고객 배달일/픽업일 일괄 변경 기능 (동일 수령일의 취소 건 등 누락 방지 완벽 처리)
         async function changeCustomerOrderDate(phone, orderKeysStr, label) {
-            const cleanPhone = String(phone).replace(/\D/g, "");
-            const orderKeys = orderKeysStr.split(",");
+            const cleanPhone = String(phone || "").replace(/\D/g, "");
+            const orderKeys = (orderKeysStr || "").split(",").map(k => k.trim()).filter(Boolean);
             if (orderKeys.length === 0) return;
             
             const firstKey = orderKeys[0];
-            // o.phone === phone 대신 orderKey 고유값으로 찾도록 개선 및 o.phone 포맷 다를 시 방어
-            const matchingOrder = rawOrders.find(o => o.orderKey === firstKey);
-            const currentDate = matchingOrder ? (matchingOrder.pickupDate || "") : "";
+            const matchingOrder = rawOrders.find(o => String(o.orderKey).trim() === firstKey);
+            const currentDate = matchingOrder ? (matchingOrder.pickupDate || matchingOrder.date || "") : "";
             
             showDatePickerModal(`${label} 변경`, currentDate, async (trimmedDate) => {
                 showLoader("📅 주문 날짜 변경 중...");
                 try {
-                    const targetDateInfo = getOrderDateInfo(matchingOrder);
-                    const targetDateStr = targetDateInfo.dateStr; // 이전 날짜 (예: "2026-07-27")
+                    const targetDateInfo = matchingOrder ? getOrderDateInfo(matchingOrder) : { dateStr: "" };
+                    const targetDateStr = targetDateInfo.dateStr;
                     
-                    // 선택한 카드에 속한 주문들(orderKeys)을 정확히 타겟으로 변경 대상 구성
+                    const targetKeysSet = new Set(orderKeys);
                     const targetOrdersToChange = rawOrders.filter(o => {
                         const oCleanPhone = String(o.phone || "").replace(/\D/g, "");
                         const targetCleanPhone = String(phone || "").replace(/\D/g, "");
@@ -3692,20 +3693,25 @@
                             
                         if (!isSameCustomer) return false;
                         
-                        return orderKeys.includes(o.orderKey);
+                        return targetKeysSet.has(String(o.orderKey).trim());
                     });
 
                     const promises = [];
                     targetOrdersToChange.forEach(order => {
-                        const updatePayload = { pickupDate: trimmedDate, date: trimmedDate };
-                        // 만약 기존 matchKey가 날짜 형태(YYYY-MM-DD)였다면 새 날짜로 함께 업데이트
-                        if (order.matchKey && order.matchKey.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        const updatePayload = { 
+                            pickupDate: trimmedDate, 
+                            date: trimmedDate,
+                            orderDate: trimmedDate
+                        };
+                        if (order.matchKey) {
                             updatePayload.matchKey = trimmedDate;
                         }
 
                         // 로컬 메모리 상태 즉시 업데이트
                         order.pickupDate = trimmedDate;
                         order.date = trimmedDate;
+                        order.orderDate = trimmedDate;
+                        if (order.matchKey) order.matchKey = trimmedDate;
 
                         // Firebase 패치 (DB에 저장된 실제 최상위 phone 키, firebasePhoneKey, cleanPhone 키 모두 전송하여 이탈 방지)
                         const targetPhones = new Set([cleanPhone]);
@@ -3714,7 +3720,8 @@
                         if (matchingOrder && matchingOrder.firebasePhoneKey) targetPhones.add(String(matchingOrder.firebasePhoneKey).trim());
                         
                         targetPhones.forEach(pKey => {
-                            const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${order.orderKey}.json`;
+                            if (!pKey) return;
+                            const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${encodeURIComponent(order.orderKey)}.json`;
                             promises.push(
                                 fetch(url, {
                                     method: 'PATCH',
@@ -3728,6 +3735,9 @@
                     await Promise.all(promises);
                     showToast("📅 주문 날짜가 정상적으로 변경되었습니다.");
 
+                    // DB 커밋 대기 (200ms)
+                    await new Promise(r => setTimeout(r, 200));
+
                     // 변경된 새 날짜 탭으로 UI 활성 탭 자동 전환
                     if (trimmedDate && /^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
                         const parts = trimmedDate.split('-');
@@ -3736,7 +3746,7 @@
                         currentDay = parseInt(parts[2]) + "일";
                     }
 
-                    await fetchOrders();
+                    await fetchOrders(true);
 
                     // 날짜 변경 후 이전 날짜 및 새 날짜에 대해 배달비 자동 부과/제거 로직 호출
                     await checkAndApplyDeliveryFeeAfterCancellation(phone, targetDateStr);
