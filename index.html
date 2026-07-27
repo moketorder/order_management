@@ -2411,9 +2411,11 @@
                         else if (isStocked) calculatedStatus = "입고";
 
                         rawOrders.push({
+                            firebasePhoneKey: phone,
                             phone,
-                            orderKey,
                             ...it,
+                            orderKey,
+                            firebasePhoneKey: phone,
                             status: calculatedStatus
                         });
                     }
@@ -3508,14 +3510,22 @@
             try {
                 const promises = [];
                 orderKeys.forEach(orderKey => {
-                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
-                    promises.push(
-                        fetch(url, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ shippingMethod: targetMethod })
-                        })
-                    );
+                    const target = rawOrders.find(it => it.orderKey === orderKey);
+                    const targetPhones = new Set([cleanPhone]);
+                    if (phone) targetPhones.add(String(phone).trim());
+                    if (target && target.phone) targetPhones.add(String(target.phone).trim());
+                    if (target && target.firebasePhoneKey) targetPhones.add(String(target.firebasePhoneKey).trim());
+
+                    targetPhones.forEach(pKey => {
+                        const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${orderKey}.json`;
+                        promises.push(
+                            fetch(url, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ shippingMethod: targetMethod })
+                            })
+                        );
+                    });
                 });
                 
                 await Promise.all(promises);
@@ -3671,8 +3681,16 @@
                     
                     // 이 고객의 동일 날짜 주문들 또는 현재 카드에 포함된 주문들을 전체 검색하여 누락 없이 대상 목록 구성
                     const targetOrdersToChange = rawOrders.filter(o => {
-                        const oPhone = String(o.phone).replace(/\D/g, "");
-                        if (oPhone !== cleanPhone) return false;
+                        const oCleanPhone = String(o.phone || "").replace(/\D/g, "");
+                        const targetCleanPhone = String(phone || "").replace(/\D/g, "");
+                        const oFbCleanPhone = String(o.firebasePhoneKey || "").replace(/\D/g, "");
+                        
+                        const isSameCustomer = (oCleanPhone === targetCleanPhone) || 
+                            (oFbCleanPhone === targetCleanPhone) || 
+                            (o.phone === phone) || 
+                            (o.firebasePhoneKey === phone);
+                            
+                        if (!isSameCustomer) return false;
                         
                         // 1. 현재 카드에 표시되어 전달된 주문 키에 포함되는가? (배달비 등 날짜 형식이 아닌 특수 상품 누락 방지)
                         if (orderKeys.includes(o.orderKey)) return true;
@@ -3694,9 +3712,11 @@
                         order.pickupDate = trimmedDate;
                         order.date = trimmedDate;
 
-                        // Firebase 패치 (DB에 저장된 실제 최상위 phone 키와 cleanPhone 키 모두 전송하여 이탈 방지)
+                        // Firebase 패치 (DB에 저장된 실제 최상위 phone 키, firebasePhoneKey, cleanPhone 키 모두 전송하여 이탈 방지)
                         const targetPhones = new Set([cleanPhone]);
                         if (order.phone) targetPhones.add(String(order.phone).trim());
+                        if (order.firebasePhoneKey) targetPhones.add(String(order.firebasePhoneKey).trim());
+                        if (matchingOrder && matchingOrder.firebasePhoneKey) targetPhones.add(String(matchingOrder.firebasePhoneKey).trim());
                         
                         targetPhones.forEach(pKey => {
                             const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${order.orderKey}.json`;
@@ -3929,10 +3949,10 @@
                     // 새 배달비 주문 생성
                     const formattedTimestamp = formatTimestampToFullString(Date.now());
                     const orderKey = fSafeKey(formattedTimestamp) + "_배달비";
-                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
 
                     const deliveryFeePayload = {
                         ...baseOrder,
+                        orderKey: orderKey,
                         item: "배달비",
                         qty: 1,
                         price: 3000,
@@ -3950,13 +3970,22 @@
                         deliveryPhotoTime: null
                     };
 
-                    const res = await fetch(url, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(deliveryFeePayload)
+                    const targetPhones = new Set([cleanPhone]);
+                    if (baseOrder.phone) targetPhones.add(String(baseOrder.phone).trim());
+                    if (baseOrder.firebasePhoneKey) targetPhones.add(String(baseOrder.firebasePhoneKey).trim());
+                    
+                    const promises = [];
+                    targetPhones.forEach(pKey => {
+                        const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${orderKey}.json`;
+                        promises.push(
+                            fetch(url, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(deliveryFeePayload)
+                            })
+                        );
                     });
-
-                    if (!res.ok) throw new Error("배달비 Firebase 저장 실패");
+                    await Promise.all(promises);
                     
                     showToast("⚠️ 부분 취소로 인해 배달비 3,000원이 자동으로 부과되었습니다.");
                     // 구글 시트 동기화
@@ -4102,6 +4131,7 @@
             const targetPhones = new Set([cleanPhone]);
             if (phone) targetPhones.add(String(phone).trim());
             if (target && target.phone) targetPhones.add(String(target.phone).trim());
+            if (target && target.firebasePhoneKey) targetPhones.add(String(target.firebasePhoneKey).trim());
             
             try {
                 const patchBody = getStatusPatchBody(newStatus);
