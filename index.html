@@ -1943,7 +1943,6 @@
                     <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
                     <button class="btn-common" style="border: 1.5px solid #d32f2f; background: #fff5f5; color: #d32f2f; font-weight: 700;" onclick="deleteCanceledOrders()">🗑️ 취소주문 삭제</button>
                     <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV</button>
-                    <button id="btnToggleAllDates" class="btn-common" style="border: 1.5px solid var(--border); background:white; color: var(--text-sub); font-weight: 700;" onclick="toggleAllDates()">📅 전체 날짜 보기</button>
                 </div>
             </div>
 
@@ -2469,7 +2468,7 @@
             return diffDays <= 15;
         }
 
-        let showAllDates = false;
+        let showAllDates = true;
         function toggleAllDates() {
             showAllDates = !showAllDates;
             const btn = document.getElementById('btnToggleAllDates');
@@ -3204,12 +3203,17 @@
                         
                         <div class="card-footer" style="display: flex; flex-direction: column; align-items: stretch; gap: 8px;">
                             <div class="total-amount-box" style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
-                                <span>총 주문액</span>
-                                <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="font-size:13px; color:var(--text-sub); font-weight:700;">총 주문액:</span>
+                                    <span class="total-price">${customer.totalPrice.toLocaleString()}원</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
                                     <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid ${isDelivery ? 'var(--purple)' : 'var(--primary)'}; color: ${isDelivery ? 'var(--purple)' : 'var(--primary)'}; background: white;" onclick="toggleShippingMethod('${customer.phone}', '${orderKeysStr}', '${isDelivery ? '매장픽업' : '배달주문'}')">
                                         ${isDelivery ? '📍 픽업전환' : '🚚 배달전환'}
                                     </button>
-                                    <span class="total-price">${customer.totalPrice.toLocaleString()}원</span>
+                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #d97706; color: #d97706; background: white;" onclick="changeCustomerOrderDate('${customer.phone}', '${orderKeysStr}', '${isDelivery ? '배달일' : '픽업일'}')">
+                                        ${isDelivery ? '📅 배달일 변경' : '📅 픽업일 변경'}
+                                    </button>
                                 </div>
                             </div>
                             ${printableFixedMemoHtml ? `<div style="display:flex; flex-direction:column; width:100%; gap:6px; margin-top:8px;">${printableFixedMemoHtml}</div>` : ''}
@@ -3474,6 +3478,49 @@
             } catch (e) {
                 console.error(e);
                 showToast("변경 중 오류가 발생했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // [신규] 고객 배달일/픽업일 일괄 변경 기능
+        async function changeCustomerOrderDate(phone, orderKeysStr, label) {
+            const cleanPhone = String(phone).replace(/\D/g, "");
+            const orderKeys = orderKeysStr.split(",");
+            if (orderKeys.length === 0) return;
+            
+            const firstKey = orderKeys[0];
+            const matchingOrder = rawOrders.find(o => o.phone === phone && o.orderKey === firstKey);
+            const currentDate = matchingOrder ? (matchingOrder.pickupDate || "") : "";
+            
+            const newDate = prompt(`📅 ${label}을 변경하시겠습니까?\n예: YYYY-MM-DD 형식 (예: 2026-07-27)`, currentDate);
+            if (newDate === null) return;
+            
+            const trimmedDate = newDate.trim();
+            if (trimmedDate === "") {
+                showToast("올바른 날짜를 입력해 주세요.");
+                return;
+            }
+            
+            showLoader("📅 주문 날짜 변경 중...");
+            try {
+                const promises = orderKeys.map(orderKey => {
+                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
+                    return fetch(url, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            pickupDate: trimmedDate
+                        })
+                    });
+                });
+                
+                await Promise.all(promises);
+                showToast("📅 주문 날짜가 정상적으로 변경되었습니다.");
+                await fetchOrders();
+            } catch (e) {
+                console.error(e);
+                showToast("날짜 변경 중 오류가 발생했습니다: " + e.toString());
             } finally {
                 hideLoader();
             }
