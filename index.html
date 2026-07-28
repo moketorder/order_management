@@ -1945,7 +1945,6 @@
                 </div>
                 <div class="controls-row button-row">
                     <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
-                    <button class="btn-common" style="border: 1.5px solid #d97706; background: #fffbeb; color: #d97706; font-weight: 700;" onclick="archiveOldOrders()">📁 지난주문 정리</button>
                     <button class="btn-common" style="border: 1.5px solid #d32f2f; background: #fff5f5; color: #d32f2f; font-weight: 700;" onclick="deleteCanceledOrders()">🗑️ 취소주문 삭제</button>
                     <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV</button>
                 </div>
@@ -2459,6 +2458,9 @@
                 
                 // 탭 구축 및 렌더링
                 buildDateTabs();
+
+                // 30일 지난 완료 주문 백그라운드 자동 이관
+                autoArchiveOldOrdersSilent();
                 
             } catch (e) {
                 console.error(e);
@@ -3346,6 +3348,60 @@
                 console.error("아카이브 로드 실패:", e);
             } finally {
                 hideLoader();
+            }
+        }
+
+        async function autoArchiveOldOrdersSilent() {
+            try {
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+                const cutoffTime = todayStart.getTime() - (30 * 24 * 60 * 60 * 1000);
+
+                const archivableOrders = [];
+                rawOrders.forEach(item => {
+                    const status = item.status || "대기";
+                    const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                    const isCompleted = (status === '배달완료' || status === '픽업' || isCanceled);
+
+                    if (isCompleted) {
+                        const dateInfo = getOrderDateInfo(item);
+                        if (dateInfo.dateStr && dateInfo.dateStr !== "기타") {
+                            const parts = dateInfo.dateStr.split('-');
+                            if (parts.length === 3) {
+                                const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                                if (d.getTime() < cutoffTime) {
+                                    archivableOrders.push(item);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                if (archivableOrders.length > 0) {
+                    const archivePatch = {};
+                    const deletePatch = {};
+                    archivableOrders.forEach(item => {
+                        const cleanPhone = String(item.phone || "").replace(/\D/g, "");
+                        archivePatch[`${cleanPhone}/${item.orderKey}`] = item;
+                        deletePatch[`${cleanPhone}/${item.orderKey}`] = null;
+                    });
+
+                    await fetch(`${FIREBASE_DB_URL}orders_archive.json`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(archivePatch)
+                    });
+
+                    await fetch(`${FIREBASE_DB_URL}orders.json`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(deletePatch)
+                    });
+
+                    console.log(`[자동 아카이브] 30일 지난 완료 주문 ${archivableOrders.length}건 보관함으로 자동 이관 완료`);
+                }
+            } catch (e) {
+                console.error("자동 아카이브 실패:", e);
             }
         }
 
