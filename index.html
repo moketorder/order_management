@@ -1892,7 +1892,7 @@
                 <span class="sync-dot"></span>
                 <span id="sync-time-text">대기 중</span>
             </div>
-            <button class="btn-common btn-primary" style="padding: 9px 12px;" onclick="fetchOrders()">🔄 새로고침</button>
+            <button class="btn-common btn-primary" style="padding: 9px 12px;" onclick="fetchOrders(true)">🔄 새로고침</button>
         </div>
     </div>
 
@@ -2324,22 +2324,22 @@
             return false;
         }
 
-        async function fetchOrders() {
-            let hasCache = false;
-            if (isInitialLoad) {
-                hasCache = loadOrdersFromCache();
-                isInitialLoad = false;
-            }
-            if (!hasCache) {
-                showLoader("주문 데이터를 가져오는 중...");
-            }
+        async function fetchOrders(isManualRefresh = false) {
+            // [사용자 요청] 백그라운드 동기화 대신 항상 전면 로딩 화면(showLoader)을 띄우고 완료될 때까지 대기
+            showLoader("🔄 최신 주문 데이터를 불러오는 중입니다...");
+
+            const syncTextEl = document.getElementById('sync-time-text');
+            const syncDotEl = document.querySelector('.sync-dot');
+            if (syncTextEl) syncTextEl.innerText = "🔄 동기화 중...";
+            if (syncDotEl) syncDotEl.style.backgroundColor = "#f59e0b"; // 진행 중 주황색
             
             try {
+                // 1Mbps 최적화: 캐시 무효화 query(?t=...) 제거하여 브라우저 HTTP ETag/304 Not Modified 캐싱 활성화
                 const [response, memoRes, fixedMemoRes, printFixedMemoRes] = await Promise.all([
-                    fetch(`${FIREBASE_DB_URL}orders.json?t=${Date.now()}`),
-                    fetch(`${FIREBASE_DB_URL}customer_memos.json?t=${Date.now()}`).catch(e => { console.error("Firebase Memos 로드 실패:", e); return null; }),
-                    fetch(`${FIREBASE_DB_URL}fixed_memos.json?t=${Date.now()}`).catch(e => { console.error("Firebase Fixed Memos 로드 실패:", e); return null; }),
-                    fetch(`${FIREBASE_DB_URL}print_fixed_memos.json?t=${Date.now()}`).catch(e => { console.error("Firebase Print Fixed Memos 로드 실패:", e); return null; })
+                    fetch(`${FIREBASE_DB_URL}orders.json`),
+                    fetch(`${FIREBASE_DB_URL}customer_memos.json`).catch(e => { console.error("Firebase Memos 로드 실패:", e); return null; }),
+                    fetch(`${FIREBASE_DB_URL}fixed_memos.json`).catch(e => { console.error("Firebase Fixed Memos 로드 실패:", e); return null; }),
+                    fetch(`${FIREBASE_DB_URL}print_fixed_memos.json`).catch(e => { console.error("Firebase Print Fixed Memos 로드 실패:", e); return null; })
                 ]);
                 if (!response.ok) throw new Error("Firebase 연결 실패");
                 const data = await response.json() || {};
@@ -2448,10 +2448,6 @@
                     customerOrderSequences[customerKey] = tsArray;
                 }
                 
-                // 동기화 상태 갱신
-                const now = new Date();
-                document.getElementById('sync-time-text').innerText = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 동기화됨`;
-                
                 // 선택 초기화
                 selectedItems.clear();
                 updateSelectionCountText();
@@ -2462,8 +2458,15 @@
             } catch (e) {
                 console.error(e);
                 showToast("데이터를 로드하지 못했습니다.");
+                if (syncTextEl) syncTextEl.innerText = "동기화 실패";
             } finally {
                 hideLoader();
+                const now = new Date();
+                if (syncTextEl) syncTextEl.innerText = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 동기화 완료`;
+                if (syncDotEl) syncDotEl.style.backgroundColor = "var(--primary)";
+                if (isManualRefresh) {
+                    showToast("최신 주문 데이터가 동기화되었습니다.");
+                }
             }
         }
 
@@ -3897,114 +3900,10 @@
             return `${y}년 ${m}월 ${day}일 (${w}) ${h}:${min}:${s}`;
         }
 
-        // 부분 취소 시 배달비 조건 체크 및 부과 처리 함수
+        // 부분 취소 시 배달비 조건 체크 및 부과 처리 함수 (자동 부과 로직 비활성화)
         async function checkAndApplyDeliveryFeeAfterCancellation(phone, pickupDate) {
-            const cleanPhone = String(phone || "").replace(/\D/g, "");
-            if (!cleanPhone) return;
-
-            // 1. 해당 고객의 동일 날짜 주문 필터링
-            const customerDayOrders = rawOrders.filter(o => 
-                String(o.phone).replace(/\D/g, "") === cleanPhone && 
-                o.pickupDate === pickupDate
-            );
-
-            if (customerDayOrders.length === 0) return;
-
-            // 2. 배달 주문인지 확인 (배달비 항목이 있거나, 배송 방법이 배달주문인 경우)
-            const isDelivery = customerDayOrders.some(o => 
-                o.shippingMethod === '배달주문' || o.item === '배달비'
-            );
-            if (!isDelivery) return;
-
-            // 3. 명시적으로 취소 처리된 배달비 항목이 존재하는지 확인 (사용자/관리자가 배달비를 직접 취소한 경우 재부과 금지)
-            const hasCanceledDeliveryFee = customerDayOrders.some(o => 
-                o.item === '배달비' && 
-                (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE")
-            );
-            if (hasCanceledDeliveryFee) return;
-
-            // 4. 이미 취소되지 않은 활성 배달비 항목이 존재하는지 확인
-            const hasActiveDeliveryFee = customerDayOrders.some(o => 
-                o.item === '배달비' && 
-                !(o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE")
-            );
-            if (hasActiveDeliveryFee) return;
-
-            // 4. 취소되지 않은 일반 상품들의 가격 합산
-            let activeTotal = 0;
-            let activeCount = 0;
-            customerDayOrders.forEach(o => {
-                const isCanceled = o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE";
-                if (!isCanceled && o.item !== '배달비') {
-                    activeTotal += parseInt(o.total || 0);
-                    activeCount++;
-                }
-            });
-
-            // 남은 상품이 없으면 배달비를 부과하지 않음
-            if (activeCount === 0) return;
-
-            // 5. 남은 금액이 15,000원 미만인 경우 배달비 자동 부과
-            if (activeTotal < 15000) {
-                showLoader("배달비 자동 추가 중...");
-                try {
-                    const baseOrder = customerDayOrders.find(o => o.item !== '배달비');
-                    if (!baseOrder) return;
-
-                    // 새 배달비 주문 생성
-                    const formattedTimestamp = formatTimestampToFullString(Date.now());
-                    const orderKey = fSafeKey(formattedTimestamp) + "_배달비";
-
-                    const deliveryFeePayload = {
-                        ...baseOrder,
-                        orderKey: orderKey,
-                        item: "배달비",
-                        qty: 1,
-                        price: 3000,
-                        total: 3000,
-                        paid: baseOrder.paid || false,
-                        status: "대기",
-                        canceled: false,
-                        timestamp: formattedTimestamp,
-                        rawTimestamp: Date.now(),
-                        isStocked: false,
-                        received: false,
-                        delivered: false,
-                        deliveryPhoto: null,
-                        deliveryPhotoExists: null,
-                        deliveryPhotoTime: null
-                    };
-
-                    const targetPhones = new Set([cleanPhone]);
-                    if (baseOrder.phone) targetPhones.add(String(baseOrder.phone).trim());
-                    if (baseOrder.firebasePhoneKey) targetPhones.add(String(baseOrder.firebasePhoneKey).trim());
-                    
-                    const promises = [];
-                    targetPhones.forEach(pKey => {
-                        const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${orderKey}.json`;
-                        promises.push(
-                            fetch(url, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(deliveryFeePayload)
-                            })
-                        );
-                    });
-                    await Promise.all(promises);
-                    
-                    showToast("⚠️ 부분 취소로 인해 배달비 3,000원이 자동으로 부과되었습니다.");
-                    // 구글 시트 동기화
-                    syncStatusToGoogleSheets(baseOrder.phone, formattedTimestamp, "배달비", "대기");
-                    
-                    // 주문 다시 갱신
-                    await fetchOrders(true);
-                } catch (e) {
-                    console.error(e);
-                    showToast("배달비 추가 실패: " + e.toString());
-                } finally {
-                    hideLoader();
-                }
-            }
+            // [요청 반영] 고객 카드에 자동으로 배달비 부과되는 로직 비활성화
+            return;
         }
 
         // 활성 금액이 기준액(15,000원) 이상이 되는 경우 배달비를 자동 제거하는 함수
@@ -6333,15 +6232,31 @@
             
             uploadSelectedFiles.forEach((item, idx) => {
                 const row = document.createElement('div');
-                row.style = "display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 8px; border: 1.5px solid var(--border);";
+                row.style = "display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 8px; border: 1.5px solid var(--border); gap: 10px;";
                 
                 const isChecked = (idx === uploadThumbnailIndex);
                 
+                let imgSrc = '';
+                if (item.isExisting && item.id) {
+                    imgSrc = `https://lh3.googleusercontent.com/d/${item.id}`;
+                } else if (item.file) {
+                    try {
+                        imgSrc = URL.createObjectURL(item.file);
+                    } catch(e) {
+                        imgSrc = '';
+                    }
+                }
+
+                const imgTag = imgSrc 
+                    ? `<img src="${imgSrc}" style="width: 36px; height: 36px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); flex-shrink: 0;" onerror="this.onerror=null; this.style.display='none';">` 
+                    : `<div style="width: 36px; height: 36px; background: #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">🖼️</div>`;
+
                 row.innerHTML = `
                     <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
-                        <input type="radio" name="thumbnailSelect" id="thumb_${idx}" ${isChecked ? 'checked' : ''} onchange="setThumbnail(${idx})" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--primary);">
+                        <input type="radio" name="thumbnailSelect" id="thumb_${idx}" ${isChecked ? 'checked' : ''} onchange="setThumbnail(${idx})" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--primary); flex-shrink: 0;">
+                        ${imgTag}
                         <span style="font-size: 13px; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; flex: 1;" onclick="setThumbnail(${idx})">
-                            📄 ${item.displayName}
+                            ${item.displayName}
                         </span>
                         ${isChecked ? '<span style="color: var(--primary); font-size: 11px; font-weight: 800; background: var(--primary-light); padding: 2px 6px; border-radius: 4px; flex-shrink: 0;">대표 섬네일</span>' : ''}
                     </div>
@@ -6805,14 +6720,10 @@
             }
 
             try {
-                const finalImages = [];
-                
+                // 1. 모든 신규 사진 업로드 처리 (item.id 수집)
                 for (let i = 0; i < uploadSelectedFiles.length; i++) {
                     const item = uploadSelectedFiles[i];
-                    if (item.isExisting) {
-                        if (item.id) finalImages.push(item.id);
-                        continue;
-                    }
+                    if (item.isExisting) continue;
                     
                     showLoader(`📸 사진 업로드 중 (${i + 1}/${uploadSelectedFiles.length}): ${item.displayName}`);
                     const base64Data = await getCompressedBase64(item.file);
@@ -6838,11 +6749,26 @@
                     
                     if (resJson.result === 'success') {
                         item.id = resJson.fileId || resJson.id || resJson.fileid || null;
-                        if (item.id) finalImages.push(item.id);
                     } else {
                         throw new Error(resJson.message || "이미지 서버 응답 에러");
                     }
                 }
+
+                // 2. uploadThumbnailIndex로 지정된 대표 섬네일을 0번 인덱스에 배치하여 finalImages 구성
+                const finalImages = [];
+                const thumbItem = (uploadThumbnailIndex >= 0 && uploadThumbnailIndex < uploadSelectedFiles.length) 
+                    ? uploadSelectedFiles[uploadThumbnailIndex] 
+                    : null;
+
+                if (thumbItem && thumbItem.id) {
+                    finalImages.push(thumbItem.id);
+                }
+
+                uploadSelectedFiles.forEach((item, idx) => {
+                    if (item.id && (thumbItem === null || idx !== uploadThumbnailIndex)) {
+                        finalImages.push(item.id);
+                    }
+                });
 
                 showLoader("💾 Firebase 주문서 데이터베이스 반영 중...");
 
