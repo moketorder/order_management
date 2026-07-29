@@ -2916,6 +2916,11 @@
                             items: []
                         };
                     }
+                    if ((!grouped[customerKey].address || String(grouped[customerKey].address).trim() === "") && item.address && String(item.address).trim() !== "") {
+                        grouped[customerKey].address = item.address;
+                        grouped[customerKey].addressDetail = item.addressDetail || "";
+                        grouped[customerKey].entrance = item.entrance || "";
+                    }
                     grouped[customerKey].items.push(item);
                     const isCanceled = (item.canceled === true || item.canceled === "true");
                     if (!isCanceled) {
@@ -3689,6 +3694,69 @@
             return patchBody;
         }
 
+        async function findSavedCustomerAddress(phone) {
+            const cleanPhone = String(phone || "").replace(/\D/g, "");
+            if (!cleanPhone) return null;
+
+            // 1. 현재 로드된 rawOrders 중 동일한 전화번호의 주소가 존재하는 주문 탐색
+            for (const item of rawOrders) {
+                const itemCleanPhone = String(item.phone || "").replace(/\D/g, "");
+                if (itemCleanPhone === cleanPhone && item.address && String(item.address).trim() !== "") {
+                    return {
+                        address: item.address,
+                        addressDetail: item.addressDetail || "",
+                        entrance: item.entrance || ""
+                    };
+                }
+            }
+
+            // 2. rawOrders에 없으면 Firebase DB (orders 노드) 전체 탐색
+            try {
+                const resOrders = await fetch(`${FIREBASE_DB_URL}orders/${cleanPhone}.json`);
+                if (resOrders.ok) {
+                    const data = await resOrders.json();
+                    if (data && typeof data === 'object') {
+                        for (const key of Object.keys(data)) {
+                            const item = data[key];
+                            if (item && item.address && String(item.address).trim() !== "") {
+                                return {
+                                    address: item.address,
+                                    addressDetail: item.addressDetail || "",
+                                    entrance: item.entrance || ""
+                                };
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Firebase orders 주소 조회 실패:", e);
+            }
+
+            // 3. orders_archive 노드 탐색
+            try {
+                const resArchive = await fetch(`${FIREBASE_DB_URL}orders_archive/${cleanPhone}.json`);
+                if (resArchive.ok) {
+                    const data = await resArchive.json();
+                    if (data && typeof data === 'object') {
+                        for (const key of Object.keys(data)) {
+                            const item = data[key];
+                            if (item && item.address && String(item.address).trim() !== "") {
+                                return {
+                                    address: item.address,
+                                    addressDetail: item.addressDetail || "",
+                                    entrance: item.entrance || ""
+                                };
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Firebase orders_archive 주소 조회 실패:", e);
+            }
+
+            return null;
+        }
+
         // 수령 방법 (배달 <-> 픽업) 전환 처리 함수
         async function toggleShippingMethod(phone, orderKeysStr, targetMethod) {
             const label = targetMethod === '배달주문' ? '배달' : '픽업';
@@ -3699,6 +3767,35 @@
             const orderKeys = orderKeysStr.split(",");
             
             try {
+                let addressToApply = null;
+                if (targetMethod === '배달주문') {
+                    addressToApply = await findSavedCustomerAddress(phone);
+                    if (!addressToApply) {
+                        hideLoader();
+                        const userAddr = prompt("DB에 저장된 이 고객의 기존 주소가 없습니다.\n배달 주소를 입력하시겠습니까? (미입력 시 취소)", "");
+                        if (userAddr === null) {
+                            return;
+                        }
+                        showLoader("수령 방법 변경 중...");
+                        if (userAddr.trim() !== "") {
+                            const userDetail = prompt("상세주소(동, 호수)를 입력해주세요:", "") || "";
+                            const userEntrance = prompt("공동현관 출입방법/비밀번호를 입력해주세요 (선택):", "") || "";
+                            addressToApply = {
+                                address: userAddr.trim(),
+                                addressDetail: userDetail.trim(),
+                                entrance: userEntrance.trim()
+                            };
+                        }
+                    }
+                }
+
+                const patchPayload = { shippingMethod: targetMethod };
+                if (targetMethod === '배달주문' && addressToApply) {
+                    patchPayload.address = addressToApply.address;
+                    patchPayload.addressDetail = addressToApply.addressDetail;
+                    patchPayload.entrance = addressToApply.entrance;
+                }
+
                 const promises = [];
                 orderKeys.forEach(orderKey => {
                     const target = rawOrders.find(it => it.orderKey === orderKey);
@@ -3713,13 +3810,21 @@
                             fetch(url, {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ shippingMethod: targetMethod })
+                                body: JSON.stringify(patchPayload)
                             })
                         );
                     });
                 });
                 
                 await Promise.all(promises);
+
+                orderKeys.forEach(orderKey => {
+                    const targets = rawOrders.filter(it => it.orderKey === orderKey || (String(it.phone).replace(/\D/g, "") === cleanPhone && it.orderKey === orderKey));
+                    targets.forEach(t => {
+                        Object.assign(t, patchPayload);
+                    });
+                });
+
                 showToast(`수령 방법이 ${label}(으)로 전환되었습니다.`);
                 await fetchOrders();
             } catch (e) {
@@ -4153,6 +4258,14 @@
                 .replace(/\n/g, ' ');
         }
 
+        function isPickupOrDeliveryCompleted(item) {
+            if (!item) return false;
+            const status = item.status;
+            const isReceived = (item.received === true || item.received === "true" || String(item.received).toUpperCase() === "TRUE");
+            const isDelivered = (item.delivered === true || item.delivered === "true" || String(item.delivered).toUpperCase() === "TRUE");
+            return status === '픽업' || status === '픽업완료' || status === '배달완료' || isReceived || isDelivered;
+        }
+
         // 개별 품목 클릭 시 상태 변경 팝업 모달
         function openItemStatusModal(phone, orderKey, itemName, currentStatus, isCanceled) {
             const existing = document.getElementById('item-status-select-modal');
@@ -4174,19 +4287,27 @@
                 { status: '취소', label: '🔴 주문 취소', color: '#dc2626', bg: '#fef2f2' }
             ];
 
+            const cleanPhone = String(phone || "").replace(/\D/g, "");
+            const targetItem = rawOrders.find(it => (it.phone === phone || String(it.phone).replace(/\D/g, "") === cleanPhone) && it.orderKey === orderKey) || rawOrders.find(it => it.orderKey === orderKey);
+            const isAlreadyCompleted = targetItem ? isPickupOrDeliveryCompleted(targetItem) : (currentStatus === '픽업' || currentStatus === '픽업완료' || currentStatus === '배달완료');
+
             let optionsHtml = '';
             options.forEach(opt => {
                 const isActive = (isCanceled && opt.status === '취소') || (!isCanceled && currentStatus === opt.status);
+                const isBlockedStocked = isAlreadyCompleted && opt.status === '입고';
+
                 optionsHtml += `
-                    <button type="button" onclick="selectItemStatus('${phone}', '${orderKey}', '${opt.status}')" style="
+                    <button type="button" onclick="${isBlockedStocked ? `showToast('픽업완료 또는 배달완료 처리된 상품은 입고완료로 변경할 수 없습니다.')` : `selectItemStatus('${phone}', '${orderKey}', '${opt.status}')`}" style="
                         width: 100%; padding: 12px 16px; margin-bottom: 8px; border-radius: 10px;
                         border: 1.5px solid ${isActive ? opt.color : '#e2e8f0'};
-                        background: ${isActive ? opt.bg : '#ffffff'}; color: ${opt.color};
-                        font-size: 15px; font-weight: 800; cursor: pointer; text-align: left;
+                        background: ${isActive ? opt.bg : (isBlockedStocked ? '#f8fafc' : '#ffffff')}; color: ${isBlockedStocked ? '#94a3b8' : opt.color};
+                        font-size: 15px; font-weight: 800; cursor: ${isBlockedStocked ? 'not-allowed' : 'pointer'}; text-align: left;
                         display: flex; align-items: center; justify-content: space-between;
+                        ${isBlockedStocked ? 'opacity: 0.65;' : ''}
                     ">
                         <span>${opt.label}</span>
                         ${isActive ? '<span style="font-size:12px; background:'+opt.color+'; color:#fff; padding:2px 6px; border-radius:4px;">현재상태</span>' : ''}
+                        ${isBlockedStocked && !isActive ? '<span style="font-size:11px; background:#e2e8f0; color:#64748b; padding:2px 6px; border-radius:4px;">변경 불가</span>' : ''}
                     </button>
                 `;
             });
@@ -4207,6 +4328,14 @@
         }
 
         function selectItemStatus(phone, orderKey, newStatus) {
+            if (newStatus === '입고' || newStatus === '입고완료') {
+                const cleanPhone = String(phone || "").replace(/\D/g, "");
+                const target = rawOrders.find(it => (it.phone === phone || String(it.phone).replace(/\D/g, "") === cleanPhone) && it.orderKey === orderKey) || rawOrders.find(it => it.orderKey === orderKey);
+                if (target && isPickupOrDeliveryCompleted(target)) {
+                    showToast("픽업완료 또는 배달완료 처리된 상품은 입고완료로 변경할 수 없습니다.");
+                    return;
+                }
+            }
             const modal = document.getElementById('item-status-select-modal');
             if (modal) modal.remove();
             updateSingleItemStatus(phone, orderKey, newStatus);
@@ -4214,9 +4343,15 @@
 
         // 6. 단일/일괄 상태 변경 실행 (Firebase PUT/PATCH 및 구글 시트 동기화)
         async function updateSingleItemStatus(phone, orderKey, newStatus) {
-            showLoader("상태 업데이트 중...");
             const cleanPhone = String(phone || "").replace(/\D/g, "");
             const target = rawOrders.find(it => (it.phone === phone || String(it.phone).replace(/\D/g, "") === cleanPhone) && it.orderKey === orderKey) || rawOrders.find(it => it.orderKey === orderKey);
+
+            if ((newStatus === '입고' || newStatus === '입고완료') && target && isPickupOrDeliveryCompleted(target)) {
+                showToast("픽업완료 또는 배달완료 처리된 상품은 입고완료로 변경할 수 없습니다.");
+                return;
+            }
+
+            showLoader("상태 업데이트 중...");
             
             const targetPhones = new Set([cleanPhone]);
             if (phone) targetPhones.add(String(phone).trim());
@@ -4268,10 +4403,18 @@
         }
 
         async function updateCustomerAllItems(phone, newStatus) {
-            showLoader(`이 고객 전체 상품 [${newStatus}] 업데이트 중...`);
             const cleanPhone = String(phone || "").replace(/\D/g, "");
+            let customerItems = rawOrders.filter(it => it.phone === phone);
             
-            const customerItems = rawOrders.filter(it => it.phone === phone);
+            if (newStatus === '입고' || newStatus === '입고완료') {
+                customerItems = customerItems.filter(it => !isPickupOrDeliveryCompleted(it));
+                if (customerItems.length === 0) {
+                    showToast("이 고객의 모든 상품이 이미 픽업완료 또는 배달완료 상태입니다.");
+                    return;
+                }
+            }
+
+            showLoader(`이 고객 전체 상품 [${newStatus}] 업데이트 중...`);
             
             try {
                 const patchBody = getStatusPatchBody(newStatus);
@@ -4337,11 +4480,20 @@
                 if (isCanceled && newStatus !== '대기') {
                     return; // '대기'로 되돌리는 경우 외에 취소된 주문은 제외
                 }
+
+                if ((newStatus === '입고' || newStatus === '입고완료') && target && isPickupOrDeliveryCompleted(target)) {
+                    return; // 픽업완료 또는 배달완료 상품은 입고완료 일괄 변경 제외
+                }
+
                 itemsToProcess.push({ phone, orderKey, target });
             });
 
             if (itemsToProcess.length === 0) {
-                showToast("선택된 항목 중 변경 가능한 주문이 없습니다. (취소된 주문은 대기로만 변경 가능)");
+                if (newStatus === '입고' || newStatus === '입고완료') {
+                    showToast("선택된 항목 중 변경 가능한 주문이 없습니다. (픽업완료/배달완료/취소 상품 제외)");
+                } else {
+                    showToast("선택된 항목 중 변경 가능한 주문이 없습니다. (취소된 주문은 대기로만 변경 가능)");
+                }
                 return;
             }
 
