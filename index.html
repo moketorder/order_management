@@ -1596,6 +1596,16 @@
             color: var(--text-main) !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
+
+        /* [신규] 발주 내역 모바일 카드 vs 데스크톱 테이블 반응형 */
+        @media (max-width: 768px) {
+            .desktop-purchase-table-wrap { display: none !important; }
+            .purchase-mobile-card-list { display: block !important; }
+        }
+        @media (min-width: 769px) {
+            .desktop-purchase-table-wrap { display: block !important; }
+            .purchase-mobile-card-list { display: none !important; }
+        }
         
         /* [신규] 상품업로드 스코프 스타일 (주문관리 스타일 충돌 예방) */
         #tab-admin-products .card {
@@ -1902,11 +1912,12 @@
 
     <!-- [신규] 관리자 메뉴 대분류 탭 -->
     <div class="admin-nav-tabs no-print" style="max-width: 1200px; margin: 15px auto 0 auto; padding: 0 15px;">
-        <div class="segment-control four-cols" style="display: grid; grid-template-columns: repeat(4, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px;">
-            <div class="segment-btn admin-nav-btn active" data-tab="orders" onclick="switchAdminTab('orders')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 주문 관리</div>
-            <div class="segment-btn admin-nav-btn" data-tab="product-upload" onclick="switchAdminTab('product-upload')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📦 상품 등록</div>
-            <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 상품 목록 <span id="product-count" style="display: none;">(0)</span></div>
-            <div class="segment-btn admin-nav-btn" data-tab="thumbnail-generator" onclick="switchAdminTab('thumbnail-generator')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🎨 섬네일</div>
+        <div class="segment-control five-cols" style="display: grid; grid-template-columns: repeat(5, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px;">
+            <div class="segment-btn admin-nav-btn active" data-tab="orders" onclick="switchAdminTab('orders')" style="text-align:center; padding:12px 4px; font-weight:800; cursor:pointer; border-radius:10px; font-size:13px; user-select:none;">📋 주문 관리</div>
+            <div class="segment-btn admin-nav-btn" data-tab="product-upload" onclick="switchAdminTab('product-upload')" style="text-align:center; padding:12px 4px; font-weight:800; cursor:pointer; border-radius:10px; font-size:13px; user-select:none;">📦 상품 등록</div>
+            <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px 4px; font-weight:800; cursor:pointer; border-radius:10px; font-size:13px; user-select:none;">📋 상품 목록 <span id="product-count" style="display: none;">(0)</span></div>
+            <div class="segment-btn admin-nav-btn" data-tab="thumbnail-generator" onclick="switchAdminTab('thumbnail-generator')" style="text-align:center; padding:12px 4px; font-weight:800; cursor:pointer; border-radius:10px; font-size:13px; user-select:none;">🎨 섬네일</div>
+            <div class="segment-btn admin-nav-btn" data-tab="purchase-history" onclick="switchAdminTab('purchase-history')" style="text-align:center; padding:12px 4px; font-weight:800; cursor:pointer; border-radius:10px; font-size:13px; user-select:none;">🚚 발주 내역</div>
         </div>
     </div>
 
@@ -2234,7 +2245,159 @@
                 </div>
             </div>
         </div>
-        </div>
+        
+        <!-- 탭 5: 발주 내역 관리 영역 -->
+        <div id="tab-admin-purchase-history" class="admin-tab-content" style="display: none;">
+            <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 15px;">
+                
+                <!-- 하위 카테고리 탭 (발주 등록 / 발주 목록) -->
+                <div class="sub-tabs-container no-print" style="margin-bottom: 20px;">
+                    <div class="segment-control two-cols" style="display: grid; grid-template-columns: 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
+                        <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
+                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
+                    </div>
+                </div>
+
+                <!-- 하위 섹션 1: 발주 내역 등록/수정 -->
+                <div id="purchase-section-register" class="purchase-sub-section">
+                    <div class="card" style="background: #ffffff; border-radius: 16px; padding: 20px; box-shadow: var(--shadow); margin-bottom: 20px; border: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+                            <h2 id="purchase-form-title" style="font-size: 17px; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
+                                🚚 발주 내역 등록
+                            </h2>
+                            <span id="purchase-edit-mode-badge" style="display: none; font-size: 12px; font-weight: 800; background: #fff7ed; color: #c2410c; padding: 3px 8px; border-radius: 6px; border: 1px solid #ffedd5;">수정 모드 중</span>
+                        </div>
+
+                        <form id="purchase-order-form" onsubmit="savePurchaseOrder(event)">
+                            <input type="hidden" id="purchase-editing-id" value="">
+                            
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                                <!-- 발주일 -->
+                                <div>
+                                    <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">📅 발주일자</label>
+                                    <input type="date" id="purchase-date" class="form-control" required style="width: 100%; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box;">
+                                </div>
+
+                                <!-- 업체명 (드롭다운/자동완성 datalist) -->
+                                <div>
+                                    <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">🏢 업체명</label>
+                                    <input type="text" id="purchase-supplier" list="purchase-suppliers-datalist" class="form-control" placeholder="예: 농협 청과" style="width: 100%; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box;">
+                                    <datalist id="purchase-suppliers-datalist"></datalist>
+                                </div>
+
+                                <!-- 발주 상품명 (등록 상품 자동완성 datalist 연동) -->
+                                <div style="grid-column: span 2;">
+                                    <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">📦 발주 상품명 (등록 상품 선택 가능)</label>
+                                    <input type="text" id="purchase-item-name" list="uploaded-products-datalist" class="form-control" placeholder="예: [과일] 나주 배 5kg (클릭 시 등록된 상품 목록 선택)" required oninput="onPurchaseItemNameChange(); calcPurchaseTotal();" onchange="onPurchaseItemNameChange()" style="width: 100%; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box;">
+                                    <datalist id="uploaded-products-datalist"></datalist>
+                                </div>
+
+                                <!-- 발주 수량 (박스/팩) -->
+                                <div>
+                                    <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">📦 발주 수량 (박스/팩)</label>
+                                    <input type="number" id="purchase-qty" class="form-control" placeholder="예: 10" min="1" required oninput="calcPurchaseTotal()" style="width: 100%; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box;">
+                                </div>
+
+                                <!-- 한 박스에 몇 개 (박스당 낱개 수) -->
+                                <div>
+                                    <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">🔢 한 박스에 몇 개 (낱개 수)</label>
+                                    <input type="number" id="purchase-items-per-box" class="form-control" placeholder="예: 20" min="1" value="1" required oninput="calcPurchaseTotal()" style="width: 100%; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box;">
+                                </div>
+
+                                <!-- 낱개 가격 (단가 원) -->
+                                <div>
+                                    <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">💵 낱개 단가 (원)</label>
+                                    <input type="number" id="purchase-unit-price" class="form-control" placeholder="예: 3000" min="0" required oninput="calcPurchaseTotal()" style="width: 100%; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box;">
+                                </div>
+
+                                <!-- 🏷️ 현재 판매가 (원) -->
+                                <div>
+                                    <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">🏷️ 현재 판매가 (원)</label>
+                                    <input type="number" id="purchase-sale-price" class="form-control" placeholder="예: 4000" min="0" oninput="calcPurchaseTotal()" style="width: 100%; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box;">
+                                </div>
+                            </div>
+
+                            <!-- 계산 결과 요약 바 -->
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; gap: 16px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px dashed #cbd5e1;">
+                                    <div style="font-size: 13px; font-weight: 800; color: #334155; flex: 1; min-width: 140px;">
+                                        총 낱개 수량: <span id="purchase-calc-total-units" style="color: var(--blue); font-size: 15px; font-weight: 900;">0개</span>
+                                    </div>
+                                    <div style="font-size: 13px; font-weight: 800; color: #334155; flex: 1; min-width: 140px;">
+                                        총 발주 금액: <span id="purchase-calc-total-price" style="color: #d97706; font-size: 16px; font-weight: 900;">0원</span>
+                                    </div>
+                                </div>
+                                
+                                <div style="font-size: 13px; font-weight: 800; color: #334155; background: #e0f2fe; padding: 10px 14px; border-radius: 10px; border: 1px solid #bae6fd; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
+                                    <span>🏷️ 현재 판매가 (마진율)</span>
+                                    <span id="purchase-calc-sale-price-margin" style="color: #0369a1; font-size: 16px; font-weight: 900;">0원 (0.0%)</span>
+                                </div>
+                                <div style="font-size: 13px; font-weight: 800; color: #334155; background: #f0fdf4; padding: 10px 14px; border-radius: 10px; border: 1px solid #bcf0da; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
+                                    <span>🟢 20% 마진 (단가/0.8)</span>
+                                    <span id="purchase-calc-margin-20" style="color: #15803d; font-size: 16px; font-weight: 900;">0원</span>
+                                </div>
+                                <div style="font-size: 13px; font-weight: 800; color: #334155; background: #eff6ff; padding: 10px 14px; border-radius: 10px; border: 1px solid #bfdbfe; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
+                                    <span>🔵 30% 마진 (단가/0.7)</span>
+                                    <span id="purchase-calc-margin-30" style="color: #1d4ed8; font-size: 16px; font-weight: 900;">0원</span>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                <button type="button" id="btn-purchase-cancel" onclick="resetPurchaseOrderForm()" style="display: none; padding: 10px 16px; border: 1px solid #cbd5e1; background: #ffffff; color: #64748b; font-size: 14px; font-weight: 700; border-radius: 10px; cursor: pointer;">취소</button>
+                                <button type="submit" id="btn-purchase-submit" style="padding: 10px 24px; border: none; background: var(--primary); color: #ffffff; font-size: 14px; font-weight: 800; border-radius: 10px; cursor: pointer;">➕ 발주 내역 저장</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 하위 섹션 2: 발주 내역 목록 카드 -->
+                <div id="purchase-section-list" class="purchase-sub-section" style="display: none;">
+                    <div class="card" style="background: #ffffff; border-radius: 16px; padding: 20px; box-shadow: var(--shadow); border: 1px solid var(--border);">
+                        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <h2 style="font-size: 17px; font-weight: 800; color: var(--text-main); margin: 0;">📊 발주 목록</h2>
+                                <span id="purchase-total-count-badge" style="font-size: 12px; font-weight: 800; background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 12px;">총 0건</span>
+                            </div>
+
+                            <div style="display: flex; gap: 8px; align-items: center; flex: 1; justify-content: flex-end; max-width: 460px;">
+                                <select id="purchaseMonthFilter" onchange="renderPurchaseOrdersList()" style="padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 13px; font-weight: 700; background: #ffffff; cursor: pointer; flex-shrink: 0;">
+                                    <option value="all">🗓️ 전체 기간</option>
+                                </select>
+                                <input type="text" id="purchaseSearchInput" placeholder="상품명, 업체명 검색..." oninput="renderPurchaseOrdersList()" style="padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 13px; font-weight: 700; flex: 1;">
+                            </div>
+                        </div>
+
+                        <!-- 데스크톱용 테이블 뷰 -->
+                        <div class="desktop-purchase-table-wrap" style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; min-width: 1050px;">
+                                <thead>
+                                    <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; text-align: left;">
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #475569; width: 95px;">발주일자</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #475569; width: 110px;">업체명</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #475569;">발주 상품명</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #475569; text-align: right; width: 75px;">발주수량</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #475569; text-align: right; width: 85px;">박스당 낱개</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #475569; text-align: right; width: 85px;">총 낱개수량</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #475569; text-align: right; width: 85px;">낱개 단가</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #475569; text-align: right; width: 105px;">총 발주금액</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #15803d; text-align: right; width: 95px; background: #f0fdf4;">20% 마진</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #1d4ed8; text-align: right; width: 95px; background: #eff6ff;">30% 마진</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #0284c7; text-align: right; width: 120px; background: #f0f9ff;">현재 판매가(마진율)</th>
+                                        <th style="padding: 10px 12px; font-size: 13px; font-weight: 800; color: #475569; text-align: center; width: 90px;">관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="purchase-orders-tbody">
+                                    <tr>
+                                        <td colspan="12" style="text-align: center; padding: 40px; color: #94a3b8; font-weight: 700;">등록된 발주 내역이 없습니다.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 모바일/스마트폰용 리스폰시브 카드리스트 뷰 -->
+                        <div id="purchase-orders-mobile-list" class="purchase-mobile-card-list"></div>
+                    </div>
+                </div>
 
     <script>
         const FIREBASE_DB_URL = "https://moketdb-default-rtdb.asia-southeast1.firebasedatabase.app/";
@@ -5806,6 +5969,12 @@
             const uploadTab = document.getElementById('tab-admin-product-upload');
             const listTab = document.getElementById('tab-admin-product-list');
             const generatorTab = document.getElementById('tab-admin-thumbnail-generator');
+            const purchaseHistoryTab = document.getElementById('tab-admin-purchase-history');
+            const productsParent = document.getElementById('tab-admin-products');
+            
+            if (productsParent) {
+                productsParent.style.display = tabName === 'orders' ? 'none' : 'block';
+            }
             
             // 만약 섬네일 탭으로 간다면 상품 목록에서 선택된 것을 큐에 집어넣음
             if (tabName === 'thumbnail-generator') {
@@ -5826,6 +5995,9 @@
             if (generatorTab) {
                 generatorTab.style.display = tabName === 'thumbnail-generator' ? 'block' : 'none';
             }
+            if (purchaseHistoryTab) {
+                purchaseHistoryTab.style.display = tabName === 'purchase-history' ? 'block' : 'none';
+            }
             
             if (tabName === 'product-upload') {
                 initUploadTab(); // 상품 탭 로딩
@@ -5834,7 +6006,842 @@
                 renderProductsList(); // 리스트 갱신
             } else if (tabName === 'thumbnail-generator') {
                 initThumbnailGeneratorTab();
+            } else if (tabName === 'purchase-history') {
+                initPurchaseHistoryTab();
             }
+        }
+
+        /* ----------------------------------------------------
+           [신규] 발주 내역 관리 기능 (Purchase Orders Management)
+        ---------------------------------------------------- */
+        let purchaseOrders = [];
+        let isPurchaseTabInitialized = false;
+
+        function switchPurchaseSubTab(subTab) {
+            const regBtn = document.getElementById('btn-purchase-subtab-register');
+            const listBtn = document.getElementById('btn-purchase-subtab-list');
+            const regSec = document.getElementById('purchase-section-register');
+            const listSec = document.getElementById('purchase-section-list');
+
+            if (regBtn) regBtn.classList.toggle('active', subTab === 'register');
+            if (listBtn) listBtn.classList.toggle('active', subTab === 'list');
+            if (regSec) regSec.style.display = subTab === 'register' ? 'block' : 'none';
+            if (listSec) listSec.style.display = subTab === 'list' ? 'block' : 'none';
+
+            if (subTab === 'list') {
+                renderPurchaseOrdersList();
+            }
+        }
+
+        async function initPurchaseHistoryTab() {
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const dateEl = document.getElementById('purchase-date');
+            if (dateEl && !dateEl.value) dateEl.value = todayStr;
+            
+            updateUploadedProductsDatalist();
+            await loadPurchaseOrders();
+        }
+
+        function openGoogleSheetImportModal() {
+            const modal = document.getElementById('modal-google-sheet-import');
+            if (modal) modal.style.display = 'flex';
+            switchImportMode('paste');
+            const savedUrl = localStorage.getItem('moket_purchase_sheet_url') || "";
+            const urlInput = document.getElementById('google-sheet-url-input');
+            if (urlInput && !urlInput.value && savedUrl) {
+                urlInput.value = savedUrl;
+            }
+        }
+
+        function closeGoogleSheetImportModal() {
+            const modal = document.getElementById('modal-google-sheet-import');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function switchImportMode(mode) {
+            const pasteTab = document.getElementById('tab-import-mode-paste');
+            const urlTab = document.getElementById('tab-import-mode-url');
+            const fileTab = document.getElementById('tab-import-mode-file');
+
+            const pasteSec = document.getElementById('import-mode-sec-paste');
+            const urlSec = document.getElementById('import-mode-sec-url');
+            const fileSec = document.getElementById('import-mode-sec-file');
+
+            if (pasteTab) {
+                pasteTab.style.background = mode === 'paste' ? '#ffffff' : 'transparent';
+                pasteTab.style.color = mode === 'paste' ? '#059669' : '#64748b';
+                pasteTab.style.boxShadow = mode === 'paste' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+            }
+            if (urlTab) {
+                urlTab.style.background = mode === 'url' ? '#ffffff' : 'transparent';
+                urlTab.style.color = mode === 'url' ? '#059669' : '#64748b';
+                urlTab.style.boxShadow = mode === 'url' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+            }
+            if (fileTab) {
+                fileTab.style.background = mode === 'file' ? '#ffffff' : 'transparent';
+                fileTab.style.color = mode === 'file' ? '#059669' : '#64748b';
+                fileTab.style.boxShadow = mode === 'file' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+            }
+
+            if (pasteSec) pasteSec.style.display = mode === 'paste' ? 'block' : 'none';
+            if (urlSec) urlSec.style.display = mode === 'url' ? 'block' : 'none';
+            if (fileSec) fileSec.style.display = mode === 'file' ? 'block' : 'none';
+        }
+
+        async function submitGoogleSheetPasteImport() {
+            const inputEl = document.getElementById('google-sheet-paste-input');
+            const text = inputEl ? inputEl.value.trim() : "";
+            if (!text) {
+                showToast("구글 시트에서 복사한 내역을 상자에 붙여넣어 주세요.");
+                return;
+            }
+            showLoader("붙여넣은 발주 내역 분석 및 저장 중...");
+            try {
+                await parseAndSavePurchaseCsv(text);
+            } catch(e) {
+                console.error(e);
+                showToast("분석 중 오류 발생: " + e.message);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function submitGoogleSheetImport() {
+            const urlInput = document.getElementById('google-sheet-url-input');
+            const tabInput = document.getElementById('google-sheet-tab-name-input');
+            const url = urlInput ? urlInput.value.trim() : "";
+            const tabName = tabInput ? tabInput.value.trim() : "";
+            if (url) {
+                await importFromGoogleSheetUrl(url, tabName);
+            } else {
+                showToast("구글 시트 주소(URL)를 입력하시거나 CSV 파일을 선택해 주세요.");
+            }
+        }
+
+        async function importFromGoogleSheetUrl(inputUrl, sheetNameOverride = "") {
+            if (!inputUrl) return;
+            
+            localStorage.setItem('moket_purchase_sheet_url', inputUrl);
+            
+            let sheetId = "";
+            let gid = "";
+            let isPubHtml = false;
+            
+            // Extract gid if present (e.g. #gid=123456 or &gid=123456)
+            const gidMatch = inputUrl.match(/[#&?]gid=([0-9]+)/);
+            if (gidMatch) {
+                gid = gidMatch[1];
+            }
+
+            if (inputUrl.includes('/d/e/2PACX-')) {
+                const matchPub = inputUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
+                if (matchPub) {
+                    sheetId = matchPub[1];
+                    isPubHtml = true;
+                }
+            } else {
+                const matchNormal = inputUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                if (matchNormal) {
+                    sheetId = matchNormal[1];
+                } else {
+                    sheetId = inputUrl.trim();
+                }
+            }
+
+            const targetUrls = [];
+            const sheetParam = sheetNameOverride ? `&sheet=${encodeURIComponent(sheetNameOverride)}` : '';
+            const gidParam = gid ? `&gid=${gid}` : '';
+
+            if (isPubHtml) {
+                targetUrls.push(`https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv${sheetParam}${gidParam}`);
+            } else {
+                if (sheetNameOverride) {
+                    targetUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetNameOverride)}`);
+                    targetUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&sheet=${encodeURIComponent(sheetNameOverride)}`);
+                }
+                if (gid) {
+                    targetUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`);
+                    targetUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`);
+                    targetUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/pub?output=csv&gid=${gid}`);
+                }
+                targetUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`);
+                targetUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`);
+                targetUrls.push(`https://docs.google.com/spreadsheets/d/${sheetId}/pub?output=csv`);
+            }
+
+            showLoader("구글 시트 전체 발주내역 동기화 중...");
+            let fetchedText = null;
+
+            // 1단계: 직접 Fetch 시도
+            for (const tUrl of targetUrls) {
+                try {
+                    const res = await fetch(tUrl);
+                    if (res.ok) {
+                        const txt = await res.text();
+                        if (txt && !txt.includes('<!DOCTYPE html>') && (txt.includes(',') || txt.includes('\t') || txt.includes(';'))) {
+                            fetchedText = txt;
+                            break;
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            // 2단계: CORS 프록시 경유 시도
+            if (!fetchedText) {
+                for (const tUrl of targetUrls) {
+                    try {
+                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(tUrl)}`;
+                        const res = await fetch(proxyUrl);
+                        if (res.ok) {
+                            const txt = await res.text();
+                            if (txt && !txt.includes('<!DOCTYPE html>') && (txt.includes(',') || txt.includes('\t') || txt.includes(';'))) {
+                                fetchedText = txt;
+                                break;
+                            }
+                        }
+                    } catch(e) {}
+                }
+            }
+
+            // 3단계: 2차 CORS 프록시 시도
+            if (!fetchedText) {
+                for (const tUrl of targetUrls) {
+                    try {
+                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(tUrl)}`;
+                        const res = await fetch(proxyUrl);
+                        if (res.ok) {
+                            const txt = await res.text();
+                            if (txt && !txt.includes('<!DOCTYPE html>') && (txt.includes(',') || txt.includes('\t') || txt.includes(';'))) {
+                                fetchedText = txt;
+                                break;
+                            }
+                        }
+                    } catch(e) {}
+                }
+            }
+
+            if (fetchedText) {
+                try {
+                    await parseAndSavePurchaseCsv(fetchedText);
+                } catch(err) {
+                    console.error(err);
+                    showToast("시트 분석 중 오류: " + err.message);
+                } finally {
+                    hideLoader();
+                }
+            } else {
+                hideLoader();
+                alert("구글 시트를 불러오지 못했습니다.\n\n[체크사항]\n1. 구글 시트 공유 권한이 '링크가 있는 모든 사용자에게 공개' 상태인지 확인해 주세요.\n2. 특정 시트(탭)의 내용을 불러오려면 해당 탭을 연 상태의 웹주소를 복사해 붙여넣어 주세요.\n3. 또는 CSV 파일 직접 선택을 이용해 다운받으신 시트 파일(.csv)을 등록하실 수 있습니다.");
+            }
+        }
+
+        function handlePurchaseCsvFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(evt) {
+                const text = evt.target.result;
+                showLoader("CSV 발주내역 분석 및 저장 중...");
+                try {
+                    await parseAndSavePurchaseCsv(text);
+                } catch(ex) {
+                    console.error(ex);
+                    showToast("CSV 분석 실패: " + ex.message);
+                } finally {
+                    hideLoader();
+                }
+            };
+            reader.readAsText(file, 'utf-8');
+        }
+
+        function normalizePurchaseDate(str) {
+            if (!str) return new Date().toISOString().substring(0, 10);
+            const clean = String(str).trim();
+            
+            // YYYY-MM-DD or YYYY.MM.DD or YYYY/MM/DD
+            const m1 = clean.match(/^(\d{4})[-.\/]\s*(\d{1,2})[-.\/]\s*(\d{1,2})/);
+            if (m1) {
+                return `${m1[1]}-${String(m1[2]).padStart(2, '0')}-${String(m1[3]).padStart(2, '0')}`;
+            }
+            
+            // YY-MM-DD or YY.MM.DD or YY/MM/DD
+            const m2 = clean.match(/^(\d{2})[-.\/]\s*(\d{1,2})[-.\/]\s*(\d{1,2})/);
+            if (m2) {
+                const year = parseInt(m2[1]) > 50 ? '19' + m2[1] : '20' + m2[1];
+                return `${year}-${String(m2[2]).padStart(2, '0')}-${String(m2[3]).padStart(2, '0')}`;
+            }
+
+            // MM/DD/YYYY
+            const m3 = clean.match(/^(\d{1,2})[-.\/]\s*(\d{1,2})[-.\/]\s*(\d{4})/);
+            if (m3) {
+                return `${m3[3]}-${String(m3[1]).padStart(2, '0')}-${String(m3[2]).padStart(2, '0')}`;
+            }
+
+            return clean;
+        }
+
+        async function parseAndSavePurchaseCsv(csvText) {
+            if (!csvText) return;
+            csvText = csvText.replace(/^\uFEFF/, '');
+            
+            const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== "");
+            if (lines.length === 0) {
+                showToast("불러올 데이터가 없습니다.");
+                return;
+            }
+
+            let delim = ',';
+            const firstLine = lines[0];
+            if (firstLine.includes('\t') && !firstLine.includes(',')) delim = '\t';
+            else if (firstLine.includes(';') && !firstLine.includes(',')) delim = ';';
+
+            function parseCSVLine(line) {
+                const result = [];
+                let cur = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === delim && !inQuotes) {
+                        result.push(cur.trim().replace(/^"|"$/g, ''));
+                        cur = '';
+                    } else {
+                        cur += char;
+                    }
+                }
+                result.push(cur.trim().replace(/^"|"$/g, ''));
+                return result;
+            }
+
+            const parsedRows = lines.map(line => parseCSVLine(line));
+            if (parsedRows.length === 0) return;
+
+            // 헤더 자동 찾기 (상단 10줄 이내 탐색)
+            const keywordList = ['날짜', '일자', '발주일', '작성일', 'date', '업체', '거래처', '공급', '매입', 'supplier', 'vendor', '상품', '품명', '품목', '내용', '제품', '적요', '명칭', 'item', 'name', 'product', 'title', '수량', '박스', '팩', 'qty', 'count', '단가', '원가', '공급가', '구매가', '판매가'];
+            
+            let bestHeaderRowIdx = -1;
+            let maxScore = 0;
+
+            const checkLimit = Math.min(10, parsedRows.length);
+            for (let r = 0; r < checkLimit; r++) {
+                const rowStr = parsedRows[r].join(' ').toLowerCase();
+                let score = 0;
+                keywordList.forEach(kw => {
+                    if (rowStr.includes(kw)) score++;
+                });
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestHeaderRowIdx = r;
+                }
+            }
+
+            let headers = [];
+            let startLineIdx = 1;
+
+            if (bestHeaderRowIdx >= 0 && maxScore >= 1) {
+                headers = parsedRows[bestHeaderRowIdx].map(h => h.toLowerCase().trim());
+                startLineIdx = bestHeaderRowIdx + 1;
+            } else {
+                headers = parsedRows[0].map(h => h.toLowerCase().trim());
+                startLineIdx = 1;
+            }
+
+            let dateIdx = headers.findIndex(h => h.includes('날짜') || h.includes('일자') || h.includes('발주일') || h.includes('작성일') || h.includes('date') || h.includes('일시'));
+            let supplierIdx = headers.findIndex(h => h.includes('업체') || h.includes('거래처') || h.includes('공급') || h.includes('매입') || h.includes('supplier') || h.includes('vendor'));
+            let itemIdx = headers.findIndex(h => h.includes('상품') || h.includes('품명') || h.includes('품목') || h.includes('내용') || h.includes('제품') || h.includes('적요') || h.includes('명칭') || h.includes('item') || h.includes('name') || h.includes('product') || h.includes('title'));
+            let qtyIdx = headers.findIndex(h => h.includes('수량') || h.includes('박스') || h.includes('팩') || h.includes('개수') || h.includes('qty') || h.includes('count') || h.includes('quantity'));
+            let perBoxIdx = headers.findIndex(h => h.includes('입수') || h.includes('낱개수') || h.includes('한 박스') || h.includes('박스당') || h.includes('포장') || h.includes('itemsperbox') || h.includes('box'));
+            let unitPriceIdx = headers.findIndex(h => h.includes('단가') || h.includes('원가') || h.includes('공급가') || h.includes('구매가') || h.includes('매입가') || h.includes('unitprice') || h.includes('cost') || h.includes('price'));
+            let salePriceIdx = headers.findIndex(h => h.includes('판매가') || h.includes('소비자가') || h.includes('매출가') || h.includes('saleprice'));
+
+            if (itemIdx < 0) {
+                let bestCol = 0;
+                let maxLen = 0;
+                const sampleRow = parsedRows.length > startLineIdx ? parsedRows[startLineIdx] : parsedRows[0];
+                sampleRow.forEach((val, idx) => {
+                    const cleanVal = val.trim();
+                    if (cleanVal && isNaN(cleanVal) && cleanVal.length > maxLen) {
+                        maxLen = cleanVal.length;
+                        bestCol = idx;
+                    }
+                });
+                itemIdx = bestCol;
+                if (dateIdx < 0) dateIdx = 0;
+                if (supplierIdx < 0) supplierIdx = 1;
+            }
+
+            const batchPayload = {};
+            let count = 0;
+            const todayStr = new Date().toISOString().substring(0, 10);
+            const nowTime = Date.now();
+
+            for (let i = startLineIdx; i < parsedRows.length; i++) {
+                const row = parsedRows[i];
+                if (!row || row.length === 0 || !row.join('').trim()) continue;
+
+                const rawItem = (itemIdx >= 0 && row[itemIdx]) ? row[itemIdx].trim() : "";
+                if (!rawItem || rawItem === "상품명" || rawItem === "품명" || rawItem === "품목명" || rawItem === "내용" || rawItem === "제품명") continue;
+                if (rawItem === "합계" || rawItem === "총계" || rawItem === "소계") continue;
+
+                const rawDate = (dateIdx >= 0 && row[dateIdx]) ? row[dateIdx].trim() : todayStr;
+                const date = normalizePurchaseDate(rawDate);
+                const supplier = (supplierIdx >= 0 && row[supplierIdx]) ? row[supplierIdx].trim() : "";
+                const qty = qtyIdx >= 0 ? (parseInt(String(row[qtyIdx] || "").replace(/[^0-9]/g, '')) || 1) : 1;
+                const itemsPerBox = perBoxIdx >= 0 ? (parseInt(String(row[perBoxIdx] || "").replace(/[^0-9]/g, '')) || 1) : 1;
+                const unitPrice = unitPriceIdx >= 0 ? (parseInt(String(row[unitPriceIdx] || "").replace(/[^0-9]/g, '')) || 0) : 0;
+                const salePrice = salePriceIdx >= 0 ? (parseInt(String(row[salePriceIdx] || "").replace(/[^0-9]/g, '')) || unitPrice) : unitPrice;
+
+                const totalUnits = qty * itemsPerBox;
+                const totalPrice = totalUnits * unitPrice;
+
+                const key = 'po_' + (nowTime + i) + '_' + Math.random().toString(36).substr(2, 5);
+                batchPayload[key] = {
+                    date,
+                    supplier,
+                    itemName: rawItem,
+                    qty,
+                    itemsPerBox,
+                    unitPrice,
+                    salePrice,
+                    totalUnits,
+                    totalPrice,
+                    createdAt: nowTime + i
+                };
+                count++;
+            }
+
+            if (count === 0) {
+                showToast("불러올 유효한 발주 항목이 없습니다.");
+                return;
+            }
+
+            const res = await fetch(`${FIREBASE_DB_URL}purchase_orders.json`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(batchPayload)
+            });
+
+            if (!res.ok) {
+                throw new Error("데이터베이스 일괄 저장 실패");
+            }
+
+            // 필터 및 검색어 초기화로 모든 내역이 100% 화면에 보이게 함
+            const monthFilter = document.getElementById('purchaseMonthFilter');
+            if (monthFilter) monthFilter.value = 'all';
+            const searchInput = document.getElementById('purchaseSearchInput');
+            if (searchInput) searchInput.value = '';
+
+            showToast(`구글 시트에서 총 ${count}건의 발주 내역 전체를 불러왔습니다!`);
+            await loadPurchaseOrders();
+            closeGoogleSheetImportModal();
+            switchPurchaseSubTab('list');
+        }
+
+        function updateUploadedProductsDatalist() {
+            const datalist = document.getElementById('uploaded-products-datalist');
+            if (!datalist) return;
+            const namesSet = new Set();
+            if (Array.isArray(uploadProducts)) {
+                uploadProducts.forEach(p => {
+                    if (p && p.name) namesSet.add(p.name.trim());
+                });
+            }
+            let html = "";
+            Array.from(namesSet).sort().forEach(name => {
+                html += `<option value="${name}"></option>`;
+            });
+            datalist.innerHTML = html;
+        }
+
+        function onPurchaseItemNameChange() {
+            const val = document.getElementById('purchase-item-name').value.trim();
+            if (!val || !Array.isArray(uploadProducts)) return;
+            const matched = uploadProducts.find(p => p && p.name && p.name.trim() === val);
+            if (matched && matched.price) {
+                const salePriceInput = document.getElementById('purchase-sale-price');
+                if (salePriceInput && (!salePriceInput.value || salePriceInput.value === "0")) {
+                    salePriceInput.value = matched.price;
+                    calcPurchaseTotal();
+                }
+            }
+        }
+
+        function quickCreatePurchaseOrder(index) {
+            const prod = uploadProducts[index];
+            if (!prod) return;
+            switchAdminTab('purchase-history');
+            switchPurchaseSubTab('register');
+            resetPurchaseOrderForm();
+            document.getElementById('purchase-item-name').value = prod.name || "";
+            if (prod.price) {
+                document.getElementById('purchase-sale-price').value = prod.price;
+            }
+            calcPurchaseTotal();
+            showToast(`'${prod.name}' 발주 등록 양식에 정보가 입력되었습니다.`);
+        }
+
+        function calcPurchaseTotal() {
+            const qty = parseInt(document.getElementById('purchase-qty').value || 0);
+            const itemsPerBox = parseInt(document.getElementById('purchase-items-per-box').value || 1);
+            const unitPrice = parseInt(document.getElementById('purchase-unit-price').value || 0);
+            const salePrice = parseInt(document.getElementById('purchase-sale-price').value || 0);
+
+            const totalUnits = qty * itemsPerBox;
+            const totalPrice = totalUnits * unitPrice;
+            const priceMargin20 = unitPrice > 0 ? Math.round(unitPrice / 0.8) : 0;
+            const priceMargin30 = unitPrice > 0 ? Math.round(unitPrice / 0.7) : 0;
+            const marginRate = salePrice > 0 ? ((salePrice - unitPrice) / salePrice) * 100 : 0;
+
+            document.getElementById('purchase-calc-total-units').innerText = totalUnits.toLocaleString() + "개";
+            document.getElementById('purchase-calc-total-price').innerText = totalPrice.toLocaleString() + "원";
+            const m20El = document.getElementById('purchase-calc-margin-20');
+            if (m20El) m20El.innerText = priceMargin20.toLocaleString() + "원";
+            const m30El = document.getElementById('purchase-calc-margin-30');
+            if (m30El) m30El.innerText = priceMargin30.toLocaleString() + "원";
+
+            const salePriceMarginEl = document.getElementById('purchase-calc-sale-price-margin');
+            if (salePriceMarginEl) {
+                if (salePrice > 0) {
+                    salePriceMarginEl.innerText = `${salePrice.toLocaleString()}원 (${marginRate.toFixed(1)}%)`;
+                } else {
+                    salePriceMarginEl.innerText = "0원 (0.0%)";
+                }
+            }
+        }
+
+        function updateSupplierDatalist() {
+            const datalist = document.getElementById('purchase-suppliers-datalist');
+            if (!datalist) return;
+            const suppliers = new Set();
+            purchaseOrders.forEach(po => {
+                if (po.supplier && String(po.supplier).trim() !== "") {
+                    suppliers.add(String(po.supplier).trim());
+                }
+            });
+            let html = "";
+            Array.from(suppliers).sort().forEach(s => {
+                html += `<option value="${s}"></option>`;
+            });
+            datalist.innerHTML = html;
+        }
+
+        async function loadPurchaseOrders() {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}purchase_orders.json?t=${Date.now()}`);
+                if (res.ok) {
+                    const data = await res.json() || {};
+                    purchaseOrders = [];
+                    for (const id in data) {
+                        if (data[id] && typeof data[id] === 'object') {
+                            purchaseOrders.push({ id, ...data[id] });
+                        }
+                    }
+                    purchaseOrders.sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0));
+                    localStorage.setItem('moket_purchase_orders_cache', JSON.stringify(purchaseOrders));
+                }
+            } catch (e) {
+                console.error("발주 내역 로드 실패:", e);
+                const cached = localStorage.getItem('moket_purchase_orders_cache');
+                if (cached) {
+                    try { purchaseOrders = JSON.parse(cached); } catch (ex) {}
+                }
+            } finally {
+                updateSupplierDatalist();
+                buildPurchaseMonthFilterOptions();
+                renderPurchaseOrdersList();
+            }
+        }
+
+        function getYearMonthFromDateStr(dateStr) {
+            if (!dateStr) return null;
+            const str = String(dateStr).trim();
+            
+            // YYYY-MM or YYYY.MM or YYYY/MM
+            let m = str.match(/^(\d{4})[-.\/]\s*(\d{1,2})/);
+            if (m) {
+                return `${m[1]}-${String(m[2]).padStart(2, '0')}`;
+            }
+
+            // YY-MM or YY.MM or YY/MM
+            m = str.match(/^(\d{2})[-.\/]\s*(\d{1,2})/);
+            if (m) {
+                const y = parseInt(m[1]) > 50 ? '19' + m[1] : '20' + m[1];
+                return `${y}-${String(m[2]).padStart(2, '0')}`;
+            }
+
+            // 2026년 7월 or 26년 7월
+            m = str.match(/(\d{2,4})\s*년\s*(\d{1,2})\s*월/);
+            if (m) {
+                const y = m[1].length === 2 ? (parseInt(m[1]) > 50 ? '19' + m[1] : '20' + m[1]) : m[1];
+                return `${y}-${String(m[2]).padStart(2, '0')}`;
+            }
+
+            return null;
+        }
+
+        function buildPurchaseMonthFilterOptions() {
+            const select = document.getElementById('purchaseMonthFilter');
+            if (!select) return;
+            const currentVal = select.value;
+
+            const monthsMap = new Map();
+            purchaseOrders.forEach(po => {
+                const ym = getYearMonthFromDateStr(po.date);
+                if (ym) {
+                    const [y, m] = ym.split('-');
+                    monthsMap.set(ym, `${y}년 ${parseInt(m)}월`);
+                }
+            });
+
+            const sortedKeys = Array.from(monthsMap.keys()).sort().reverse();
+            let optionsHtml = '<option value="all">🗓️ 전체 기간</option>';
+            sortedKeys.forEach(ym => {
+                optionsHtml += `<option value="${ym}">${monthsMap.get(ym)}</option>`;
+            });
+
+            select.innerHTML = optionsHtml;
+            if (Array.from(select.options).some(o => o.value === currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        async function savePurchaseOrder(e) {
+            if (e) e.preventDefault();
+            
+            const editingId = document.getElementById('purchase-editing-id').value;
+            const date = document.getElementById('purchase-date').value;
+            const supplier = document.getElementById('purchase-supplier').value.trim();
+            const itemName = document.getElementById('purchase-item-name').value.trim();
+            const qty = parseInt(document.getElementById('purchase-qty').value || 0);
+            const itemsPerBox = parseInt(document.getElementById('purchase-items-per-box').value || 1);
+            const unitPrice = parseInt(document.getElementById('purchase-unit-price').value || 0);
+            const salePrice = parseInt(document.getElementById('purchase-sale-price').value || 0);
+
+            if (!date || !itemName || qty <= 0 || itemsPerBox <= 0) {
+                showToast("모든 항목을 올바르게 입력해 주세요.");
+                return;
+            }
+
+            const totalUnits = qty * itemsPerBox;
+            const totalPrice = totalUnits * unitPrice;
+
+            const payload = {
+                date,
+                supplier,
+                itemName,
+                qty,
+                itemsPerBox,
+                unitPrice,
+                salePrice,
+                totalUnits,
+                totalPrice,
+                createdAt: Date.now()
+            };
+
+            showLoader("발주 내역 저장 중...");
+            try {
+                let url = `${FIREBASE_DB_URL}purchase_orders.json`;
+                let method = "POST";
+
+                if (editingId) {
+                    url = `${FIREBASE_DB_URL}purchase_orders/${editingId}.json`;
+                    method = "PATCH";
+                }
+
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) throw new Error("Firebase 발주 내역 저장 실패");
+
+                showToast(editingId ? "발주 내역이 수정되었습니다." : "발주 내역이 저장되었습니다.");
+                resetPurchaseOrderForm();
+                await loadPurchaseOrders();
+                switchPurchaseSubTab('list');
+            } catch (e) {
+                console.error(e);
+                showToast("저장 실패: " + e.toString());
+            } finally {
+                hideLoader();
+            }
+        }
+
+        function editPurchaseOrder(id) {
+            const item = purchaseOrders.find(it => it.id === id);
+            if (!item) return;
+
+            document.getElementById('purchase-editing-id').value = id;
+            document.getElementById('purchase-date').value = item.date || "";
+            document.getElementById('purchase-supplier').value = item.supplier || "";
+            document.getElementById('purchase-item-name').value = item.itemName || "";
+            document.getElementById('purchase-qty').value = item.qty || "";
+            document.getElementById('purchase-items-per-box').value = item.itemsPerBox || 1;
+            document.getElementById('purchase-unit-price').value = item.unitPrice || 0;
+            document.getElementById('purchase-sale-price').value = item.salePrice || "";
+
+            document.getElementById('purchase-form-title').innerText = "✏️ 발주 내역 수정";
+            document.getElementById('purchase-edit-mode-badge').style.display = "inline-block";
+            document.getElementById('btn-purchase-cancel').style.display = "inline-block";
+            document.getElementById('btn-purchase-submit').innerText = "💾 수정 완료";
+
+            switchPurchaseSubTab('register');
+            calcPurchaseTotal();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetPurchaseOrderForm() {
+            document.getElementById('purchase-order-form').reset();
+            document.getElementById('purchase-editing-id').value = "";
+            document.getElementById('purchase-supplier').value = "";
+            document.getElementById('purchase-sale-price').value = "";
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            document.getElementById('purchase-date').value = todayStr;
+            document.getElementById('purchase-items-per-box').value = "1";
+
+            document.getElementById('purchase-form-title').innerText = "🚚 발주 내역 등록";
+            document.getElementById('purchase-edit-mode-badge').style.display = "none";
+            document.getElementById('btn-purchase-cancel').style.display = "none";
+            document.getElementById('btn-purchase-submit').innerText = "➕ 발주 내역 저장";
+
+            calcPurchaseTotal();
+        }
+
+        async function deletePurchaseOrder(id) {
+            if (!confirm("정말로 이 발주 내역을 삭제하시겠습니까?")) return;
+            showLoader("발주 내역 삭제 중...");
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}purchase_orders/${id}.json`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) throw new Error("삭제 실패");
+                showToast("발주 내역이 삭제되었습니다.");
+                await loadPurchaseOrders();
+            } catch (e) {
+                console.error(e);
+                showToast("삭제 중 오류가 발생했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        function renderPurchaseOrdersList() {
+            const tbody = document.getElementById('purchase-orders-tbody');
+            const mobileContainer = document.getElementById('purchase-orders-mobile-list');
+            if (!tbody) return;
+
+            const search = (document.getElementById('purchaseSearchInput')?.value || "").toLowerCase().trim();
+            const monthFilter = document.getElementById('purchaseMonthFilter')?.value || "all";
+
+            let filtered = purchaseOrders.filter(po => {
+                if (monthFilter !== "all") {
+                    const ym = getYearMonthFromDateStr(po.date);
+                    if (!ym || ym !== monthFilter) return false;
+                }
+                if (search !== "") {
+                    const nameMatch = (po.itemName || "").toLowerCase().includes(search);
+                    const dateMatch = (po.date || "").includes(search);
+                    const supplierMatch = (po.supplier || "").toLowerCase().includes(search);
+                    return nameMatch || dateMatch || supplierMatch;
+                }
+                return true;
+            });
+
+            const countBadge = document.getElementById('purchase-total-count-badge');
+            if (countBadge) countBadge.innerText = `총 ${filtered.length}건`;
+
+            if (filtered.length === 0) {
+                const emptyHtml = `
+                    <div style="text-align: center; padding: 40px 20px;">
+                        <div style="font-size: 15px; font-weight: 800; color: #64748b; margin-bottom: 8px;">🚚 등록된 발주 내역이 없습니다.</div>
+                        <div style="font-size: 13px; color: #94a3b8;">'발주 등록' 탭에서 신규 발주 내역을 등록해 주세요.</div>
+                    </div>`;
+                tbody.innerHTML = `<tr><td colspan="12">${emptyHtml}</td></tr>`;
+                if (mobileContainer) mobileContainer.innerHTML = emptyHtml;
+                return;
+            }
+
+            let tableHtml = "";
+            let mobileHtml = "";
+
+            filtered.forEach(po => {
+                const uPrice = parseInt(po.unitPrice || 0);
+                const sPrice = parseInt(po.salePrice || 0);
+                const m20 = uPrice > 0 ? Math.round(uPrice / 0.8) : 0;
+                const m30 = uPrice > 0 ? Math.round(uPrice / 0.7) : 0;
+                const mRate = sPrice > 0 ? ((sPrice - uPrice) / sPrice) * 100 : 0;
+
+                // 데스크톱 테이블 행
+                tableHtml += `
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 12px; font-weight: 700; color: #475569; font-size: 13px;">${po.date || '-'}</td>
+                        <td style="padding: 12px; font-weight: 800; color: #334155; font-size: 13px;">${po.supplier || '-'}</td>
+                        <td style="padding: 12px; font-weight: 800; color: #1e293b; font-size: 14px;">${po.itemName || '-'}</td>
+                        <td style="padding: 12px; font-weight: 800; color: var(--blue); font-size: 14px; text-align: right;">${parseInt(po.qty || 0).toLocaleString()}박스</td>
+                        <td style="padding: 12px; font-weight: 700; color: #64748b; font-size: 13px; text-align: right;">${parseInt(po.itemsPerBox || 1).toLocaleString()}개입</td>
+                        <td style="padding: 12px; font-weight: 800; color: #166534; font-size: 14px; text-align: right;">${parseInt(po.totalUnits || 0).toLocaleString()}개</td>
+                        <td style="padding: 12px; font-weight: 700; color: #475569; font-size: 13px; text-align: right;">${uPrice.toLocaleString()}원</td>
+                        <td style="padding: 12px; font-weight: 900; color: #d97706; font-size: 14px; text-align: right;">${parseInt(po.totalPrice || 0).toLocaleString()}원</td>
+                        <td style="padding: 12px; font-weight: 900; color: #15803d; font-size: 14px; text-align: right; background: #f0fdf4;">${m20 > 0 ? m20.toLocaleString() + '원' : '-'}</td>
+                        <td style="padding: 12px; font-weight: 900; color: #1d4ed8; font-size: 14px; text-align: right; background: #eff6ff;">${m30 > 0 ? m30.toLocaleString() + '원' : '-'}</td>
+                        <td style="padding: 12px; font-weight: 900; color: #0284c7; font-size: 14px; text-align: right; background: #f0f9ff;">
+                            ${sPrice > 0 ? `${sPrice.toLocaleString()}원<br><span style="font-size: 11px; font-weight: 800; color: #0369a1;">(마진 ${mRate.toFixed(1)}%)</span>` : '-'}
+                        </td>
+                        <td style="padding: 12px; text-align: center;">
+                            <div style="display: flex; gap: 4px; justify-content: center;">
+                                <button type="button" onclick="editPurchaseOrder('${po.id}')" style="padding: 4px 8px; border: 1px solid #cbd5e1; background: white; color: #3b82f6; border-radius: 6px; font-size: 12px; font-weight: 800; cursor: pointer;">수정</button>
+                                <button type="button" onclick="deletePurchaseOrder('${po.id}')" style="padding: 4px 8px; border: 1px solid #fca5a5; background: #fef2f2; color: #ef4444; border-radius: 6px; font-size: 12px; font-weight: 800; cursor: pointer;">삭제</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+
+                // 모바일/스마트폰용 깔끔한 카드 레이아웃
+                mobileHtml += `
+                    <div style="background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 10px;">
+                            <div style="font-size: 12px; font-weight: 800; color: #64748b; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                <span>📅 ${po.date || "-"}</span>
+                                ${po.supplier ? `<span style="background: #f1f5f9; padding: 2px 7px; border-radius: 6px; color: #334155; font-weight: 800;">🏢 ${po.supplier}</span>` : ''}
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" onclick="editPurchaseOrder('${po.id}')" style="padding: 4px 10px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">수정</button>
+                                <button type="button" onclick="deletePurchaseOrder('${po.id}')" style="padding: 4px 10px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">삭제</button>
+                            </div>
+                        </div>
+                        <div style="font-size: 15px; font-weight: 900; color: #0f172a; margin-bottom: 10px; word-break: keep-all;">
+                            📦 ${po.itemName || "-"}
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8fafc; padding: 10px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 10px; border: 1px solid #f1f5f9;">
+                            <div>발주수량: <b style="color:#0f172a;">${parseInt(po.qty || 0).toLocaleString()}박스</b> <span style="font-size:10px; color:#64748b;">(${parseInt(po.itemsPerBox || 1)}개입)</span></div>
+                            <div>총 낱개수량: <b style="color:#2563eb;">${parseInt(po.totalUnits || 0).toLocaleString()}개</b></div>
+                            <div>낱개 단가: <b style="color:#0f172a;">${uPrice.toLocaleString()}원</b></div>
+                            <div>총 발주금액: <b style="color:#d97706;">${parseInt(po.totalPrice || 0).toLocaleString()}원</b></div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 800;">
+                            <div style="display: flex; justify-content: space-between; background: #f0fdf4; padding: 6px 10px; border-radius: 8px; color: #15803d; border: 1px solid #bcf0da;">
+                                <span>🟢 20% 마진 (단가/0.8)</span>
+                                <span>${m20 > 0 ? m20.toLocaleString() + '원' : '-'}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; background: #eff6ff; padding: 6px 10px; border-radius: 8px; color: #1d4ed8; border: 1px solid #bfdbfe;">
+                                <span>🔵 30% 마진 (단가/0.7)</span>
+                                <span>${m30 > 0 ? m30.toLocaleString() + '원' : '-'}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; background: #f0f9ff; padding: 6px 10px; border-radius: 8px; color: #0369a1; border: 1px solid #bae6fd;">
+                                <span>🏷️ 현재 판매가 (마진율)</span>
+                                <span>${sPrice > 0 ? `${sPrice.toLocaleString()}원 (${mRate.toFixed(1)}%)` : '-'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            tbody.innerHTML = tableHtml;
+            if (mobileContainer) mobileContainer.innerHTML = mobileHtml;
         }
 
         let hasUploadTabInitialized = false;
@@ -6663,6 +7670,7 @@
                 buildManageCategoryTabs();
                 buildSubTabs();
                 renderProductsList();
+                updateUploadedProductsDatalist();
             } catch (e) {
                 console.error("데이터 로드 실패:", e);
                 showToast("데이터 로드에 실패했습니다.");
@@ -6857,6 +7865,7 @@
                             </div>
                         </div>
                         <div class="product-actions">
+                            <button class="btn-action" style="color: #0284c7; background: #e0f2fe; border: 1px solid #bae6fd; font-weight: 800;" onclick="quickCreatePurchaseOrder(${index})">🚚 발주</button>
                             <button class="btn-action action-edit" onclick="editProduct(${index})">수정</button>
                             <button class="btn-action action-duplicate" onclick="duplicateSingleProduct(${index})">복제</button>
                             <button class="btn-action action-delete" onclick="deleteProduct(${index})">삭제</button>
