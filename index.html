@@ -2424,7 +2424,8 @@
 
                             <div style="display: flex; gap: 8px; align-items: center; flex: 1; justify-content: flex-end; max-width: 460px;">
                                 <select id="purchaseMonthFilter" onchange="renderPurchaseOrdersList()" style="padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 13px; font-weight: 700; background: #ffffff; cursor: pointer; flex-shrink: 0;">
-                                    <option value="all">🗓️ 전체 기간</option>
+                                    <option value="none">🗓️ 기간 선택 (또는 검색)</option>
+                                    <option value="all">🗓️ 전체 기간 보기</option>
                                 </select>
                                 <input type="text" id="purchaseSearchInput" placeholder="상품명, 업체명 검색..." oninput="renderPurchaseOrdersList()" style="padding: 8px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 13px; font-weight: 700; flex: 1;">
                             </div>
@@ -6659,14 +6660,16 @@
             });
 
             const sortedKeys = Array.from(monthsMap.keys()).sort().reverse();
-            let optionsHtml = '<option value="all">🗓️ 전체 기간</option>';
+            let optionsHtml = '<option value="none">🗓️ 기간 선택 (또는 검색)</option><option value="all">🗓️ 전체 기간 보기</option>';
             sortedKeys.forEach(ym => {
                 optionsHtml += `<option value="${ym}">${monthsMap.get(ym)}</option>`;
             });
 
             select.innerHTML = optionsHtml;
-            if (Array.from(select.options).some(o => o.value === currentVal)) {
+            if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
                 select.value = currentVal;
+            } else {
+                select.value = "none";
             }
         }
 
@@ -6798,7 +6801,23 @@
             if (!tbody) return;
 
             const search = (document.getElementById('purchaseSearchInput')?.value || "").toLowerCase().trim();
-            const monthFilter = document.getElementById('purchaseMonthFilter')?.value || "all";
+            const monthFilter = document.getElementById('purchaseMonthFilter')?.value || "none";
+
+            // 초기 상태: 기간 미선택 및 검색어 없음 (버벅임 방지용 공란 안내 화면)
+            if (monthFilter === "none" && search === "") {
+                const countBadge = document.getElementById('purchase-total-count-badge');
+                if (countBadge) countBadge.innerText = `총 ${purchaseOrders.length}건 보관 중`;
+
+                const promptHtml = `
+                    <div style="text-align: center; padding: 50px 20px;">
+                        <div style="font-size: 28px; margin-bottom: 10px;">🔍</div>
+                        <div style="font-size: 15px; font-weight: 800; color: #334155; margin-bottom: 6px;">조회하실 기간을 선택하시거나 검색어를 입력해 주세요.</div>
+                        <div style="font-size: 13px; color: #64748b;">상단의 <b>'🗓️ 기간 선택'</b> 또는 <b>검색창</b>을 이용하시면 딜레이 없이 빠르게 조회됩니다.</div>
+                    </div>`;
+                tbody.innerHTML = `<tr><td colspan="12">${promptHtml}</td></tr>`;
+                if (mobileContainer) mobileContainer.innerHTML = promptHtml;
+                return;
+            }
 
             let filtered = purchaseOrders.filter(po => {
                 if (monthFilter !== "all") {
