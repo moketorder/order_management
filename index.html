@@ -1088,15 +1088,26 @@
         @media print {
             @page {
                 margin: 0;
+                size: auto;
             }
             
+            html, body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                visibility: visible !important;
+            }
+
             .no-print, body > *:not(.print-only) {
                 display: none !important;
             }
  
-            .print-only {
+            .print-only, .print-only * {
                 display: block !important;
-                position: static !important;
+                visibility: visible !important;
+            }
+
+            .print-only {
+                position: absolute !important;
                 left: 0 !important;
                 top: 0 !important;
                 width: 72mm !important;
@@ -5720,8 +5731,25 @@
             return formatShortAddress(address);
         }
 
-        // 6.5 선택된 주문 카드 인쇄 헬퍼
-        function printSelectedCards() {
+        // 단일 고객 영수증 인쇄 헬퍼
+        function printSingleCustomerCard(phone, orderKeysStr) {
+            const keys = (orderKeysStr || "").split(',').filter(Boolean);
+            if (keys.length === 0) {
+                showToast("인쇄할 주문 정보가 없습니다.");
+                return;
+            }
+            
+            const prevSelected = new Set(selectedItems);
+            selectedItems.clear();
+            keys.forEach(k => selectedItems.add(phone + "|" + k));
+            
+            printSelectedCards(true);
+            
+            selectedItems = prevSelected;
+        }
+
+        // 선택된 주문 카드 인쇄 헬퍼
+        function printSelectedCards(forcePrintAll = false) {
             if (selectedItems.size === 0) {
                 showToast("선택된 주문 항목이 없습니다.");
                 return;
@@ -5732,10 +5760,12 @@
             rawOrders.forEach(item => {
                 const key = item.phone + "|" + item.orderKey;
                 if (selectedItems.has(key)) {
-                    const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
-                    const isDelivered = (item.delivered === true || item.delivered === "true" || String(item.delivered).toUpperCase() === "TRUE");
-                    const isReceived = (item.received === true || item.received === "true" || String(item.received).toUpperCase() === "TRUE");
-                    if (isCanceled || isDelivered || isReceived) return; // 취소, 배달완료, 픽업완료 상품은 인쇄 대상에서 제외
+                    if (!forcePrintAll) {
+                        const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                        const isDelivered = (item.delivered === true || item.delivered === "true" || String(item.delivered).toUpperCase() === "TRUE");
+                        const isReceived = (item.received === true || item.received === "true" || String(item.received).toUpperCase() === "TRUE");
+                        if (isCanceled || isDelivered || isReceived) return; // 취소, 배달완료, 픽업완료 상품은 인쇄 대상에서 제외
+                    }
 
                     const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && item.address.trim() !== "")) ? '배달주문' : '매장픽업';
                     const customerKey = `${item.name}_${item.phone}_${actualShippingMethod}`;
@@ -5819,15 +5849,10 @@
                 `;
 
                 customer.items.forEach(it => {
-                    let statusBadge = '';
-                    
-                    // 1. 입금 완료 여부 뱃지 생성 (입고 상태 및 수령 여부는 전면 제외)
                     const isPaid = (it.paid === true || it.paid === "true" || String(it.paid).toUpperCase() === "TRUE");
-                    if (isPaid) {
-                        statusBadge += ' <span style="font-size:10px; color:#000; font-weight:800; border:1.5px solid #000; padding:1px 3px; border-radius:2px; margin-left:4px; display:inline-block; line-height:1;">[입금완료]</span>';
-                    } else {
-                        statusBadge += ' <span style="font-size:10px; color:#000; font-weight:800; border:1.5px solid #000; padding:1px 3px; border-radius:2px; margin-left:4px; display:inline-block; line-height:1;">[미입금]</span>';
-                    }
+                    const statusBadge = isPaid 
+                        ? ' <span style="font-size:10px; color:#000; font-weight:800; border:1.5px solid #000; padding:1px 3px; border-radius:2px; margin-left:4px; display:inline-block; line-height:1;">[입금완료]</span>'
+                        : ' <span style="font-size:10px; color:#000; font-weight:800; border:1.5px solid #000; padding:1px 3px; border-radius:2px; margin-left:4px; display:inline-block; line-height:1;">[미입금]</span>';
 
                     printHtml += `
                         <tr style="border-bottom:none;">
@@ -5848,7 +5873,7 @@
                 `;
             });
 
-            // 3. 현재 창의 인쇄 영역을 활용하여 인쇄 처리 (팝업 차단 및 모바일/PC 브라우저 호환성 에러 완벽 해결)
+            // 3. 인쇄 처리
             let printArea = document.getElementById("print-area");
             if (!printArea) {
                 printArea = document.createElement("div");
@@ -5859,15 +5884,9 @@
 
             printArea.innerHTML = printHtml;
 
-            // 브라우저의 인쇄 대화상자 실행 (인쇄 미리보기 화면이 나타나며, 사용자가 끄기 전까지 꺼지지 않음)
             setTimeout(() => {
                 window.print();
-            }, 100);
-
-            // 인쇄 완료 또는 취소 후 인쇄 영역 자동 정리
-            window.onafterprint = () => {
-                printArea.innerHTML = '';
-            };
+            }, 150);
         }
 
         // 7. 유틸리티 UI 컴포넌트 (로더, 토스트)
