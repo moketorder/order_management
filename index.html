@@ -6877,8 +6877,8 @@
 
                     const rawStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null) ? 9999 : parseInt(prod.stock);
                     const adjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)] || 0);
-                    const realStock = Math.max(0, rawStock + adjVal);
-                    const stockText = (rawStock >= 9999) ? "무제한" : `${realStock}개 남음`;
+                    const realStock = (rawStock >= 9999) ? 9999 : Math.max(0, rawStock + adjVal);
+                    const stockText = (rawStock >= 9999) ? "무제한" : (realStock <= 0 ? `<span style="color: var(--red); font-weight: 800;">🔴 품절</span>` : `${realStock}개 남음`);
 
                     const hasImage = prod.images && prod.images.length > 0;
                     const imgUrl = hasImage ? `https://lh3.googleusercontent.com/d/${prod.images[0]}=s220` : '';
@@ -6907,7 +6907,7 @@
                         <div class="product-actions">
                             <button class="btn-action action-edit" onclick="editProduct(${index})">수정</button>
                             <button class="btn-action action-duplicate" onclick="duplicateSingleProduct(${index})">복제</button>
-                            <button class="btn-action action-delete" onclick="deleteProduct(${index})">삭제</button>
+                            <button class="btn-action action-delete" onclick="markAsSoldOut(${index})">품절</button>
                         </div>
                     `;
 
@@ -7184,10 +7184,23 @@
 
                 if (uploadIsEditMode && uploadEditProductKey !== null) {
                     oldProd = uploadProducts[uploadEditProductKey];
-                    const oldStock = (oldProd.stock === undefined || oldProd.stock === null) ? "" : oldProd.stock;
-                    if (String(stock) !== String(oldStock) || oldProd.name !== name || oldProd.matchKey !== matchKey) {
-                        isStockChanged = true;
+                    const oldRawStock = (oldProd.stock === undefined || oldProd.stock === null || oldProd.stock === "") ? 9999 : parseInt(oldProd.stock);
+                    const oldAdjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(oldProd.matchKey, oldProd.name)] || 0);
+                    const oldRealStock = (oldRawStock >= 9999) ? 9999 : Math.max(0, oldRawStock + oldAdjVal);
+
+                    if (isUnlimited) {
+                        if (oldRawStock < 9999) {
+                            isStockChanged = true;
+                        }
+                    } else {
+                        if (oldRawStock >= 9999 || parseInt(stock) !== oldRealStock || oldProd.name !== name || oldProd.matchKey !== matchKey) {
+                            isStockChanged = true;
+                        }
                     }
+
+                    const finalStock = isStockChanged ? stock : oldProd.stock;
+                    productObj.stock = finalStock;
+
                     updatedProducts[uploadEditProductKey] = {
                         ...uploadProducts[uploadEditProductKey],
                         ...productObj
@@ -7200,10 +7213,24 @@
                             return;
                         }
                         oldProd = updatedProducts[dupIndex];
-                        const oldStock = (oldProd.stock === undefined || oldProd.stock === null) ? "" : oldProd.stock;
-                        if (String(stock) !== String(oldStock) || oldProd.name !== name || oldProd.matchKey !== matchKey) {
-                            isStockChanged = true;
+                        const oldRawStock = (oldProd.stock === undefined || oldProd.stock === null || oldProd.stock === "") ? 9999 : parseInt(oldProd.stock);
+                        const oldAdjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(oldProd.matchKey, oldProd.name)] || 0);
+                        const oldRealStock = (oldRawStock >= 9999) ? 9999 : Math.max(0, oldRawStock + oldAdjVal);
+
+                        if (isUnlimited) {
+                            if (oldRawStock < 9999) {
+                                isStockChanged = true;
+                            }
+                        } else {
+                            if (oldRawStock >= 9999 || parseInt(stock) !== oldRealStock || oldProd.name !== name || oldProd.matchKey !== matchKey) {
+                                
+                                isStockChanged = true;
+                            }
                         }
+
+                        const finalStock = isStockChanged ? stock : oldProd.stock;
+                        productObj.stock = finalStock;
+
                         updatedProducts[dupIndex] = {
                             ...updatedProducts[dupIndex],
                             ...productObj
@@ -7258,6 +7285,50 @@
             } catch (e) {
                 console.error("저장 에러:", e);
                 showToast("저장에 실패했습니다: " + e.toString());
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function markAsSoldOut(index) {
+            const prod = uploadProducts[index];
+            if (!confirm(`'${prod.name}' 상품을 품절 처리하시겠습니까?`)) return;
+
+            showLoader("🔴 품절 처리 중...");
+            try {
+                let updatedList = [...uploadProducts];
+                updatedList[index] = {
+                    ...prod,
+                    stock: 0,
+                    updatedAt: Date.now()
+                };
+
+                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedList)
+                });
+
+                if (!res.ok) throw new Error("Firebase 업데이트 실패");
+
+                const adjKey = fGetAdjKey(prod.matchKey, prod.name);
+                await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(0)
+                }).catch(e => console.error("품절 처리에 따른 재고 조정값 초기화 실패:", e));
+                uploadGlobalAdjustments[adjKey] = 0;
+
+                uploadProducts = updatedList;
+                
+                showToast("상품이 품절 처리되었습니다.");
+                await loadProductsFromServer();
+                buildManageCategoryTabs();
+                buildSubTabs();
+                renderProductsList();
+            } catch (e) {
+                console.error("품절 처리 중 오류 발생:", e);
+                showToast("품절 처리하지 못했습니다: " + e.toString());
             } finally {
                 hideLoader();
             }
@@ -7336,11 +7407,14 @@
             document.getElementById('productDesc').value = prod.desc || "";
 
             const rawStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null) ? 9999 : parseInt(prod.stock);
+            const adjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)] || 0);
+            const realStock = (rawStock >= 9999) ? 9999 : Math.max(0, rawStock + adjVal);
+
             const isUnlimited = (rawStock >= 9999);
             document.getElementById('unlimitedStock').checked = isUnlimited;
             
             const stockInput = document.getElementById('productStock');
-            stockInput.value = isUnlimited ? '9999' : rawStock;
+            stockInput.value = isUnlimited ? '9999' : realStock;
             stockInput.disabled = isUnlimited;
 
             isShowToday = (prod.showToday !== false);
