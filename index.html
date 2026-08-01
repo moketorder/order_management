@@ -3820,29 +3820,9 @@
             selectAllCb.checked = allSelected;
         }
 
-        // 5. 구글 스프레드시트 상태 동기화 헬퍼
+        // 5. 구글 스프레드시트 상태 동기화 헬퍼 (GAS 사용 중단으로 비활성화)
         async function syncStatusToGoogleSheets(phone, timestamp, item, status) {
-            try {
-                const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbw6F-D5UhJTkLafBv4uOs5_lUD61ervXveLCcZ6ROHNYhFbEi_vJUamKHUjHE9wGeaY/exec';
-                const payload = {
-                    header: 'status_update',
-                    phone: phone,
-                    timestamp: timestamp,
-                    item: item,
-                    status: status
-                };
-                
-                // 구글 시트 동기화는 백그라운드에서 비동기로 실행
-                fetch(GAS_API_URL, {
-                    method: 'POST',
-                    redirect: 'follow',
-                    body: JSON.stringify(payload)
-                }).then(res => res.json())
-                  .then(data => console.log('GAS status sync result:', data))
-                  .catch(err => console.error('GAS status sync error:', err));
-            } catch (e) {
-                console.error('GAS sync error:', e);
-            }
+            console.log('GAS sync disabled.');
         }
 
         function getStatusPatchBody(status) {
@@ -6393,11 +6373,10 @@
             genScale = item.scale || 1.2;
             updateGenImgTransform();
             
-            const bgImg = document.getElementById('gen-bg-image');
             if (item.imgId) {
                 bgImg.src = "";
                 bgImg.crossOrigin = "anonymous";
-                bgImg.src = `https://lh3.googleusercontent.com/d/${item.imgId}`;
+                bgImg.src = (String(item.imgId).startsWith("data:") || String(item.imgId).startsWith("http")) ? item.imgId : `https://lh3.googleusercontent.com/d/${item.imgId}`;
             } else if (item.localDataUrl) {
                 bgImg.src = item.localDataUrl;
             } else {
@@ -6639,7 +6618,7 @@
                 
                 let imgSrc = '';
                 if (item.isExisting && item.id) {
-                    imgSrc = `https://lh3.googleusercontent.com/d/${item.id}`;
+                    imgSrc = (String(item.id).startsWith("data:") || String(item.id).startsWith("http")) ? item.id : `https://lh3.googleusercontent.com/d/${item.id}`;
                 } else if (item.file) {
                     try {
                         imgSrc = URL.createObjectURL(item.file);
@@ -6906,7 +6885,7 @@
                     const stockText = (rawStock >= 9999) ? "무제한" : (realStock <= 0 ? `<span style="color: var(--red); font-weight: 800;">🔴 품절</span>` : `${realStock}개 남음`);
 
                     const hasImage = prod.images && prod.images.length > 0;
-                    const imgUrl = hasImage ? `https://lh3.googleusercontent.com/d/${prod.images[0]}=s220` : '';
+                    const imgUrl = hasImage ? ((String(prod.images[0]).startsWith("data:") || String(prod.images[0]).startsWith("http")) ? prod.images[0] : `https://lh3.googleusercontent.com/d/${prod.images[0]}=s220`) : '';
 
                     const statusBadge = (!isVisible) 
                         ? `<span style="font-size: 10px; font-weight: 800; background: #fee2e2; color: #ef4444; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🙈 숨김</span>`
@@ -7131,7 +7110,7 @@
             }
 
             try {
-                // 1. 모든 신규 사진 업로드 처리 (item.id 수집)
+                // 1. 모든 신규 사진 업로드 처리 (item.id 수집 - GAS로 구글 드라이브에 이미지 파일 저장)
                 for (let i = 0; i < uploadSelectedFiles.length; i++) {
                     const item = uploadSelectedFiles[i];
                     if (item.isExisting) continue;
