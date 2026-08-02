@@ -2004,6 +2004,7 @@
                     <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
                     <button class="btn-common" style="border: 1.5px solid #d32f2f; background: #fff5f5; color: #d32f2f; font-weight: 700;" onclick="deleteCanceledOrders()">🗑️ 취소주문 삭제</button>
                     <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV</button>
+                    <button class="btn-common" style="border: 1.5px solid #0284c7; background: #f0f9ff; color: #0284c7; font-weight: 700;" onclick="restoreRecentlyArchivedOrders()">♻️ 최근주문 복구</button>
                 </div>
             </div>
 
@@ -3564,7 +3565,7 @@
             try {
                 const todayStart = new Date();
                 todayStart.setHours(0, 0, 0, 0);
-                const cutoffTime = todayStart.getTime() - (15 * 24 * 60 * 60 * 1000);
+                const cutoffTime = todayStart.getTime() - (10 * 24 * 60 * 60 * 1000);
 
                 const archivableOrders = [];
                 rawOrders.forEach(item => {
@@ -3573,21 +3574,18 @@
                     const isCompleted = (status === '배달완료' || status === '픽업' || isCanceled);
 
                     if (isCompleted) {
+                        const dateInfo = getOrderDateInfo(item);
                         let orderTimestamp = null;
-                        const dateStr = item.pickupDate || item.orderDate || item.date;
-                        if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(String(dateStr).trim())) {
-                            const parts = String(dateStr).trim().split('-');
-                            orderTimestamp = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getTime();
-                        } else if (item.timestamp) {
-                            orderTimestamp = typeof item.timestamp === 'number' ? item.timestamp : parseInt(item.timestamp);
-                        } else {
-                            const dateInfo = getOrderDateInfo(item);
-                            if (dateInfo.dateStr && dateInfo.dateStr !== "기타" && dateInfo.dateStr.includes('-')) {
-                                const parts = dateInfo.dateStr.split('-');
-                                if (parts.length === 3) {
-                                    orderTimestamp = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getTime();
-                                }
+                        if (dateInfo.dateStr && dateInfo.dateStr !== "기타") {
+                            const parts = dateInfo.dateStr.split('-');
+                            if (parts.length === 3) {
+                                orderTimestamp = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getTime();
                             }
+                        }
+                        // 날짜 필드가 없으면 실제 주문 접수 시각(timestamp)을 안전하게 파싱해서 대체 (한글 날짜 문자열 대응, parseInt 오작동 방지)
+                        if (orderTimestamp === null && item.timestamp) {
+                            const parsedTs = parseTimestampToDate(item.timestamp).getTime();
+                            if (parsedTs > 0) orderTimestamp = parsedTs;
                         }
 
                         if (orderTimestamp && orderTimestamp < cutoffTime) {
@@ -3619,12 +3617,90 @@
 
                     const archSet = new Set(archivableOrders.map(it => (it.phone || "") + "_" + it.orderKey));
                     rawOrders = rawOrders.filter(o => !archSet.has((o.phone || "") + "_" + o.orderKey));
-                    renderFilteredData();
+                    renderFilteredOrders();
 
                     console.log(`[자동 아카이브] 15일 지난 완료/취소 주문 ${archivableOrders.length}건 보관함으로 자동 이관 완료`);
                 }
             } catch (e) {
                 console.error("자동 아카이브 실패:", e);
+            }
+        }
+
+        // [1회성 복구] 예전 날짜파싱 버그로 인해 최근 10일 이내인데도 orders_archive로 잘못 옮겨진 주문을
+        // 다시 orders로 되돌리는 함수. 여러 번 눌러도 안전(이미 복구된 건 대상에서 자동 제외).
+        async function restoreRecentlyArchivedOrders() {
+            if (!confirm("최근 10일 이내인데 보관함(archive)에 잘못 들어가 있는 주문을 찾아 되돌립니다.\n계속하시겠습니까?")) return;
+
+            showLoader("♻️ 최근 주문 복구 대상 확인 중...");
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}orders_archive.json`);
+                if (!res.ok) throw new Error("보관함(archive) 로드 실패");
+                const data = await res.json();
+
+                if (!data) {
+                    showToast("보관함(archive)에 데이터가 없습니다.");
+                    return;
+                }
+
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+                const cutoffTime = todayStart.getTime() - (10 * 24 * 60 * 60 * 1000);
+
+                const toRestore = [];
+                for (const phone in data) {
+                    for (const orderKey in data[phone]) {
+                        const it = data[phone][orderKey];
+                        if (!it) continue;
+
+                        const dateInfo = getOrderDateInfo(it);
+                        let orderTimestamp = null;
+                        if (dateInfo.dateStr && dateInfo.dateStr !== "기타") {
+                            const parts = dateInfo.dateStr.split('-');
+                            if (parts.length === 3) {
+                                orderTimestamp = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getTime();
+                            }
+                        }
+                        if (orderTimestamp === null && it.timestamp) {
+                            const parsedTs = parseTimestampToDate(it.timestamp).getTime();
+                            if (parsedTs > 0) orderTimestamp = parsedTs;
+                        }
+
+                        // 정상적으로 날짜를 계산할 수 있고, 최근 10일 이내(cutoff 이상)라면 복구 대상
+                        if (orderTimestamp !== null && orderTimestamp >= cutoffTime) {
+                            toRestore.push({ phone, orderKey, item: it });
+                        }
+                    }
+                }
+
+                if (toRestore.length === 0) {
+                    showToast("복구할 대상이 없습니다. (최근 10일 이내 잘못 보관된 주문 없음)");
+                    return;
+                }
+
+                showLoader(`♻️ ${toRestore.length}건 복구 중...`);
+                const promises = toRestore.map(({ phone, orderKey, item }) => {
+                    const cleanPhone = String(phone || "").replace(/\D/g, "") || phone;
+                    return fetch(`${FIREBASE_DB_URL}orders/${encodeURIComponent(cleanPhone)}/${encodeURIComponent(orderKey)}.json`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(item)
+                    }).then(putRes => {
+                        if (!putRes.ok) throw new Error("복구용 orders 쓰기 실패: " + orderKey);
+                        return fetch(`${FIREBASE_DB_URL}orders_archive/${encodeURIComponent(phone)}/${encodeURIComponent(orderKey)}.json`, {
+                            method: 'DELETE'
+                        });
+                    });
+                });
+
+                await Promise.all(promises);
+                showToast(`🎉 최근 주문 ${toRestore.length}건을 성공적으로 복구했습니다.`);
+                isArchiveLoaded = false; // 캐시 플래그 초기화
+                await fetchOrders(true);
+            } catch (e) {
+                console.error("복구 처리 오류:", e);
+                showToast("복구 중 오류가 발생했습니다: " + e.toString());
+            } finally {
+                hideLoader();
             }
         }
 
@@ -3680,7 +3756,7 @@
                 showToast(`🎉 30일 이상 지난 주문 ${archivableOrders.length}건을 보관함으로 이동했습니다!`);
                 const archSet = new Set(archivableOrders.map(it => (it.phone || "") + "_" + it.orderKey));
                 rawOrders = rawOrders.filter(o => !archSet.has((o.phone || "") + "_" + o.orderKey));
-                renderFilteredData();
+                renderFilteredOrders();
             } catch (e) {
                 console.error("아카이브 오류:", e);
                 showToast("아카이브 처리 실패: " + e.toString());
@@ -3930,7 +4006,7 @@
                 });
                 await Promise.all(promises);
                 showToast(`수령 방법이 ${label}(으)로 전환되었습니다.`);
-                renderFilteredData();
+                renderFilteredOrders();
             } catch (e) {
                 console.error(e);
                 showToast("변경 중 오류가 발생했습니다.");
@@ -4151,7 +4227,7 @@
                         currentDay = parseInt(parts[2]) + "일";
                     }
 
-                    renderFilteredData();
+                    renderFilteredOrders();
 
                     // 날짜 변경 후 이전 날짜 및 새 날짜에 대해 배달비 자동 부과/제거 로직 호출
                     await checkAndApplyDeliveryFeeAfterCancellation(phone, targetDateStr);
@@ -4202,7 +4278,7 @@
                 }
                 
                 showToast("메모가 저장되었습니다.");
-                renderFilteredData();
+                renderFilteredOrders();
             } catch (e) {
                 console.error(e);
                 showToast("메모 저장 실패: " + e.toString());
@@ -4241,7 +4317,7 @@
                 }
                 
                 showToast("고정 메모가 저장되었습니다.");
-                renderFilteredData();
+                renderFilteredOrders();
             } catch (e) {
                 console.error(e);
                 showToast("고정 메모 저장 실패: " + e.toString());
@@ -4280,7 +4356,7 @@
                 }
                 
                 showToast("인쇄용 고정 메모가 저장되었습니다.");
-                renderFilteredData();
+                renderFilteredOrders();
             } catch (e) {
                 console.error(e);
                 showToast("인쇄용 고정 메모 저장 실패: " + e.toString());
@@ -4352,7 +4428,7 @@
                         showToast("🎉 주문 총액이 15,000원 이상이 되어 배달비가 자동으로 제거되었습니다.");
                         const feeKeys = new Set(deliveryFeeItems.map(it => (it.phone || "") + "_" + it.orderKey));
                         rawOrders = rawOrders.filter(o => !feeKeys.has((o.phone || "") + "_" + o.orderKey));
-                        renderFilteredData();
+                        renderFilteredOrders();
                     } catch (e) {
                         console.error(e);
                     } finally {
@@ -4470,7 +4546,7 @@
                     syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
                 }
                 
-                renderFilteredData();
+                renderFilteredOrders();
 
                 if (newStatus === '취소' && target) {
                     await checkAndApplyDeliveryFeeAfterCancellation(phone, target.pickupDate);
@@ -4519,7 +4595,7 @@
                     syncStatusToGoogleSheets(it.phone, it.timestamp, it.item, newStatus);
                 });
                 
-                renderFilteredData();
+                renderFilteredOrders();
 
                 if (newStatus === '취소') {
                     const firstItem = customerItems[0];
@@ -4597,7 +4673,7 @@
                 showToast(`${itemsToProcess.length}개 주문 항목의 상태를 일괄 변경했습니다.`);
                 selectedItems.clear();
                 updateSelectionCountText();
-                renderFilteredData();
+                renderFilteredOrders();
 
                 if (newStatus === '취소') {
                     const uniqueGroups = new Map();
@@ -4678,7 +4754,7 @@
                 showToast(`${itemsToProcess.length}개 주문 항목의 입금을 확인했습니다.`);
                 selectedItems.clear();
                 updateSelectionCountText();
-                renderFilteredData();
+                renderFilteredOrders();
             } catch (e) {
                 console.error(e);
                 showToast("입금 완료 처리 중 오류가 발생했습니다.");
@@ -4720,7 +4796,7 @@
                 showToast(`취소된 주문 ${canceledOrders.length}건이 성공적으로 삭제되었습니다.`);
                 const canceledSet = new Set(canceledOrders.map(it => (it.phone || "") + "_" + it.orderKey));
                 rawOrders = rawOrders.filter(o => !canceledSet.has((o.phone || "") + "_" + o.orderKey));
-                renderFilteredData();
+                renderFilteredOrders();
             } catch (e) {
                 showToast("삭제 오류: " + e.toString());
                 console.error(e);
@@ -4836,8 +4912,14 @@
                 dateTitle += ` (검색어: "${search}" 필터 결과)`;
             }
             
-            // 취소 제외 주문 목록
-            const nonCanceledOrders = targetOrders.filter(it => !(it.canceled === true || it.canceled === "true"));
+            // 취소 / 배달완료 / 픽업완료 건은 통계에서 항상 제외
+            const nonCanceledOrders = targetOrders.filter(it => {
+                const isCanceled = (it.canceled === true || it.canceled === "true");
+                if (isCanceled) return false;
+                const st = it.status || "대기";
+                if (st === '배달완료' || st === '픽업') return false;
+                return true;
+            });
             
             // 1. 총 주문수량 및 2. 총 주문금액 계산 (배달/픽업 분류 포함)
             let totalQty = 0;
