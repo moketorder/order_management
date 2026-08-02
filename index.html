@@ -2194,11 +2194,11 @@
                             <span id="upload-selection-count-text">0개 상품 선택됨</span>
                         </div>
                     </div>
-                    <div class="batch-buttons" style="display: flex; gap: 8px;">
-                        <button class="btn-batch type-show" onclick="handleBatchVisibility(true)" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">👁️ 노출</button>
-                        <button class="btn-batch type-hide" onclick="handleBatchVisibility(false)" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">🙈 숨김</button>
-                        <button class="btn-batch type-print" onclick="switchAdminTab('thumbnail-generator')" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition); color: #d97706; border-color: rgba(217, 119, 6, 0.25);">🎨 섬네일</button>
-                        <button class="btn-batch type-purchase" onclick="handleBatchPurchase()" style="flex: 1; min-width: 100px; padding: 10px 16px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: var(--transition); color: #10b981; border-color: rgba(16, 185, 129, 0.25);">🚚 발주</button>
+                    <div class="batch-buttons" style="display: flex; gap: 4px; width: 100%; box-sizing: border-box;">
+                        <button class="btn-batch type-show" onclick="handleBatchVisibility(true)" style="flex: 1; min-width: 0; padding: 9px 2px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: var(--transition); white-space: nowrap;">👁️ 노출</button>
+                        <button class="btn-batch type-hide" onclick="handleBatchVisibility(false)" style="flex: 1; min-width: 0; padding: 9px 2px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: var(--transition); white-space: nowrap;">🙈 숨김</button>
+                        <button class="btn-batch type-print" onclick="switchAdminTab('thumbnail-generator')" style="flex: 1; min-width: 0; padding: 9px 2px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: var(--transition); color: #d97706; border-color: rgba(217, 119, 6, 0.25); white-space: nowrap;">🎨 섬네일</button>
+                        <button class="btn-batch type-purchase" onclick="handleBatchPurchase()" style="flex: 1; min-width: 0; padding: 9px 2px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: var(--transition); color: #10b981; border-color: rgba(16, 185, 129, 0.25); white-space: nowrap;">🚚 발주</button>
                     </div>
                 </div>
             </div>
@@ -6952,10 +6952,20 @@
                         item.style.background = 'var(--primary-light)';
                     }
 
-                    const rawStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null) ? 9999 : parseInt(prod.stock);
-                    const adjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)] || 0);
-                    const realStock = (rawStock >= 9999) ? 9999 : Math.max(0, rawStock + adjVal);
-                    const stockText = (rawStock >= 9999) ? "무제한" : (realStock <= 0 ? `<span style="color: var(--red); font-weight: 800;">🔴 품절</span>` : `${realStock}개 남음`);
+                    const isUnlimitedStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null || String(prod.stock).trim() === "무제한");
+                    const adjValRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)];
+                    const isUnlimitedAdj = (adjValRaw === "unlimited" || (adjValRaw !== undefined && String(adjValRaw).startsWith("unlimited")));
+
+                    const isUnlimited = isUnlimitedStock || isUnlimitedAdj;
+                    let stockText = "";
+                    if (isUnlimited) {
+                        stockText = "무제한";
+                    } else {
+                        const rawStock = parseInt(prod.stock || 0);
+                        const adjVal = parseInt(adjValRaw || 0);
+                        const realStock = Math.max(0, rawStock + adjVal);
+                        stockText = realStock <= 0 ? `<span style="color: var(--red); font-weight: 800;">🔴 품절</span>` : `${realStock}개 남음`;
+                    }
 
                     const hasImage = prod.images && prod.images.length > 0;
                     const imgUrl = hasImage ? ((String(prod.images[0]).startsWith("data:") || String(prod.images[0]).startsWith("http")) ? prod.images[0] : `https://lh3.googleusercontent.com/d/${prod.images[0]}=s220`) : '';
