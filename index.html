@@ -2207,11 +2207,12 @@
                             <span id="upload-selection-count-text">0개 상품 선택됨</span>
                         </div>
                     </div>
-                    <div class="batch-buttons" style="display: flex; gap: 4px; width: 100%; box-sizing: border-box;">
-                        <button class="btn-batch type-show" onclick="handleBatchVisibility(true)" style="flex: 1; min-width: 0; padding: 9px 2px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: var(--transition); white-space: nowrap;">👁️ 노출</button>
-                        <button class="btn-batch type-hide" onclick="handleBatchVisibility(false)" style="flex: 1; min-width: 0; padding: 9px 2px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: var(--transition); white-space: nowrap;">🙈 숨김</button>
-                        <button class="btn-batch type-print" onclick="switchAdminTab('thumbnail-generator')" style="flex: 1; min-width: 0; padding: 9px 2px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: var(--transition); color: #d97706; border-color: rgba(217, 119, 6, 0.25); white-space: nowrap;">🎨 섬네일</button>
-                        <button class="btn-batch type-purchase" onclick="handleBatchPurchase()" style="flex: 1; min-width: 0; padding: 9px 2px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; transition: var(--transition); color: #10b981; border-color: rgba(16, 185, 129, 0.25); white-space: nowrap;">🚚 발주</button>
+                    <div class="batch-buttons" style="display: flex; gap: 3px; width: 100%; box-sizing: border-box;">
+                        <button class="btn-batch type-show" onclick="handleBatchVisibility(true)" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); white-space: nowrap; overflow: hidden;">👁️ 노출</button>
+                        <button class="btn-batch type-hide" onclick="handleBatchVisibility(false)" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); white-space: nowrap; overflow: hidden;">🙈 숨김</button>
+                        <button class="btn-batch type-delete" onclick="handleBatchDelete()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(220, 38, 38, 0.3); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #dc2626; white-space: nowrap; overflow: hidden;">🗑️ 삭제</button>
+                        <button class="btn-batch type-print" onclick="switchAdminTab('thumbnail-generator')" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #d97706; border-color: rgba(217, 119, 6, 0.25); white-space: nowrap; overflow: hidden;">🎨 섬네일</button>
+                        <button class="btn-batch type-purchase" onclick="handleBatchPurchase()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #10b981; border-color: rgba(16, 185, 129, 0.25); white-space: nowrap; overflow: hidden;">🚚 발주</button>
                     </div>
                 </div>
             </div>
@@ -5162,13 +5163,10 @@
                 dateTitle += ` (검색어: "${search}" 필터 결과)`;
             }
             
-            // 취소 / 배달완료 / 픽업완료 건은 통계에서 항상 제외
+            // [수정] 취소건만 제외하고, 배달완료·픽업완료 건도 주문현황 통계에 포함 (USER 요청)
             const nonCanceledOrders = targetOrders.filter(it => {
                 const isCanceled = (it.canceled === true || it.canceled === "true");
-                if (isCanceled) return false;
-                const st = it.status || "대기";
-                if (st === '배달완료' || st === '픽업') return false;
-                return true;
+                return !isCanceled;
             });
             
             // 1. 총 주문수량 및 2. 총 주문금액 계산 (배달/픽업 분류 포함)
@@ -7441,6 +7439,56 @@
             } catch (e) {
                 console.error("일괄 처리 에러:", e);
                 showToast("변경에 실패했습니다: " + e.toString());
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // [신규] 선택 상품 일괄 삭제
+        async function handleBatchDelete() {
+            if (uploadSelectedProductIndices.size === 0) return;
+            const count = uploadSelectedProductIndices.size;
+            if (!confirm(`선택한 ${count}개 상품을 삭제하시겠습니까?\n삭제된 상품은 되돌릴 수 없습니다.`)) return;
+
+            showLoader(`🗑️ 상품 ${count}개 삭제 중...`);
+            try {
+                const idxSet = uploadSelectedProductIndices;
+                // 삭제 대상(재고 조정키 정리를 위해 미리 수집)
+                const toDelete = [];
+                idxSet.forEach(idx => { if (uploadProducts[idx]) toDelete.push(uploadProducts[idx]); });
+
+                // 선택된 인덱스를 제외한 새 목록
+                const updatedList = uploadProducts.filter((_, i) => !idxSet.has(i));
+
+                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedList)
+                });
+                if (!res.ok) throw new Error("Firebase 삭제 동기화 실패");
+                updatePublishedProductsTimestamp();
+
+                // 각 상품의 Firebase 재고 조정값도 함께 제거 (병렬)
+                await Promise.all(toDelete.map(prod => {
+                    const adjKey = fGetAdjKey(prod.matchKey, prod.name);
+                    delete uploadGlobalAdjustments[adjKey];
+                    return fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, { method: 'DELETE' })
+                        .catch(e => console.error("재고 조정값 삭제 실패:", e));
+                }));
+
+                uploadProducts = updatedList;
+                uploadSelectedProductIndices.clear();
+                updateBatchBar();
+                const countEl = document.getElementById('product-count');
+                if (countEl) countEl.innerText = uploadProducts.length;
+                showToast(`${count}개 상품이 삭제되었습니다.`);
+                await loadProductsFromServer();
+                buildManageCategoryTabs();
+                buildSubTabs();
+                renderProductsList();
+            } catch (e) {
+                console.error("일괄 삭제 에러:", e);
+                showToast("삭제에 실패했습니다: " + e.toString());
             } finally {
                 hideLoader();
             }
