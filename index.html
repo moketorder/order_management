@@ -7543,22 +7543,35 @@
                         contentType: item.file.type
                     };
 
-                    const response = await fetch(UPLOAD_API_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'text/plain'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) throw new Error(`[${item.displayName}] 이미지 업로드 실패`);
-                    const resJson = await response.json();
-                    
-                    if (resJson.result === 'success') {
-                        item.id = resJson.fileId || resJson.id || resJson.fileid || null;
-                    } else {
-                        throw new Error(resJson.message || "이미지 서버 응답 에러");
+                    // [버그수정] GAS 업로드는 간헐적으로 실패하므로 장당 최대 3회 자동 재시도
+                    let resJson = null;
+                    let lastErr = null;
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        try {
+                            if (attempt > 1) {
+                                showLoader(`📸 사진 업로드 재시도 (${i + 1}/${uploadSelectedFiles.length}) [${attempt}/3]: ${item.displayName}`);
+                                await new Promise(r => setTimeout(r, 800 * attempt));
+                            }
+                            const response = await fetch(UPLOAD_API_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain' },
+                                body: JSON.stringify(payload)
+                            });
+                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                            const j = await response.json();
+                            if (j.result !== 'success') throw new Error(j.message || "이미지 서버 응답 에러");
+                            resJson = j;
+                            break;
+                        } catch (e) {
+                            lastErr = e;
+                            console.warn(`이미지 업로드 시도 ${attempt}/3 실패 (${item.displayName}):`, e);
+                        }
                     }
+
+                    if (!resJson) {
+                        throw new Error(`[${item.displayName}] 이미지 업로드가 3회 재시도 후에도 실패했습니다.${lastErr ? ' (' + lastErr.message + ')' : ''}`);
+                    }
+                    item.id = resJson.fileId || resJson.id || resJson.fileid || null;
                 }
 
                 // 2. uploadThumbnailIndex로 지정된 대표 섬네일을 0번 인덱스에 배치하여 finalImages 구성
