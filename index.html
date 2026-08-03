@@ -8,6 +8,9 @@
     <!-- html2canvas & JSZip libraries for thumbnail generation -->
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Firebase Realtime Database SDK (실시간 리스너용, REST 폴링 대체) -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
     <!-- Pretendard Variable Font -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
@@ -838,6 +841,9 @@
             opacity: 0;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
             z-index: 10000;
+            white-space: nowrap;
+            max-width: 92vw;
+            overflow-x: auto;
         }
 
         .toast.show {
@@ -856,6 +862,13 @@
 
         /* 모바일 반응형 미디어 쿼리 */
         @media (max-width: 768px) {
+            /* 토스트 메시지 모바일 최적화 (한 줄 유지) */
+            .toast {
+                font-size: 12px;
+                padding: 9px 16px;
+                max-width: 90vw;
+            }
+
             /* 썸네일 일괄 생성기 모바일 뷰 최적화 (스케일 조정) */
             .generator-workspace {
                 grid-template-columns: 1fr !important;
@@ -2436,6 +2449,19 @@
     <script>
         const FIREBASE_DB_URL = "https://moketdb-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
+        // [신규] Firebase 실시간 리스너용 SDK 초기화 (REST 폴링 대신 웹소켓 기반 실시간 동기화)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAo0PrW2XaP_fq0FB5o452DLvj79Qpa_Sk",
+            authDomain: "moketdb.firebaseapp.com",
+            databaseURL: "https://moketdb-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "moketdb",
+            storageBucket: "moketdb.firebasestorage.app",
+            messagingSenderId: "467232072804",
+            appId: "1:467232072804:web:58d9f5ba58a2c2a642eb71"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const rtdb = firebase.database();
+
         async function updatePublishedProductsTimestamp() {
             try {
                 await fetch(`${FIREBASE_DB_URL}published_products_last_updated.json`, {
@@ -2558,9 +2584,6 @@
                 if (!response.ok) throw new Error("Firebase 연결 실패");
                 const data = await response.json() || {};
                 
-                // 캐시 저장
-                localStorage.setItem('moket_orders_cache', JSON.stringify(data));
-                
                 if (memoRes && memoRes.ok) {
                     customerMemos = await memoRes.json() || {};
                     localStorage.setItem('moket_customer_memos_cache', JSON.stringify(customerMemos));
@@ -2582,95 +2605,8 @@
                     printFixedMemos = {};
                 }
                 
-                // 데이터 평탄화
-                rawOrders = [];
-                for (const phone in data) {
-                    for (const orderKey in data[phone]) {
-                        const it = data[phone][orderKey];
-                        
-                        // 7일 지난 배달 완료 사진 가비지 컬렉션 (DB 용량 확보)
-                        const hasPhoto = it.deliveryPhotoExists || it.deliveryPhoto;
-                        if (hasPhoto && it.deliveryPhotoTime) {
-                            const photoAge = Date.now() - parseInt(it.deliveryPhotoTime);
-                            if (photoAge > 7 * 24 * 60 * 60 * 1000) {
-                                const cleanPhone = String(phone).replace(/\D/g, "");
-                                
-                                // orders 노드에서 플래그/사진 속성 제거
-                                fetch(`${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ deliveryPhoto: null, deliveryPhotoExists: null, deliveryPhotoTime: null })
-                                }).catch(e => console.error("배달사진 메타 GC 실패:", e));
-                                
-                                // delivery_photos 노드에서 실제 이미지 데이터 제거
-                                fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`, {
-                                    method: 'DELETE'
-                                }).catch(e => console.error("배달사진 이미지 GC 실패:", e));
-                                
-                                delete it.deliveryPhoto;
-                                delete it.deliveryPhotoExists;
-                                delete it.deliveryPhotoTime;
-                            }
-                        }
-                        
-                        const isCanceled = (it.canceled === true || String(it.canceled).toUpperCase() === "TRUE");
-                        const isDelivered = (it.delivered === true || String(it.delivered).toUpperCase() === "TRUE");
-                        const isReceived = (it.received === true || String(it.received).toUpperCase() === "TRUE");
-                        const isStocked = (it.isStocked === true || String(it.isStocked).toUpperCase() === "TRUE");
-
-                        let calculatedStatus = "대기";
-                        if (isCanceled) calculatedStatus = "취소";
-                        else if (isDelivered) calculatedStatus = "배달완료";
-                        else if (isReceived) calculatedStatus = "픽업";
-                        else if (isStocked) calculatedStatus = "입고";
-
-                        rawOrders.push({
-                            firebasePhoneKey: phone,
-                            phone,
-                            ...it,
-                            orderKey,
-                            firebasePhoneKey: phone,
-                            status: calculatedStatus
-                        });
-                    }
-                }
-                
-                // 타임스탬프 기준 최신순 정렬 (한글 포맷 대응 안전한 파싱)
-                rawOrders.sort((a, b) => parseTimestampToDate(b.timestamp) - parseTimestampToDate(a.timestamp));
-                
-                // 고객별 누적 주문 횟수(시퀀스) 계산
-                customerOrderSequences = {};
-                rawOrders.forEach(item => {
-                    const cleanPhone = String(item.phone || "").replace(/\D/g, "");
-                    const customerKey = (!cleanPhone) ? (((String(item.name || "무명")).trim()) + "_비인증") : cleanPhone;
-                    const ts = String(item.timestamp || "");
-                    const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
-                    if (isCanceled) return;
-
-                    if (!customerOrderSequences[customerKey]) {
-                        customerOrderSequences[customerKey] = new Set();
-                    }
-                    if (ts) {
-                        customerOrderSequences[customerKey].add(ts);
-                    }
-                });
-
-                for (const customerKey in customerOrderSequences) {
-                    const tsArray = Array.from(customerOrderSequences[customerKey]).sort((a, b) => {
-                        return parseTimestampToDate(a) - parseTimestampToDate(b);
-                    });
-                    customerOrderSequences[customerKey] = tsArray;
-                }
-                
-                // 선택 초기화
-                selectedItems.clear();
-                updateSelectionCountText();
-                
-                // 탭 구축 및 렌더링
-                buildDateTabs();
-
-                // 30일 지난 완료 주문 백그라운드 자동 이관
-                autoArchiveOldOrdersSilent();
+                // 데이터 가공/렌더링은 processOrdersSnapshot()에서 공통으로 처리 (실시간 리스너와 로직 공유)
+                processOrdersSnapshot(data);
                 
             } catch (e) {
                 console.error(e);
@@ -2685,6 +2621,153 @@
                     showToast("최신 주문 데이터가 동기화되었습니다.");
                 }
             }
+        }
+
+        // [신규] orders 원본 데이터(data)를 받아 rawOrders를 만들고 화면을 갱신하는 공통 함수.
+        // fetchOrders()(REST 수동 새로고침)와 attachRealtimeListeners()(실시간 웹소켓) 양쪽에서 재사용됨.
+        function processOrdersSnapshot(data) {
+            data = data || {};
+            try { localStorage.setItem('moket_orders_cache', JSON.stringify(data)); } catch (e) { console.error("주문 캐시 저장 실패:", e); }
+
+            // 데이터 평탄화
+            rawOrders = [];
+            for (const phone in data) {
+                for (const orderKey in data[phone]) {
+                    const it = data[phone][orderKey];
+                    
+                    // 7일 지난 배달 완료 사진 가비지 컬렉션 (DB 용량 확보)
+                    const hasPhoto = it.deliveryPhotoExists || it.deliveryPhoto;
+                    if (hasPhoto && it.deliveryPhotoTime) {
+                        const photoAge = Date.now() - parseInt(it.deliveryPhotoTime);
+                        if (photoAge > 7 * 24 * 60 * 60 * 1000) {
+                            const cleanPhone = String(phone).replace(/\D/g, "");
+                            
+                            // orders 노드에서 플래그/사진 속성 제거
+                            fetch(`${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ deliveryPhoto: null, deliveryPhotoExists: null, deliveryPhotoTime: null })
+                            }).catch(e => console.error("배달사진 메타 GC 실패:", e));
+                            
+                            // delivery_photos 노드에서 실제 이미지 데이터 제거
+                            fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`, {
+                                method: 'DELETE'
+                            }).catch(e => console.error("배달사진 이미지 GC 실패:", e));
+                            
+                            delete it.deliveryPhoto;
+                            delete it.deliveryPhotoExists;
+                            delete it.deliveryPhotoTime;
+                        }
+                    }
+                    
+                    const isCanceled = (it.canceled === true || String(it.canceled).toUpperCase() === "TRUE");
+                    const isDelivered = (it.delivered === true || String(it.delivered).toUpperCase() === "TRUE");
+                    const isReceived = (it.received === true || String(it.received).toUpperCase() === "TRUE");
+                    const isStocked = (it.isStocked === true || String(it.isStocked).toUpperCase() === "TRUE");
+
+                    let calculatedStatus = "대기";
+                    if (isCanceled) calculatedStatus = "취소";
+                    else if (isDelivered) calculatedStatus = "배달완료";
+                    else if (isReceived) calculatedStatus = "픽업";
+                    else if (isStocked) calculatedStatus = "입고";
+
+                    rawOrders.push({
+                        firebasePhoneKey: phone,
+                        phone,
+                        ...it,
+                        orderKey,
+                        firebasePhoneKey: phone,
+                        status: calculatedStatus
+                    });
+                }
+            }
+            
+            // 타임스탬프 기준 최신순 정렬 (한글 포맷 대응 안전한 파싱)
+            rawOrders.sort((a, b) => parseTimestampToDate(b.timestamp) - parseTimestampToDate(a.timestamp));
+            
+            // 고객별 누적 주문 횟수(시퀀스) 계산
+            customerOrderSequences = {};
+            rawOrders.forEach(item => {
+                const cleanPhone = String(item.phone || "").replace(/\D/g, "");
+                const customerKey = (!cleanPhone) ? (((String(item.name || "무명")).trim()) + "_비인증") : cleanPhone;
+                const ts = String(item.timestamp || "");
+                const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                if (isCanceled) return;
+
+                if (!customerOrderSequences[customerKey]) {
+                    customerOrderSequences[customerKey] = new Set();
+                }
+                if (ts) {
+                    customerOrderSequences[customerKey].add(ts);
+                }
+            });
+
+            for (const customerKey in customerOrderSequences) {
+                const tsArray = Array.from(customerOrderSequences[customerKey]).sort((a, b) => {
+                    return parseTimestampToDate(a) - parseTimestampToDate(b);
+                });
+                customerOrderSequences[customerKey] = tsArray;
+            }
+            
+            // 선택 초기화
+            selectedItems.clear();
+            updateSelectionCountText();
+            
+            // 탭 구축 및 렌더링
+            buildDateTabs();
+
+            // 10일 지난 완료 주문 백그라운드 자동 이관
+            autoArchiveOldOrdersSilent();
+        }
+
+        // [신규] REST 폴링 대신 Firebase 실시간 리스너(웹소켓)로 orders/메모 데이터를 구독.
+        // 최초 연결 시 한 번 전체를 받고, 이후로는 변경분만 서버가 알아서 밀어줌 → 새로고침 반복 불필요.
+        let isRealtimeFirstLoadDone = false;
+
+        function attachRealtimeListeners() {
+            showLoader("실시간 연동 설정 중...");
+            const syncTextEl = document.getElementById('sync-time-text');
+            const syncDotEl = document.querySelector('.sync-dot');
+            if (syncTextEl) syncTextEl.innerText = "연동 중...";
+            if (syncDotEl) syncDotEl.style.backgroundColor = "#f59e0b";
+
+            rtdb.ref('orders').on('value', (snapshot) => {
+                const data = snapshot.val() || {};
+                processOrdersSnapshot(data);
+
+                if (!isRealtimeFirstLoadDone) {
+                    isRealtimeFirstLoadDone = true;
+                    hideLoader();
+                }
+
+                const now = new Date();
+                if (syncTextEl) syncTextEl.innerText = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 실시간 연동중`;
+                if (syncDotEl) syncDotEl.style.backgroundColor = "var(--primary)";
+            }, (error) => {
+                console.error("실시간 연동 오류:", error);
+                showToast("실시간 연동에 실패했습니다: " + error.message);
+                hideLoader();
+                if (syncTextEl) syncTextEl.innerText = "연동 실패";
+                if (syncDotEl) syncDotEl.style.backgroundColor = "var(--red)";
+            });
+
+            rtdb.ref('customer_memos').on('value', (snapshot) => {
+                customerMemos = snapshot.val() || {};
+                try { localStorage.setItem('moket_customer_memos_cache', JSON.stringify(customerMemos)); } catch (e) {}
+                renderFilteredOrders();
+            });
+
+            rtdb.ref('fixed_memos').on('value', (snapshot) => {
+                fixedMemos = snapshot.val() || {};
+                try { localStorage.setItem('moket_fixed_memos_cache', JSON.stringify(fixedMemos)); } catch (e) {}
+                renderFilteredOrders();
+            });
+
+            rtdb.ref('print_fixed_memos').on('value', (snapshot) => {
+                printFixedMemos = snapshot.val() || {};
+                try { localStorage.setItem('moket_print_fixed_memos_cache', JSON.stringify(printFixedMemos)); } catch (e) {}
+                renderFilteredOrders();
+            });
         }
 
         // 날짜 파싱 헬퍼
@@ -3439,10 +3522,10 @@
                                         ${fixedMemoHtml}
                                     </div>
                                     
-                                    <!-- 그다음 배달일때는 주소 -->
+                                    <!-- 그다음 배달일때는 주소 (탭하면 수정 가능) -->
                                     ${isDelivery ? `
-                                        <div class="address-box" style="margin-top: 2px;">
-                                            <div><strong>🏡 주소:</strong> ${formatShortAddress(customer.address)}</div>
+                                        <div class="address-box" style="margin-top: 2px; cursor: pointer;" onclick="editCustomerAddress('${customer.phone}', '${orderKeysStr}', '${escapeArg(customer.address)}', '${escapeArg(customer.addressDetail)}', '${escapeArg(customer.entrance)}')" title="탭하여 주소 수정">
+                                            <div><strong>🏡 주소:</strong> ${formatShortAddress(customer.address)} <span style="color:#94a3b8; font-size:11px;">✏️</span></div>
                                             <div><strong>🏢 상세주소:</strong> ${customer.addressDetail}</div>
                                             ${customer.entrance ? `<div><strong>🚪 공동현관:</strong> ${customer.entrance}</div>` : ''}
                                         </div>
@@ -3980,6 +4063,48 @@
             const orderKeys = orderKeysStr.split(",");
             
             try {
+                // [신규] 픽업 → 배달 전환 시, 이 고객의 기존 주문 중 주소가 남아있는 가장 최근 건을 찾아 자동으로 채워줌
+                let inheritedAddress = null;
+                if (targetMethod === '배달주문') {
+                    const sameCustomerPastOrders = rawOrders.filter(o => {
+                        const oCleanPhone = String(o.phone || "").replace(/\D/g, "");
+                        return oCleanPhone && oCleanPhone === cleanPhone && o.address && String(o.address).trim() !== "";
+                    });
+                    if (sameCustomerPastOrders.length > 0) {
+                        sameCustomerPastOrders.sort((a, b) => parseTimestampToDate(b.timestamp) - parseTimestampToDate(a.timestamp));
+                        const best = sameCustomerPastOrders[0];
+                        inheritedAddress = {
+                            address: best.address || "",
+                            addressDetail: best.addressDetail || "",
+                            entrance: best.entrance || ""
+                        };
+                    }
+
+                    // 최근 화면(rawOrders)에 없으면 10일 넘게 지나 orders_archive로 옮겨졌을 수 있음 → 해당 고객분만 조회
+                    if (!inheritedAddress && cleanPhone) {
+                        try {
+                            const archRes = await fetch(`${FIREBASE_DB_URL}orders_archive/${encodeURIComponent(cleanPhone)}.json`);
+                            if (archRes.ok) {
+                                const archData = await archRes.json();
+                                if (archData) {
+                                    const archOrders = Object.values(archData).filter(o => o && o.address && String(o.address).trim() !== "");
+                                    if (archOrders.length > 0) {
+                                        archOrders.sort((a, b) => parseTimestampToDate(b.timestamp) - parseTimestampToDate(a.timestamp));
+                                        const best = archOrders[0];
+                                        inheritedAddress = {
+                                            address: best.address || "",
+                                            addressDetail: best.addressDetail || "",
+                                            entrance: best.entrance || ""
+                                        };
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error("보관함(archive) 주소 조회 실패:", e);
+                        }
+                    }
+                }
+
                 const promises = [];
                 orderKeys.forEach(orderKey => {
                     const target = rawOrders.find(it => it.orderKey === orderKey);
@@ -3988,13 +4113,20 @@
                     if (target && target.phone) targetPhones.add(String(target.phone).trim());
                     if (target && target.firebasePhoneKey) targetPhones.add(String(target.firebasePhoneKey).trim());
 
+                    const patchBody = { shippingMethod: targetMethod };
+                    if (inheritedAddress) {
+                        patchBody.address = inheritedAddress.address;
+                        patchBody.addressDetail = inheritedAddress.addressDetail;
+                        patchBody.entrance = inheritedAddress.entrance;
+                    }
+
                     targetPhones.forEach(pKey => {
                         const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${orderKey}.json`;
                         promises.push(
                             fetch(url, {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ shippingMethod: targetMethod })
+                                body: JSON.stringify(patchBody)
                             })
                         );
                     });
@@ -4002,10 +4134,24 @@
                 
                 orderKeys.forEach(orderKey => {
                     const target = rawOrders.find(it => it.orderKey === orderKey);
-                    if (target) target.shippingMethod = targetMethod;
+                    if (target) {
+                        target.shippingMethod = targetMethod;
+                        if (inheritedAddress) {
+                            target.address = inheritedAddress.address;
+                            target.addressDetail = inheritedAddress.addressDetail;
+                            target.entrance = inheritedAddress.entrance;
+                        }
+                    }
                 });
                 await Promise.all(promises);
-                showToast(`수령 방법이 ${label}(으)로 전환되었습니다.`);
+
+                if (targetMethod === '배달주문' && inheritedAddress) {
+                    showToast(`수령 방법이 배달(으)로 전환되었고, 기존 주소를 자동으로 불러왔습니다.`);
+                } else if (targetMethod === '배달주문' && !inheritedAddress) {
+                    showToast(`수령 방법이 배달(으)로 전환되었습니다. (기존 주소 기록이 없어 직접 입력이 필요합니다)`);
+                } else {
+                    showToast(`수령 방법이 ${label}(으)로 전환되었습니다.`);
+                }
                 renderFilteredOrders();
             } catch (e) {
                 console.error(e);
@@ -4146,6 +4292,111 @@
         }
 
         // [신규] 고객 배달일/픽업일 일괄 변경 기능 (동일 수령일의 취소 건 등 누락 방지 완벽 처리)
+        // [신규] 배송 주소 수정 모달
+        function editCustomerAddress(phone, orderKeysStr, currentAddress, currentAddressDetail, currentEntrance) {
+            const existing = document.getElementById('custom-address-edit-modal');
+            if (existing) existing.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'custom-address-edit-modal';
+            modal.style = `
+                position: fixed; z-index: 10000; left: 0; right: 0; top: 0; bottom: 0;
+                width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.4);
+                display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+            `;
+
+            modal.innerHTML = `
+                <div style="background: white; padding: 20px; border-radius: 16px; width: calc(100% - 32px); max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); box-sizing: border-box; margin: 16px;">
+                    <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 800; color: #1f2937; text-align: center;">🏡 배송 주소 수정</h3>
+                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:4px;">주소</label>
+                            <input type="text" id="modal-address-input" value="${(currentAddress || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d1d5db; border-radius:8px; font-size:14px; font-weight:600; outline:none;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:4px;">상세주소</label>
+                            <input type="text" id="modal-address-detail-input" value="${(currentAddressDetail || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d1d5db; border-radius:8px; font-size:14px; font-weight:600; outline:none;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:4px;">공동현관키</label>
+                            <input type="text" id="modal-entrance-input" value="${(currentEntrance || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d1d5db; border-radius:8px; font-size:14px; font-weight:600; outline:none;">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                        <button id="modal-address-cancel" style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #4b5563; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer;">취소</button>
+                        <button id="modal-address-confirm" style="padding: 8px 16px; border: none; background: var(--primary); color: white; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer;">저장</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            setTimeout(() => {
+                const input = document.getElementById('modal-address-input');
+                if (input) { input.focus(); input.select(); }
+            }, 100);
+
+            document.getElementById('modal-address-cancel').onclick = () => modal.remove();
+            document.getElementById('modal-address-confirm').onclick = async () => {
+                const newAddress = document.getElementById('modal-address-input').value.trim();
+                const newAddressDetail = document.getElementById('modal-address-detail-input').value.trim();
+                const newEntrance = document.getElementById('modal-entrance-input').value.trim();
+                modal.remove();
+                await saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance);
+            };
+
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+        }
+
+        // [신규] 배송 주소 저장 (해당 고객의 이 주문 묶음 전체 항목에 동일하게 반영)
+        async function saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance) {
+            const cleanPhone = String(phone || "").replace(/\D/g, "");
+            const orderKeys = (orderKeysStr || "").split(",").map(k => k.trim()).filter(Boolean);
+            if (orderKeys.length === 0) return;
+
+            showLoader("🏡 배송 주소 저장 중...");
+            try {
+                const updatePayload = { address: newAddress, addressDetail: newAddressDetail, entrance: newEntrance };
+                const promises = [];
+
+                orderKeys.forEach(orderKey => {
+                    const target = rawOrders.find(it => it.orderKey === orderKey);
+                    const targetPhones = new Set([cleanPhone]);
+                    if (phone) targetPhones.add(String(phone).trim());
+                    if (target && target.phone) targetPhones.add(String(target.phone).trim());
+                    if (target && target.firebasePhoneKey) targetPhones.add(String(target.firebasePhoneKey).trim());
+
+                    // 로컬 상태 즉시 반영
+                    if (target) {
+                        target.address = newAddress;
+                        target.addressDetail = newAddressDetail;
+                        target.entrance = newEntrance;
+                    }
+
+                    targetPhones.forEach(pKey => {
+                        if (!pKey) return;
+                        const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${encodeURIComponent(orderKey)}.json`;
+                        promises.push(
+                            fetch(url, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(updatePayload)
+                            })
+                        );
+                    });
+                });
+
+                await Promise.all(promises);
+                showToast("🏡 배송 주소가 저장되었습니다.");
+                renderFilteredOrders();
+            } catch (e) {
+                console.error(e);
+                showToast("주소 저장 중 오류가 발생했습니다: " + e.toString());
+            } finally {
+                hideLoader();
+            }
+        }
+
         async function changeCustomerOrderDate(phone, orderKeysStr, label) {
             const cleanPhone = String(phone || "").replace(/\D/g, "");
             const orderKeys = (orderKeysStr || "").split(",").map(k => k.trim()).filter(Boolean);
@@ -7693,7 +7944,9 @@
 
         // 초기 시작
         window.onload = function() {
-            fetchOrders();
+            // 캐시가 있으면 즉시 화면에 먼저 그려주고, 실시간 리스너로 최신 데이터를 이어받음
+            loadOrdersFromCache();
+            attachRealtimeListeners();
             
             // URL 파라미터 체크하여 탭 자동 활성화 (구버전 리다이렉션 및 신규 3탭 대응)
             const urlParams = new URLSearchParams(window.location.search);
