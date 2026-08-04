@@ -2016,6 +2016,7 @@
                 <div class="controls-row button-row">
                     <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
                     <button class="btn-common" style="border: 1.5px solid #d32f2f; background: #fff5f5; color: #d32f2f; font-weight: 700;" onclick="deleteCanceledOrders()">🗑️ 취소주문 삭제</button>
+                    <button class="btn-common" style="border: 1.5px solid #b45309; background: #fffbeb; color: #b45309; font-weight: 700;" onclick="cleanupPhantomOrders()">🧹 유령주문 정리</button>
                     <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV</button>
                     <button class="btn-common" style="border: 1.5px solid #0284c7; background: #f0f9ff; color: #0284c7; font-weight: 700;" onclick="restoreRecentlyArchivedOrders()">♻️ 최근주문 복구</button>
                 </div>
@@ -3494,7 +3495,8 @@
                     const orderSeqNumber = orderIndex !== -1 ? (orderIndex + 1) : 1;
                     const totalOrderCount = tsSeq.length;
                     const seqBadge = `<span style="font-size:11px; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-weight:bold; display:inline-block;">${orderSeqNumber}번째 주문 (총 ${totalOrderCount}회)</span>`;
-                    const orderKeysStr = customerItems.map(it => it.orderKey).join(',');
+                    // [버그수정] 상품명에 쉼표가 있으면 키가 쪼개져 유령 주문이 생김 → 상품명에 안 나오는 구분자 사용
+                    const orderKeysStr = customerItems.map(it => it.orderKey).join('|@@|');
  
                     card.innerHTML = `
                         <div class="card-header">
@@ -4060,7 +4062,7 @@
             
             showLoader("수령 방법 변경 중...");
             const cleanPhone = String(phone).replace(/\D/g, "");
-            const orderKeys = orderKeysStr.split(",");
+            const orderKeys = orderKeysStr.split("|@@|");
             
             try {
                 // [신규] 픽업 → 배달 전환 시, 이 고객의 기존 주문 중 주소가 남아있는 가장 최근 건을 찾아 자동으로 채워줌
@@ -4348,7 +4350,7 @@
         // [신규] 배송 주소 저장 (해당 고객의 이 주문 묶음 전체 항목에 동일하게 반영)
         async function saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance) {
             const cleanPhone = String(phone || "").replace(/\D/g, "");
-            const orderKeys = (orderKeysStr || "").split(",").map(k => k.trim()).filter(Boolean);
+            const orderKeys = (orderKeysStr || "").split("|@@|").map(k => k.trim()).filter(Boolean);
             if (orderKeys.length === 0) return;
 
             showLoader("🏡 배송 주소 저장 중...");
@@ -4396,7 +4398,7 @@
 
         async function changeCustomerOrderDate(phone, orderKeysStr, label) {
             const cleanPhone = String(phone || "").replace(/\D/g, "");
-            const orderKeys = (orderKeysStr || "").split(",").map(k => k.trim()).filter(Boolean);
+            const orderKeys = (orderKeysStr || "").split("|@@|").map(k => k.trim()).filter(Boolean);
             if (orderKeys.length === 0) return;
             
             const firstKey = orderKeys[0];
@@ -5004,6 +5006,54 @@
                 showToast("입금 완료 처리 중 오류가 발생했습니다.");
             } finally {
                 hideLoader();
+            }
+        }
+
+        // [신규] item(상품명) 없는 유령 주문 정리 — 과거 주소/상태 변경 버그(잘못된 경로 PATCH, 쉼표 키 쪼개짐)로 생긴 잔재 삭제
+        async function cleanupPhantomOrders() {
+            showLoader("🧹 유령 주문 스캔 중...");
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}orders.json?t=` + Date.now(), { cache: 'no-store' });
+                if (!r.ok) throw new Error(`스캔 실패 ${r.status}`);
+                const all = await r.json() || {};
+
+                const updates = {};
+                let phantoms = 0;
+                for (const phoneKey in all) {
+                    const orders = all[phoneKey] || {};
+                    for (const orderKey in orders) {
+                        const o = orders[orderKey];
+                        const itemVal = (o && typeof o === 'object') ? o.item : undefined;
+                        const itemMissing = (o == null) || itemVal === undefined || itemVal === null ||
+                            String(itemVal).trim() === '' || String(itemVal).trim().toLowerCase() === 'undefined';
+                        // 안전장치: 실제 주문은 반드시 timestamp(주문일시)가 있음. item 없고 timestamp도 없을 때만 유령으로 판정
+                        const hasTs = (o && typeof o === 'object') && o.timestamp !== undefined && String(o.timestamp).trim() !== '';
+                        if (itemMissing && !hasTs) {
+                            updates[`${phoneKey}/${orderKey}`] = null;
+                            phantoms++;
+                        }
+                    }
+                }
+
+                hideLoader();
+                if (phantoms === 0) { showToast("정리할 유령 주문이 없습니다."); return; }
+                if (!confirm(`상품명(item)이 없는 유령 주문 ${phantoms}건을 삭제합니다.\n(상품명과 주문일시가 있는 실제 주문은 절대 삭제되지 않습니다)\n\n진행할까요?`)) return;
+
+                showLoader(`🧹 유령 주문 ${phantoms}건 삭제 중...`);
+                const del = await fetch(`${FIREBASE_DB_URL}orders.json`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updates)
+                });
+                if (!del.ok) throw new Error(`삭제 실패 ${del.status}`);
+
+                hideLoader();
+                showToast(`유령 주문 ${phantoms}건을 정리했습니다.`);
+                setTimeout(() => location.reload(), 1200);
+            } catch (e) {
+                hideLoader();
+                console.error("유령 주문 정리 실패:", e);
+                showToast("유령 주문 정리 실패: " + e.toString());
             }
         }
 
@@ -6069,7 +6119,8 @@
 
         // [추가] 실시간 재고 매핑 헬퍼 함수 (상품 목록 렌더링 에러 해결)
         function fSafeKey(s) {
-            return String(s || "").replace(/[\.\-\$#\[\]\/]/g, "_").trim();
+            // [버그수정] %, ? 는 주문 키가 URL 경로에 들어갈 때 깨져서 주문 저장이 실패하므로 함께 치환 (주문서.html과 동일해야 함)
+            return String(s || "").replace(/[\.\-\$#\[\]\/%?]/g, "_").trim();
         }
         function fGetAdjKey(mKey, name) {
             const s = String(mKey || "").trim();
