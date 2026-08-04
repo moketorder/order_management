@@ -2016,9 +2016,7 @@
                 <div class="controls-row button-row">
                     <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
                     <button class="btn-common" style="border: 1.5px solid #d32f2f; background: #fff5f5; color: #d32f2f; font-weight: 700;" onclick="deleteCanceledOrders()">🗑️ 취소주문 삭제</button>
-                    <button class="btn-common" style="border: 1.5px solid #b45309; background: #fffbeb; color: #b45309; font-weight: 700;" onclick="cleanupPhantomOrders()">🧹 유령주문 정리</button>
-                    <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV</button>
-                    <button class="btn-common" style="border: 1.5px solid #0284c7; background: #f0f9ff; color: #0284c7; font-weight: 700;" onclick="restoreRecentlyArchivedOrders()">♻️ 최근주문 복구</button>
+                    <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 주문 CSV</button>
                 </div>
             </div>
 
@@ -2191,7 +2189,14 @@
                         <input type="text" id="product-search-input" placeholder="🔍 상품명을 입력하여 검색..." oninput="onProductSearchInput(this.value)" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; box-sizing: border-box; outline: none; transition: var(--transition);">
                         <button type="button" onclick="clearProductSearch(); renderProductsList();" id="btn-clear-product-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 18px; color: var(--text-sub); cursor: pointer; line-height: 1;">&times;</button>
                     </div>
-                    
+
+                    <!-- [신규] 상품 목록 CSV 내보내기 / 업로드 -->
+                    <div style="display:flex; gap:8px; margin-bottom:12px;">
+                        <button type="button" onclick="exportProductsToCSV()" style="flex:1; padding:9px 6px; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:var(--radius-sm); font-size:12.5px; font-weight:800; cursor:pointer;">📤 목록 CSV</button>
+                        <button type="button" onclick="document.getElementById('product-csv-file').click()" style="flex:1; padding:9px 6px; border:1.5px solid #059669; background:#ecfdf5; color:#059669; border-radius:var(--radius-sm); font-size:12.5px; font-weight:800; cursor:pointer;">📥 CSV 업로드</button>
+                        <input type="file" id="product-csv-file" accept=".csv,text/csv" style="display:none;" onchange="importProductsFromCSV(this)">
+                    </div>
+
                     <div class="card" style="padding: 10px;">
                         <div id="products-list-container">
                             <div style="text-align: center; padding: 40px 0; color: var(--text-sub); font-size: 13px;">
@@ -3012,10 +3017,21 @@
                 currentDay = sortedDays.includes(todayDayStr) ? todayDayStr : (sortedDays[0] || "");
             }
 
+            // [신규] 현재 보고 있는 월/연도가 실제 오늘과 같을 때만 '오늘' 버튼 표시 (다른 달의 같은 날짜 오인 방지)
+            const nowY = todayObj.getFullYear() + "년";
+            const nowM = (todayObj.getMonth() + 1) + "월";
+            const isTodayMonth = (currentYear === nowY && currentMonth === nowM);
+
             sortedDays.forEach(day => {
                 const btn = document.createElement('button');
-                btn.className = `date-btn ${day === currentDay ? 'active' : ''}`;
+                const isToday = isTodayMonth && (day === todayDayStr);
+                btn.className = `date-btn ${day === currentDay ? 'active' : ''}${isToday ? ' today-tab' : ''}`;
                 btn.innerText = day;
+                if (isToday) {
+                    // 오늘 버튼은 다른 날짜를 눌러도 구분되도록 굵은 앰버색 테두리 표시
+                    btn.style.border = '3.5px solid #f59e0b';
+                    btn.title = '오늘';
+                }
                 btn.onclick = () => {
                     currentDay = day;
                     buildDayTabs(true); // 사용자 액션 플래그 true
@@ -8014,6 +8030,141 @@
 
             if (wasEditMode) {
                 switchAdminTab('product-list');
+            }
+        }
+
+        // [신규] 상품 목록 CSV 내보내기
+        function exportProductsToCSV() {
+            if (!uploadProducts || uploadProducts.length === 0) { showToast("내보낼 상품이 없습니다."); return; }
+            const headers = ["상품명", "가격", "재고", "분류(matchKey)", "날짜", "설명", "당일노출", "예약노출", "매주노출"];
+            const bool = (v, def) => {
+                const on = (v === undefined || v === null) ? def : (v === true || v === 'true');
+                return on ? "O" : "X";
+            };
+            const list = uploadProducts.filter(p => p && String(p.name || "").trim() !== "");
+            let csv = "﻿" + headers.join(",") + "\n"; // BOM: 엑셀 한글 깨짐 방지
+            list.forEach(p => {
+                const stockOut = (p.stock === "" || p.stock === null || p.stock === undefined) ? "무제한" : p.stock;
+                const row = [
+                    p.name || "",
+                    (p.price === undefined || p.price === null) ? "" : p.price,
+                    stockOut,
+                    p.matchKey || "",
+                    p.date || "",
+                    p.desc || "",
+                    bool(p.showToday, true),
+                    bool(p.showReserve, true),
+                    bool(p.showWeekly, false)
+                ];
+                csv += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",") + "\n";
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const t = new Date();
+            a.href = url;
+            a.download = `moket_상품목록_${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}.csv`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`상품 ${list.length}개를 CSV로 내보냈습니다.`);
+        }
+
+        // 따옴표/쉼표/줄바꿈을 안전하게 처리하는 간단 CSV 파서
+        function parseCSVText(text) {
+            text = String(text || "").replace(/^﻿/, "");
+            const rows = []; let row = [], field = "", inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i];
+                if (inQuotes) {
+                    if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+                    else field += c;
+                } else {
+                    if (c === '"') inQuotes = true;
+                    else if (c === ',') { row.push(field); field = ""; }
+                    else if (c === '\r') { /* skip */ }
+                    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
+                    else field += c;
+                }
+            }
+            if (field !== "" || row.length > 0) { row.push(field); rows.push(row); }
+            return rows;
+        }
+
+        // [신규] 상품 목록 CSV 업로드 (전체 목록 교체)
+        async function importProductsFromCSV(input) {
+            const file = input.files && input.files[0];
+            input.value = ""; // 같은 파일 다시 선택 가능하게 리셋
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const rows = parseCSVText(text).filter(r => r.length > 1 && r.some(c => String(c).trim() !== ""));
+                if (rows.length < 2) { showToast("CSV에 상품 데이터가 없습니다."); return; }
+
+                const header = rows[0].map(h => String(h).trim());
+                const idxOf = (names) => header.findIndex(h => names.some(n => h.replace(/\s/g, "").includes(n)));
+                const iName = idxOf(["상품명", "이름", "name"]);
+                const iPrice = idxOf(["가격", "price"]);
+                const iStock = idxOf(["재고", "stock"]);
+                const iMatch = idxOf(["분류", "matchKey", "matchkey", "카테고리"]);
+                const iDate = idxOf(["날짜", "date"]);
+                const iDesc = idxOf(["설명", "desc"]);
+                const iToday = idxOf(["당일"]);
+                const iReserve = idxOf(["예약"]);
+                const iWeekly = idxOf(["매주"]);
+                if (iName < 0) { showToast("CSV에 '상품명' 열이 없습니다."); return; }
+
+                const parseBool = (v, def) => {
+                    const s = String(v == null ? "" : v).trim().toUpperCase();
+                    if (s === "") return def;
+                    return (s === "O" || s === "TRUE" || s === "Y" || s === "1" || s === "예" || s === "참");
+                };
+                const cell = (row, i) => (i >= 0 && i < row.length) ? String(row[i] == null ? "" : row[i]).trim() : "";
+
+                const newList = [];
+                for (let r = 1; r < rows.length; r++) {
+                    const row = rows[r];
+                    const name = cell(row, iName);
+                    if (!name) continue;
+                    const matchKey = cell(row, iMatch);
+                    const stockRaw = cell(row, iStock);
+                    const stock = (stockRaw === "" || stockRaw === "무제한") ? "" : (isNaN(parseInt(stockRaw)) ? "" : parseInt(stockRaw));
+                    const priceRaw = cell(row, iPrice).replace(/[^\d-]/g, "");
+                    // 기존 상품에서 이미지/폴더 보존 (이름+분류 매칭)
+                    const existing = uploadProducts.find(p => p && p.name === name && String(p.matchKey || "") === matchKey);
+                    newList.push({
+                        name,
+                        price: priceRaw !== "" ? (parseInt(priceRaw) || 0) : (existing ? (existing.price || 0) : 0),
+                        stock,
+                        matchKey,
+                        date: iDate >= 0 ? cell(row, iDate) : (existing ? (existing.date || "") : ""),
+                        desc: iDesc >= 0 ? cell(row, iDesc) : (existing ? (existing.desc || "") : ""),
+                        images: existing ? (existing.images || []) : [],
+                        folderId: existing ? (existing.folderId || "") : "",
+                        isWebUploaded: true,
+                        showToday: iToday >= 0 ? parseBool(cell(row, iToday), true) : (existing ? existing.showToday !== false : true),
+                        showReserve: iReserve >= 0 ? parseBool(cell(row, iReserve), true) : (existing ? existing.showReserve !== false : true),
+                        showWeekly: iWeekly >= 0 ? parseBool(cell(row, iWeekly), false) : (existing ? existing.showWeekly === true : false),
+                        updatedAt: Date.now()
+                    });
+                }
+                if (newList.length === 0) { showToast("불러올 상품이 없습니다."); return; }
+
+                if (!confirm(`CSV의 상품 ${newList.length}개로 전체 상품 목록을 교체합니다.\n(현재 ${uploadProducts.length}개 → ${newList.length}개)\n\n※ 이미지는 이름+분류가 같은 기존 상품에서 자동으로 이어받습니다. 매칭 안 되는 상품은 이미지가 비어있게 됩니다.\n※ 되돌릴 수 없으니, 먼저 '목록 CSV'로 백업해 두는 걸 권장합니다.\n\n진행할까요?`)) return;
+
+                showLoader(`📥 상품 ${newList.length}개 업로드 중...`);
+                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newList)
+                });
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                updatePublishedProductsTimestamp();
+                uploadProducts = newList;
+                hideLoader();
+                showToast(`상품 ${newList.length}개를 업로드했습니다.`);
+                setTimeout(() => location.reload(), 1200);
+            } catch (e) {
+                hideLoader();
+                console.error("CSV 업로드 실패:", e);
+                showToast("CSV 업로드 실패: " + e.toString());
             }
         }
 
