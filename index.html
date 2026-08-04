@@ -4108,10 +4108,6 @@
                 const promises = [];
                 orderKeys.forEach(orderKey => {
                     const target = rawOrders.find(it => it.orderKey === orderKey);
-                    const targetPhones = new Set([cleanPhone]);
-                    if (phone) targetPhones.add(String(phone).trim());
-                    if (target && target.phone) targetPhones.add(String(target.phone).trim());
-                    if (target && target.firebasePhoneKey) targetPhones.add(String(target.firebasePhoneKey).trim());
 
                     const patchBody = { shippingMethod: targetMethod };
                     if (inheritedAddress) {
@@ -4120,16 +4116,17 @@
                         patchBody.entrance = inheritedAddress.entrance;
                     }
 
-                    targetPhones.forEach(pKey => {
-                        const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${orderKey}.json`;
-                        promises.push(
-                            fetch(url, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(patchBody)
-                            })
-                        );
-                    });
+                    // [버그수정] 실제 저장 경로(firebasePhoneKey)에만 PATCH (유령 undefined 주문 생성 방지)
+                    const actualPhoneKey = (target && target.firebasePhoneKey) ? String(target.firebasePhoneKey).trim() : cleanPhone;
+                    if (!actualPhoneKey) return;
+                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(actualPhoneKey)}/${orderKey}.json`;
+                    promises.push(
+                        fetch(url, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(patchBody)
+                        })
+                    );
                 });
                 
                 orderKeys.forEach(orderKey => {
@@ -4361,10 +4358,6 @@
 
                 orderKeys.forEach(orderKey => {
                     const target = rawOrders.find(it => it.orderKey === orderKey);
-                    const targetPhones = new Set([cleanPhone]);
-                    if (phone) targetPhones.add(String(phone).trim());
-                    if (target && target.phone) targetPhones.add(String(target.phone).trim());
-                    if (target && target.firebasePhoneKey) targetPhones.add(String(target.firebasePhoneKey).trim());
 
                     // 로컬 상태 즉시 반영
                     if (target) {
@@ -4373,17 +4366,21 @@
                         target.entrance = newEntrance;
                     }
 
-                    targetPhones.forEach(pKey => {
-                        if (!pKey) return;
-                        const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${encodeURIComponent(orderKey)}.json`;
-                        promises.push(
-                            fetch(url, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(updatePayload)
-                            })
-                        );
-                    });
+                    // [버그수정] 실제 저장 경로(firebasePhoneKey)에만 PATCH.
+                    // 예전엔 여러 전화번호 변형에 PATCH했는데, Firebase PATCH는 없는 경로에 새 노드를 만들어서
+                    // 잘못된 번호 키에 item 없는 유령 주문(=undefined 상품)이 생성되던 문제가 있었음.
+                    const actualPhoneKey = (target && target.firebasePhoneKey)
+                        ? String(target.firebasePhoneKey).trim()
+                        : cleanPhone;
+                    if (!actualPhoneKey) return;
+                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(actualPhoneKey)}/${encodeURIComponent(orderKey)}.json`;
+                    promises.push(
+                        fetch(url, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(updatePayload)
+                        })
+                    );
                 });
 
                 await Promise.all(promises);
@@ -4445,15 +4442,13 @@
                         order.orderDate = trimmedDate;
                         if (order.matchKey) order.matchKey = trimmedDate;
 
-                        // Firebase 패치 (DB에 저장된 실제 최상위 phone 키, firebasePhoneKey, cleanPhone 키 모두 전송하여 이탈 방지)
-                        const targetPhones = new Set([cleanPhone]);
-                        if (order.phone) targetPhones.add(String(order.phone).trim());
-                        if (order.firebasePhoneKey) targetPhones.add(String(order.firebasePhoneKey).trim());
-                        if (matchingOrder && matchingOrder.firebasePhoneKey) targetPhones.add(String(matchingOrder.firebasePhoneKey).trim());
-                        
-                        targetPhones.forEach(pKey => {
-                            if (!pKey) return;
-                            const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${encodeURIComponent(order.orderKey)}.json`;
+                        // [버그수정] 실제 저장 경로(firebasePhoneKey)에만 PATCH.
+                        // 여러 전화번호 변형에 PATCH하면 없는 경로에 item 없는 유령 주문(undefined)이 생성됨.
+                        const actualPhoneKey = order.firebasePhoneKey
+                            ? String(order.firebasePhoneKey).trim()
+                            : cleanPhone;
+                        if (actualPhoneKey) {
+                            const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(actualPhoneKey)}/${encodeURIComponent(order.orderKey)}.json`;
                             promises.push(
                                 fetch(url, {
                                     method: 'PATCH',
@@ -4461,7 +4456,7 @@
                                     body: JSON.stringify(updatePayload)
                                 })
                             );
-                        });
+                        }
                     });
                     
                     await Promise.all(promises);
@@ -4763,16 +4758,14 @@
             const cleanPhone = String(phone || "").replace(/\D/g, "");
             const target = rawOrders.find(it => (it.phone === phone || String(it.phone).replace(/\D/g, "") === cleanPhone) && it.orderKey === orderKey) || rawOrders.find(it => it.orderKey === orderKey);
             
-            const targetPhones = new Set([cleanPhone]);
-            if (phone) targetPhones.add(String(phone).trim());
-            if (target && target.phone) targetPhones.add(String(target.phone).trim());
-            if (target && target.firebasePhoneKey) targetPhones.add(String(target.firebasePhoneKey).trim());
-            
+            // [버그수정] 실제 저장 경로(firebasePhoneKey)에만 PATCH (여러 번호 변형에 PATCH하면 유령 undefined 주문 생성됨)
+            const actualPhoneKey = (target && target.firebasePhoneKey) ? String(target.firebasePhoneKey).trim() : cleanPhone;
+
             try {
                 const patchBody = getStatusPatchBody(newStatus);
                 const promises = [];
-                targetPhones.forEach(pKey => {
-                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(pKey)}/${orderKey}.json`;
+                if (actualPhoneKey) {
+                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(actualPhoneKey)}/${orderKey}.json`;
                     promises.push(
                         fetch(url, {
                             method: 'PATCH',
@@ -4780,13 +4773,13 @@
                             body: JSON.stringify(patchBody)
                         })
                     );
-                    
+
                     if (newStatus !== '배달완료') {
-                        fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(pKey)}/${orderKey}.json`, {
+                        fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(actualPhoneKey)}/${orderKey}.json`, {
                             method: 'DELETE'
                         }).catch(e => console.error("배달사진 이미지 삭제 실패:", e));
                     }
-                });
+                }
                 
                 await Promise.all(promises);
                 showToast(`상태를 [${newStatus}]로 변경 완료했습니다.`);
