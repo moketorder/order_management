@@ -1884,6 +1884,9 @@
         #tab-admin-products .segment-control.five-cols {
             grid-template-columns: repeat(5, 1fr) !important;
         }
+        /* [신규] 재고관리/예약구매 카테고리 가로 스크롤바 숨김 */
+        #manage-category-tabs { scrollbar-width: none; -ms-overflow-style: none; }
+        #manage-category-tabs::-webkit-scrollbar { display: none; }
         #tab-admin-products .segment-btn {
             background: none;
             border: none;
@@ -2072,7 +2075,7 @@
                 <div id="tab-upload" class="tab-content active">
                     <div class="card">
                         <div class="card-title" id="form-card-title">✨ 신규 상품 등록</div>
-                        
+
                         <form id="productForm" onsubmit="submitForm(event)">
                             <!-- 대분류 세그먼트 -->
                             <div class="form-group">
@@ -2159,7 +2162,10 @@
                                 </div>
                             </div>
 
-                            <button type="submit" class="btn-submit" id="btn-submit-form" style="width: 100%; height: 50px; background: var(--text-main); color: white; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-top: 24px; transition: var(--transition);">📤 등록 완료</button>
+                            <div style="display: flex; gap: 8px; margin-top: 24px;">
+                                <button type="submit" class="btn-submit" id="btn-submit-form" style="flex: 1 1 0; min-width: 0; padding: 0; height: 50px; background: var(--text-main); color: white; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: var(--transition);">📤 등록 완료</button>
+                                <button type="button" id="btn-duplicate-form" onclick="duplicateFromForm(event)" style="display: none; flex: 1 1 0; min-width: 0; padding: 0; height: 50px; background: #7c3aed; color: white; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(124,58,237,0.25); transition: var(--transition);">👯 복제하기</button>
+                            </div>
                             <button type="button" class="btn-cancel" id="btn-cancel-edit" onclick="exitEditMode()" style="display: none; width: 100%; height: 50px; background: white; border: 1.5px solid var(--border); color: var(--text-sub); border-radius: var(--radius-sm); font-size: 15px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; margin-top: 8px; transition: var(--transition);">취소</button>
                         </form>
                     </div>
@@ -2173,12 +2179,13 @@
                 <!-- 구버전 tab-manage 컨테이너 복원 -->
                 <div id="tab-manage" class="tab-content active">
                     <!-- 배송 유형 대분류 필터 탭 -->
-                    <div class="segment-control two-cols" id="manage-delivery-type-tabs" style="margin-bottom: 12px; display: grid; grid-template-columns: 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px;">
+                    <div class="segment-control" id="manage-delivery-type-tabs" style="margin-bottom: 12px; display: grid; grid-template-columns: 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px;">
                         <div class="segment-btn active" data-manage-delivery-type="today" onclick="selectManageDeliveryType('today')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 당일구매</div>
                         <div class="segment-btn" data-manage-delivery-type="reserve" onclick="selectManageDeliveryType('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 예약구매</div>
+                        <div class="segment-btn" data-manage-delivery-type="inventory" onclick="selectManageDeliveryType('inventory')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📦 재고관리</div>
                     </div>
                     <!-- 상품 목록 대분류 필터 탭 -->
-                    <div class="segment-control five-cols" id="manage-category-tabs" style="margin-bottom: 12px; display: grid; background: #e2e8f0; padding: 4px; border-radius: 12px;">
+                    <div class="segment-control five-cols" id="manage-category-tabs" style="margin-bottom: 12px; display: grid; grid-template-columns: repeat(5, 1fr); row-gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 12px;">
                         <!-- JavaScript에서 동적으로 카테고리 탭들을 꽂아넣음 -->
                     </div>
                     <!-- 상품 목록 소분류 하위 탭 -->
@@ -4885,19 +4892,28 @@
             }
 
             const itemsToProcess = [];
+            let skippedDone = 0; // [신규] 입고완료 시 이미 픽업/배달완료/취소된 건은 제외한 개수
             selectedItems.forEach(itemInfo => {
                 const [phone, orderKey] = itemInfo.split("|");
                 const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
                 const isCanceled = target && (target.canceled === true || target.canceled === "true" || String(target.canceled).toUpperCase() === "TRUE");
-                
+
                 if (isCanceled && newStatus !== '대기') {
                     return; // '대기'로 되돌리는 경우 외에 취소된 주문은 제외
+                }
+                // [신규] 입고완료 버튼은 이미 픽업완료/배달완료/취소 처리된 주문에는 적용하지 않음(완료건을 되돌리지 않도록)
+                if (newStatus === '입고') {
+                    const isDelivered = target && (target.delivered === true || target.delivered === "true" || String(target.delivered).toUpperCase() === "TRUE");
+                    const isReceived = target && (target.received === true || target.received === "true" || String(target.received).toUpperCase() === "TRUE");
+                    if (isCanceled || isDelivered || isReceived) { skippedDone++; return; }
                 }
                 itemsToProcess.push({ phone, orderKey, target });
             });
 
             if (itemsToProcess.length === 0) {
-                showToast("선택된 항목 중 변경 가능한 주문이 없습니다. (취소된 주문은 대기로만 변경 가능)");
+                showToast(skippedDone > 0
+                    ? "선택된 항목이 픽업완료/배달완료/취소 상태라 입고완료로 변경하지 않았습니다."
+                    : "선택된 항목 중 변경 가능한 주문이 없습니다. (취소된 주문은 대기로만 변경 가능)");
                 return;
             }
 
@@ -4932,7 +4948,7 @@
                 
                 await Promise.all(promises);
                 
-                showToast(`${itemsToProcess.length}개 주문 항목의 상태를 일괄 변경했습니다.`);
+                showToast(`${itemsToProcess.length}개 주문 항목의 상태를 일괄 변경했습니다.` + (skippedDone > 0 ? ` (완료/취소 ${skippedDone}건 제외)` : ``));
                 selectedItems.clear();
                 updateSelectionCountText();
                 renderFilteredOrders();
@@ -6248,7 +6264,9 @@
             return isUpdated;
         }
         let uploadIsEditMode = false;
-        let uploadEditProductKey = null; 
+        let uploadEditProductKey = null;
+        let uploadEditProductRef = null; // [하드닝] 수정 대상 상품을 순번 대신 이름+분류+날짜로 식별
+        let uploadForceDuplicate = false; // [신규] '복제하기': 현재 폼을 새 상품으로 강제 등록
         let uploadSelectedDate = new Date().toISOString().split('T')[0];
         let uploadManageDeliveryType = "today"; 
         let uploadManageTab = "today-fruit"; 
@@ -6327,7 +6345,9 @@
             });
             
             if (type === 'today') {
-                uploadManageTab = 'today-fruit'; 
+                uploadManageTab = 'today-fruit';
+            } else if (type === 'inventory') {
+                uploadManageTab = 'inv-all';
             } else {
                 uploadManageTab = 'all';
             }
@@ -6341,28 +6361,104 @@
             renderProductsList();
         }
 
+        // [신규] 예약구매(사다드림+공동구매) 날짜 분류용 헬퍼들
+        function toISODate(s) {
+            s = String(s == null ? '' : s).trim();
+            let m = s.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+            if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+            m = s.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+            if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+            m = s.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+            if (m) return `${new Date().getFullYear()}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
+            m = s.match(/^(\d{2})[.\-\/](\d{1,2})[.\-\/](\d{1,2})$/);
+            if (m) return `20${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+            return '';
+        }
+        function isReserveListProduct(prod) {
+            if (!prod) return false;
+            const name = String(prod.name || '');
+            const mk = String(prod.matchKey || '').trim();
+            const isSada = name.includes('사다드림') || mk === '사다드림';
+            const isDate = /^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(mk);
+            return isSada || isDate; // 예약구매 목록엔 사다드림 + 공동구매(날짜)만
+        }
+        function getReserveGroupDate(prod) {
+            if (!prod) return '';
+            const mk = String(prod.matchKey || '').trim();
+            if (/^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(mk)) return toISODate(mk); // 공동구매: matchKey가 날짜
+            return toISODate(prod.date); // 사다드림 등: date 필드가 실제 날짜
+        }
+        function fmtMD(iso) {
+            const pt = String(iso).split('-');
+            if (pt.length !== 3) return (iso || '날짜미정');
+            const d = new Date(parseInt(pt[0]), parseInt(pt[1]) - 1, parseInt(pt[2]));
+            const w = isNaN(d.getTime()) ? '' : `(${['일', '월', '화', '수', '목', '금', '토'][d.getDay()]})`;
+            return `${parseInt(pt[1])}/${parseInt(pt[2])}${w}`;
+        }
+
         // [신규] 상품 목록 대분류 동적 카테고리 탭 빌드
         function buildManageCategoryTabs() {
             const container = document.getElementById('manage-category-tabs');
             if (!container) return;
             container.innerHTML = '';
-            
-            if (uploadManageDeliveryType === 'today') {
-                container.innerHTML = `
-                    <div class="segment-btn ${uploadManageTab === 'today-all' ? 'active' : ''}" data-manage-tab="today-all" onclick="selectManageTab('today-all')" style="text-align:center; padding:10px 0; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px;">전체</div>
-                    <div class="segment-btn ${uploadManageTab === 'today-fruit' ? 'active' : ''}" data-manage-tab="today-fruit" onclick="selectManageTab('today-fruit')" style="text-align:center; padding:10px 0; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px;">과일</div>
-                    <div class="segment-btn ${uploadManageTab === 'today-frozen' ? 'active' : ''}" data-manage-tab="today-frozen" onclick="selectManageTab('today-frozen')" style="text-align:center; padding:10px 0; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px;">냉동</div>
-                    <div class="segment-btn ${uploadManageTab === 'today-refrigerated' ? 'active' : ''}" data-manage-tab="today-refrigerated" onclick="selectManageTab('today-refrigerated')" style="text-align:center; padding:10px 0; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px;">냉장</div>
-                    <div class="segment-btn ${uploadManageTab === 'today-room' ? 'active' : ''}" data-manage-tab="today-room" onclick="selectManageTab('today-room')" style="text-align:center; padding:10px 0; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px;">상온</div>
-                `;
+
+            // [수정] 재고관리·예약구매는 한 줄 가로 스크롤(개수 가변), 나머지는 그리드
+            if (uploadManageDeliveryType === 'inventory' || uploadManageDeliveryType === 'reserve') {
+                // '#tab-admin-products .segment-control { display:grid !important }'를 이기려면 인라인에도 !important 필요
+                container.classList.remove('five-cols');
+                container.style.setProperty('display', 'flex', 'important');
+                container.style.setProperty('flex-direction', 'row', 'important');
+                container.style.setProperty('flex-wrap', 'nowrap', 'important');
+                container.style.setProperty('overflow-x', 'auto', 'important');
+                container.style.gridTemplateColumns = '';
+                container.style.rowGap = '';
+                container.style.gap = '4px';
+                // [신규] 마우스 휠(세로)로 가로 스크롤
+                container.onwheel = (e) => {
+                    if (e.deltaY !== 0) { e.preventDefault(); container.scrollLeft += e.deltaY; }
+                };
             } else {
-                container.innerHTML = `
-                    <div class="segment-btn ${uploadManageTab === 'all' ? 'active' : ''}" data-manage-tab="all" onclick="selectManageTab('all')" style="text-align:center; padding:10px 0; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px;">전체</div>
-                    <div class="segment-btn ${uploadManageTab === 'reserve' ? 'active' : ''}" data-manage-tab="reserve" onclick="selectManageTab('reserve')" style="text-align:center; padding:10px 0; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px;">공동구매</div>
-                    <div class="segment-btn ${uploadManageTab === 'onsite-frozen' ? 'active' : ''}" data-manage-tab="onsite-frozen" onclick="selectManageTab('onsite-frozen')" style="text-align:center; padding:10px 0; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px;">냉동</div>
-                    <div class="segment-btn ${uploadManageTab === 'onsite-refrigerated' ? 'active' : ''}" data-manage-tab="onsite-refrigerated" onclick="selectManageTab('onsite-refrigerated')" style="text-align:center; padding:10px 0; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px;">냉장</div>
-                    <div class="segment-btn ${uploadManageTab === 'onsite-room' ? 'active' : ''}" data-manage-tab="onsite-room" onclick="selectManageTab('onsite-room')" style="text-align:center; padding:10px 0; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px;">상온</div>
-                `;
+                container.onwheel = null;
+                container.classList.add('five-cols');
+                container.style.removeProperty('flex-direction');
+                container.style.removeProperty('flex-wrap');
+                container.style.removeProperty('overflow-x');
+                container.style.setProperty('display', 'grid', 'important');
+                container.style.gridTemplateColumns = 'repeat(5, 1fr)';
+                container.style.rowGap = '4px';
+                container.style.gap = '';
+            }
+
+            if (uploadManageDeliveryType === 'today') {
+                // [수정] 당일구매는 과일만 노출하므로 세부 카테고리 탭 제거(숨김)
+                // 위에서 display:grid를 !important로 걸었으므로, 숨김도 !important로 해야 빈 박스가 안 남음
+                container.style.setProperty('display', 'none', 'important');
+                container.innerHTML = '';
+                uploadManageTab = 'today-fruit';
+            } else if (uploadManageDeliveryType === 'inventory') {
+                // [신규] 재고관리 — 선반/보관 위치 카테고리 10개
+                const shelves = [
+                    ['inv-all', '전체'], ['shelf-1', '선반1'], ['shelf-2', '선반2'], ['shelf-3', '선반3'],
+                    ['fridge-1', '냉장1'], ['fridge-2', '냉장2'], ['freezer-4', '냉동4'], ['freezer-5', '냉동5'],
+                    ['freezer-6', '냉동6'], ['freezer-7', '냉동7'], ['other', '기타']
+                ];
+                container.innerHTML = shelves.map(([key, label]) =>
+                    `<div class="segment-btn ${uploadManageTab === key ? 'active' : ''}" data-manage-tab="${key}" onclick="selectManageTab('${key}')" style="flex:0 0 auto; min-width:52px; text-align:center; padding:10px 12px; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px; white-space:nowrap;">${label}</div>`
+                ).join('');
+            } else {
+                // [수정] 예약구매: 전체 + 날짜별 (사다드림·공동구매를 모두 날짜로 분류)
+                const dateSet = new Set();
+                uploadProducts.forEach(p => {
+                    if (!isReserveListProduct(p)) return;
+                    const d = getReserveGroupDate(p);
+                    if (d) dateSet.add(d);
+                });
+                const dates = [...dateSet].sort().reverse(); // 가장 먼 날짜 먼저
+                const cats = [['all', '전체']];
+                dates.forEach(d => cats.push([d, fmtMD(d)]));
+                container.innerHTML = cats.map(([key, label]) =>
+                    `<div class="segment-btn ${uploadManageTab === key ? 'active' : ''}" data-manage-tab="${key}" onclick="selectManageTab('${key}')" style="flex:0 0 auto; min-width:52px; text-align:center; padding:10px 12px; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px; white-space:nowrap;">${label}</div>`
+                ).join('');
             }
         }
 
@@ -7186,66 +7282,32 @@
             let filteredProducts = uploadProducts.map((prod, index) => ({ prod, index }));
             
             if (uploadManageDeliveryType === 'today') {
+                // [수정] 당일구매는 과일(야채/채소 포함)만 표시 — 세부 카테고리 없음
                 filteredProducts = filteredProducts.filter(({ prod }) => {
                     if (prod.name === "배달비") return false;
                     const mKey = String(prod.matchKey || "").trim();
-                    
-                    const isReserveDate = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
-                    const isCostco = mKey.includes("코스트코");
-                    if (isReserveDate || isCostco) return false;
-
-                    const isFruit = /과일|야채|채소/.test(mKey) || /\[과일\]|\[야채\]/.test(prod.name);
-                    const isFrozen = mKey.includes("냉동") || (prod.storage && prod.storage.includes("냉동"));
-                    const isRefrigerated = mKey.includes("냉장") || (prod.storage && prod.storage.includes("냉장"));
-                    const isRoom = mKey.includes("상온") || mKey.includes("실온") || (prod.storage && (prod.storage.includes("상온") || prod.storage.includes("실온")));
-
-                    if (!isFruit && !isFrozen && !isRefrigerated && !isRoom) return false;
-
-                    if (uploadManageTab === 'today-fruit') return isFruit;
-                    if (uploadManageTab === 'today-frozen') return isFrozen;
-                    if (uploadManageTab === 'today-refrigerated') return isRefrigerated;
-                    if (uploadManageTab === 'today-room') return isRoom;
-                    
-                    return true;
+                    const isFruit = /과일|야채|채소/.test(mKey) || /\[과일\]|\[야채\]|\[채소\]/.test(prod.name);
+                    return isFruit;
+                });
+            } else if (uploadManageDeliveryType === 'inventory') {
+                // [신규] 재고관리 — 냉동/냉장/상온 보관 상품만 대상. '전체'는 그 전부, 특정 선반은 shelf가 일치하는 상품.
+                filteredProducts = filteredProducts.filter(({ prod }) => {
+                    if (prod.name === "배달비") return false;
+                    const mk = String(prod.matchKey || "").trim();
+                    const st = String(prod.storage || "").trim();
+                    const isStorage = /냉동|냉장|상온|실온/.test(mk) || /냉동|냉장|상온|실온/.test(st);
+                    if (!isStorage) return false; // 공동구매 날짜/과일/코스트코 등은 제외
+                    if (uploadManageTab === 'inv-all') return true;
+                    return String(prod.shelf || "") === uploadManageTab;
                 });
             } else {
-                // 예약구매 필터링 (과일/야채, 코스트코 배제하고 냉동, 냉장, 상온으로 구성)
+                // [수정] 예약구매: 사다드림 + 공동구매(날짜)만 표시. 탭 = 전체 또는 특정 날짜.
                 filteredProducts = filteredProducts.filter(({ prod }) => {
                     if (prod.name === "배달비") return false;
-                    const mKey = String(prod.matchKey || "").trim();
-                    
-                    // 코스트코나 과일/야채(예약과일 등)는 명시적으로 배제
-                    const isCostco = mKey.includes("코스트코");
-                    const isFruitVeg = /예약.*(?:과일|야채|기타)|(?:과일|야채|기타).*예약|과일_예약|야채_예약|기타_예약/.test(mKey) || /\[예약과일\]|\[예약야채\]|\[예약기타\]/.test(prod.name);
-                    if (isCostco || isFruitVeg) return false;
-                    
-                    // 분류 판정
-                    const isReserve = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
-                    const isFrozen = mKey.includes("냉동") || (prod.storage && prod.storage.includes("냉동"));
-                    const isRefrigerated = mKey.includes("냉장") || (prod.storage && prod.storage.includes("냉장"));
-                    const isRoom = mKey.includes("상온") || mKey.includes("실온") || (prod.storage && (prod.storage.includes("상온") || prod.storage.includes("실온")));
-                    
-                    // 어느 카테고리에도 속하지 않는다면 배제
-                    if (!isReserve && !isFrozen && !isRefrigerated && !isRoom) return false;
-                    
-                    // 탭별 분기 필터링
-                    if (uploadManageTab === 'reserve') return isReserve;
-                    if (uploadManageTab === 'onsite-frozen') return isFrozen;
-                    if (uploadManageTab === 'onsite-refrigerated') return isRefrigerated;
-                    if (uploadManageTab === 'onsite-room') return isRoom;
-                    
-                    return true; // uploadManageTab === 'all'
+                    if (!isReserveListProduct(prod)) return false;
+                    if (uploadManageTab === 'all') return true;
+                    return getReserveGroupDate(prod) === uploadManageTab;
                 });
-
-                // 공동구매 날짜 서브 탭 필터링
-                if (uploadSubTab !== 'all') {
-                    filteredProducts = filteredProducts.filter(({ prod }) => {
-                        if (uploadManageTab === 'reserve') {
-                            return prod.date === uploadSubTab;
-                        }
-                        return true;
-                    });
-                }
             }
 
             // 상품 검색어 필터링
@@ -7263,9 +7325,24 @@
                 return;
             }
 
+            // [신규] 재고관리 모드: 선반 순서/라벨 (미지정이 맨 위, 이후 선반 세팅 순서대로)
+            const isInventoryView = (uploadManageDeliveryType === 'inventory');
+            const isReserveView = (uploadManageDeliveryType === 'reserve');
+            const SHELF_ORDER = { '': 0, 'shelf-1': 1, 'shelf-2': 2, 'shelf-3': 3, 'fridge-1': 4, 'fridge-2': 5, 'freezer-4': 6, 'freezer-5': 7, 'freezer-6': 8, 'freezer-7': 9, 'other': 10 };
+            const SHELF_LABEL = { '': '📦 미지정', 'shelf-1': '🗄️ 선반1', 'shelf-2': '🗄️ 선반2', 'shelf-3': '🗄️ 선반3', 'fridge-1': '❄️ 냉장1', 'fridge-2': '❄️ 냉장2', 'freezer-4': '🧊 냉동4', 'freezer-5': '🧊 냉동5', 'freezer-6': '🧊 냉동6', 'freezer-7': '🧊 냉동7', 'other': '🧺 기타' };
+            const isProductSoldOut = (prod) => {
+                const unl = (prod.stock === "" || prod.stock == null || String(prod.stock).trim() === "무제한");
+                const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)];
+                const unlAdj = (adjRaw === "unlimited" || (adjRaw != null && String(adjRaw).startsWith("unlimited")));
+                if (unl || unlAdj) return false;
+                return Math.max(0, parseInt(prod.stock || 0) + parseInt(adjRaw || 0)) <= 0;
+            };
+
             const grouped = {};
             filteredProducts.forEach(({ prod, index }) => {
-                const mKey = prod.matchKey || "기타";
+                const mKey = isInventoryView ? String(prod.shelf || '')
+                    : isReserveView ? (getReserveGroupDate(prod) || '날짜미정')
+                    : (prod.matchKey || "기타");
                 if (!grouped[mKey]) {
                     grouped[mKey] = [];
                 }
@@ -7273,6 +7350,16 @@
             });
 
             const groupKeys = Object.keys(grouped).sort((a, b) => {
+                if (isInventoryView) {
+                    const oa = (SHELF_ORDER[a] !== undefined) ? SHELF_ORDER[a] : 99;
+                    const ob = (SHELF_ORDER[b] !== undefined) ? SHELF_ORDER[b] : 99;
+                    return oa - ob;
+                }
+                if (isReserveView) {
+                    if (a === '날짜미정') return 1;
+                    if (b === '날짜미정') return -1;
+                    return b.localeCompare(a); // 먼 날짜 먼저(내림차순)
+                }
                 const isDateA = /^\d{4}-\d{2}-\d{2}$/.test(a);
                 const isDateB = /^\d{4}-\d{2}-\d{2}$/.test(b);
                 if (isDateA && isDateB) return b.localeCompare(a); 
@@ -7291,7 +7378,13 @@
                 groupTitle.style = "font-size: 13px; font-weight: 800; color: var(--text-sub); margin: 16px 0 8px 4px; padding-left: 6px; border-left: 3px solid var(--primary);";
                 
                 let displayTitle = mKey;
-                if (mKey === "냉동") displayTitle = "🧊 냉동 상품";
+                if (isInventoryView) {
+                    displayTitle = (SHELF_LABEL[mKey] !== undefined) ? SHELF_LABEL[mKey] : (mKey || '📦 미지정');
+                }
+                else if (isReserveView) {
+                    displayTitle = /^\d{4}-\d{2}-\d{2}$/.test(mKey) ? `🗓️ ${mKey}` : '🗓️ 날짜미정';
+                }
+                else if (mKey === "냉동") displayTitle = "🧊 냉동 상품";
                 else if (mKey === "냉장") displayTitle = "❄️ 냉장 상품";
                 else if (mKey === "상온") displayTitle = "🌡️ 상온/실온 상품";
                 else if (mKey === "과일_예약") displayTitle = "🍎 과일";
@@ -7305,6 +7398,11 @@
 
                 // 숨김 상품은 밑으로 정렬하고, 노출 여부가 같으면 가나다순으로 정렬
                 grouped[mKey].sort((a, b) => {
+                    // [신규] 재고관리: 각 선반 그룹 '안에서만' 품절 상품을 뒤로 (그룹/카테고리 순서는 유지)
+                    if (isInventoryView) {
+                        const soA = isProductSoldOut(a.prod), soB = isProductSoldOut(b.prod);
+                        if (soA !== soB) return soA ? 1 : -1;
+                    }
                     const isVisibleA = uploadManageDeliveryType === 'today'
                         ? (a.prod.showToday !== undefined ? (a.prod.showToday === true || a.prod.showToday === 'true') : (a.prod.show !== false && a.prod.show !== 'false'))
                         : (a.prod.showReserve !== undefined ? (a.prod.showReserve === true || a.prod.showReserve === 'true') : (a.prod.show !== false && a.prod.show !== 'false'));
@@ -7360,9 +7458,47 @@
                     const hasImage = prod.images && prod.images.length > 0;
                     const imgUrl = hasImage ? ((String(prod.images[0]).startsWith("data:") || String(prod.images[0]).startsWith("http")) ? prod.images[0] : `https://lh3.googleusercontent.com/d/${prod.images[0]}=s220`) : '';
 
-                    const statusBadge = (!isVisible) 
+                    const statusBadge = (!isVisible)
                         ? `<span style="font-size: 10px; font-weight: 800; background: #fee2e2; color: #ef4444; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🙈 숨김</span>`
                         : `<span style="font-size: 10px; font-weight: 800; background: #dcfce7; color: #22c55e; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">👁️ 노출중</span>`;
+
+                    // [신규] 재고관리 모드: 선반 지정 드롭다운
+                    let actionsHtml;
+                    if (uploadManageDeliveryType === 'inventory') {
+                        const shelfOpts = [['', '미지정'], ['shelf-1', '선반1'], ['shelf-2', '선반2'], ['shelf-3', '선반3'], ['fridge-1', '냉장1'], ['fridge-2', '냉장2'], ['freezer-4', '냉동4'], ['freezer-5', '냉동5'], ['freezer-6', '냉동6'], ['freezer-7', '냉동7'], ['other', '기타']];
+                        const cur = String(prod.shelf || '');
+                        // 현재 실재고(또는 무제한)를 입력칸 기본값으로
+                        let stockInputVal = '무제한';
+                        if (!isUnlimited) {
+                            stockInputVal = Math.max(0, parseInt(prod.stock || 0) + parseInt(adjValRaw || 0));
+                        }
+                        actionsHtml = `<div class="product-actions" style="display:flex; flex-direction:column; gap:4px; width:104px; flex-shrink:0;">
+                            <div style="display:flex; gap:3px; align-items:center; width:100%;">
+                                <input type="text" id="stock-input-${index}" value="${stockInputVal}" placeholder="${stockInputVal}" inputmode="numeric" onfocus="this.value='';" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault(); updateProductStock(${index}, this.value);}" title="재고 수량 (숫자 입력, 999=무제한)" style="flex:1; min-width:0; padding:5px 4px; border:1.5px solid var(--border); border-radius:6px; font-size:12px; font-weight:700; text-align:center; box-sizing:border-box;">
+                                <button type="button" onclick="event.stopPropagation(); updateProductStock(${index}, document.getElementById('stock-input-${index}').value)" style="flex-shrink:0; padding:6px 8px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button>
+                            </div>
+                            <div style="display:flex; gap:3px; align-items:center; width:100%;">
+                                <select onchange="assignShelf(${index}, this.value)" onclick="event.stopPropagation()" style="flex:1; min-width:0; padding:6px 2px; border:1.5px solid ${cur ? 'var(--primary)' : 'var(--border)'}; border-radius:6px; font-size:11px; font-weight:700; background:white; box-sizing:border-box;">${shelfOpts.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+                                <button type="button" onclick="event.stopPropagation(); editProduct(${index})" style="flex-shrink:0; padding:6px 8px; border:1.5px solid #64748b; background:#f1f5f9; color:#475569; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">수정</button>
+                            </div>
+                        </div>`;
+                    } else {
+                        // [신규] 당일/예약 탭도 재고관리와 동일하게 재고 입력칸+변경, 수정 버튼 제공 (선반 드롭다운·기존 복제/품절 버튼 제외)
+                        let stockInputVal = '무제한';
+                        if (!isUnlimited) {
+                            stockInputVal = Math.max(0, parseInt(prod.stock || 0) + parseInt(adjValRaw || 0));
+                        }
+                        actionsHtml = `<div class="product-actions" style="display:flex; flex-direction:column; gap:4px; width:104px; flex-shrink:0;">
+                            <div style="display:flex; gap:3px; align-items:center; width:100%;">
+                                <input type="text" id="stock-input-${index}" value="${stockInputVal}" placeholder="${stockInputVal}" inputmode="numeric" onfocus="this.value='';" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault(); updateProductStock(${index}, this.value);}" title="재고 수량 (숫자 입력, 999=무제한)" style="flex:1; min-width:0; padding:5px 4px; border:1.5px solid var(--border); border-radius:6px; font-size:12px; font-weight:700; text-align:center; box-sizing:border-box;">
+                                <button type="button" onclick="event.stopPropagation(); updateProductStock(${index}, document.getElementById('stock-input-${index}').value)" style="flex:1; min-width:0; padding:6px 4px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button>
+                            </div>
+                            <div style="display:flex; gap:3px; align-items:center; width:100%;">
+                                <button type="button" onclick="event.stopPropagation(); editProduct(${index})" style="flex:1; min-width:0; padding:6px 4px; border:1.5px solid #64748b; background:#f1f5f9; color:#475569; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">수정</button>
+                                <button type="button" onclick="event.stopPropagation(); markAsSoldOut(${index})" style="flex:1; min-width:0; padding:6px 4px; border:1.5px solid #ef4444; background:#fef2f2; color:#ef4444; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">품절</button>
+                            </div>
+                        </div>`;
+                    }
 
                     item.innerHTML = `
                         <label class="checkbox-container" style="display: none; margin-right: 8px; flex-shrink: 0;">
@@ -7371,7 +7507,7 @@
                         </label>
                         ${hasImage ? `<img src="${imgUrl}" class="product-img">` : `<div class="product-img" style="display:flex; align-items:center; justify-content:center; font-size:16px;">📦</div>`}
                         <div class="product-info" onclick="toggleSelectProduct(${index})" style="cursor: pointer; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
-                            <div class="product-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700;">
+                            <div class="product-name" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-all; line-height: 1.3; font-weight: 700;">
                                 ${prod.name}
                             </div>
                             <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
@@ -7381,11 +7517,7 @@
                                 ${statusBadge}
                             </div>
                         </div>
-                        <div class="product-actions">
-                            <button class="btn-action action-edit" onclick="editProduct(${index})">수정</button>
-                            <button class="btn-action action-duplicate" onclick="duplicateSingleProduct(${index})">복제</button>
-                            <button class="btn-action action-delete" onclick="markAsSoldOut(${index})">품절</button>
-                        </div>
+                        ${actionsHtml}
                     `;
 
                     // 길게 누르기(롱프레스) 이벤트 핸들링
@@ -7610,8 +7742,21 @@
             }
         }
 
+        // [신규] 복제하기: 현재 수정 폼 내용을 '새 상품'으로 등록 (원본은 그대로 유지)
+        function duplicateFromForm(event) {
+            if (event) event.preventDefault();
+            if (!confirm("현재 내용으로 새 상품을 복제 등록합니다.\n(원본 상품은 그대로 남습니다. 같은 이름·날짜여도 새로 만들어집니다)\n\n진행할까요?")) return;
+            uploadIsEditMode = false;
+            uploadEditProductKey = null;
+            uploadEditProductRef = null;
+            uploadForceDuplicate = true; // submitForm이 중복 판정 없이 무조건 새로 push
+            submitForm(event || { preventDefault: () => {} });
+        }
+
         async function submitForm(event) {
             event.preventDefault();
+            const forceDup = uploadForceDuplicate; // 이번 제출이 복제인지
+            uploadForceDuplicate = false;
 
             const name = document.getElementById('productName').value.trim();
             const price = parseInt(document.getElementById('productPrice').value);
@@ -7735,7 +7880,22 @@
                 let oldProd = null;
 
                 if (uploadIsEditMode && uploadEditProductKey !== null) {
-                    oldProd = uploadProducts[uploadEditProductKey];
+                    // [하드닝] 순번(index) 대신 이름+분류+날짜로 실제 위치를 찾아 제자리 수정 (목록이 바뀌어도 엉뚱한 항목 덮어쓰기/복제 방지)
+                    let editIdx = -1;
+                    if (uploadEditProductRef) {
+                        editIdx = updatedProducts.findIndex(p => p
+                            && p.name === uploadEditProductRef.name
+                            && String(p.matchKey || '') === uploadEditProductRef.matchKey
+                            && String(p.date || '') === uploadEditProductRef.date);
+                    }
+                    if (editIdx < 0 && uploadEditProductKey < updatedProducts.length) editIdx = uploadEditProductKey; // 폴백(구 방식)
+                    if (editIdx < 0 || editIdx >= updatedProducts.length) {
+                        hideLoader();
+                        showToast("수정할 상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
+                        return;
+                    }
+
+                    oldProd = updatedProducts[editIdx];
                     const oldRawStock = (oldProd.stock === undefined || oldProd.stock === null || oldProd.stock === "") ? 9999 : parseInt(oldProd.stock);
                     const oldAdjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(oldProd.matchKey, oldProd.name)] || 0);
                     const oldRealStock = (oldRawStock >= 9999) ? 9999 : Math.max(0, oldRawStock + oldAdjVal);
@@ -7753,13 +7913,13 @@
                     const finalStock = isStockChanged ? stock : oldProd.stock;
                     productObj.stock = finalStock;
 
-                    updatedProducts[uploadEditProductKey] = {
-                        ...uploadProducts[uploadEditProductKey],
+                    updatedProducts[editIdx] = {
+                        ...updatedProducts[editIdx],
                         ...productObj
                     };
                 } else {
                     const dupIndex = updatedProducts.findIndex(p => p.name === name && p.date === date);
-                    if (dupIndex > -1) {
+                    if (dupIndex > -1 && !forceDup) {
                         if (!confirm("동일한 날짜에 같은 이름의 상품이 이미 등록되어 있습니다.\n덮어쓰시겠습니까?")) {
                             hideLoader();
                             return;
@@ -7929,14 +8089,93 @@
             }
         }
 
+        // [신규] 재고관리 — 상품 선반 지정 저장
+        async function assignShelf(index, shelfKey) {
+            const prod = uploadProducts[index];
+            if (!prod) return;
+            const prev = prod.shelf || '';
+            prod.shelf = shelfKey;
+            prod.updatedAt = Date.now();
+            try {
+                // 전체 목록을 저장(다른 필드·이모지 그대로 보존). 실패 시 롤백.
+                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(uploadProducts)
+                });
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                updatePublishedProductsTimestamp();
+                const labels = { '': '미지정', 'shelf-1': '선반1', 'shelf-2': '선반2', 'shelf-3': '선반3', 'fridge-1': '냉장1', 'fridge-2': '냉장2', 'freezer-4': '냉동4', 'freezer-5': '냉동5', 'freezer-6': '냉동6', 'freezer-7': '냉동7' };
+                showToast(`'${prod.name}' → ${labels[shelfKey] || '미지정'}`);
+                // 재고관리 화면은 선반별로 그룹핑되므로(전체 포함) 변경 즉시 재렌더해 상품을 새 선반 그룹으로 이동
+                if (uploadManageDeliveryType === 'inventory') {
+                    renderProductsList();
+                }
+            } catch (e) {
+                prod.shelf = prev; // 롤백
+                console.error("선반 지정 실패:", e);
+                showToast("선반 지정 실패: " + e.toString());
+            }
+        }
+
+        // [신규] 재고관리 — 상품 재고 수량 직접 변경 (절대값 설정: 기본재고=입력값, 조정값 0으로 리셋)
+        async function updateProductStock(index, value) {
+            const prod = uploadProducts[index];
+            if (!prod) return;
+            const raw = String(value == null ? '' : value).trim();
+            if (raw === '') { renderProductsList(); return; } // 빈 값이면 변경 없음(원래 값으로 복원)
+            let wantUnlimited = (raw === '무제한' || raw.toLowerCase() === 'unlimited');
+            let newStock;
+            if (wantUnlimited) {
+                newStock = '';
+            } else {
+                const n = parseInt(raw.replace(/[^\d-]/g, ''));
+                if (isNaN(n) || n < 0) { showToast('0 이상 숫자 또는 "무제한"을 입력하세요.'); renderProductsList(); return; }
+                if (n === 999) { wantUnlimited = true; newStock = ''; } // [신규] 999 입력 시 무제한
+                else newStock = n;
+            }
+
+            const prevStock = prod.stock;
+            const adjKey = fGetAdjKey(prod.matchKey, prod.name);
+            const prevAdj = uploadGlobalAdjustments[adjKey];
+            // 로컬 즉시 반영: 기본재고=입력값, 조정값 0(무제한이면 'unlimited')
+            prod.stock = newStock;
+            prod.updatedAt = Date.now();
+            uploadGlobalAdjustments[adjKey] = wantUnlimited ? 'unlimited' : 0;
+
+            try {
+                const [r1, r2] = await Promise.all([
+                    fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(uploadProducts)
+                    }),
+                    fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wantUnlimited ? 'unlimited' : 0)
+                    })
+                ]);
+                if (!r1.ok || !r2.ok) throw new Error(`저장 실패 ${r1.status}/${r2.status}`);
+                updatePublishedProductsTimestamp();
+                showToast(`'${prod.name}' 재고 → ${wantUnlimited ? '무제한' : newStock}`);
+                renderProductsList();
+            } catch (e) {
+                prod.stock = prevStock;
+                uploadGlobalAdjustments[adjKey] = prevAdj;
+                console.error('재고 변경 실패:', e);
+                showToast('재고 변경 실패: ' + e.toString());
+                renderProductsList();
+            }
+        }
+
         function editProduct(index) {
             const prod = uploadProducts[index];
             uploadIsEditMode = true;
             uploadEditProductKey = index;
+            // [하드닝] 순번은 목록 재정렬/새로고침에 취약하므로, 이름+분류+날짜로 실제 대상을 기억해 둠
+            uploadEditProductRef = { name: prod.name, matchKey: String(prod.matchKey || ''), date: String(prod.date || '') };
 
             switchAdminTab('product-upload');
 
             document.getElementById('form-card-title').innerText = `✏️ 상품 수정: ${prod.name}`;
+            { const dupBtn = document.getElementById('btn-duplicate-form'); if (dupBtn) dupBtn.style.display = 'flex'; } // 수정 모드에선 복제하기 버튼 노출(제출버튼과 반반)
             
             // 버튼 ID 바인딩 교정 (submitBtn -> btn-submit-form, cancelBtn -> btn-cancel-edit)
             const submitBtn = document.getElementById('btn-submit-form');
@@ -8004,8 +8243,10 @@
             const wasEditMode = uploadIsEditMode;
             uploadIsEditMode = false;
             uploadEditProductKey = null;
+            uploadEditProductRef = null;
 
             document.getElementById('form-card-title').innerText = "✨ 신규 상품 등록";
+            { const dupBtn = document.getElementById('btn-duplicate-form'); if (dupBtn) dupBtn.style.display = 'none'; } // 신규 등록 모드에선 복제하기 숨김
             
             const submitBtn = document.getElementById('btn-submit-form');
             if (submitBtn) submitBtn.innerText = "📤 등록 완료";
