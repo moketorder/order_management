@@ -4423,18 +4423,25 @@
             const cleanPhone = String(phone || "").replace(/\D/g, "");
             const orderKeys = (orderKeysStr || "").split("|@@|").map(k => k.trim()).filter(Boolean);
             if (orderKeys.length === 0) return;
-            
-            const firstKey = orderKeys[0];
+
+            // [신규] 체크한 항목만 날짜 변경: 이 카드의 주문키 중 체크박스로 선택된 것만 대상.
+            // 아무것도 체크하지 않았으면 이 카드 전체를 변경(기존 동작 유지).
+            const checkedKeySet = new Set([...selectedItems].map(info => String(info).split("|")[1]));
+            const checkedInGroup = orderKeys.filter(k => checkedKeySet.has(k));
+            const keysToChange = checkedInGroup.length > 0 ? checkedInGroup : orderKeys;
+            const onlyChecked = checkedInGroup.length > 0;
+
+            const firstKey = keysToChange[0];
             const matchingOrder = rawOrders.find(o => String(o.orderKey).trim() === firstKey);
             const currentDate = matchingOrder ? (matchingOrder.pickupDate || matchingOrder.date || "") : "";
-            
+
             showDatePickerModal(`${label} 변경`, currentDate, async (trimmedDate) => {
                 showLoader("📅 주문 날짜 변경 중...");
                 try {
                     const targetDateInfo = matchingOrder ? getOrderDateInfo(matchingOrder) : { dateStr: "" };
                     const targetDateStr = targetDateInfo.dateStr;
                     
-                    const targetKeysSet = new Set(orderKeys);
+                    const targetKeysSet = new Set(keysToChange);
                     const targetOrdersToChange = rawOrders.filter(o => {
                         const oCleanPhone = String(o.phone || "").replace(/\D/g, "");
                         const targetCleanPhone = String(phone || "").replace(/\D/g, "");
@@ -4485,7 +4492,7 @@
                     });
                     
                     await Promise.all(promises);
-                    showToast("📅 주문 날짜가 정상적으로 변경되었습니다.");
+                    showToast(`📅 주문 날짜가 정상적으로 변경되었습니다.` + (onlyChecked ? ` (체크한 ${keysToChange.length}건만)` : ``));
 
                     // DB 커밋 대기 (200ms)
                     await new Promise(r => setTimeout(r, 200));
