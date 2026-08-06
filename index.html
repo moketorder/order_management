@@ -2004,36 +2004,25 @@
     <!-- 탭 1: 주문 관리 영역 -->
     <div id="tab-admin-orders" class="admin-tab-content">
         <div class="container">
-            <!-- 컨트롤 필터 바 -->
+            <!-- 컨트롤 필터 바 (버튼 + 로직용 숨김 필터) -->
             <div class="controls-card no-print">
-                <div class="controls-row">
-                    <select id="filterDateRange" class="select-filter" style="width: 76px; min-width: 76px; flex-shrink: 0; padding-left: 4px; padding-right: 4px;" onchange="handleFilterChange()">
-                        <option value="day" selected>🔍 일</option>
-                        <option value="week">🔍 주</option>
-                        <option value="month">🔍 월</option>
-                        <option value="all">🔍 전체</option>
-                    </select>
-                    <div class="search-wrapper">
-                        <input type="text" id="searchInput" class="search-input" style="padding-right: 35px;" placeholder="고객명, 연락처, 카톡명, 실명, 주소, 상품명 검색..." onkeyup="handleSearchInput()">
-                        <button id="clearSearchBtn" class="clear-search-btn" onclick="clearSearch()">&times;</button>
-                    </div>
-                </div>
-                <div class="controls-row">
-                    <select id="filterShipping" class="select-filter" onchange="handleFilterChange()">
-                        <option value="all" selected>수령방법</option>
-                        <option value="배달주문">🚚 배달주문</option>
-                        <option value="매장픽업">📍 픽업주문</option>
-                    </select>
-                    <select id="filterStatus" class="select-filter" onchange="handleFilterChange()">
-                        <option value="all" selected>상태</option>
-                        <option value="대기">🔘 대기</option>
-                        <option value="입고">🟡 입고 완료</option>
-                        <option value="픽업">🟣 픽업 완료</option>
-                        <option value="배달완료">🟢 배달 완료</option>
-                        <option value="배달미입금">🔴 배달 미입금</option>
-                        <option value="픽업미입금">🔴 픽업 미입금</option>
-                    </select>
-                </div>
+                <!-- [숨김] 날짜범위: 검색은 전체 기준 / 상태: 상태 탭이 값을 설정 -->
+                <select id="filterDateRange" style="display:none;">
+                    <option value="day">일</option>
+                    <option value="week">주</option>
+                    <option value="month">월</option>
+                    <option value="all" selected>전체</option>
+                </select>
+                <select id="filterStatus" style="display:none;">
+                    <option value="all" selected>상태</option>
+                    <option value="대기">대기</option>
+                    <option value="입고">입고</option>
+                    <option value="픽업">픽업</option>
+                    <option value="배달완료">배달완료</option>
+                    <option value="배달미입금">배달미입금</option>
+                    <option value="픽업미입금">픽업미입금</option>
+                    <option value="입금완료">입금완료</option>
+                </select>
                 <div class="controls-row button-row">
                     <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
                     <button class="btn-common" style="border: 1.5px solid #d32f2f; background: #fff5f5; color: #d32f2f; font-weight: 700;" onclick="deleteCanceledOrders()">🗑️ 취소주문 삭제</button>
@@ -2041,13 +2030,30 @@
                 </div>
             </div>
 
-            <!-- 분류 탭 (대분류: 달 / 소분류: 일) -->
+            <!-- 분류 탭 (연도 + 월 / 일) -->
             <div class="tabs-section">
                 <div class="main-tabs" id="month-tabs">
                     <!-- 월 탭 동적 로드 -->
                 </div>
                 <div class="date-filter-container" id="day-tabs">
                     <!-- 일 탭 동적 로드 -->
+                </div>
+            </div>
+
+            <!-- [신규] 상태별 탭 (개수 표시, 클릭 시 그 상태만) -->
+            <div id="order-status-tabs" class="no-print" style="display:flex; gap:5px; overflow-x:auto; padding:2px 0 4px; margin:4px 0 0; -ms-overflow-style:none; scrollbar-width:none;"></div>
+            <div id="order-status-tabs2" class="no-print" style="display:flex; gap:5px; overflow-x:auto; padding:2px 0 8px; margin:0 0 6px; -ms-overflow-style:none; scrollbar-width:none;"></div>
+
+            <!-- [신규] 수령방법(작게) + 검색(크게) -->
+            <div class="no-print" style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
+                <select id="filterShipping" class="select-filter" style="flex:0 0 108px; width:108px; min-width:108px; padding-left:6px; padding-right:6px;" onchange="handleFilterChange()">
+                    <option value="all" selected>수령방법</option>
+                    <option value="배달주문">🚚 배달주문</option>
+                    <option value="매장픽업">📍 픽업주문</option>
+                </select>
+                <div class="search-wrapper" style="flex:1; min-width:0;">
+                    <input type="text" id="searchInput" class="search-input" style="width:100%; padding-right:35px;" placeholder="고객명·연락처·상품명 검색..." onkeyup="handleSearchInput()">
+                    <button id="clearSearchBtn" class="clear-search-btn" onclick="clearSearch()">&times;</button>
                 </div>
             </div>
 
@@ -2481,55 +2487,67 @@
     <style>
         .sales-toggle-btn { padding:7px 12px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; }
         .sales-toggle-btn.active { border-color:var(--primary); background:var(--primary-light); color:var(--primary); }
+        /* 발주 관리 분류 카테고리 색상 (비활성=컬러 테두리 / 활성=컬러 채움) */
+        .up-cat-all   { border-color:#94a3b8; color:#475569; }
+        .up-cat-all.active   { background:#475569; border-color:#475569; color:#fff; }
+        .up-cat-fruit { border-color:#fca5a5; color:#dc2626; }
+        .up-cat-fruit.active { background:#ef4444; border-color:#ef4444; color:#fff; }
+        .up-cat-group { border-color:#93c5fd; color:#2563eb; }
+        .up-cat-group.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
+        .up-cat-sada  { border-color:#6ee7b7; color:#059669; }
+        .up-cat-sada.active  { background:#10b981; border-color:#10b981; color:#fff; }
+        .up-cat-other { border-color:#fcd34d; color:#d97706; }
+        .up-cat-other.active { background:#f59e0b; border-color:#f59e0b; color:#fff; }
+        /* 판매현황 배송유형 색상 */
+        .sm-all      { border-color:#94a3b8; color:#475569; }
+        .sm-all.active      { background:#475569; border-color:#475569; color:#fff; }
+        .sm-delivery { border-color:#93c5fd; color:#2563eb; }
+        .sm-delivery.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
+        .sm-pickup   { border-color:#6ee7b7; color:#059669; }
+        .sm-pickup.active   { background:#10b981; border-color:#10b981; color:#fff; }
         .sales-sub-btn { color:var(--text-sub); }
         .sales-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
         #tab-admin-sales table th, #tab-admin-sales table td { border-bottom:1px solid #f1f5f9; }
+        #order-status-tabs, #order-status-tabs2 { -webkit-overflow-scrolling: touch; }
+        #order-status-tabs::-webkit-scrollbar, #order-status-tabs2::-webkit-scrollbar { display: none; }
     </style>
     <div id="tab-admin-sales" class="admin-tab-content" style="display: none;">
         <div class="container" style="max-width: 900px; margin: 0 auto; padding: 15px;">
 
-            <!-- 하위 탭: 발주 관리 / 판매현황 -->
-            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:16px;">
-                <div class="segment-btn sales-sub-btn active" data-sales-sub="purchase" onclick="setSalesSubTab('purchase')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">🧾 발주 관리</div>
-                <div class="segment-btn sales-sub-btn" data-sales-sub="status" onclick="setSalesSubTab('status')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">📊 판매현황</div>
+            <!-- 하위 탭: 발주 관리 / 판매현황 / 지난 미완료 -->
+            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:16px;">
+                <div class="segment-btn sales-sub-btn active" data-sales-sub="purchase" onclick="setSalesSubTab('purchase')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🧾 발주 관리</div>
+                <div class="segment-btn sales-sub-btn" data-sales-sub="status" onclick="setSalesSubTab('status')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📊 판매현황</div>
+                <div class="segment-btn sales-sub-btn" data-sales-sub="overdue" onclick="setSalesSubTab('overdue')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">⚠️ 지난 미완료</div>
             </div>
 
             <!-- 발주 관리 (오늘 이후 주문 집계) -->
             <div id="sales-sub-purchase">
             <!-- A. 오늘 이후 주문 집계 (준비·발주) -->
             <div class="card" style="padding: 14px; margin-bottom: 16px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-                    <div class="card-title" style="margin:0;">📦 오늘 이후 주문 집계 (준비·발주)</div>
-                    <button type="button" onclick="initSalesTab()" style="padding:5px 10px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">🔄 새로고침</button>
+                <!-- 컨트롤 패널: 기간 / 분류 / 요약을 하나의 틀로 정리 -->
+                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px;">
+                    <div id="sales-uprange-tabs" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:9px;"></div>
+                    <div id="sales-upcoming-range" style="display:none; gap:6px; margin-bottom:9px; align-items:center; flex-wrap:wrap;">
+                        <input type="date" id="sales-up-from" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
+                        <span style="font-size:12px;">~</span>
+                        <input type="date" id="sales-up-to" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:9px;">
+                        <button type="button" data-sales-upcat="all" onclick="setSalesUpcomingCat('all')" class="sales-toggle-btn up-cat-all active">전체</button>
+                        <button type="button" data-sales-upcat="fruit" onclick="setSalesUpcomingCat('fruit')" class="sales-toggle-btn up-cat-fruit">🍎 과일</button>
+                        <button type="button" data-sales-upcat="group" onclick="setSalesUpcomingCat('group')" class="sales-toggle-btn up-cat-group">📦 공동구매</button>
+                        <button type="button" data-sales-upcat="sada" onclick="setSalesUpcomingCat('sada')" class="sales-toggle-btn up-cat-sada">🛒 사다드림</button>
+                        <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn up-cat-other">그외</button>
+                    </div>
+                    <div id="sales-upcoming-summary" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
                 </div>
-                <div style="font-size:11px; color:var(--text-sub); font-weight:700; margin-bottom:8px;">픽업/배달 예정일 기준 미취소 주문을 상품별로 집계 · 재고 부족(재고−주문 &lt; 0)은 빨강·상단</div>
-                <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
-                    <span style="font-size:12px; font-weight:800; color:#475569;">집계 범위</span>
-                    <button type="button" data-sales-uprange="today_after" onclick="setSalesUpcomingRange('today_after')" class="sales-toggle-btn active">전체</button>
-                    <button type="button" data-sales-uprange="today_only" onclick="setSalesUpcomingRange('today_only')" class="sales-toggle-btn">오늘</button>
-                    <button type="button" data-sales-uprange="after_today" onclick="setSalesUpcomingRange('after_today')" class="sales-toggle-btn">그외</button>
-                    <button type="button" data-sales-uprange="custom" onclick="setSalesUpcomingRange('custom')" class="sales-toggle-btn">📅 기간설정</button>
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+                    <input type="text" id="sales-upcoming-search" placeholder="🔍 상품 검색" oninput="renderSalesUpcoming()" style="flex:1; padding:8px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; box-sizing:border-box;">
+                    <button type="button" onclick="initSalesTab()" style="flex-shrink:0; padding:8px 12px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">🔄 새로고침</button>
                 </div>
-                <div id="sales-upcoming-range" style="display:none; gap:6px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
-                    <input type="date" id="sales-up-from" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
-                    <span style="font-size:12px;">~</span>
-                    <input type="date" id="sales-up-to" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
-                </div>
-                <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
-                    <span style="font-size:12px; font-weight:800; color:#475569;">카테고리</span>
-                    <button type="button" data-sales-upcat="all" onclick="setSalesUpcomingCat('all')" class="sales-toggle-btn active">전체</button>
-                    <button type="button" data-sales-upcat="fruit" onclick="setSalesUpcomingCat('fruit')" class="sales-toggle-btn">🍎 과일</button>
-                    <button type="button" data-sales-upcat="group" onclick="setSalesUpcomingCat('group')" class="sales-toggle-btn">📦 공동구매</button>
-                    <button type="button" data-sales-upcat="sada" onclick="setSalesUpcomingCat('sada')" class="sales-toggle-btn">🛒 사다드림</button>
-                    <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn">그외</button>
-                </div>
-                <div id="sales-upcoming-summary" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                        <thead id="sales-upcoming-thead"></thead>
-                        <tbody id="sales-upcoming-tbody"></tbody>
-                    </table>
-                </div>
+                <div id="sales-upcoming-sortbar" style="display:flex; gap:5px; margin-bottom:8px; flex-wrap:wrap; align-items:center;"></div>
+                <div id="sales-upcoming-list"></div>
             </div>
 
             </div><!-- /sales-sub-purchase -->
@@ -2538,33 +2556,29 @@
             <div id="sales-sub-status" style="display:none;">
             <!-- B~D. 판매현황 -->
             <div class="card" style="padding: 14px; margin-bottom: 16px;">
-                <div class="card-title" style="margin:0 0 10px 0;">📊 판매현황</div>
-
-                <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
-                    <span style="font-size:12px; font-weight:800; color:#475569;">집계 기준</span>
-                    <button type="button" id="sales-basis-pickup" onclick="setSalesDateBasis('pickup')" class="sales-toggle-btn active">픽업·배달일</button>
-                    <button type="button" id="sales-basis-order" onclick="setSalesDateBasis('order')" class="sales-toggle-btn">주문일</button>
-                </div>
-
-                <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
-                    <span style="font-size:12px; font-weight:800; color:#475569;">배송유형</span>
-                    <button type="button" data-sales-method="all" onclick="setSalesMethod('all')" class="sales-toggle-btn active">전체</button>
-                    <button type="button" data-sales-method="delivery" onclick="setSalesMethod('delivery')" class="sales-toggle-btn">🚚 배달</button>
-                    <button type="button" data-sales-method="pickup" onclick="setSalesMethod('pickup')" class="sales-toggle-btn">📍 픽업</button>
-                </div>
-
-                <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
-                    <span style="font-size:12px; font-weight:800; color:#475569;">기간</span>
-                    <button type="button" data-sales-period="today" onclick="setSalesPeriod('today')" class="sales-toggle-btn">오늘</button>
-                    <button type="button" data-sales-period="week" onclick="setSalesPeriod('week')" class="sales-toggle-btn">이번주</button>
-                    <button type="button" data-sales-period="month" onclick="setSalesPeriod('month')" class="sales-toggle-btn active">이번달</button>
-                    <button type="button" data-sales-period="all" onclick="setSalesPeriod('all')" class="sales-toggle-btn">전체</button>
-                    <button type="button" data-sales-period="custom" onclick="setSalesPeriod('custom')" class="sales-toggle-btn">직접</button>
-                </div>
-                <div id="sales-custom-range" style="display:none; gap:6px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
-                    <input type="date" id="sales-custom-from" class="form-control" style="width:auto; height:38px;" onchange="onSalesCustomRangeChange()">
-                    <span style="font-size:12px;">~</span>
-                    <input type="date" id="sales-custom-to" class="form-control" style="width:auto; height:38px;" onchange="onSalesCustomRangeChange()">
+                <!-- 컨트롤 패널: 집계기준 / 배송유형 / 기간을 하나의 틀로 정리 -->
+                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:14px;">
+                    <div style="display:flex; gap:6px; margin-bottom:9px; flex-wrap:wrap; align-items:center;">
+                        <button type="button" id="sales-basis-pickup" onclick="setSalesDateBasis('pickup')" class="sales-toggle-btn active">픽업·배달일</button>
+                        <button type="button" id="sales-basis-order" onclick="setSalesDateBasis('order')" class="sales-toggle-btn">주문일</button>
+                    </div>
+                    <div style="display:flex; gap:6px; margin-bottom:9px; flex-wrap:wrap; align-items:center;">
+                        <button type="button" data-sales-method="all" onclick="setSalesMethod('all')" class="sales-toggle-btn sm-all active">전체</button>
+                        <button type="button" data-sales-method="delivery" onclick="setSalesMethod('delivery')" class="sales-toggle-btn sm-delivery">🚚 배달</button>
+                        <button type="button" data-sales-method="pickup" onclick="setSalesMethod('pickup')" class="sales-toggle-btn sm-pickup">📍 픽업</button>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                        <button type="button" data-sales-period="today" onclick="setSalesPeriod('today')" class="sales-toggle-btn">오늘</button>
+                        <button type="button" data-sales-period="week" onclick="setSalesPeriod('week')" class="sales-toggle-btn">이번주</button>
+                        <button type="button" data-sales-period="month" onclick="setSalesPeriod('month')" class="sales-toggle-btn active">이번달</button>
+                        <button type="button" data-sales-period="all" onclick="setSalesPeriod('all')" class="sales-toggle-btn">전체</button>
+                        <button type="button" data-sales-period="custom" onclick="setSalesPeriod('custom')" class="sales-toggle-btn">직접</button>
+                    </div>
+                    <div id="sales-custom-range" style="display:none; gap:6px; margin-top:9px; align-items:center; flex-wrap:wrap;">
+                        <input type="date" id="sales-custom-from" class="form-control" style="width:auto; height:38px;" onchange="onSalesCustomRangeChange()">
+                        <span style="font-size:12px;">~</span>
+                        <input type="date" id="sales-custom-to" class="form-control" style="width:auto; height:38px;" onchange="onSalesCustomRangeChange()">
+                    </div>
                 </div>
 
                 <div id="sales-metrics" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px,1fr)); gap:8px; margin-bottom:14px;"></div>
@@ -2585,6 +2599,19 @@
                 </div>
             </div>
             </div><!-- /sales-sub-status -->
+
+            <!-- 지난 미완료 (오늘 이전 예정일인데 배달완료/픽업완료/취소가 아닌 주문) -->
+            <div id="sales-sub-overdue" style="display:none;">
+                <div class="card" style="padding: 14px; margin-bottom: 16px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                        <div class="card-title" style="margin:0;">⚠️ 지난 미완료</div>
+                        <button type="button" onclick="renderSalesOverdue()" style="padding:5px 10px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">🔄 새로고침</button>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-sub); font-weight:700; margin-bottom:10px;">픽업/배달 예정일이 오늘 이전인데 아직 <b>배달완료·픽업완료·취소가 아닌</b> 주문 (수령이 밀린 건). 고객 안내가 필요할 수 있어요.</div>
+                    <div id="sales-overdue-summary" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>
+                    <div id="sales-overdue-list"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2824,9 +2851,12 @@
                 }
             }
             
+            // [신규] 이미 불러온 보관함(과거 주문)을 다시 합침 → 실시간 갱신 후에도 7/27 이전 등 옛 자료 검색 유지
+            mergeArchiveIntoRawOrders();
+
             // 타임스탬프 기준 최신순 정렬 (한글 포맷 대응 안전한 파싱)
             rawOrders.sort((a, b) => parseTimestampToDate(b.timestamp) - parseTimestampToDate(a.timestamp));
-            
+
             // 고객별 누적 주문 횟수(시퀀스) 계산
             customerOrderSequences = {};
             rawOrders.forEach(item => {
@@ -3101,13 +3131,28 @@
                 }
             }
 
-            sortedMonths.forEach(month => {
+            // [수정] 월 탭은 현재월 + 직전 2개월 + 기타만 표시(현재 연도 기준). 다른 연도는 데이터의 월 전체.
+            let displayMonths;
+            const _nowYearStr = new Date().getFullYear() + "년";
+            if (currentYear === _nowYearStr) {
+                const nowMonthNum = new Date().getMonth() + 1;
+                displayMonths = [];
+                for (let i = 0; i < 3; i++) { const mn = nowMonthNum - i; if (mn >= 1) displayMonths.push(mn + "월"); }
+                if (sortedMonths.includes("기타")) displayMonths.push("기타");
+                if (currentMonth && currentMonth !== "기타" && currentMonth !== "전체" && !displayMonths.includes(currentMonth)) displayMonths.unshift(currentMonth);
+            } else {
+                displayMonths = sortedMonths;
+            }
+            displayMonths.unshift("전체"); // [신규] 월 탭 맨 앞 '전체'(해당 연도 전부)
+            displayMonths.forEach(month => {
                 const btn = document.createElement('button');
                 btn.className = `main-tab-btn ${month === currentMonth ? 'active' : ''}`;
                 btn.innerText = month;
                 btn.onclick = () => {
                     currentMonth = month;
-                    currentDay = ""; // 월 변경 시 일 초기화
+                    // [신규] 현재달은 오늘(특정일) 기본, 지난달/다른 달은 '전체'(그 달 전부) 기본
+                    const isCurMonth = (currentYear === (new Date().getFullYear() + "년") && month === ((new Date().getMonth() + 1) + "월"));
+                    currentDay = (month === "전체") ? "" : (isCurMonth ? "" : "전체");
                     buildDateTabs(true); // 일 탭 재구성 (사용자 액션 플래그 true)
                 };
                 monthContainer.appendChild(btn);
@@ -3146,12 +3191,22 @@
             const dayContainer = document.getElementById('day-tabs');
             dayContainer.innerHTML = '';
 
+            // [신규] 월=전체면 일 탭 없이 해당 연도 전체 표시
+            if (currentMonth === "전체") { renderFilteredOrders(); return; }
+
             const todayObj = new Date();
             const todayDayStr = todayObj.getDate() + "일";
 
-            if (!currentDay || !sortedDays.includes(currentDay)) {
+            if (currentDay !== "전체" && (!currentDay || !sortedDays.includes(currentDay))) {
                 currentDay = sortedDays.includes(todayDayStr) ? todayDayStr : (sortedDays[0] || "");
             }
+
+            // [신규] '전체'(그 달 전부) 일 탭 — 맨 앞
+            const allDayBtn = document.createElement('button');
+            allDayBtn.className = `date-btn ${currentDay === "전체" ? 'active' : ''}`;
+            allDayBtn.innerText = "전체";
+            allDayBtn.onclick = () => { currentDay = "전체"; buildDayTabs(true); };
+            dayContainer.appendChild(allDayBtn);
 
             // [신규] 현재 보고 있는 월/연도가 실제 오늘과 같을 때만 '오늘' 버튼 표시 (다른 달의 같은 날짜 오인 방지)
             const nowY = todayObj.getFullYear() + "년";
@@ -3215,6 +3270,52 @@
         }
 
         // 3. 필터링 및 렌더링
+        // [신규] 현재 연/월/일 탭 스코프 매칭 (전체 지원): 월=전체 → 그 연도 전부, 일=전체 → 그 달 전부
+        function matchesCurrentDateScope(item){
+            const info = getOrderDateInfo(item);
+            const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
+            if (currentMonth === "전체") return itemYear === currentYear;
+            if (currentDay === "전체") return itemYear === currentYear && info.month === currentMonth;
+            return itemYear === currentYear && info.month === currentMonth && info.day === currentDay;
+        }
+
+        // [신규] 상태별 탭(개수) — 상태 제외 필터된 항목으로 각 상태 개수 계산 후 렌더
+        function buildOrderStatusTabs(items){
+            const c1 = document.getElementById('order-status-tabs');
+            const c2 = document.getElementById('order-status-tabs2');
+            if (!c1) return;
+            const counts = { all: 0, '대기': 0, '입고': 0, '픽업': 0, '배달완료': 0, '배달미입금': 0, '입금완료': 0 };
+            (items || []).forEach(item => {
+                counts.all++;
+                const status = item.status || '대기';
+                const asm = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
+                const paid = (item.paid === true || item.paid === "true");
+                const canceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                if (status === '대기') counts['대기']++;
+                else if (status === '입고') counts['입고']++;
+                else if (status === '픽업') counts['픽업']++;
+                else if (status === '배달완료') counts['배달완료']++;
+                if (asm === '배달주문' && !paid && !canceled && status !== '배달완료') counts['배달미입금']++;
+                if (paid && !canceled) counts['입금완료']++;
+            });
+            const cur = document.getElementById('filterStatus').value;
+            const renderTab = ([v, label]) => {
+                const active = (cur === v);
+                return `<button type="button" onclick="selectOrderStatus('${v}')" style="flex:0 0 auto; white-space:nowrap; padding:7px 10px; border-radius:8px; border:1.5px solid ${active?'var(--primary)':'var(--border)'}; background:${active?'var(--primary-light)':'#fff'}; color:${active?'var(--primary)':'var(--text-sub)'}; font-size:12px; font-weight:800; cursor:pointer;">${label} <b style="color:${active?'var(--primary)':'var(--text-main)'};">${counts[v]}</b></button>`;
+            };
+            const row1 = [['all','전체'],['대기','🔘 대기'],['입고','🟡 입고'],['픽업','🟣 픽업완료'],['배달완료','🟢 배달완료']];
+            const row2 = [['배달미입금','🔴 배달미입금'],['입금완료','💵 입금완료']];
+            c1.innerHTML = row1.map(renderTab).join('');
+            if (c2) c2.innerHTML = row2.map(renderTab).join('');
+        }
+        function selectOrderStatus(v){
+            const sel = document.getElementById('filterStatus');
+            if (sel) sel.value = v;
+            selectedItems.clear();
+            updateSelectionCountText();
+            renderFilteredOrders();
+        }
+
         function renderFilteredOrders() {
             window.deliveryPhotos = {};
             try {
@@ -3271,19 +3372,11 @@
                             return true;
                         });
                     } else { // "day" (당일)
-                        filtered = rawOrders.filter(item => {
-                            const info = getOrderDateInfo(item);
-                            const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
-                            return itemYear === currentYear && info.month === currentMonth && info.day === currentDay;
-                        });
+                        filtered = rawOrders.filter(item => matchesCurrentDateScope(item));
                     }
                 } else {
-                    // 검색어가 없을 때: 기본으로 현재 선택된 일자 탭 데이터를 보여줌
-                    filtered = rawOrders.filter(item => {
-                        const info = getOrderDateInfo(item);
-                        const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
-                        return itemYear === currentYear && info.month === currentMonth && info.day === currentDay;
-                    });
+                    // 검색어가 없을 때: 현재 선택된 연/월/일 탭(전체 포함) 데이터를 보여줌
+                    filtered = rawOrders.filter(item => matchesCurrentDateScope(item));
                 }
 
                 // 2단계: 수령방법 및 검색 키워드 필터
@@ -3291,17 +3384,7 @@
                     const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
                     const matchShipping = shippingFilter === 'all' || actualShippingMethod === shippingFilter;
                     
-                    let matchStatus = true;
-                    const status = item.status || "대기";
-                    if (statusFilter !== 'all') {
-                        if (statusFilter === '대기') matchStatus = status === '대기';
-                        else if (statusFilter === '입고') matchStatus = status === '입고';
-                        else if (statusFilter === '픽업') matchStatus = status === '픽업';
-                        else if (statusFilter === '배달완료') matchStatus = status === '배달완료';
-                        else if (statusFilter === '배달미입금') matchStatus = (actualShippingMethod === '배달주문') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '배달완료';
-                        else if (statusFilter === '픽업미입금') matchStatus = (actualShippingMethod === '매장픽업') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '픽업';
-                    }
-
+                    // (상태 필터는 개수 계산 후 별도 단계에서 적용)
                     const phoneStr = String(item.phone || "");
                     const nameStr = String(item.name || "");
                     const itemStr = String(item.item || "");
@@ -3334,8 +3417,25 @@
                         fixedMemo.toLowerCase().includes(search) ||
                         printFixedMemo.toLowerCase().includes(search);
 
-                    return matchShipping && matchStatus && matchSearch;
+                    return matchShipping && matchSearch;
                 });
+
+                // 2-1단계: 상태별 개수 탭 갱신 후, 선택된 상태로 필터
+                buildOrderStatusTabs(filtered);
+                if (statusFilter !== 'all') {
+                    filtered = filtered.filter(item => {
+                        const status = item.status || "대기";
+                        const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
+                        if (statusFilter === '대기') return status === '대기';
+                        if (statusFilter === '입고') return status === '입고';
+                        if (statusFilter === '픽업') return status === '픽업';
+                        if (statusFilter === '배달완료') return status === '배달완료';
+                        if (statusFilter === '배달미입금') return (actualShippingMethod === '배달주문') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '배달완료';
+                        if (statusFilter === '픽업미입금') return (actualShippingMethod === '매장픽업') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '픽업';
+                        if (statusFilter === '입금완료') return (item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true");
+                        return true;
+                    });
+                }
 
                 // 3단계: 고객별(이름 + 연락처 + 수령방법 + 수령일)로 그룹화
                 const grouped = {};
@@ -3755,6 +3855,19 @@
         // 4. 필터 및 아카이브 / 체크박스 이벤트 핸들러
 
         let isArchiveLoaded = false;
+        let archivedOrdersCache = []; // [신규] 보관함(orders_archive) 캐시 — 실시간 갱신 후에도 rawOrders에 다시 합치기 위함
+
+        // [신규] 캐시된 보관함 주문을 rawOrders에 병합(중복 제외). 실시간 리스너가 rawOrders를 재생성해도 검색 가능하게 유지.
+        function mergeArchiveIntoRawOrders() {
+            if (!isArchiveLoaded || !archivedOrdersCache.length) return;
+            const seen = new Set(rawOrders.map(o => String(o.phone) + '|' + String(o.orderKey)));
+            let added = false;
+            archivedOrdersCache.forEach(a => {
+                const k = String(a.phone) + '|' + String(a.orderKey);
+                if (!seen.has(k)) { rawOrders.push(a); seen.add(k); added = true; }
+            });
+            if (added) rawOrders.sort((a, b) => parseTimestampToDate(b.timestamp) - parseTimestampToDate(a.timestamp));
+        }
 
         async function loadArchiveOrdersIfNeeded() {
             if (isArchiveLoaded) return;
@@ -3763,6 +3876,7 @@
                 const res = await fetch(`${FIREBASE_DB_URL}orders_archive.json`);
                 if (res.ok) {
                     const data = await res.json();
+                    archivedOrdersCache = [];
                     if (data) {
                         for (const phone in data) {
                             for (const orderKey in data[phone]) {
@@ -3778,23 +3892,20 @@
                                 else if (isReceived) calculatedStatus = "픽업";
                                 else if (isStocked) calculatedStatus = "입고";
 
-                                const exists = rawOrders.some(o => o.phone === phone && o.orderKey === orderKey);
-                                if (!exists) {
-                                    rawOrders.push({
-                                        firebasePhoneKey: phone,
-                                        phone,
-                                        ...it,
-                                        orderKey,
-                                        status: calculatedStatus,
-                                        isArchived: true
-                                    });
-                                }
+                                archivedOrdersCache.push({
+                                    firebasePhoneKey: phone,
+                                    phone,
+                                    ...it,
+                                    orderKey,
+                                    status: calculatedStatus,
+                                    isArchived: true
+                                });
                             }
                         }
-                        rawOrders.sort((a, b) => parseTimestampToDate(b.timestamp) - parseTimestampToDate(a.timestamp));
                     }
                 }
                 isArchiveLoaded = true;
+                mergeArchiveIntoRawOrders(); // rawOrders에 병합
             } catch (e) {
                 console.error("아카이브 로드 실패:", e);
             } finally {
@@ -6532,6 +6643,29 @@
             else { state.key = key; state.dir = defaultDir; }
         }
         function sortSalesUpcoming(key){ toggleSalesSort(salesUpcomingSort, key, key === 'name' ? 'asc' : 'desc'); renderSalesUpcoming(); }
+        // [신규] 집계 범위 탭 동적 생성: 전체 + 오늘 + 오늘 이후 주문 있는 날짜별 + 기간설정
+        function buildSalesUpcomingRangeTabs(){
+            const bar = document.getElementById('sales-uprange-tabs');
+            if (!bar) return;
+            const today = salesTodayMidnight();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+            const dateSet = new Set([todayStr]); // 오늘은 주문 없어도 포함
+            getSalesSourceOrders().forEach(o => {
+                if (isSalesCanceled(o)) return;
+                const info = getOrderDateInfo(o);
+                if (!info.dateStr || info.dateStr === '기타') return;
+                const p = info.dateStr.split('-');
+                const d = new Date(+p[0], +p[1]-1, +p[2]);
+                if (d >= today) dateSet.add(info.dateStr);
+            });
+            const dates = [...dateSet].sort(); // 오름차순 (오늘 → 미래)
+            const cur = salesUpcomingRange;
+            const tab = (v, label) => `<button type="button" data-sales-uprange="${v}" onclick="setSalesUpcomingRange('${v}')" class="sales-toggle-btn${cur === v ? ' active' : ''}">${label}</button>`;
+            let html = tab('today_after', '전체');
+            dates.forEach(ds => { html += tab(ds, fmtMD(ds)); });
+            bar.innerHTML = html;
+        }
+
         function setSalesUpcomingRange(mode){
             salesUpcomingRange = mode;
             document.querySelectorAll('[data-sales-uprange]').forEach(b => b.classList.toggle('active', b.dataset.salesUprange === mode));
@@ -6657,15 +6791,43 @@
             renderSalesStatus();
         }
 
+        // [신규] 발주 관리 카드에서 재고 변경 (상품목록의 updateProductStock 재사용 후 판매탭 재렌더)
+        async function salesUpdateStock(index, value){
+            await updateProductStock(index, value);
+            renderSalesUpcoming();
+        }
+
         // A. 오늘 이후 주문 집계
         function renderSalesUpcoming(){
-            const tbody = document.getElementById('sales-upcoming-tbody');
+            const list = document.getElementById('sales-upcoming-list');
             const sumBox = document.getElementById('sales-upcoming-summary');
-            if (!tbody) return;
+            const sortbar = document.getElementById('sales-upcoming-sortbar');
+            if (!list) return;
             const today = salesTodayMidnight();
+            buildSalesUpcomingRangeTabs(); // 집계 범위 탭(전체/날짜별/기간설정) 갱신
+            // [수정] 보유분 기준일: 특정 날짜 탭 선택 시 그 날짜, 아니면 오늘
+            let refDate = today;
+            const isDateSel = /^\d{4}-\d{2}-\d{2}$/.test(salesUpcomingRange); // 특정 날짜 탭 선택 여부
+            if (isDateSel) {
+                const _rp = salesUpcomingRange.split('-');
+                refDate = new Date(+_rp[0], +_rp[1]-1, +_rp[2]);
+            }
             const map = new Map();
+            const todayAfterMap = new Map(); // [신규] 보유분용: (전체=오늘이후 누적 / 날짜선택=해당 날짜만) 주문 수량, 취소 제외
             getSalesSourceOrders().forEach(o => {
                 if (isSalesCanceled(o)) return;
+                const prod = salesFindProduct(o);
+                const key = prod ? (String(prod.name) + '|' + String(prod.matchKey || '')) : ('name:' + String(o.item || ''));
+                // 보유분: 전체 탭=오늘 포함 이후 누적 / 특정 날짜 탭=그 날짜 주문수량만 → 재고에 더할 분
+                const _oi = getOrderDateInfo(o);
+                if (_oi.dateStr && _oi.dateStr !== '기타') {
+                    const _pp = _oi.dateStr.split('-');
+                    const _dd = new Date(+_pp[0], +_pp[1]-1, +_pp[2]);
+                    const _inScope = isDateSel ? (_oi.dateStr === salesUpcomingRange) : (_dd >= refDate);
+                    if (_inScope) todayAfterMap.set(key, (todayAfterMap.get(key) || 0) + (parseInt(o.qty || 0) || 0));
+                }
+                // 카드 집계: 카테고리 + 날짜범위 필터
+                if (salesUpcomingCats.size > 0 && !salesUpcomingCats.has(salesProductCategory(prod, o.item))) return; // 카테고리 필터(비어있으면 전체)
                 const info = getOrderDateInfo(o);
                 if (!info.dateStr || info.dateStr === '기타') return;
                 const p = info.dateStr.split('-');
@@ -6678,71 +6840,105 @@
                     if (from && d < from) return;
                     if (to && d > to) return;
                 }
-                else if (salesUpcomingRange === 'today_only') { if (d.getTime() !== today.getTime()) return; } // 오늘
-                else if (salesUpcomingRange === 'after_today') { if (d <= today) return; } // 그외(오늘 제외 이후)
+                else if (/^\d{4}-\d{2}-\d{2}$/.test(salesUpcomingRange)) { if (info.dateStr !== salesUpcomingRange) return; } // 특정 날짜만
                 else { if (d < today) return; } // 전체(오늘 포함 이후)
-                const prod = salesFindProduct(o);
-                if (salesUpcomingCats.size > 0 && !salesUpcomingCats.has(salesProductCategory(prod, o.item))) return; // 카테고리 필터(비어있으면 전체)
-                const key = prod ? (String(prod.name) + '|' + String(prod.matchKey || '')) : ('name:' + String(o.item || ''));
-                if (!map.has(key)) map.set(key, { name: o.item || '상품명 없음', prod, qty: 0, amount: 0, dates: new Set() });
+                if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, qty: 0, amount: 0, dates: new Set() });
                 const g = map.get(key);
                 g.qty += (parseInt(o.qty || 0) || 0);
                 g.amount += (parseInt(o.total || 0) || 0);
                 g.dates.add(info.dateStr);
             });
             const rows = [...map.values()].map(g => {
-                const stock = g.prod ? salesRealStock(g.prod) : null;
-                const diff = (stock === null || stock === Infinity) ? null : (stock - g.qty);
-                return Object.assign(g, { stock, diff });
+                const stock = g.prod ? salesRealStock(g.prod) : null;   // 주문으로 차감된 현재 재고
+                const todayAfter = todayAfterMap.get(g.key) || 0;       // 오늘 포함 이후 주문 수량
+                let onHand; // 보유분 = 재고 + 오늘 이후 주문 수량
+                if (stock === null) onHand = null;
+                else if (stock === Infinity) onHand = Infinity;
+                else onHand = stock + todayAfter;
+                let shortage; // 부족분 = 보유분 - 주문수량 (음수=부족, 양수=여유)
+                if (onHand === null) shortage = null;
+                else if (onHand === Infinity) shortage = Infinity; // 무제한 보유 → 부족 없음
+                else shortage = onHand - g.qty;
+                return Object.assign(g, { stock, onHand, shortage });
             });
+            // [신규] 상품명 검색 필터
+            const _searchEl = document.getElementById('sales-upcoming-search');
+            const _kw = _searchEl ? _searchEl.value.trim().toLowerCase() : '';
+            const filteredRows = _kw ? rows.filter(r => String(r.name || '').toLowerCase().includes(_kw)) : rows;
+            // 정렬 칩 (표 헤더 대신)
             const upCols = [
-                { key:'name', label:'상품명', align:'left' },
-                { key:'qty', label:'주문수량', align:'right' },
-                { key:'stock', label:'현재재고', align:'right' },
-                { key:'diff', label:'차이(재고−주문)', align:'right' },
-                { key:'amount', label:'주문액', align:'right' }
+                { key:'name', label:'상품명' },
+                { key:'qty', label:'주문수량' },
+                { key:'stock', label:'재고' },
+                { key:'onhand', label:'보유분' },
+                { key:'shortage', label:'부족분' },
+                { key:'amount', label:'주문액' }
             ];
-            const uthead = document.getElementById('sales-upcoming-thead');
-            if (uthead) uthead.innerHTML = salesSortHeader(upCols, salesUpcomingSort, 'sortSalesUpcoming');
+            if (sortbar) sortbar.innerHTML = '<span style="font-size:11px; font-weight:800; color:#475569;">정렬</span>' + upCols.map(c => {
+                const active = salesUpcomingSort.key === c.key;
+                const arrow = active ? (salesUpcomingSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+                return `<button type="button" onclick="sortSalesUpcoming('${c.key}')" class="sales-toggle-btn${active ? ' active' : ''}" style="padding:5px 9px; font-size:11px;">${c.label}${arrow}</button>`;
+            }).join('');
             const us = salesUpcomingSort;
-            rows.sort((a, b) => {
+            filteredRows.sort((a, b) => {
                 if (us.key === 'name') return salesCmpStr(a.name, b.name, us.dir);
                 const pick = (r) => {
                     if (us.key === 'qty') return r.qty;
-                    if (us.key === 'stock') return (r.stock === Infinity ? Number.MAX_SAFE_INTEGER : r.stock);
-                    if (us.key === 'diff') return r.diff;
+                    if (us.key === 'stock') return (r.stock === Infinity ? Number.MAX_SAFE_INTEGER : (r.stock === null ? -1 : r.stock));
+                    if (us.key === 'onhand') return (r.onHand === Infinity ? Number.MAX_SAFE_INTEGER : r.onHand);
+                    if (us.key === 'shortage') return (r.shortage === Infinity ? Number.MAX_SAFE_INTEGER : r.shortage);
                     if (us.key === 'amount') return r.amount;
                     return 0;
                 };
                 return salesCmpNum(pick(a), pick(b), us.dir);
             });
-            if (rows.length === 0){
-                tbody.innerHTML = `<tr><td colspan="5" style="padding:16px; text-align:center; color:var(--text-sub);">오늘 이후 예정된 주문이 없습니다.</td></tr>`;
+            if (filteredRows.length === 0){
+                list.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-sub); font-size:13px;">${_kw ? '검색 결과가 없습니다.' : '해당 조건의 예정 주문이 없습니다.'}</div>`;
                 if (sumBox) sumBox.innerHTML = '';
                 return;
             }
             let totalQty = 0, totalAmount = 0, shortageCount = 0;
-            tbody.innerHTML = rows.map(r => {
+            filteredRows.forEach(r => {
                 totalQty += r.qty; totalAmount += r.amount;
-                const stockText = (r.stock === null) ? '<span style="color:var(--text-sub);">-</span>' : (r.stock === Infinity ? '무제한' : (r.stock + '개'));
-                let diffText;
-                if (r.diff === null) diffText = '<span style="color:var(--text-sub);">-</span>';
-                else if (r.diff < 0){ shortageCount++; diffText = `<span style="color:#dc2626; font-weight:900;">${r.diff}개 (부족)</span>`; }
-                else diffText = `<span style="color:#059669; font-weight:800;">+${r.diff}개</span>`;
+                if (r.shortage !== null && r.shortage !== Infinity && r.shortage < 0) shortageCount++;
+            });
+            // 상품 카드 1개 HTML (부수효과 없음)
+            const cardHTML = (r) => {
+                const stockText = (r.stock === null) ? '-' : (r.stock === Infinity ? '무제한' : (r.stock + '개'));
+                const onHandText = (r.onHand === null) ? '-' : (r.onHand === Infinity ? '무제한' : (r.onHand + '개'));
+                let shortText;
+                if (r.shortage === null) shortText = '<b style="color:var(--text-sub); font-weight:900;">-</b>';
+                else if (r.shortage < 0) shortText = `<b style="color:#dc2626; font-weight:900;">${r.shortage}개</b>`; // 부족(음수)만 표시
+                else shortText = '<b style="color:#64748b; font-weight:900;">0개</b>'; // 0 이상(여유·무제한)은 0개
                 const dateHint = [...r.dates].sort().map(fmtMD).join(', ');
-                return `<tr>
-                    <td style="padding:8px; text-align:left;">${r.name}<div style="font-size:10px; color:var(--text-sub);">${dateHint}</div></td>
-                    <td style="padding:8px; text-align:right; font-weight:800;">${r.qty}개</td>
-                    <td style="padding:8px; text-align:right;">${stockText}</td>
-                    <td style="padding:8px; text-align:right;">${diffText}</td>
-                    <td style="padding:8px; text-align:right;">${r.amount.toLocaleString()}원</td>
-                </tr>`;
-            }).join('');
+                // 재고 변경칸용 인덱스/현재값 (상품이 매칭된 경우만)
+                const idx = r.prod ? uploadProducts.indexOf(r.prod) : -1;
+                const stockInputVal = (r.stock === Infinity) ? '무제한' : (r.stock === null ? '' : r.stock);
+                return `<div style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+                        <div style="font-weight:700; font-size:13px; word-break:break-all; line-height:1.3;">${r.name}</div>
+                        <span style="flex-shrink:0; font-size:12px; color:var(--text-sub); white-space:nowrap;">주문액 <b style="color:var(--text-main);">${r.amount.toLocaleString()}원</b></span>
+                    </div>
+                    <div style="font-size:10px; color:var(--text-sub); margin:2px 0 5px;">${dateHint}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                        <div style="display:flex; gap:12px; font-size:12px; flex-wrap:wrap;">
+                            <span style="color:var(--text-sub);">주문수량 <b style="color:#2563eb; font-weight:900;">${r.qty}개</b></span>
+                            <span style="color:var(--text-sub);">재고 <b style="color:#7c3aed; font-weight:900;">${stockText}</b></span>
+                            <span style="color:var(--text-sub);">보유분 <b style="color:#059669; font-weight:900;">${onHandText}</b></span>
+                            <span style="color:var(--text-sub);">부족분 ${shortText}</span>
+                        </div>
+                        ${idx >= 0 ? `<div style="flex-shrink:0; display:flex; gap:4px; align-items:center;">
+                            <input type="text" id="sales-stock-input-${idx}" value="${stockInputVal}" placeholder="${stockInputVal}" inputmode="numeric" onfocus="this.value='';" onkeydown="if(event.key==='Enter'){event.preventDefault(); salesUpdateStock(${idx}, this.value);}" title="재고 수량 입력 (숫자, 999=무제한)" style="width:58px; padding:4px 6px; border:1.5px solid var(--border); border-radius:6px; font-size:12px; font-weight:700; text-align:center; box-sizing:border-box;">
+                            <button type="button" onclick="salesUpdateStock(${idx}, document.getElementById('sales-stock-input-${idx}').value)" style="padding:5px 11px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button>
+                        </div>` : ''}
+                    </div>
+                </div>`;
+            };
+            list.innerHTML = filteredRows.map(cardHTML).join('');
             if (sumBox) sumBox.innerHTML =
-                salesStatChip('상품 종류', rows.length + '종') +
-                salesStatChip('총 주문수량', totalQty.toLocaleString() + '개') +
-                salesStatChip('총 주문액', totalAmount.toLocaleString() + '원') +
-                salesStatChip('재고 부족', shortageCount + '종', shortageCount > 0 ? '#dc2626' : null);
+                salesStatChip('상품 종류', filteredRows.length + '종') +
+                salesStatChip('재고 부족', shortageCount + '종', shortageCount > 0 ? '#dc2626' : null) +
+                salesStatChip('총 주문액', totalAmount.toLocaleString() + '원');
         }
 
         function getSalesPeriodRange(){
@@ -6781,7 +6977,7 @@
                 if (salesMethodFilter === 'pickup' && isDelivery) return false;
                 return true;
             });
-            let totalAmount = 0, totalQty = 0, paidAmount = 0, pickupDoneAmount = 0, unpaidAmount = 0, deliveryQty = 0, pickupQty = 0;
+            let totalAmount = 0, totalQty = 0, deliveredAmount = 0, pickupDoneAmount = 0, unpaidAmount = 0, deliveryQty = 0, pickupQty = 0;
             // [수정] '건수'는 주문현황과 동일하게 고객(이름_전화번호) 단위로 집계 (주문시각이 달라도 같은 고객이면 1건)
             const custGroups = new Map(); // key: 사람_날짜 → 'delivery' | 'pickup' — 주문건수(고객×날짜)용
             const peopleSet = new Set();  // [신규] 순수 주문자 인원: 전화번호(숫자만) 기준 중복 제거
@@ -6791,9 +6987,11 @@
                 const amt = parseInt(o.total || 0) || 0;
                 const q = parseInt(o.qty || 0) || 0;
                 totalAmount += amt; totalQty += q;
-                if (isSalesPaid(o)) paidAmount += amt;
-                else if (String(o.status || '') === '픽업') pickupDoneAmount += amt; // 미입금이지만 픽업완료 → 별도 집계
-                else unpaidAmount += amt;
+                const _st = String(o.status || '');
+                if (_st === '배달완료') deliveredAmount += amt;            // 배달완료 금액(입금 여부 무관)
+                else if (_st === '픽업') pickupDoneAmount += amt;          // 픽업완료 금액(입금 여부 무관)
+                else if (!isSalesPaid(o)) unpaidAmount += amt;             // 미입금 = 배달완료·픽업완료 아닌 미입금(대기·입고 등)
+                // else: 입금됐지만 아직 배달/픽업 전(선입금) → 3칸 어디에도 넣지 않음
                 const isDeliveryO = isSalesDelivery(o);
                 if (isDeliveryO) deliveryQty += q; else pickupQty += q;
                 const _cdd = salesOrderDate(o);
@@ -6826,20 +7024,21 @@
 
             const paidBox = document.getElementById('sales-paid-summary');
             const denom = totalAmount > 0 ? totalAmount : 1;
-            const paidPct = Math.round(paidAmount / denom * 100);
+            const deliveredPct = Math.round(deliveredAmount / denom * 100);
             const pickupPct = Math.round(pickupDoneAmount / denom * 100);
-            const unpaidPct = Math.max(0, 100 - paidPct - pickupPct);
+            const unpaidPct = Math.round(unpaidAmount / denom * 100);
             if (paidBox) paidBox.innerHTML = `
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    ${salesStatChip('입금완료', paidAmount.toLocaleString() + '원', '#059669')}
+                    ${salesStatChip('배달완료', deliveredAmount.toLocaleString() + '원', '#059669')}
                     ${salesStatChip('픽업완료', pickupDoneAmount.toLocaleString() + '원', pickupDoneAmount > 0 ? '#7c3aed' : null)}
                     ${salesStatChip('미입금', unpaidAmount.toLocaleString() + '원', unpaidAmount > 0 ? '#dc2626' : null)}
                 </div>
-                <div style="margin-top:6px; height:10px; background:#ef4444; border-radius:6px; overflow:hidden; display:flex;">
-                    <div style="width:${paidPct}%; height:100%; background:#059669;"></div>
+                <div style="margin-top:6px; height:10px; background:#e5e7eb; border-radius:6px; overflow:hidden; display:flex;">
+                    <div style="width:${deliveredPct}%; height:100%; background:#059669;"></div>
                     <div style="width:${pickupPct}%; height:100%; background:#7c3aed;"></div>
+                    <div style="width:${unpaidPct}%; height:100%; background:#ef4444;"></div>
                 </div>
-                <div style="font-size:11px; color:var(--text-sub); margin-top:3px;">입금완료 ${paidPct}% · 픽업완료 ${pickupPct}% · 미입금 ${unpaidPct}%</div>`;
+                <div style="font-size:11px; color:var(--text-sub); margin-top:3px;">배달완료 ${deliveredPct}% · 픽업완료 ${pickupPct}% · 미입금 ${unpaidPct}%</div>`;
 
             _salesRankingCache = [...itemMap.entries()];
             renderSalesRanking();
@@ -6945,13 +7144,75 @@
         }
         function onSalesCustomRangeChange(){ if (salesPeriod === 'custom') renderSalesStatus(); }
 
-        // 판매 관리 하위 탭 전환: 'purchase'(발주 관리) | 'status'(판매현황)
+        // 판매 관리 하위 탭 전환: 'purchase'(발주 관리) | 'status'(판매현황) | 'overdue'(지난 미완료)
         function setSalesSubTab(which){
             document.querySelectorAll('.sales-sub-btn').forEach(b => b.classList.toggle('active', b.dataset.salesSub === which));
             const pur = document.getElementById('sales-sub-purchase');
             const st = document.getElementById('sales-sub-status');
+            const od = document.getElementById('sales-sub-overdue');
             if (pur) pur.style.display = (which === 'purchase') ? 'block' : 'none';
             if (st) st.style.display = (which === 'status') ? 'block' : 'none';
+            if (od) od.style.display = (which === 'overdue') ? 'block' : 'none';
+            if (which === 'overdue') renderSalesOverdue();
+        }
+
+        // 지난 미완료: 오늘 이전 예정일인데 배달완료/픽업완료/취소가 아닌 주문 (고객별 그룹)
+        function renderSalesOverdue(){
+            const box = document.getElementById('sales-overdue-list');
+            const sum = document.getElementById('sales-overdue-summary');
+            if (!box) return;
+            const today = salesTodayMidnight();
+            const items = [];
+            getSalesSourceOrders().forEach(o => {
+                if (isSalesCanceled(o)) return;
+                const st = String(o.status || '');
+                if (st === '픽업' || st === '배달완료' || st === '취소') return; // 완료/취소 제외
+                const info = getOrderDateInfo(o);
+                if (!info.dateStr || info.dateStr === '기타') return;
+                const p = info.dateStr.split('-');
+                const d = new Date(+p[0], +p[1]-1, +p[2]);
+                if (d.getFullYear() < 2000 || d >= today) return; // 오늘 이전만
+                items.push({ dateStr: info.dateStr, status: st || '대기', name: o.name || '무명', phone: String(o.phone || ''), item: o.item || '상품명 없음', qty: parseInt(o.qty || 0) || 0, paid: isSalesPaid(o) });
+            });
+            const groups = new Map(); // 고객별(이름_전화)
+            items.forEach(it => {
+                const k = it.name + '_' + it.phone;
+                if (!groups.has(k)) groups.set(k, { name: it.name, phone: it.phone, items: [], oldest: it.dateStr });
+                const g = groups.get(k);
+                g.items.push(it);
+                if (it.dateStr < g.oldest) g.oldest = it.dateStr;
+            });
+            const arr = [...groups.values()].sort((a, b) => a.oldest < b.oldest ? -1 : 1); // 오래된 순
+            if (sum) sum.innerHTML = salesStatChip('미완료 고객', arr.length + '명') + salesStatChip('미완료 건수', items.length + '건');
+            if (arr.length === 0){
+                box.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-sub); font-size:13px;">오늘 이전 미완료(픽업/배달 안 된) 주문이 없습니다. 👍</div>`;
+                return;
+            }
+            box.innerHTML = arr.map(g => {
+                const cleanPhone = g.phone.replace(/\D/g, '');
+                const itemsHtml = g.items.sort((a, b) => a.dateStr < b.dateStr ? -1 : 1).map(it => {
+                    const stColor = it.status === '입고' ? '#d97706' : '#64748b';
+                    return `<div style="display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 0; border-top:1px dashed #f1f5f9;">
+                        <span style="color:var(--text-main); word-break:break-all;">${it.item} <b>×${it.qty}</b></span>
+                        <span style="flex-shrink:0; color:var(--text-sub); white-space:nowrap;">${fmtMD(it.dateStr)} · <b style="color:${stColor};">${it.status}</b> · ${it.paid ? '<b style="color:#059669;">입금</b>' : '<b style="color:#dc2626;">미입금</b>'}</span>
+                    </div>`;
+                }).join('');
+                // 미완료 안내 문자 본문 자동 작성 (URL 인코딩으로 특수문자 안전 처리)
+                const smsMsg = `[모켓] ${g.name}님, 아직 픽업/배달 전인 주문이 있어 안내드립니다.\n`
+                    + g.items.map(it => `· ${it.item} ×${it.qty} (${fmtMD(it.dateStr)}, ${it.status})`).join('\n')
+                    + `\n확인 부탁드려요 🙏`;
+                const smsMsgEnc = encodeURIComponent(smsMsg);
+                return `<div style="border:1px solid var(--border); border-left:3px solid #dc2626; border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;">
+                        <div style="font-weight:800; font-size:13px;">${g.name} <span style="font-size:11px; color:var(--text-sub); font-weight:600;">${g.phone}</span></div>
+                        ${cleanPhone ? `<div style="flex-shrink:0; display:flex; gap:5px;">
+                            <a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:3px 8px; border-radius:6px;">📞 전화</a>
+                            <button type="button" onclick="copyTextAndSms(decodeURIComponent('${smsMsgEnc}'), '${cleanPhone}', '미완료 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:3px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>
+                        </div>` : ''}
+                    </div>
+                    ${itemsHtml}
+                </div>`;
+            }).join('');
         }
         function salesPeriodLabel(){ return ({ today:'오늘', week:'이번주', month:'이번달', all:'전체', custom:'직접설정' })[salesPeriod] || salesPeriod; }
 
@@ -9133,7 +9394,7 @@
             }
 
             // [신규] PC 환경에서 가로 스크롤 탭 컨테이너 마우스 휠 스크롤 지원
-            const horizontalScrollIds = ['sub-products-list-tabs', 'month-tabs', 'day-tabs'];
+            const horizontalScrollIds = ['sub-products-list-tabs', 'month-tabs', 'day-tabs', 'order-status-tabs', 'order-status-tabs2'];
             horizontalScrollIds.forEach(id => {
                 const container = document.getElementById(id);
                 if (container) {
