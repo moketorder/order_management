@@ -1992,12 +1992,12 @@
     <div class="admin-nav-tabs no-print" style="max-width: 1200px; margin: 15px auto 0 auto; padding: 0 15px;">
         <div class="segment-control five-cols" style="display: grid; grid-template-columns: repeat(5, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px;">
             <div class="segment-btn admin-nav-btn active" data-tab="orders" onclick="switchAdminTab('orders')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 주문 관리</div>
-            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 판매 관리</div>
             <div class="segment-btn admin-nav-btn" data-tab="product-upload" onclick="switchAdminTab('product-upload')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📦 상품 등록</div>
             <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 상품 목록 <span id="product-count" style="display: none;">(0)</span></div>
+            <div class="segment-btn admin-nav-btn" data-tab="purchase-history" onclick="switchAdminTab('purchase-history')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🚚 발주 내역</div>
+            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 판매 관리</div>
             <!-- [숨김] 섬네일 탭 — 버튼만 숨기고 기능(tab-admin-thumbnail-generator, switchAdminTab)은 그대로 유지 -->
             <div class="segment-btn admin-nav-btn" data-tab="thumbnail-generator" onclick="switchAdminTab('thumbnail-generator')" style="display:none; text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🎨 섬네일</div>
-            <div class="segment-btn admin-nav-btn" data-tab="purchase-history" onclick="switchAdminTab('purchase-history')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🚚 발주 내역</div>
         </div>
     </div>
 
@@ -6288,6 +6288,9 @@
         // =========================================================================
 
         const UPLOAD_API_URL = "https://script.google.com/macros/s/AKfycbw6F-D5UhJTkLafBv4uOs5_lUD61ervXveLCcZ6ROHNYhFbEi_vJUamKHUjHE9wGeaY/exec";
+        // [신규] Cloudinary 사진 업로드 설정 — 아래 두 값을 실제 값으로 바꾸세요 (Cloudinary 콘솔에서 확인)
+        const CLOUDINARY_CLOUD_NAME = "q36jlrdf";        // Cloudinary Cloud name
+        const CLOUDINARY_UPLOAD_PRESET = "moket_image";  // Unsigned 업로드 프리셋
 
         // [추가] 실시간 재고 매핑 헬퍼 함수 (상품 목록 렌더링 에러 해결)
         function fSafeKey(s) {
@@ -8467,61 +8470,14 @@
             }
 
             try {
-                // 1. 모든 신규 사진 업로드 처리 (item.id 수집 - GAS로 구글 드라이브에 이미지 파일 저장)
+                // 1. 모든 신규 사진 업로드 처리 (item.id = Cloudinary CDN URL). GAS 대신 Cloudinary 직접 업로드로 속도 개선.
                 for (let i = 0; i < uploadSelectedFiles.length; i++) {
                     const item = uploadSelectedFiles[i];
                     if (item.isExisting) continue;
-                    
+
                     showLoader(`📸 사진 업로드 중 (${i + 1}/${uploadSelectedFiles.length}): ${item.displayName}`);
-                    const base64Data = await getCompressedBase64(item.file);
-                    
-                    const payload = {
-                        header: "upload_image",
-                        productName: name,
-                        base64: base64Data,
-                        filename: `${Date.now()}_${item.file.name}`,
-                        contentType: item.file.type
-                    };
-
-                    // [개선] GAS 업로드 안정화: 응답 타임아웃(AbortController) + 최대 5회 자동 재시도.
-                    // '서버 응답 없음'은 대개 GAS 지연이 원인이라, 60초 내 응답 없으면 취소 후 재시도한다.
-                    let resJson = null;
-                    let lastErr = null;
-                    const MAX_TRY = 5;
-                    for (let attempt = 1; attempt <= MAX_TRY; attempt++) {
-                        const controller = new AbortController();
-                        const timer = setTimeout(() => controller.abort(), 60000);
-                        try {
-                            if (attempt > 1) {
-                                showLoader(`📸 사진 업로드 재시도 (${i + 1}/${uploadSelectedFiles.length}) [${attempt}/${MAX_TRY}]: ${item.displayName}`);
-                                await new Promise(r => setTimeout(r, Math.min(5000, 800 * attempt)));
-                            }
-                            const response = await fetch(UPLOAD_API_URL, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'text/plain' },
-                                body: JSON.stringify(payload),
-                                signal: controller.signal
-                            });
-                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                            const text = await response.text();
-                            let j;
-                            try { j = JSON.parse(text); }
-                            catch (pe) { throw new Error("서버가 올바른 JSON 응답을 주지 않음: " + String(text).slice(0, 80)); }
-                            if (j.result !== 'success') throw new Error(j.message || "이미지 서버 응답 에러");
-                            resJson = j;
-                            break;
-                        } catch (e) {
-                            lastErr = (e && e.name === 'AbortError') ? new Error('서버 응답 시간 초과(60초)') : e;
-                            console.warn(`이미지 업로드 시도 ${attempt}/${MAX_TRY} 실패 (${item.displayName}):`, lastErr.message);
-                        } finally {
-                            clearTimeout(timer);
-                        }
-                    }
-
-                    if (!resJson) {
-                        throw new Error(`[${item.displayName}] 이미지 업로드가 ${MAX_TRY}회 재시도 후에도 실패했습니다.${lastErr ? ' (' + lastErr.message + ')' : ''}`);
-                    }
-                    item.id = resJson.fileId || resJson.id || resJson.fileid || null;
+                    const base64Data = await getCompressedBase64(item.file); // 클라이언트에서 리사이즈+압축 후 업로드
+                    item.id = await uploadToCloudinary(base64Data, item.displayName);
                 }
 
                 // 2. uploadThumbnailIndex로 지정된 대표 섬네일을 0번 인덱스에 배치하여 finalImages 구성
@@ -9084,6 +9040,36 @@
                 console.error("CSV 업로드 실패:", e);
                 showToast("CSV 업로드 실패: " + e.toString());
             }
+        }
+
+        // [신규] Cloudinary 직접 업로드 (unsigned). data URI 또는 File을 받아 CDN URL(secure_url) 반환. 재시도 포함.
+        async function uploadToCloudinary(fileOrDataUri, label) {
+            if (!CLOUDINARY_CLOUD_NAME || CLOUDINARY_CLOUD_NAME.indexOf('여기에') === 0 ||
+                !CLOUDINARY_UPLOAD_PRESET || CLOUDINARY_UPLOAD_PRESET.indexOf('여기에') === 0) {
+                throw new Error('Cloudinary 설정(cloud name / upload preset)이 아직 입력되지 않았습니다.');
+            }
+            const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+            let lastErr = null;
+            const MAX_TRY = 4;
+            for (let attempt = 1; attempt <= MAX_TRY; attempt++) {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 60000);
+                try {
+                    const form = new FormData();
+                    form.append('file', fileOrDataUri);
+                    form.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                    const res = await fetch(url, { method: 'POST', body: form, signal: controller.signal });
+                    const j = await res.json().catch(() => null);
+                    if (!res.ok) throw new Error((j && j.error && j.error.message) || ('HTTP ' + res.status));
+                    if (!j || !j.secure_url) throw new Error('Cloudinary 응답에 URL이 없습니다.');
+                    return j.secure_url;
+                } catch (e) {
+                    lastErr = (e && e.name === 'AbortError') ? new Error('업로드 시간 초과(60초)') : e;
+                    console.warn(`Cloudinary 업로드 시도 ${attempt}/${MAX_TRY} 실패 (${label}):`, lastErr.message);
+                    if (attempt < MAX_TRY) await new Promise(r => setTimeout(r, Math.min(4000, 700 * attempt)));
+                } finally { clearTimeout(timer); }
+            }
+            throw new Error(`[${label}] 이미지 업로드가 ${MAX_TRY}회 재시도 후에도 실패했습니다.${lastErr ? ' (' + lastErr.message + ')' : ''}`);
         }
 
         function getCompressedBase64(file) {
