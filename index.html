@@ -676,6 +676,22 @@
             font-weight: 850;
         }
 
+        /* [신규] 수량 2개 이상 강조 — 화면에선 기존과 동일, 영수증 '인쇄 시에만' 크게 박스로 강조 */
+        @media print {
+            .qty-highlight.qty-multi {
+                color: #000 !important;
+                background: #fff !important;
+                border: 2.5px solid #000 !important;
+                font-size: 1.5em !important;
+                font-weight: 900 !important;
+                text-decoration: underline !important;
+                padding: 0 7px !important;
+                white-space: nowrap;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+
         .mobile-item-middle {
             display: flex;
             justify-content: space-between;
@@ -1976,9 +1992,11 @@
     <div class="admin-nav-tabs no-print" style="max-width: 1200px; margin: 15px auto 0 auto; padding: 0 15px;">
         <div class="segment-control five-cols" style="display: grid; grid-template-columns: repeat(5, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px;">
             <div class="segment-btn admin-nav-btn active" data-tab="orders" onclick="switchAdminTab('orders')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 주문 관리</div>
+            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 판매 관리</div>
             <div class="segment-btn admin-nav-btn" data-tab="product-upload" onclick="switchAdminTab('product-upload')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📦 상품 등록</div>
             <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 상품 목록 <span id="product-count" style="display: none;">(0)</span></div>
-            <div class="segment-btn admin-nav-btn" data-tab="thumbnail-generator" onclick="switchAdminTab('thumbnail-generator')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🎨 섬네일</div>
+            <!-- [숨김] 섬네일 탭 — 버튼만 숨기고 기능(tab-admin-thumbnail-generator, switchAdminTab)은 그대로 유지 -->
+            <div class="segment-btn admin-nav-btn" data-tab="thumbnail-generator" onclick="switchAdminTab('thumbnail-generator')" style="display:none; text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🎨 섬네일</div>
             <div class="segment-btn admin-nav-btn" data-tab="purchase-history" onclick="switchAdminTab('purchase-history')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🚚 발주 내역</div>
         </div>
     </div>
@@ -2458,6 +2476,117 @@
             </div>
         </div>
         </div>
+
+    <!-- 탭: 판매 관리 -->
+    <style>
+        .sales-toggle-btn { padding:7px 12px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; }
+        .sales-toggle-btn.active { border-color:var(--primary); background:var(--primary-light); color:var(--primary); }
+        .sales-sub-btn { color:var(--text-sub); }
+        .sales-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+        #tab-admin-sales table th, #tab-admin-sales table td { border-bottom:1px solid #f1f5f9; }
+    </style>
+    <div id="tab-admin-sales" class="admin-tab-content" style="display: none;">
+        <div class="container" style="max-width: 900px; margin: 0 auto; padding: 15px;">
+
+            <!-- 하위 탭: 발주 관리 / 판매현황 -->
+            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:16px;">
+                <div class="segment-btn sales-sub-btn active" data-sales-sub="purchase" onclick="setSalesSubTab('purchase')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">🧾 발주 관리</div>
+                <div class="segment-btn sales-sub-btn" data-sales-sub="status" onclick="setSalesSubTab('status')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">📊 판매현황</div>
+            </div>
+
+            <!-- 발주 관리 (오늘 이후 주문 집계) -->
+            <div id="sales-sub-purchase">
+            <!-- A. 오늘 이후 주문 집계 (준비·발주) -->
+            <div class="card" style="padding: 14px; margin-bottom: 16px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                    <div class="card-title" style="margin:0;">📦 오늘 이후 주문 집계 (준비·발주)</div>
+                    <button type="button" onclick="initSalesTab()" style="padding:5px 10px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">🔄 새로고침</button>
+                </div>
+                <div style="font-size:11px; color:var(--text-sub); font-weight:700; margin-bottom:8px;">픽업/배달 예정일 기준 미취소 주문을 상품별로 집계 · 재고 부족(재고−주문 &lt; 0)은 빨강·상단</div>
+                <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+                    <span style="font-size:12px; font-weight:800; color:#475569;">집계 범위</span>
+                    <button type="button" data-sales-uprange="today_after" onclick="setSalesUpcomingRange('today_after')" class="sales-toggle-btn active">전체</button>
+                    <button type="button" data-sales-uprange="today_only" onclick="setSalesUpcomingRange('today_only')" class="sales-toggle-btn">오늘</button>
+                    <button type="button" data-sales-uprange="after_today" onclick="setSalesUpcomingRange('after_today')" class="sales-toggle-btn">그외</button>
+                    <button type="button" data-sales-uprange="custom" onclick="setSalesUpcomingRange('custom')" class="sales-toggle-btn">📅 기간설정</button>
+                </div>
+                <div id="sales-upcoming-range" style="display:none; gap:6px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="date" id="sales-up-from" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
+                    <span style="font-size:12px;">~</span>
+                    <input type="date" id="sales-up-to" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
+                </div>
+                <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+                    <span style="font-size:12px; font-weight:800; color:#475569;">카테고리</span>
+                    <button type="button" data-sales-upcat="all" onclick="setSalesUpcomingCat('all')" class="sales-toggle-btn active">전체</button>
+                    <button type="button" data-sales-upcat="fruit" onclick="setSalesUpcomingCat('fruit')" class="sales-toggle-btn">🍎 과일</button>
+                    <button type="button" data-sales-upcat="group" onclick="setSalesUpcomingCat('group')" class="sales-toggle-btn">📦 공동구매</button>
+                    <button type="button" data-sales-upcat="sada" onclick="setSalesUpcomingCat('sada')" class="sales-toggle-btn">🛒 사다드림</button>
+                    <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn">그외</button>
+                </div>
+                <div id="sales-upcoming-summary" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead id="sales-upcoming-thead"></thead>
+                        <tbody id="sales-upcoming-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            </div><!-- /sales-sub-purchase -->
+
+            <!-- 판매현황 -->
+            <div id="sales-sub-status" style="display:none;">
+            <!-- B~D. 판매현황 -->
+            <div class="card" style="padding: 14px; margin-bottom: 16px;">
+                <div class="card-title" style="margin:0 0 10px 0;">📊 판매현황</div>
+
+                <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
+                    <span style="font-size:12px; font-weight:800; color:#475569;">집계 기준</span>
+                    <button type="button" id="sales-basis-pickup" onclick="setSalesDateBasis('pickup')" class="sales-toggle-btn active">픽업·배달일</button>
+                    <button type="button" id="sales-basis-order" onclick="setSalesDateBasis('order')" class="sales-toggle-btn">주문일</button>
+                </div>
+
+                <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
+                    <span style="font-size:12px; font-weight:800; color:#475569;">배송유형</span>
+                    <button type="button" data-sales-method="all" onclick="setSalesMethod('all')" class="sales-toggle-btn active">전체</button>
+                    <button type="button" data-sales-method="delivery" onclick="setSalesMethod('delivery')" class="sales-toggle-btn">🚚 배달</button>
+                    <button type="button" data-sales-method="pickup" onclick="setSalesMethod('pickup')" class="sales-toggle-btn">📍 픽업</button>
+                </div>
+
+                <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+                    <span style="font-size:12px; font-weight:800; color:#475569;">기간</span>
+                    <button type="button" data-sales-period="today" onclick="setSalesPeriod('today')" class="sales-toggle-btn">오늘</button>
+                    <button type="button" data-sales-period="week" onclick="setSalesPeriod('week')" class="sales-toggle-btn">이번주</button>
+                    <button type="button" data-sales-period="month" onclick="setSalesPeriod('month')" class="sales-toggle-btn active">이번달</button>
+                    <button type="button" data-sales-period="all" onclick="setSalesPeriod('all')" class="sales-toggle-btn">전체</button>
+                    <button type="button" data-sales-period="custom" onclick="setSalesPeriod('custom')" class="sales-toggle-btn">직접</button>
+                </div>
+                <div id="sales-custom-range" style="display:none; gap:6px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="date" id="sales-custom-from" class="form-control" style="width:auto; height:38px;" onchange="onSalesCustomRangeChange()">
+                    <span style="font-size:12px;">~</span>
+                    <input type="date" id="sales-custom-to" class="form-control" style="width:auto; height:38px;" onchange="onSalesCustomRangeChange()">
+                </div>
+
+                <div id="sales-metrics" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px,1fr)); gap:8px; margin-bottom:14px;"></div>
+
+                <div id="sales-paid-summary" style="margin-bottom:14px;"></div>
+
+                <button type="button" onclick="exportSalesCSV()" style="width:100%; padding:9px; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:var(--radius-sm); font-size:13px; font-weight:800; cursor:pointer; margin-bottom:16px;">📤 판매 리포트 CSV 내보내기</button>
+
+                <div class="card-title" id="sales-trend-title" style="margin:6px 0 8px 0; font-size:14px;">📈 일자별 매출 추이</div>
+                <div id="sales-daily-trend" style="margin-bottom:16px;"></div>
+
+                <div class="card-title" style="margin:6px 0 8px 0; font-size:14px;">🏆 상품별 판매 순위</div>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead id="sales-ranking-thead"></thead>
+                        <tbody id="sales-ranking-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            </div><!-- /sales-sub-status -->
+        </div>
+    </div>
 
     <script>
         const FIREBASE_DB_URL = "https://moketdb-default-rtdb.asia-southeast1.firebasedatabase.app/";
@@ -3404,6 +3533,10 @@
 
                         const isCanceledOrCompleted = isCanceled || status === '픽업' || status === '배달완료';
 
+                        // [신규] 수량 2개 이상이면 강조(qty-multi) — 인쇄 시 1개로 착각 방지
+                        const qtyNum = parseInt(it.qty || 0) || 0;
+                        const qtyClass = qtyNum >= 2 ? 'qty-highlight qty-multi' : 'qty-highlight';
+
                         // 1. 데스크톱용 행 템플릿
                         desktopRowsHtml += `
                             <tr class="${isCanceledOrCompleted ? 'row-canceled' : ''}">
@@ -3414,7 +3547,7 @@
                                     </label>
                                 </td>
                                 <td class="item-name-cell">${it.item} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}</td>
-                                <td style="width:70px;"><strong class="qty-highlight">${it.qty}</strong>개</td>
+                                <td style="width:70px;"><strong class="${qtyClass}">${qtyNum}</strong>개</td>
                                 <td style="width:100px;">${parseInt(it.price || 0).toLocaleString()}원</td>
                                 <td style="width:100px;"><strong>${parseInt(it.total || 0).toLocaleString()}원</strong></td>
                                 <td style="width:120px; text-align:center;">
@@ -3435,7 +3568,7 @@
                                     <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${customer.phone}', '${it.orderKey}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
                                 </div>
                                 <div class="mobile-item-middle">
-                                    <span>수량: <strong class="qty-highlight">${it.qty}</strong>개</span>
+                                    <span>수량: <strong class="${qtyClass}">${qtyNum}</strong>개</span>
                                     <span>단가: ${parseInt(it.price || 0).toLocaleString()}원</span>
                                     <span>합계: <strong>${parseInt(it.total || 0).toLocaleString()}원</strong></span>
                                 </div>
@@ -6274,6 +6407,7 @@
         let uploadEditProductKey = null;
         let uploadEditProductRef = null; // [하드닝] 수정 대상 상품을 순번 대신 이름+분류+날짜로 식별
         let uploadForceDuplicate = false; // [신규] '복제하기': 현재 폼을 새 상품으로 강제 등록
+        let uploadEditShelf = ''; // [신규] 수정 시 기존 선반위치(shelf)를 기억해 폼에 반영
         let uploadSelectedDate = new Date().toISOString().split('T')[0];
         let uploadManageDeliveryType = "today"; 
         let uploadManageTab = "today-fruit"; 
@@ -6289,8 +6423,10 @@
 
         // 탭 전환 (주문 관리 / 상품 관리 전체 전환)
         function switchAdminTab(tabName) {
+            // [수정] 섬네일 페이지는 '상품 목록' 안에 있는 느낌을 주도록, 섬네일일 때도 상품 목록 탭을 선택 상태로 유지
+            const navActiveTab = (tabName === 'thumbnail-generator') ? 'product-list' : tabName;
             document.querySelectorAll('.admin-nav-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.tab === tabName);
+                btn.classList.toggle('active', btn.dataset.tab === navActiveTab);
             });
             
             const ordersTab = document.getElementById('tab-admin-orders');
@@ -6298,6 +6434,7 @@
             const listTab = document.getElementById('tab-admin-product-list');
             const generatorTab = document.getElementById('tab-admin-thumbnail-generator');
             const purchaseHistoryTab = document.getElementById('tab-admin-purchase-history');
+            const salesTab = document.getElementById('tab-admin-sales');
             
             // 만약 섬네일 탭으로 간다면 상품 목록에서 선택된 것을 큐에 집어넣음
             if (tabName === 'thumbnail-generator') {
@@ -6321,7 +6458,10 @@
             if (purchaseHistoryTab) {
                 purchaseHistoryTab.style.display = tabName === 'purchase-history' ? 'block' : 'none';
             }
-            
+            if (salesTab) {
+                salesTab.style.display = tabName === 'sales' ? 'block' : 'none';
+            }
+
             if (tabName === 'product-upload') {
                 initUploadTab(); // 상품 탭 로딩
             } else if (tabName === 'product-list') {
@@ -6331,7 +6471,503 @@
                 initThumbnailGeneratorTab();
             } else if (tabName === 'purchase-history') {
                 initPurchaseHistoryTab();
+            } else if (tabName === 'sales') {
+                setSalesSubTab('purchase'); // 탭 진입 시 항상 발주 관리부터
+                initSalesTab();
             }
+        }
+
+        // ===== [신규] 판매 관리 탭 =====
+        let salesDateBasis = 'pickup'; // 'pickup'(픽업·배달일, 기본) | 'order'(주문일)
+        let salesMethodFilter = 'all'; // 'all' | 'delivery'(배달) | 'pickup'(픽업)
+        let salesArchiveOrders = [];   // [신규] 보관함(orders_archive) 과거 주문 (판매현황 전체기간 집계용)
+        let salesArchiveLoaded = false;
+        let salesPeriod = 'month';    // today | week | month | all | custom
+        let _salesRankingCache = [];
+        let _salesDayCache = new Map();
+        let salesUpcomingRange = 'today_after'; // 발주 집계 범위: today_after(오늘 포함 이후) | today_only(오늘만) | after_today(내일 이후)
+        let salesUpcomingCats = new Set(); // 발주 카테고리 필터: 비어있으면 '전체', 값이 있으면 그 카테고리만
+
+        // 상품 카테고리 분류: 'fruit'(과일/야채/채소) | 'group'(공동구매=날짜) | 'sada'(사다드림) | 'other'(그외=상시판매 등)
+        function salesProductCategory(prod, orderItemName){
+            const mk = String(prod ? (prod.matchKey || '') : '').trim();
+            const nm = String((prod && prod.name) || orderItemName || '');
+            if (nm.includes('사다드림') || mk === '사다드림') return 'sada';
+            if (/과일|야채|채소/.test(mk) || /\[과일\]|\[야채\]|\[채소\]/.test(nm)) return 'fruit';
+            if (/^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(mk)) return 'group'; // 공동구매: matchKey가 날짜
+            return 'other';
+        }
+        let salesUpcomingSort = { key: 'qty', dir: 'desc' };   // 발주 관리 정렬(기본: 주문수량 많은 순)
+        let salesRankSort = { key: 'amount', dir: 'desc' };     // 판매 순위 정렬(기본: 판매액 많은 순)
+
+        // 정렬 헤더 HTML 생성 (클릭 시 sortFnName(key) 호출, 활성 컬럼에 화살표)
+        function salesSortHeader(cols, sort, sortFnName){
+            return '<tr style="font-size:12px; font-weight:800; color:#475569; background:#f8fafc;">' + cols.map(c => {
+                const active = (sort.key === c.key);
+                const arrow = active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+                const clickable = (c.sortable !== false);
+                const style = `padding:8px; text-align:${c.align}; white-space:nowrap;${clickable ? ' cursor:pointer; user-select:none;' : ''}${active ? ' color:var(--primary);' : ''}`;
+                const onclick = clickable ? ` onclick="${sortFnName}('${c.key}')"` : '';
+                return `<th style="${style}"${onclick}>${c.label}${arrow}</th>`;
+            }).join('') + '</tr>';
+        }
+        // 숫자 비교(빈값/무한대는 항상 뒤로), 문자 비교(한글)
+        function salesCmpNum(a, b, dir){
+            const an = (a === null || a === undefined || Number.isNaN(a));
+            const bn = (b === null || b === undefined || Number.isNaN(b));
+            if (an && bn) return 0;
+            if (an) return 1;
+            if (bn) return -1;
+            return dir === 'asc' ? (a - b) : (b - a);
+        }
+        function salesCmpStr(a, b, dir){
+            const r = String(a || '').localeCompare(String(b || ''), 'ko');
+            return dir === 'asc' ? r : -r;
+        }
+        function toggleSalesSort(state, key, defaultDir){
+            if (state.key === key) state.dir = (state.dir === 'asc' ? 'desc' : 'asc');
+            else { state.key = key; state.dir = defaultDir; }
+        }
+        function sortSalesUpcoming(key){ toggleSalesSort(salesUpcomingSort, key, key === 'name' ? 'asc' : 'desc'); renderSalesUpcoming(); }
+        function setSalesUpcomingRange(mode){
+            salesUpcomingRange = mode;
+            document.querySelectorAll('[data-sales-uprange]').forEach(b => b.classList.toggle('active', b.dataset.salesUprange === mode));
+            const rangeBox = document.getElementById('sales-upcoming-range');
+            if (rangeBox) rangeBox.style.display = (mode === 'custom') ? 'flex' : 'none';
+            renderSalesUpcoming();
+        }
+        function setSalesUpcomingCat(cat){
+            if (cat === 'all') { salesUpcomingCats.clear(); } // 전체: 개별 선택 모두 해제 → 전부 표시
+            else { if (salesUpcomingCats.has(cat)) salesUpcomingCats.delete(cat); else salesUpcomingCats.add(cat); }
+            // 버튼 상태 동기화: 전체는 아무것도 선택 안됐을 때 활성, 개별은 선택된 것만 활성
+            const allBtn = document.querySelector('[data-sales-upcat="all"]');
+            if (allBtn) allBtn.classList.toggle('active', salesUpcomingCats.size === 0);
+            document.querySelectorAll('[data-sales-upcat]').forEach(b => {
+                if (b.dataset.salesUpcat === 'all') return;
+                b.classList.toggle('active', salesUpcomingCats.has(b.dataset.salesUpcat));
+            });
+            renderSalesUpcoming();
+        }
+        function sortSalesRanking(key){ toggleSalesSort(salesRankSort, key, key === 'name' ? 'asc' : 'desc'); renderSalesRanking(); }
+
+        function isSalesCanceled(o){ return (o && (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE")); }
+        function isSalesPaid(o){ return (o && (o.paid === true || o.paid === "true" || o.paid === "True" || o.isPaid === true || o.isPaid === "true")); }
+        // 배달 판별 — 주문현황(showTodaySummary)과 동일: shippingMethod가 '배달주문'이거나, '매장픽업'이 아니고 주소가 있으면 배달
+        function isSalesDelivery(o){ return (o.shippingMethod === '배달주문' || (o.shippingMethod !== '매장픽업' && o.address && String(o.address).trim() !== '')); }
+        // [신규] 순수 주문자 식별 키 — 전화번호 포맷(+82/82/10 등)을 010형으로 정규화해 같은 사람을 하나로. 전화 깨짐/없음이면 이름으로.
+        function salesPersonKey(o){
+            let d = String(o.phone || '').replace(/\D/g, '');
+            if (d.startsWith('82')) d = '0' + d.slice(2);                 // +82 / 82 국가코드 → 0
+            else if (d.length === 10 && d.startsWith('10')) d = '0' + d;  // 10XXXXXXXX → 010XXXXXXXX
+            if (/^01[0-9]\d{7,8}$/.test(d)) return d;                     // 유효 휴대폰만 전화 기준
+            return '명:' + String(o.name || '무명');                     // 그 외(깨진 값/없음)는 이름 기준
+        }
+
+        // [신규] 보관함(orders_archive)을 rawOrders와 동일한 형태로 평탄화 (status는 플래그로 계산)
+        function salesFlattenArchive(data){
+            const out = [];
+            if (!data) return out;
+            for (const phone in data){
+                const phoneObj = data[phone];
+                if (!phoneObj || typeof phoneObj !== 'object') continue;
+                for (const orderKey in phoneObj){
+                    const it = phoneObj[orderKey];
+                    if (!it || typeof it !== 'object') continue;
+                    const isCanceled = (it.canceled === true || String(it.canceled).toUpperCase() === "TRUE");
+                    const isDelivered = (it.delivered === true || String(it.delivered).toUpperCase() === "TRUE");
+                    const isReceived = (it.received === true || String(it.received).toUpperCase() === "TRUE");
+                    const isStocked = (it.isStocked === true || String(it.isStocked).toUpperCase() === "TRUE");
+                    let st = "대기";
+                    if (isCanceled) st = "취소"; else if (isDelivered) st = "배달완료"; else if (isReceived) st = "픽업"; else if (isStocked) st = "입고";
+                    out.push(Object.assign({ firebasePhoneKey: phone, phone }, it, { orderKey, status: st, _archived: true }));
+                }
+            }
+            return out;
+        }
+        // 보관함 1회 로드(캐시)
+        async function loadSalesArchive(){
+            if (salesArchiveLoaded) return;
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}orders_archive.json?t=${Date.now()}`);
+                if (res.ok){ salesArchiveOrders = salesFlattenArchive(await res.json()); salesArchiveLoaded = true; }
+            } catch(e){ console.error('판매관리 보관함 로드 실패:', e); }
+        }
+        // 판매관리 집계 소스 = 현재 주문(orders) + 보관함(orders_archive), 전화번호+주문키로 중복 제거(현재 주문 우선)
+        function getSalesSourceOrders(){
+            const seen = new Set();
+            const merged = [];
+            const keyOf = o => String(o.phone || '').replace(/\D/g, '') + '|' + String(o.orderKey || '');
+            (rawOrders || []).forEach(o => { seen.add(keyOf(o)); merged.push(o); });
+            (salesArchiveOrders || []).forEach(o => { const k = keyOf(o); if (!seen.has(k)) { seen.add(k); merged.push(o); } });
+            return merged;
+        }
+        function salesTodayMidnight(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+
+        // 상품 1건의 실재고(기본+조정). 무제한이면 Infinity, 못 찾으면 null.
+        function salesRealStock(prod){
+            if (!prod) return null;
+            const isUnlimitedStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null || String(prod.stock).trim() === "무제한");
+            const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)];
+            const isUnlimitedAdj = (adjRaw === "unlimited" || (adjRaw !== undefined && String(adjRaw).startsWith("unlimited")));
+            if (isUnlimitedStock || isUnlimitedAdj) return Infinity;
+            return Math.max(0, (parseInt(prod.stock || 0) || 0) + (parseInt(adjRaw || 0) || 0));
+        }
+
+        // 주문 항목에 해당하는 등록상품 찾기(이름 우선, 여러 개면 날짜 일치 우선)
+        function salesFindProduct(order){
+            const name = String(order.item || '').trim();
+            if (!name || !uploadProducts) return null;
+            const cands = uploadProducts.filter(p => p && String(p.name || '').trim() === name);
+            if (cands.length === 0) return null;
+            if (cands.length === 1) return cands[0];
+            const oDate = getOrderDateInfo(order).dateStr;
+            const byDate = cands.find(p => (toISODate(p.matchKey) === oDate) || (toISODate(p.date) === oDate));
+            return byDate || cands[0];
+        }
+
+        // 집계 기준 날짜(Date)
+        function salesOrderDate(o){
+            if (salesDateBasis === 'pickup'){
+                const info = getOrderDateInfo(o); // pickupDate 우선
+                if (info.dateStr && info.dateStr !== '기타'){ const p = info.dateStr.split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
+            }
+            return parseTimestampToDate(o.timestamp);
+        }
+
+        function salesStatChip(label, val, color){
+            return `<div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:8px 12px; min-width:90px;">
+                <div style="font-size:11px; color:var(--text-sub); font-weight:700;">${label}</div>
+                <div style="font-size:16px; font-weight:900; ${color?`color:${color};`:''}">${val}</div>
+            </div>`;
+        }
+
+        async function initSalesTab(){
+            const tbodyA = document.getElementById('sales-upcoming-tbody');
+            if (tbodyA) tbodyA.innerHTML = `<tr><td colspan="5" style="padding:16px; text-align:center; color:var(--text-sub);">불러오는 중...</td></tr>`;
+            try { await loadProductsFromServer(); } catch(e){ console.error('판매관리 재고 로드 실패:', e); }
+            try { await loadSalesArchive(); } catch(e){ console.error('판매관리 보관함 로드 실패:', e); }
+            renderSalesTab();
+        }
+
+        function renderSalesTab(){
+            renderSalesUpcoming();
+            renderSalesStatus();
+        }
+
+        // A. 오늘 이후 주문 집계
+        function renderSalesUpcoming(){
+            const tbody = document.getElementById('sales-upcoming-tbody');
+            const sumBox = document.getElementById('sales-upcoming-summary');
+            if (!tbody) return;
+            const today = salesTodayMidnight();
+            const map = new Map();
+            getSalesSourceOrders().forEach(o => {
+                if (isSalesCanceled(o)) return;
+                const info = getOrderDateInfo(o);
+                if (!info.dateStr || info.dateStr === '기타') return;
+                const p = info.dateStr.split('-');
+                const d = new Date(+p[0], +p[1]-1, +p[2]);
+                if (salesUpcomingRange === 'custom') {
+                    const fv = document.getElementById('sales-up-from').value;
+                    const tv = document.getElementById('sales-up-to').value;
+                    const from = fv ? new Date(fv + 'T00:00:00') : null;
+                    const to = tv ? new Date(tv + 'T23:59:59') : null;
+                    if (from && d < from) return;
+                    if (to && d > to) return;
+                }
+                else if (salesUpcomingRange === 'today_only') { if (d.getTime() !== today.getTime()) return; } // 오늘
+                else if (salesUpcomingRange === 'after_today') { if (d <= today) return; } // 그외(오늘 제외 이후)
+                else { if (d < today) return; } // 전체(오늘 포함 이후)
+                const prod = salesFindProduct(o);
+                if (salesUpcomingCats.size > 0 && !salesUpcomingCats.has(salesProductCategory(prod, o.item))) return; // 카테고리 필터(비어있으면 전체)
+                const key = prod ? (String(prod.name) + '|' + String(prod.matchKey || '')) : ('name:' + String(o.item || ''));
+                if (!map.has(key)) map.set(key, { name: o.item || '상품명 없음', prod, qty: 0, amount: 0, dates: new Set() });
+                const g = map.get(key);
+                g.qty += (parseInt(o.qty || 0) || 0);
+                g.amount += (parseInt(o.total || 0) || 0);
+                g.dates.add(info.dateStr);
+            });
+            const rows = [...map.values()].map(g => {
+                const stock = g.prod ? salesRealStock(g.prod) : null;
+                const diff = (stock === null || stock === Infinity) ? null : (stock - g.qty);
+                return Object.assign(g, { stock, diff });
+            });
+            const upCols = [
+                { key:'name', label:'상품명', align:'left' },
+                { key:'qty', label:'주문수량', align:'right' },
+                { key:'stock', label:'현재재고', align:'right' },
+                { key:'diff', label:'차이(재고−주문)', align:'right' },
+                { key:'amount', label:'주문액', align:'right' }
+            ];
+            const uthead = document.getElementById('sales-upcoming-thead');
+            if (uthead) uthead.innerHTML = salesSortHeader(upCols, salesUpcomingSort, 'sortSalesUpcoming');
+            const us = salesUpcomingSort;
+            rows.sort((a, b) => {
+                if (us.key === 'name') return salesCmpStr(a.name, b.name, us.dir);
+                const pick = (r) => {
+                    if (us.key === 'qty') return r.qty;
+                    if (us.key === 'stock') return (r.stock === Infinity ? Number.MAX_SAFE_INTEGER : r.stock);
+                    if (us.key === 'diff') return r.diff;
+                    if (us.key === 'amount') return r.amount;
+                    return 0;
+                };
+                return salesCmpNum(pick(a), pick(b), us.dir);
+            });
+            if (rows.length === 0){
+                tbody.innerHTML = `<tr><td colspan="5" style="padding:16px; text-align:center; color:var(--text-sub);">오늘 이후 예정된 주문이 없습니다.</td></tr>`;
+                if (sumBox) sumBox.innerHTML = '';
+                return;
+            }
+            let totalQty = 0, totalAmount = 0, shortageCount = 0;
+            tbody.innerHTML = rows.map(r => {
+                totalQty += r.qty; totalAmount += r.amount;
+                const stockText = (r.stock === null) ? '<span style="color:var(--text-sub);">-</span>' : (r.stock === Infinity ? '무제한' : (r.stock + '개'));
+                let diffText;
+                if (r.diff === null) diffText = '<span style="color:var(--text-sub);">-</span>';
+                else if (r.diff < 0){ shortageCount++; diffText = `<span style="color:#dc2626; font-weight:900;">${r.diff}개 (부족)</span>`; }
+                else diffText = `<span style="color:#059669; font-weight:800;">+${r.diff}개</span>`;
+                const dateHint = [...r.dates].sort().map(fmtMD).join(', ');
+                return `<tr>
+                    <td style="padding:8px; text-align:left;">${r.name}<div style="font-size:10px; color:var(--text-sub);">${dateHint}</div></td>
+                    <td style="padding:8px; text-align:right; font-weight:800;">${r.qty}개</td>
+                    <td style="padding:8px; text-align:right;">${stockText}</td>
+                    <td style="padding:8px; text-align:right;">${diffText}</td>
+                    <td style="padding:8px; text-align:right;">${r.amount.toLocaleString()}원</td>
+                </tr>`;
+            }).join('');
+            if (sumBox) sumBox.innerHTML =
+                salesStatChip('상품 종류', rows.length + '종') +
+                salesStatChip('총 주문수량', totalQty.toLocaleString() + '개') +
+                salesStatChip('총 주문액', totalAmount.toLocaleString() + '원') +
+                salesStatChip('재고 부족', shortageCount + '종', shortageCount > 0 ? '#dc2626' : null);
+        }
+
+        function getSalesPeriodRange(){
+            const today = salesTodayMidnight();
+            if (salesPeriod === 'all') return { from: null, to: null };
+            if (salesPeriod === 'today'){ const to = new Date(today); to.setHours(23,59,59,999); return { from: today, to }; }
+            if (salesPeriod === 'week'){
+                const from = new Date(today); const day = (from.getDay() + 6) % 7; from.setDate(from.getDate() - day); // 월요일 시작
+                const to = new Date(from); to.setDate(from.getDate() + 6); to.setHours(23,59,59,999);
+                return { from, to };
+            }
+            if (salesPeriod === 'month'){
+                const from = new Date(today.getFullYear(), today.getMonth(), 1);
+                const to = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+                return { from, to };
+            }
+            if (salesPeriod === 'custom'){
+                const f = document.getElementById('sales-custom-from').value;
+                const t = document.getElementById('sales-custom-to').value;
+                return { from: f ? new Date(f + 'T00:00:00') : null, to: t ? new Date(t + 'T23:59:59') : null };
+            }
+            return { from: null, to: null };
+        }
+
+        // B~D. 판매현황
+        function renderSalesStatus(){
+            const { from, to } = getSalesPeriodRange();
+            const inRange = getSalesSourceOrders().filter(o => {
+                if (isSalesCanceled(o)) return false;
+                const d = salesOrderDate(o);
+                if (!d || isNaN(d.getTime())) return false;
+                if (from && d < from) return false;
+                if (to && d > to) return false;
+                const isDelivery = isSalesDelivery(o);
+                if (salesMethodFilter === 'delivery' && !isDelivery) return false;
+                if (salesMethodFilter === 'pickup' && isDelivery) return false;
+                return true;
+            });
+            let totalAmount = 0, totalQty = 0, paidAmount = 0, pickupDoneAmount = 0, unpaidAmount = 0, deliveryQty = 0, pickupQty = 0;
+            // [수정] '건수'는 주문현황과 동일하게 고객(이름_전화번호) 단위로 집계 (주문시각이 달라도 같은 고객이면 1건)
+            const custGroups = new Map(); // key: 사람_날짜 → 'delivery' | 'pickup' — 주문건수(고객×날짜)용
+            const peopleSet = new Set();  // [신규] 순수 주문자 인원: 전화번호(숫자만) 기준 중복 제거
+            const itemMap = new Map();
+            const dayMap = new Map();
+            inRange.forEach(o => {
+                const amt = parseInt(o.total || 0) || 0;
+                const q = parseInt(o.qty || 0) || 0;
+                totalAmount += amt; totalQty += q;
+                if (isSalesPaid(o)) paidAmount += amt;
+                else if (String(o.status || '') === '픽업') pickupDoneAmount += amt; // 미입금이지만 픽업완료 → 별도 집계
+                else unpaidAmount += amt;
+                const isDeliveryO = isSalesDelivery(o);
+                if (isDeliveryO) deliveryQty += q; else pickupQty += q;
+                const _cdd = salesOrderDate(o);
+                const _cdk = (_cdd && !isNaN(_cdd.getTime())) ? `${_cdd.getFullYear()}-${_cdd.getMonth()+1}-${_cdd.getDate()}` : 'nodate';
+                const custKey = salesPersonKey(o) + '|' + _cdk; // [변경] 주문건수 = 고객 × 날짜 (한 사람이 여러 날 주문하면 각각 1건)
+                if (!custGroups.has(custKey)) custGroups.set(custKey, isDeliveryO ? 'delivery' : 'pickup');
+                peopleSet.add(salesPersonKey(o)); // 전화번호 정규화 기준 순수 인원(중복 제거)
+                const nm = String(o.item || '상품명 없음');
+                if (!itemMap.has(nm)) itemMap.set(nm, { qty: 0, amount: 0 });
+                const im = itemMap.get(nm); im.qty += q; im.amount += amt;
+                const dd = salesOrderDate(o);
+                if (dd && dd.getFullYear() >= 2000) { // 날짜 깨진 주문(1970 등)은 추이 그래프에서 제외
+                    const ds = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
+                    dayMap.set(ds, (dayMap.get(ds) || 0) + amt);
+                }
+            });
+
+            const metrics = document.getElementById('sales-metrics');
+            let custDelivery = 0, custPickup = 0;
+            custGroups.forEach(m => { if (m === 'delivery') custDelivery++; else custPickup++; });
+            const custTotal = custGroups.size;
+            const qcChip = (qty, cnt) => `${qty.toLocaleString()}개<span style="font-size:12px; color:var(--text-sub); font-weight:800; margin-left:1px;">(${cnt.toLocaleString()}건)</span>`;
+            if (metrics) metrics.innerHTML = [
+                salesStatChip('총 판매액', totalAmount.toLocaleString() + '원'),
+                salesStatChip('총 판매수량', qcChip(totalQty, custTotal)),
+                salesStatChip('배달 수량(건수)', qcChip(deliveryQty, custDelivery)),
+                salesStatChip('픽업 수량(건수)', qcChip(pickupQty, custPickup)),
+                salesStatChip('주문자 수', peopleSet.size.toLocaleString() + '명')
+            ].join('');
+
+            const paidBox = document.getElementById('sales-paid-summary');
+            const denom = totalAmount > 0 ? totalAmount : 1;
+            const paidPct = Math.round(paidAmount / denom * 100);
+            const pickupPct = Math.round(pickupDoneAmount / denom * 100);
+            const unpaidPct = Math.max(0, 100 - paidPct - pickupPct);
+            if (paidBox) paidBox.innerHTML = `
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    ${salesStatChip('입금완료', paidAmount.toLocaleString() + '원', '#059669')}
+                    ${salesStatChip('픽업완료', pickupDoneAmount.toLocaleString() + '원', pickupDoneAmount > 0 ? '#7c3aed' : null)}
+                    ${salesStatChip('미입금', unpaidAmount.toLocaleString() + '원', unpaidAmount > 0 ? '#dc2626' : null)}
+                </div>
+                <div style="margin-top:6px; height:10px; background:#ef4444; border-radius:6px; overflow:hidden; display:flex;">
+                    <div style="width:${paidPct}%; height:100%; background:#059669;"></div>
+                    <div style="width:${pickupPct}%; height:100%; background:#7c3aed;"></div>
+                </div>
+                <div style="font-size:11px; color:var(--text-sub); margin-top:3px;">입금완료 ${paidPct}% · 픽업완료 ${pickupPct}% · 미입금 ${unpaidPct}%</div>`;
+
+            _salesRankingCache = [...itemMap.entries()];
+            renderSalesRanking();
+
+            renderSalesDailyTrend(dayMap);
+            _salesDayCache = dayMap;
+        }
+
+        // 상품별 판매 순위(정렬 가능)
+        function renderSalesRanking(){
+            const rthead = document.getElementById('sales-ranking-thead');
+            const rtbody = document.getElementById('sales-ranking-tbody');
+            const cols = [
+                { key:'_idx', label:'#', align:'left', sortable:false },
+                { key:'name', label:'상품명', align:'left' },
+                { key:'qty', label:'판매수량', align:'right' },
+                { key:'amount', label:'판매액', align:'right' }
+            ];
+            if (rthead) rthead.innerHTML = salesSortHeader(cols, salesRankSort, 'sortSalesRanking');
+            if (!rtbody) return;
+            const list = (_salesRankingCache || []).map(([nm, v]) => ({ name: nm, qty: v.qty, amount: v.amount }));
+            const s = salesRankSort;
+            list.sort((a, b) => s.key === 'name' ? salesCmpStr(a.name, b.name, s.dir) : salesCmpNum(a[s.key], b[s.key], s.dir));
+            if (list.length === 0){ rtbody.innerHTML = `<tr><td colspan="4" style="padding:16px; text-align:center; color:var(--text-sub);">해당 기간 판매 내역이 없습니다.</td></tr>`; return; }
+            rtbody.innerHTML = list.slice(0, 50).map((r, i) => `
+                <tr>
+                    <td style="padding:8px; font-weight:800; color:${i < 3 ? '#d97706' : '#94a3b8'};">${i + 1}</td>
+                    <td style="padding:8px;">${r.name}</td>
+                    <td style="padding:8px; text-align:right; font-weight:800;">${r.qty.toLocaleString()}개</td>
+                    <td style="padding:8px; text-align:right;">${r.amount.toLocaleString()}원</td>
+                </tr>`).join('');
+        }
+
+        function renderSalesDailyTrend(dayMap){
+            const box = document.getElementById('sales-daily-trend');
+            const titleEl = document.getElementById('sales-trend-title');
+            if (!box) return;
+            // 기간에 따라 집계 단위: 이번달=주차별, 전체=월별(최근 12개월), 그외=일자별
+            let unit = 'day';
+            if (salesPeriod === 'month') unit = 'week';
+            else if (salesPeriod === 'all') unit = 'month';
+            if (titleEl) titleEl.innerText = (unit === 'week') ? '📈 주차별 매출 추이' : (unit === 'month' ? '📈 월별 매출 추이 (최근 12개월)' : '📈 일자별 매출 추이');
+
+            const buckets = new Map(); // key -> { label, amount }
+            dayMap.forEach((amt, ds) => {
+                const p = ds.split('-');
+                let key, label;
+                if (unit === 'week') {
+                    const wk = Math.ceil((+p[2]) / 7); // 1~5주차 (1~7일=1주차)
+                    key = `${p[0]}-${p[1]}-W${wk}`;
+                    label = `${wk}주차`;
+                } else if (unit === 'month') {
+                    key = `${p[0]}-${p[1]}`;
+                    label = `${p[0].slice(2)}/${+p[1]}`; // 예: 26/8
+                } else {
+                    key = ds;
+                    label = `${+p[1]}/${+p[2]}`;
+                }
+                if (!buckets.has(key)) buckets.set(key, { label, amount: 0 });
+                buckets.get(key).amount += amt;
+            });
+
+            let entries = [...buckets.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1);
+            if (unit === 'month') entries = entries.slice(-12); // 최근 12개월만
+
+            if (entries.length === 0){ box.innerHTML = `<div style="font-size:12px; color:var(--text-sub); padding:8px;">데이터 없음</div>`; return; }
+            const max = Math.max.apply(null, entries.map(e => e[1].amount).concat([1]));
+            box.innerHTML = `<div style="display:flex; flex-direction:column; gap:4px;">` + entries.map(([k, v]) => {
+                const pct = Math.round(v.amount / max * 100);
+                return `<div style="display:flex; align-items:center; gap:8px;">
+                    <div style="width:44px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0;">${v.label}</div>
+                    <div style="flex:1; background:#f1f5f9; border-radius:4px; overflow:hidden; height:18px;">
+                        <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
+                    </div>
+                    <div style="width:92px; font-size:11px; font-weight:800; text-align:right; flex-shrink:0;">${v.amount.toLocaleString()}원</div>
+                </div>`;
+            }).join('') + `</div>`;
+        }
+
+        function setSalesDateBasis(b){
+            salesDateBasis = b;
+            const ob = document.getElementById('sales-basis-order');
+            const pb = document.getElementById('sales-basis-pickup');
+            if (ob) ob.classList.toggle('active', b === 'order');
+            if (pb) pb.classList.toggle('active', b === 'pickup');
+            renderSalesStatus();
+        }
+        function setSalesMethod(m){
+            salesMethodFilter = m;
+            document.querySelectorAll('[data-sales-method]').forEach(b => b.classList.toggle('active', b.dataset.salesMethod === m));
+            renderSalesStatus();
+        }
+        function setSalesPeriod(p){
+            salesPeriod = p;
+            document.querySelectorAll('[data-sales-period]').forEach(btn => btn.classList.toggle('active', btn.dataset.salesPeriod === p));
+            const cr = document.getElementById('sales-custom-range');
+            if (cr) cr.style.display = (p === 'custom') ? 'flex' : 'none';
+            if (p !== 'custom') renderSalesStatus();
+            else {
+                const f = document.getElementById('sales-custom-from').value, t = document.getElementById('sales-custom-to').value;
+                if (f && t) renderSalesStatus();
+            }
+        }
+        function onSalesCustomRangeChange(){ if (salesPeriod === 'custom') renderSalesStatus(); }
+
+        // 판매 관리 하위 탭 전환: 'purchase'(발주 관리) | 'status'(판매현황)
+        function setSalesSubTab(which){
+            document.querySelectorAll('.sales-sub-btn').forEach(b => b.classList.toggle('active', b.dataset.salesSub === which));
+            const pur = document.getElementById('sales-sub-purchase');
+            const st = document.getElementById('sales-sub-status');
+            if (pur) pur.style.display = (which === 'purchase') ? 'block' : 'none';
+            if (st) st.style.display = (which === 'status') ? 'block' : 'none';
+        }
+        function salesPeriodLabel(){ return ({ today:'오늘', week:'이번주', month:'이번달', all:'전체', custom:'직접설정' })[salesPeriod] || salesPeriod; }
+
+        function exportSalesCSV(){
+            const ranking = _salesRankingCache || [];
+            const dayMap = _salesDayCache || new Map();
+            const basisLabel = salesDateBasis === 'pickup' ? '픽업·배달일' : '주문일';
+            let csv = "﻿";
+            csv += `판매 리포트 (집계기준: ${basisLabel} / 기간: ${salesPeriodLabel()})\n\n`;
+            csv += "상품별 판매\n순위,상품명,판매수량,판매액\n";
+            ranking.forEach(([nm, v], i) => { csv += `${i+1},"${String(nm).replace(/"/g,'""')}",${v.qty},${v.amount}\n`; });
+            csv += "\n일자별 매출\n일자,매출액\n";
+            [...dayMap.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1).forEach(([ds, amt]) => { csv += `${ds},${amt}\n`; });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `판매리포트_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         let hasUploadTabInitialized = false;
@@ -6579,6 +7215,8 @@
             { key: "기타_예약", label: "기타" }
         ];
         const costcoCategories = ["코스트코 냉동", "코스트코 냉장", "코스트코 상온"];
+        // [신규] 상품 등록/수정 폼의 선반위치(장소) 옵션 — 재고관리 탭의 선반 분류와 동일
+        const SHELF_OPTS_FORM = [['', '📦 미지정'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']];
 
         function selectMainTab(tab) {
             uploadCurrentTab = tab;
@@ -6608,18 +7246,41 @@
                 container.appendChild(input);
             } 
             else if (tab === 'onsite') {
-                document.getElementById('categoryLabel').innerText = "보관/분류 카테고리";
+                document.getElementById('categoryLabel').innerText = "보관/분류 카테고리  ·  선반위치(장소)";
+                // [신규] 왼쪽=보관분류(냉동/냉장/상온), 오른쪽=선반위치(장소) 반반 배치
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; gap:8px; align-items:stretch;';
+
                 const select = document.createElement('select');
                 select.id = 'categoryValue';
                 select.className = 'form-control';
+                select.style.flex = '1';
+                select.style.minWidth = '0';
                 onsiteCategories.forEach(cat => {
                     const opt = document.createElement('option');
                     opt.value = cat;
                     opt.innerText = (cat === "냉동" ? "🧊냉동" : cat === "냉장" ? "❄️냉장" : cat === "상온" ? "🌡️상온" : cat);
                     select.appendChild(opt);
                 });
-                container.appendChild(select);
-            } 
+
+                const shelfSelect = document.createElement('select');
+                shelfSelect.id = 'productShelf';
+                shelfSelect.className = 'form-control';
+                shelfSelect.style.flex = '1';
+                shelfSelect.style.minWidth = '0';
+                SHELF_OPTS_FORM.forEach(([v, l]) => {
+                    const opt = document.createElement('option');
+                    opt.value = v;
+                    opt.innerText = l;
+                    shelfSelect.appendChild(opt);
+                });
+                // 수정 모드일 때만 기존 선반위치 반영, 신규 등록은 항상 미지정
+                shelfSelect.value = uploadIsEditMode ? (uploadEditShelf || '') : '';
+
+                row.appendChild(select);
+                row.appendChild(shelfSelect);
+                container.appendChild(row);
+            }
             else if (tab === 'fruit') {
                 document.getElementById('categoryLabel').innerText = "과채류 분류 선택";
                 const select = document.createElement('select');
@@ -7227,6 +7888,25 @@
                 uploadThumbnailIndex--;
             }
             renderSelectedFilesList();
+        }
+
+        // [신규] Firebase PUT 재시도 (일시적 네트워크/서버 오류로 저장이 '가끔' 안 되던 문제 대응)
+        async function fbPutRetry(url, bodyObj, maxTries = 4) {
+            let lastErr = null;
+            for (let attempt = 1; attempt <= maxTries; attempt++) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(bodyObj)
+                    });
+                    if (res.ok) return true;
+                    lastErr = new Error('HTTP ' + res.status);
+                } catch (e) { lastErr = e; }
+                if (attempt < maxTries) await new Promise(r => setTimeout(r, 400 * attempt));
+            }
+            console.error('Firebase PUT 재시도 실패:', url, lastErr && lastErr.message);
+            return false;
         }
 
         async function loadProductsFromServer() {
@@ -7882,6 +8562,10 @@
                     updatedAt: Date.now()
                 };
 
+                // [신규] 상시판매 상품은 폼의 선반위치(장소)도 함께 저장 → 재고관리 탭 선반 분류와 연동
+                const shelfEl = document.getElementById('productShelf');
+                if (shelfEl) productObj.shelf = shelfEl.value;
+
                 let updatedProducts = [...uploadProducts];
                 let isStockChanged = false;
                 let oldProd = null;
@@ -8012,6 +8696,7 @@
 
         async function markAsSoldOut(index) {
             const prod = uploadProducts[index];
+            if (!prod) { showToast("상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요."); renderProductsList(); return; }
             if (!confirm(`'${prod.name}' 상품을 품절 처리하시겠습니까?`)) return;
 
             showLoader("🔴 품절 처리 중...");
@@ -8023,25 +8708,17 @@
                     updatedAt: Date.now()
                 };
 
-                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatedList)
-                });
-
-                if (!res.ok) throw new Error("Firebase 업데이트 실패");
-                updatePublishedProductsTimestamp();
-
                 const adjKey = fGetAdjKey(prod.matchKey, prod.name);
-                await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(0)
-                }).catch(e => console.error("품절 처리에 따른 재고 조정값 초기화 실패:", e));
+                const [ok1, ok2] = await Promise.all([
+                    fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, updatedList),
+                    fbPutRetry(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, 0)
+                ]);
+                if (!ok1) throw new Error("Firebase 업데이트 실패(재시도 후)");
+                updatePublishedProductsTimestamp();
                 uploadGlobalAdjustments[adjKey] = 0;
 
                 uploadProducts = updatedList;
-                
+
                 showToast("상품이 품절 처리되었습니다.");
                 await loadProductsFromServer();
                 buildManageCategoryTabs();
@@ -8099,36 +8776,31 @@
         // [신규] 재고관리 — 상품 선반 지정 저장
         async function assignShelf(index, shelfKey) {
             const prod = uploadProducts[index];
-            if (!prod) return;
+            if (!prod) { showToast("상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요."); renderProductsList(); return; }
             const prev = prod.shelf || '';
             prod.shelf = shelfKey;
             prod.updatedAt = Date.now();
-            try {
-                // 전체 목록을 저장(다른 필드·이모지 그대로 보존). 실패 시 롤백.
-                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(uploadProducts)
-                });
-                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+            // 전체 목록을 저장(다른 필드·이모지 그대로 보존). 실패 시 롤백 + 재렌더로 드롭다운 원복.
+            const ok = await fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, uploadProducts);
+            if (ok) {
                 updatePublishedProductsTimestamp();
-                const labels = { '': '미지정', 'shelf-1': '선반1', 'shelf-2': '선반2', 'shelf-3': '선반3', 'fridge-1': '냉장1', 'fridge-2': '냉장2', 'freezer-4': '냉동4', 'freezer-5': '냉동5', 'freezer-6': '냉동6', 'freezer-7': '냉동7' };
+                const labels = { '': '미지정', 'shelf-1': '선반1', 'shelf-2': '선반2', 'shelf-3': '선반3', 'fridge-1': '냉장1', 'fridge-2': '냉장2', 'freezer-4': '냉동4', 'freezer-5': '냉동5', 'freezer-6': '냉동6', 'freezer-7': '냉동7', 'other': '기타' };
                 showToast(`'${prod.name}' → ${labels[shelfKey] || '미지정'}`);
                 // 재고관리 화면은 선반별로 그룹핑되므로(전체 포함) 변경 즉시 재렌더해 상품을 새 선반 그룹으로 이동
                 if (uploadManageDeliveryType === 'inventory') {
                     renderProductsList();
                 }
-            } catch (e) {
+            } else {
                 prod.shelf = prev; // 롤백
-                console.error("선반 지정 실패:", e);
-                showToast("선반 지정 실패: " + e.toString());
+                showToast("선반 지정에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+                renderProductsList(); // 드롭다운을 원래 값으로 되돌림
             }
         }
 
         // [신규] 재고관리 — 상품 재고 수량 직접 변경 (절대값 설정: 기본재고=입력값, 조정값 0으로 리셋)
         async function updateProductStock(index, value) {
             const prod = uploadProducts[index];
-            if (!prod) return;
+            if (!prod) { showToast("상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요."); renderProductsList(); return; }
             const raw = String(value == null ? '' : value).trim();
             if (raw === '') { renderProductsList(); return; } // 빈 값이면 변경 없음(원래 값으로 복원)
             let wantUnlimited = (raw === '무제한' || raw.toLowerCase() === 'unlimited');
@@ -8151,15 +8823,11 @@
             uploadGlobalAdjustments[adjKey] = wantUnlimited ? 'unlimited' : 0;
 
             try {
-                const [r1, r2] = await Promise.all([
-                    fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(uploadProducts)
-                    }),
-                    fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
-                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wantUnlimited ? 'unlimited' : 0)
-                    })
+                const [ok1, ok2] = await Promise.all([
+                    fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, uploadProducts),
+                    fbPutRetry(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, wantUnlimited ? 'unlimited' : 0)
                 ]);
-                if (!r1.ok || !r2.ok) throw new Error(`저장 실패 ${r1.status}/${r2.status}`);
+                if (!ok1 || !ok2) throw new Error(`저장 실패(재시도 후)`);
                 updatePublishedProductsTimestamp();
                 showToast(`'${prod.name}' 재고 → ${wantUnlimited ? '무제한' : newStock}`);
                 renderProductsList();
@@ -8201,6 +8869,7 @@
                 tabType = "costco";
             }
 
+            uploadEditShelf = String(prod.shelf || ''); // [신규] 기존 선반위치를 폼에 반영 (selectMainTab에서 사용)
             selectMainTab(tabType);
 
             document.getElementById('productName').value = prod.name || "";
@@ -8265,6 +8934,7 @@
             document.getElementById('unlimitedStock').checked = false;
             document.getElementById('productStock').disabled = false;
 
+            uploadEditShelf = ''; // [신규] 선반위치 기억값 초기화
             selectMainTab('fruit');
 
             uploadSelectedFiles = [];
