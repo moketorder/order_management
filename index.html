@@ -2603,16 +2603,18 @@
                 </div>
                 <div id="sales-daily-trend" style="margin-bottom:16px;"></div>
 
-                <div style="display:flex; gap:6px; margin:6px 0 8px 0;">
-                    <button type="button" id="rank-tab-product" onclick="setSalesRankTab('product')" class="sales-toggle-btn active" style="flex:1;">🏆 상품별 순위</button>
-                    <button type="button" id="rank-tab-customer" onclick="setSalesRankTab('customer')" class="sales-toggle-btn" style="flex:1;">👑 재주문 고객 순위</button>
+                <div style="display:flex; gap:5px; margin:6px 0 8px 0; flex-wrap:nowrap; overflow-x:auto;">
+                    <button type="button" id="rank-tab-product" onclick="setSalesRankTab('product')" class="sales-toggle-btn active" style="flex:1; white-space:nowrap; padding:7px 8px;">🏆 상품 순위</button>
+                    <button type="button" id="rank-tab-customer" onclick="setSalesRankTab('customer')" class="sales-toggle-btn" style="flex:1; white-space:nowrap; padding:7px 8px;">👑 고객 순위</button>
+                    <button type="button" id="rank-tab-stats" onclick="setSalesRankTab('stats')" class="sales-toggle-btn" style="flex:1; white-space:nowrap; padding:7px 8px;">👥 고객 통계</button>
                 </div>
-                <div style="overflow-x:auto;">
+                <div id="sales-ranking-table-wrap" style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse; font-size:13px;">
                         <thead id="sales-ranking-thead"></thead>
                         <tbody id="sales-ranking-tbody"></tbody>
                     </table>
                 </div>
+                <div id="sales-customer-stats" style="display:none;"></div>
             </div>
             </div><!-- /sales-sub-status -->
 
@@ -6058,6 +6060,147 @@
             }
         }
 
+        // [신규] 고객 카드 모달 — 재주문 고객 순위에서 고객 클릭 시. 가게 운영에 필요한 요약을 한눈에.
+        function showCustomerCardModal(phoneEnc, nameEnc){
+            const phone = decodeURIComponent(phoneEnc || '');
+            const name = decodeURIComponent(nameEnc || '');
+            const targetKey = salesPersonKey({ phone, name });
+            const all = getSalesSourceOrders().filter(o => salesPersonKey(o) === targetKey && !isSalesCanceled(o));
+            if (all.length === 0){ if (typeof showToast==='function') showToast('이 고객의 주문 내역이 없습니다.'); return; }
+
+            const isDone = o => { const st = String(o.status||''); return st==='배달완료' || st==='픽업'; };
+            const completed = all.filter(isDone);
+            // [수정] 날짜 파싱 실패(1970 등 2000년 이전)는 제외 → 첫/마지막 방문일 오류 방지
+            const validDate = o => { const d = salesOrderDate(o); return (d && !isNaN(d.getTime()) && d.getFullYear() >= 2000) ? d : null; };
+            const dayKey = o => { const d = validDate(o); return d ? `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}` : null; };
+
+            let totalAmount=0, totalQty=0;
+            const dayKeys = new Set(), delDays = new Set(), pickDays = new Set();
+            const itemMap = new Map();
+            completed.forEach(o => {
+                const amt = parseInt(o.total||0)||0, q = parseInt(o.qty||0)||0;
+                totalAmount += amt; totalQty += q;
+                const dk = dayKey(o);
+                if (dk){ dayKeys.add(dk); if (isSalesDelivery(o)) delDays.add(dk); else pickDays.add(dk); }
+                const nm = String(o.item||'상품명 없음');
+                if (!itemMap.has(nm)) itemMap.set(nm, { qty:0, amount:0 });
+                const im = itemMap.get(nm); im.qty += q; im.amount += amt;
+            });
+            const orderCount = dayKeys.size;
+            const avg = orderCount>0 ? Math.round(totalAmount/orderCount) : 0;
+            const dateList = (completed.length?completed:all).map(validDate).filter(Boolean).sort((a,b)=>a-b);
+            const firstD = dateList[0], lastD = dateList[dateList.length-1];
+            const fmtY = d => d ? `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}` : '-';
+            // 마지막 주문 이후 경과일
+            const daysSince = lastD ? Math.floor((salesTodayMidnight() - new Date(lastD.getFullYear(),lastD.getMonth(),lastD.getDate()))/(24*60*60*1000)) : null;
+            // 방문빈도: 첫~마지막 주문 기간 동안 평균 며칠마다 / 월 몇 회
+            let freqText = '주문 1회';
+            if (orderCount >= 2 && firstD && lastD){
+                const spanDays = Math.max(1, Math.round((lastD - firstD)/(24*60*60*1000)));
+                const avgGap = Math.max(1, Math.round(spanDays/(orderCount-1)));
+                const perMonth = (orderCount/(spanDays/30));
+                freqText = `평균 ${avgGap}일마다 · 월 ${perMonth.toFixed(1)}회`;
+            }
+
+            const topItems = [...itemMap.entries()].sort((a,b)=>b[1].qty-a[1].qty).slice(0,5);
+            // [수정] '챙길 것' = 오늘 이전인데 아직 안 나간(대기·입고) 주문만. 오늘 포함 이후 건은 아직 밀린 게 아니라 제외.
+            const _today0 = salesTodayMidnight();
+            const pending = all.filter(o => { if (isDone(o)) return false; const d = validDate(o); return d && d < _today0; });
+            let pendingAmt=0; pending.forEach(o=>pendingAmt+=parseInt(o.total||0)||0);
+
+            // [변경] 같은 날짜 = 같은 주문으로 묶어 최근 주문일 6개 (품목수·수량·총액)
+            const dateGroups = new Map();
+            all.forEach(o => {
+                const d = validDate(o); if (!d) return;
+                const dk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                if (!dateGroups.has(dk)) dateGroups.set(dk, { dateStr: dk, ts: d.getTime(), qty:0, amount:0, items:new Set(), allDone:true });
+                const g = dateGroups.get(dk);
+                g.qty += parseInt(o.qty||0)||0;
+                g.amount += parseInt(o.total||0)||0;
+                g.items.add(String(o.item||''));
+                if (!isDone(o)) g.allDone = false;
+            });
+            const recentDates = [...dateGroups.values()].sort((a,b)=>b.ts-a.ts).slice(0,6);
+
+            // 단골 등급
+            let grade = '🌱 신규', gradeColor = '#64748b';
+            if (orderCount >= 10){ grade='👑 VIP'; gradeColor='#d97706'; }
+            else if (orderCount >= 5){ grade='⭐ 단골'; gradeColor='#7c3aed'; }
+            else if (orderCount >= 2){ grade='🔁 재구매'; gradeColor='#2563eb'; }
+
+            const cleanPhone = String(phone).replace(/\D/g,'');
+            const delRatio = orderCount>0 ? Math.round(delDays.size/orderCount*100) : 0;
+            // 성별·나이대 (미선택 아닌 값 우선)
+            const pickAttr = (field) => {
+                let v = all.map(o=>String(o[field]||'').trim()).find(x=>x && x!=='미선택');
+                if (!v) v = all.map(o=>String(o[field]||'').trim()).find(x=>x);
+                return v || '';
+            };
+            const gender = pickAttr('gender');
+            const ageGroup = pickAttr('ageGroup');
+            const genderIcon = gender==='여성'?'👩':(gender==='남성'?'👨':'👤');
+
+            const topHtml = topItems.length ? topItems.map(([nm,v],i)=>`
+                <div style="display:flex; justify-content:space-between; gap:8px; padding:4px 0; border-top:1px dashed #f1f5f9; font-size:12px;">
+                    <span style="color:var(--text-main); word-break:break-all;"><b style="color:${i<3?'#d97706':'#94a3b8'};">${i+1}</b> ${nm}</span>
+                    <span style="flex-shrink:0; color:var(--text-sub); white-space:nowrap;"><b style="color:#2563eb;">${v.qty}개</b> · ${v.amount.toLocaleString()}원</span>
+                </div>`).join('') : '<div style="color:var(--text-sub); font-size:12px; padding:4px 0;">완료 구매 내역 없음</div>';
+
+            const recentHtml = recentDates.length ? recentDates.map(g=>`
+                <div style="display:flex; justify-content:space-between; gap:8px; padding:4px 0; border-top:1px dashed #f1f5f9; font-size:12px;">
+                    <span style="color:var(--text-main);">${fmtMD(g.dateStr)} <span style="color:var(--text-sub);">· 상품 ${g.items.size}종 ${g.qty}개</span>${g.allDone?'':' <span style="color:#d97706; font-weight:800;">·진행중</span>'}</span>
+                    <span style="flex-shrink:0; color:var(--text-main); font-weight:800;">${g.amount.toLocaleString()}원</span>
+                </div>`).join('') : '<div style="color:var(--text-sub); font-size:12px; padding:4px 0;">주문 내역 없음</div>';
+
+            const modalId = 'summary-modal';
+            const oldModal = document.getElementById(modalId); if (oldModal) oldModal.remove();
+            const modal = document.createElement('div');
+            modal.id = modalId; modal.className = 'summary-modal-overlay';
+            modal.innerHTML = `
+                <div class="summary-modal-content">
+                    <div class="summary-modal-header">
+                        <h2>👤 ${name || '고객'} <span style="font-size:12px; font-weight:800; color:${gradeColor};">${grade}</span></h2>
+                        <button class="summary-modal-close" onclick="closeSummaryModal()">&times;</button>
+                    </div>
+                    <div class="summary-modal-body">
+                        <div style="font-size:12px; color:var(--text-sub); margin-bottom:10px;">${phone || '연락처 없음'}${cleanPhone ? `
+                            <span style="display:inline-flex; gap:5px; margin-left:6px;">
+                                <a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:2px 7px; border-radius:6px;">📞 전화</a>
+                                <button type="button" onclick="copyTextAndSms(decodeURIComponent('${encodeURIComponent('[모켓] '+(name||'')+'님, 안녕하세요! 😊')}'), '${cleanPhone}', '고객 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:2px 7px; border-radius:6px; cursor:pointer;">💬 문자</button>
+                            </span>` : ''}</div>
+                        ${(gender || ageGroup) ? `<div style="font-size:12px; margin-bottom:10px;">
+                            ${gender ? `<span style="font-weight:800; color:#334155;">${genderIcon} ${gender}</span>` : ''}${(gender && ageGroup) ? ' · ' : ''}${ageGroup ? `<span style="font-weight:800; color:#334155;">${ageGroup}</span>` : ''}
+                        </div>` : ''}
+
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                            ${salesStatChip('총 구매액', totalAmount.toLocaleString()+'원', '#059669')}
+                            ${salesStatChip('주문 횟수', orderCount+'회')}
+                            ${salesStatChip('1회 평균', avg.toLocaleString()+'원')}
+                            ${salesStatChip('총 수량', totalQty.toLocaleString()+'개')}
+                        </div>
+
+                        <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-sub); background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:12px;">
+                            <span>첫 방문일 <b style="color:var(--text-main);">${fmtY(firstD)}</b></span>
+                            <span>마지막 방문일 <b style="color:var(--text-main);">${fmtY(lastD)}</b>${daysSince!==null?` <span style="color:${daysSince>=30?'#dc2626':'#94a3b8'};">(${daysSince}일 전)</span>`:''}</span>
+                            <span>방문빈도 <b style="color:var(--text-main);">${freqText}</b></span>
+                            <span>배달/픽업 <b style="color:#3b82f6;">${delDays.size}</b>/<b style="color:#7c3aed;">${pickDays.size}</b> (배달 ${delRatio}%)</span>
+                        </div>
+
+                        ${pending.length ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                            ${salesStatChip('미완료(챙길것)', pending.length+'건 · '+pendingAmt.toLocaleString()+'원', '#dc2626')}
+                        </div>` : ''}
+
+                        <div style="font-size:13px; font-weight:800; color:#334155; margin:4px 0 4px;">🧡 자주 산 상품 TOP${topItems.length}</div>
+                        ${topHtml}
+
+                        <div style="font-size:13px; font-weight:800; color:#334155; margin:12px 0 4px;">🧾 최근 주문일 ${recentDates.length}일</div>
+                        ${recentHtml}
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            setTimeout(() => modal.classList.add('active'), 10);
+        }
+
         // [신규] 지난 미완료 모달 — 오늘 이전 예정일인데 아직 픽업/배달완료·취소가 아닌 주문 (주문현황과 동일한 팝업 형식)
         // 미완료(대기/입고) 주문은 보관함으로 이관되지 않고 live(rawOrders)에 남으므로 rawOrders만으로 충분
         function showOverdueModal() {
@@ -7075,7 +7218,7 @@
                             ${r.doneQty > 0 ? `<span style="color:var(--text-sub);">완료수량 <b style="color:#7c3aed; font-weight:900;">${r.doneQty}개</b></span>` : ''}
                         </div>
                         ${idx >= 0 ? `<div style="flex-shrink:0; display:flex; gap:4px; align-items:center;">
-                            <input type="text" id="sales-stock-input-${idx}" value="${stockInputVal}" placeholder="${stockInputVal}" inputmode="numeric" onclick="event.stopPropagation();" onfocus="this.value='';" onkeydown="if(event.key==='Enter'){event.preventDefault(); salesUpdateStock(${idx}, this.value);}" title="재고 수량 입력 (숫자, 999=무제한)" style="width:58px; padding:4px 6px; border:1.5px solid var(--border); border-radius:6px; font-size:12px; font-weight:700; text-align:center; box-sizing:border-box;">
+                            <input type="text" id="sales-stock-input-${idx}" value="${stockInputVal}" placeholder="${stockInputVal}" inputmode="numeric" onclick="event.stopPropagation();" onfocus="this.value='';" onkeydown="if(event.key==='Enter'){event.preventDefault(); salesUpdateStock(${idx}, this.value);}" title="재고 수량 입력 (숫자, 999=무제한)" style="width:42px; padding:4px 3px; border:1.5px solid var(--border); border-radius:6px; font-size:12px; font-weight:700; text-align:center; box-sizing:border-box;">
                             <button type="button" onclick="event.stopPropagation(); salesUpdateStock(${idx}, document.getElementById('sales-stock-input-${idx}').value)" style="padding:5px 11px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button>
                         </div>` : ''}
                     </div>
@@ -7255,17 +7398,124 @@
         // [신규] 순위 탭 (상품별 / 재주문 고객) — 상태 변수는 상단에서 선언됨
         function setSalesRankTab(tab){
             salesRankTab = tab;
-            const pb = document.getElementById('rank-tab-product'), cb = document.getElementById('rank-tab-customer');
-            if (pb) pb.classList.toggle('active', tab === 'product');
-            if (cb) cb.classList.toggle('active', tab === 'customer');
+            ['product','customer','stats'].forEach(t => { const b = document.getElementById('rank-tab-'+t); if (b) b.classList.toggle('active', tab===t); });
             renderSalesRanking();
         }
         function sortSalesCustRank(key){ toggleSalesSort(salesCustRankSort, key, key === 'name' ? 'asc' : 'desc'); renderSalesRanking(); }
 
-        // 상품별 / 재주문 고객 판매 순위(정렬 가능)
+        // [신규] 고객 통계 — 선택 기간·완료(배달·픽업) 기준. 성별/연령/신규재구매/등급/배달픽업/이탈. '미선택' 별도 표시.
+        function renderCustomerStats(box){
+            const { from, to } = getSalesPeriodRange();
+            const today = salesTodayMidnight();
+            const src = getSalesSourceOrders();
+            const isDone = o => { const st=String(o.status||''); return st==='배달완료'||st==='픽업'; };
+            const vDate = o => { const d=salesOrderDate(o); return (d && !isNaN(d.getTime()) && d.getFullYear()>=2000) ? d : null; };
+            const dkOf = d => `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+            const setPref = (cur, raw) => { const v=String(raw||'').trim(); if(!v) return cur; if(!cur||cur==='미선택') return v; if(v!=='미선택') return v; return cur; };
+
+            // 전체 이력(등급·신규재구매·이탈용)
+            const allMap = new Map();
+            src.forEach(o => {
+                if (isSalesCanceled(o) || !isDone(o)) return;
+                const d = vDate(o); if (!d) return;
+                const k = salesPersonKey(o);
+                if (!allMap.has(k)) allMap.set(k, { days:new Set(), first:d.getTime(), last:d.getTime() });
+                const g = allMap.get(k); g.days.add(dkOf(d));
+                if (d.getTime()<g.first) g.first=d.getTime();
+                if (d.getTime()>g.last) g.last=d.getTime();
+            });
+            // 기간 내 고객(인구통계·배달픽업)
+            const periodMap = new Map();
+            src.forEach(o => {
+                if (isSalesCanceled(o) || !isDone(o)) return;
+                const d = vDate(o); if (!d) return;
+                if (from && d < from) return;
+                if (to && d > to) return;
+                const del = isSalesDelivery(o);
+                if (salesMethodFilter==='delivery' && !del) return;
+                if (salesMethodFilter==='pickup' && del) return;
+                const k = salesPersonKey(o);
+                if (!periodMap.has(k)) periodMap.set(k, { gender:'', age:'', amount:0, del:0, pick:0 });
+                const g = periodMap.get(k);
+                g.amount += parseInt(o.total||0)||0;
+                if (del) g.del++; else g.pick++;
+                g.gender = setPref(g.gender, o.gender);
+                g.age = setPref(g.age, o.ageGroup);
+            });
+
+            const totalCust = periodMap.size;
+            const genderDist={}, ageDist={}; let delCust=0, pickCust=0, newC=0, retC=0, gVIP=0,gDangol=0,gRe=0,gNew=0;
+            periodMap.forEach((g,k)=>{
+                genderDist[g.gender||'미선택'] = (genderDist[g.gender||'미선택']||0)+1;
+                ageDist[g.age||'미선택'] = (ageDist[g.age||'미선택']||0)+1;
+                if (g.del>=g.pick) delCust++; else pickCust++;
+                const am = allMap.get(k);
+                if (am && from && am.first < from.getTime()) retC++; else newC++;
+                const c = am ? am.days.size : 1;
+                if (c>=10) gVIP++; else if (c>=5) gDangol++; else if (c>=2) gRe++; else gNew++;
+            });
+            let churn=0; const churnMs=30*24*60*60*1000;
+            allMap.forEach(g=>{ if ((today.getTime()-g.last) > churnMs) churn++; });
+
+            if (totalCust === 0){ box.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-sub); font-size:13px;">해당 기간 고객이 없습니다.</div>`; return; }
+
+            const ordered = (dist, order) => [...order.filter(k=>k in dist), ...Object.keys(dist).filter(k=>!order.includes(k))];
+            const bar = (label, count, total, color) => {
+                const pct = total>0 ? Math.round(count/total*100) : 0;
+                return `<div style="display:flex; align-items:center; gap:8px; margin:3px 0;">
+                    <div style="width:66px; font-size:12px; color:${label==='미선택'?'#94a3b8':'var(--text-sub)'}; flex-shrink:0; ${label==='미선택'?'font-style:italic;':'font-weight:700;'}">${label}</div>
+                    <div style="flex:1; min-width:36px; background:#f1f5f9; border-radius:4px; height:15px; overflow:hidden;"><div style="width:${pct}%; height:100%; background:${color};"></div></div>
+                    <div style="width:70px; text-align:right; font-size:12px; font-weight:800; flex-shrink:0;">${count}명·${pct}%</div>
+                </div>`;
+            };
+            const sec = t => `<div style="font-size:13px; font-weight:800; color:#334155; margin:14px 0 5px;">${t}</div>`;
+
+            const genderKeys = ordered(genderDist, ['여성','남성','미선택']);
+            const ageKeys = ordered(ageDist, ['10대','20대','30대','40대','50대','60대 이상','미선택']);
+            const gColor = k => k==='여성'?'#ec4899':(k==='남성'?'#3b82f6':'#cbd5e1');
+
+            box.innerHTML = `
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+                    ${salesStatChip('총 고객(기간)', totalCust+'명')}
+                    ${salesStatChip('신규 / 재구매', newC+' / '+retC+'명')}
+                    ${salesStatChip('이탈위험(30일+)', churn+'명', churn>0?'#dc2626':null)}
+                </div>
+                ${sec('👩 성별 분포')}
+                ${genderKeys.map(k=>bar(k, genderDist[k], totalCust, gColor(k))).join('')}
+                ${sec('🎂 연령대 분포')}
+                ${ageKeys.map(k=>bar(k, ageDist[k], totalCust, k==='미선택'?'#cbd5e1':'#8b5cf6')).join('')}
+                ${sec('🔁 신규 vs 재구매')}
+                ${bar('신규', newC, totalCust, '#10b981')}
+                ${bar('재구매', retC, totalCust, '#2563eb')}
+                ${sec('🏅 단골 등급 (전체 이력)')}
+                ${bar('👑 VIP(10+)', gVIP, totalCust, '#d97706')}
+                ${bar('⭐ 단골(5+)', gDangol, totalCust, '#7c3aed')}
+                ${bar('🔁 재구매(2+)', gRe, totalCust, '#2563eb')}
+                ${bar('🌱 신규(1)', gNew, totalCust, '#94a3b8')}
+                ${sec('🚚 배달 / 픽업 고객')}
+                ${bar('배달 위주', delCust, totalCust, '#3b82f6')}
+                ${bar('픽업 위주', pickCust, totalCust, '#7c3aed')}
+                <div style="font-size:11px; color:var(--text-sub); margin-top:12px; line-height:1.5;">
+                    · 성별·연령·배달픽업 = <b>선택 기간</b> 내 고객 기준 · 미선택은 별도 표시<br>
+                    · 신규/재구매·등급·이탈 = <b>전체 이력</b> 기준 (신규=이 기간 처음 방문 / 재구매=이전에도 방문)<br>
+                    · 이탈위험 = 마지막 주문이 <b>30일 이상</b> 지난 전체 고객 수
+                </div>`;
+        }
+
+        // 상품별 / 재주문 고객 판매 순위(정렬 가능) + 고객 통계
         function renderSalesRanking(){
             const rthead = document.getElementById('sales-ranking-thead');
             const rtbody = document.getElementById('sales-ranking-tbody');
+            const tableWrap = document.getElementById('sales-ranking-table-wrap');
+            const statsBox = document.getElementById('sales-customer-stats');
+            // 통계 탭이면 표 숨기고 통계 렌더
+            if (salesRankTab === 'stats'){
+                if (tableWrap) tableWrap.style.display = 'none';
+                if (statsBox){ statsBox.style.display = 'block'; renderCustomerStats(statsBox); }
+                return;
+            }
+            if (tableWrap) tableWrap.style.display = 'block';
+            if (statsBox) statsBox.style.display = 'none';
             if (!rtbody) return;
 
             if (salesRankTab === 'customer') {
@@ -7281,9 +7531,9 @@
                 list.sort((a, b) => s.key === 'name' ? salesCmpStr(a.name, b.name, s.dir) : salesCmpNum(a[s.key], b[s.key], s.dir));
                 if (list.length === 0){ rtbody.innerHTML = `<tr><td colspan="4" style="padding:16px; text-align:center; color:var(--text-sub);">해당 기간 고객 내역이 없습니다.</td></tr>`; return; }
                 rtbody.innerHTML = list.slice(0, 50).map((r, i) => `
-                    <tr>
+                    <tr onclick="showCustomerCardModal('${encodeURIComponent(r.phone||'')}','${encodeURIComponent(r.name||'')}')" style="cursor:pointer;" title="고객 카드 보기">
                         <td style="padding:8px; font-weight:800; color:${i < 3 ? '#d97706' : '#94a3b8'};">${i + 1}</td>
-                        <td style="padding:8px;">${r.name || '이름없음'}${r.phone ? `<span style="font-size:11px; color:var(--text-sub);"> ${r.phone}</span>` : ''}</td>
+                        <td style="padding:8px; color:var(--primary); font-weight:700; text-decoration:underline;">${r.name || '이름없음'}${r.phone ? `<span style="font-size:11px; color:var(--text-sub); font-weight:400; text-decoration:none;"> ${r.phone}</span>` : ''}</td>
                         <td style="padding:8px; text-align:right; font-weight:800;">${r.count.toLocaleString()}회</td>
                         <td style="padding:8px; text-align:right;">${r.amount.toLocaleString()}원</td>
                     </tr>`).join('');
