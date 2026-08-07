@@ -2019,6 +2019,7 @@
                     <option value="입고">입고</option>
                     <option value="픽업">픽업</option>
                     <option value="배달완료">배달완료</option>
+                    <option value="취소">취소</option>
                     <option value="배달미입금">배달미입금</option>
                     <option value="픽업미입금">픽업미입금</option>
                     <option value="입금완료">입금완료</option>
@@ -2775,6 +2776,7 @@
                 }
                 
                 // 데이터 가공/렌더링은 processOrdersSnapshot()에서 공통으로 처리 (실시간 리스너와 로직 공유)
+                ordersByPhone = data || {}; // [증분 동기화] 수동 새로고침 시에도 원본 트리 최신화
                 processOrdersSnapshot(data);
                 
             } catch (e) {
@@ -2895,6 +2897,8 @@
         // [신규] REST 폴링 대신 Firebase 실시간 리스너(웹소켓)로 orders/메모 데이터를 구독.
         // 최초 연결 시 한 번 전체를 받고, 이후로는 변경분만 서버가 알아서 밀어줌 → 새로고침 반복 불필요.
         let isRealtimeFirstLoadDone = false;
+        let ordersByPhone = {};        // [증분 동기화] 전화번호(1단계 자식) 단위 orders 원본 트리 — 변경분만 갱신
+        let _ordersRenderTimer = null; // 초기 버스트/연속 변경을 모아 1회만 렌더하기 위한 디바운스 타이머
 
         function attachRealtimeListeners() {
             showLoader("실시간 연동 설정 중...");
@@ -2903,25 +2907,44 @@
             if (syncTextEl) syncTextEl.innerText = "연동 중...";
             if (syncDotEl) syncDotEl.style.backgroundColor = "#f59e0b";
 
-            rtdb.ref('orders').on('value', (snapshot) => {
-                const data = snapshot.val() || {};
-                processOrdersSnapshot(data);
-
-                if (!isRealtimeFirstLoadDone) {
-                    isRealtimeFirstLoadDone = true;
-                    hideLoader();
-                }
-
-                const now = new Date();
-                if (syncTextEl) syncTextEl.innerText = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 실시간 연동중`;
-                if (syncDotEl) syncDotEl.style.backgroundColor = "var(--primary)";
-            }, (error) => {
+            // [증분 동기화] orders 전체 재구독(on value) 대신 전화번호 단위 변경분만 수신 → 매 변경 시 노드 전체 재다운로드 제거
+            // 초기 연결 시 child_added가 전화번호마다 1회씩 발생 → 디바운스로 모아 1회만 렌더
+            const _ordersRef = rtdb.ref('orders');
+            const _applyOrdersDelta = () => {
+                if (_ordersRenderTimer) clearTimeout(_ordersRenderTimer);
+                _ordersRenderTimer = setTimeout(() => {
+                    _ordersRenderTimer = null;
+                    processOrdersSnapshot(ordersByPhone);
+                    if (!isRealtimeFirstLoadDone) {
+                        isRealtimeFirstLoadDone = true;
+                        hideLoader();
+                    }
+                    const now = new Date();
+                    if (syncTextEl) syncTextEl.innerText = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')} 실시간 연동중`;
+                    if (syncDotEl) syncDotEl.style.backgroundColor = "var(--primary)";
+                }, 80);
+            };
+            const _ordersErr = (error) => {
                 console.error("실시간 연동 오류:", error);
                 showToast("실시간 연동에 실패했습니다: " + error.message);
                 hideLoader();
                 if (syncTextEl) syncTextEl.innerText = "연동 실패";
                 if (syncDotEl) syncDotEl.style.backgroundColor = "var(--red)";
-            });
+            };
+            _ordersRef.on('child_added',   (snap) => { ordersByPhone[snap.key] = snap.val(); _applyOrdersDelta(); }, _ordersErr);
+            _ordersRef.on('child_changed', (snap) => { ordersByPhone[snap.key] = snap.val(); _applyOrdersDelta(); }, _ordersErr);
+            _ordersRef.on('child_removed', (snap) => { delete ordersByPhone[snap.key]; _applyOrdersDelta(); }, _ordersErr);
+
+            // 안전장치: orders가 비어 child_added가 한 번도 오지 않아도 로더/초기 렌더가 멈추지 않게 처리
+            setTimeout(() => {
+                if (!isRealtimeFirstLoadDone) {
+                    isRealtimeFirstLoadDone = true;
+                    processOrdersSnapshot(ordersByPhone);
+                    hideLoader();
+                    if (syncTextEl) syncTextEl.innerText = "실시간 연동중";
+                    if (syncDotEl) syncDotEl.style.backgroundColor = "var(--primary)";
+                }
+            }, 3000);
 
             rtdb.ref('customer_memos').on('value', (snapshot) => {
                 customerMemos = snapshot.val() || {};
@@ -3074,8 +3097,8 @@
             };
             sortedYears.forEach(y => {
                 const opt = document.createElement('option');
-                opt.value = y;
-                opt.text = y;
+                opt.value = y; // 내부값은 "2026년" 유지(필터 로직 호환)
+                opt.text = y.replace(/^\d{2}(\d{2}년)$/, '$1'); // 표시만 "26년" 서식
                 opt.selected = (y === currentYear);
                 yearSelect.appendChild(opt);
             });
@@ -3279,31 +3302,51 @@
             return itemYear === currentYear && info.month === currentMonth && info.day === currentDay;
         }
 
-        // [신규] 상태별 탭(개수) — 상태 제외 필터된 항목으로 각 상태 개수 계산 후 렌더
+        // [신규] 현재 선택한 날짜 탭이 '과거(보관함)' 데이터를 포함할 수 있는지 판단
+        // → 최근(이번달·이번연도) 스코프에서는 보관함(orders_archive)을 받지 않아 데이터 사용 절약
+        function dateScopeNeedsArchive(){
+            const now = new Date();
+            const nowYearStr = now.getFullYear() + "년";
+            const nowMonthNum = now.getMonth() + 1;
+            if (currentYear && currentYear !== nowYearStr) return true;         // 지난 연도 선택
+            if (currentMonth === "전체" || currentMonth === "기타") return true;  // 연도 전체 / 기타
+            const m = parseInt(currentMonth);
+            if (!isNaN(m) && m < nowMonthNum) return true;                      // 올해의 이번달 이전 달
+            return false;                                                       // 이번달·이번연도 등 최근 스코프 → 보관함 불필요
+        }
+
+        // [신규] 상태별 탭(개수) — 상태 제외 필터된 항목으로 각 상태의 "고객 카드 수" 계산 후 렌더
+        // [수정] 품목 개수가 아니라 화면에 보이는 사람 카드(이름+연락처+수령방법+수령일) 개수로 집계
         function buildOrderStatusTabs(items){
             const c1 = document.getElementById('order-status-tabs');
             const c2 = document.getElementById('order-status-tabs2');
             if (!c1) return;
-            const counts = { all: 0, '대기': 0, '입고': 0, '픽업': 0, '배달완료': 0, '배달미입금': 0, '입금완료': 0 };
+            const sets = { all: new Set(), '대기': new Set(), '입고': new Set(), '픽업': new Set(), '배달완료': new Set(), '취소': new Set(), '배달미입금': new Set(), '입금완료': new Set() };
             (items || []).forEach(item => {
-                counts.all++;
                 const status = item.status || '대기';
                 const asm = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
                 const paid = (item.paid === true || item.paid === "true");
                 const canceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
-                if (status === '대기') counts['대기']++;
-                else if (status === '입고') counts['입고']++;
-                else if (status === '픽업') counts['픽업']++;
-                else if (status === '배달완료') counts['배달완료']++;
-                if (asm === '배달주문' && !paid && !canceled && status !== '배달완료') counts['배달미입금']++;
-                if (paid && !canceled) counts['입금완료']++;
+                const info = getOrderDateInfo(item);
+                const dateStr = info.dateStr || "기타";
+                const cardKey = `${item.name}_${item.phone}_${asm}_${dateStr}`; // 카드 그룹 키와 동일
+                sets.all.add(cardKey);
+                if (status === '대기') sets['대기'].add(cardKey);
+                else if (status === '입고') sets['입고'].add(cardKey);
+                else if (status === '픽업') sets['픽업'].add(cardKey);
+                else if (status === '배달완료') sets['배달완료'].add(cardKey);
+                if (canceled) sets['취소'].add(cardKey);
+                if (asm === '배달주문' && !paid && !canceled && status !== '배달완료') sets['배달미입금'].add(cardKey);
+                if (paid && !canceled) sets['입금완료'].add(cardKey);
             });
+            const counts = {};
+            Object.keys(sets).forEach(k => counts[k] = sets[k].size);
             const cur = document.getElementById('filterStatus').value;
             const renderTab = ([v, label]) => {
                 const active = (cur === v);
                 return `<button type="button" onclick="selectOrderStatus('${v}')" style="flex:0 0 auto; white-space:nowrap; padding:7px 10px; border-radius:8px; border:1.5px solid ${active?'var(--primary)':'var(--border)'}; background:${active?'var(--primary-light)':'#fff'}; color:${active?'var(--primary)':'var(--text-sub)'}; font-size:12px; font-weight:800; cursor:pointer;">${label} <b style="color:${active?'var(--primary)':'var(--text-main)'};">${counts[v]}</b></button>`;
             };
-            const row1 = [['all','전체'],['대기','🔘 대기'],['입고','🟡 입고'],['픽업','🟣 픽업완료'],['배달완료','🟢 배달완료']];
+            const row1 = [['all','전체'],['대기','🔘 대기'],['입고','🟡 입고'],['픽업','🟣 픽업완료'],['배달완료','🟢 배달완료'],['취소','🔴 취소']];
             const row2 = [['배달미입금','🔴 배달미입금'],['입금완료','💵 입금완료']];
             c1.innerHTML = row1.map(renderTab).join('');
             if (c2) c2.innerHTML = row2.map(renderTab).join('');
@@ -3331,53 +3374,9 @@
                 const statusFilter = document.getElementById('filterStatus').value;
                 const searchRange = document.getElementById('filterDateRange').value;
 
-                // 1단계: 날짜(년/월/일) 매칭 필터
-                let filtered = [];
-                if (search !== "") {
-                    // 검색어가 있을 때: 검색 범위(전체/월/주/일)에 맞게 필터링 적용
-                    const todayStart = new Date();
-                    todayStart.setHours(0, 0, 0, 0);
-                    const todayTime = todayStart.getTime();
-
-                    if (searchRange === "all") {
-                        filtered = [...rawOrders];
-                    } else if (searchRange === "month") {
-                        // 월: 당일 기준 앞뒤 30일 (-30일 ~ +30일)
-                        const minTime = todayTime - (30 * 24 * 60 * 60 * 1000);
-                        const maxTime = todayTime + (31 * 24 * 60 * 60 * 1000) - 1;
-                        filtered = rawOrders.filter(item => {
-                            const info = getOrderDateInfo(item);
-                            if (!info.dateStr || info.dateStr === "기타") return true;
-                            const parts = info.dateStr.split('-');
-                            if (parts.length === 3) {
-                                const itemDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                                const itemTime = itemDate.getTime();
-                                return itemTime >= minTime && itemTime <= maxTime;
-                            }
-                            return true;
-                        });
-                    } else if (searchRange === "week") {
-                        // 주: 당일 기준 앞뒤 7일 (-7일 ~ +7일)
-                        const minTime = todayTime - (7 * 24 * 60 * 60 * 1000);
-                        const maxTime = todayTime + (8 * 24 * 60 * 60 * 1000) - 1;
-                        filtered = rawOrders.filter(item => {
-                            const info = getOrderDateInfo(item);
-                            if (!info.dateStr || info.dateStr === "기타") return true;
-                            const parts = info.dateStr.split('-');
-                            if (parts.length === 3) {
-                                const itemDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                                const itemTime = itemDate.getTime();
-                                return itemTime >= minTime && itemTime <= maxTime;
-                            }
-                            return true;
-                        });
-                    } else { // "day" (당일)
-                        filtered = rawOrders.filter(item => matchesCurrentDateScope(item));
-                    }
-                } else {
-                    // 검색어가 없을 때: 현재 선택된 연/월/일 탭(전체 포함) 데이터를 보여줌
-                    filtered = rawOrders.filter(item => matchesCurrentDateScope(item));
-                }
+                // 1단계: 날짜(년/월/일) 탭 필터 — 검색 여부와 무관하게 항상 유지
+                // (검색해도 현재 선택한 월/일 탭 범위 안에서만 조회. 전체를 보려면 날짜 탭에서 '전체'를 선택)
+                let filtered = rawOrders.filter(item => matchesCurrentDateScope(item));
 
                 // 2단계: 수령방법 및 검색 키워드 필터
                 filtered = filtered.filter(item => {
@@ -3426,6 +3425,8 @@
                     filtered = filtered.filter(item => {
                         const status = item.status || "대기";
                         const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
+                        const canceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                        if (statusFilter === '취소') return canceled;
                         if (statusFilter === '대기') return status === '대기';
                         if (statusFilter === '입고') return status === '입고';
                         if (statusFilter === '픽업') return status === '픽업';
@@ -4118,8 +4119,8 @@
         }
 
         async function handleFilterChange() {
-            const searchRange = document.getElementById('filterDateRange').value;
-            if (searchRange === 'all' && !isArchiveLoaded) {
+            // [수정] 과거(전체/지난달/지난해/기타) 스코프일 때만 보관함 로드 → 최근 스코프 검색은 데이터 절약
+            if (dateScopeNeedsArchive() && !isArchiveLoaded) {
                 await loadArchiveOrdersIfNeeded();
             }
             selectedItems.clear();
@@ -4128,8 +4129,8 @@
         }
 
         async function handleSearchInput() {
-            const searchRange = document.getElementById('filterDateRange').value;
-            if (searchRange === 'all' && !isArchiveLoaded) {
+            // [수정] 과거(전체/지난달/지난해/기타) 스코프일 때만 보관함 로드 → 최근 스코프 검색은 데이터 절약
+            if (dateScopeNeedsArchive() && !isArchiveLoaded) {
                 await loadArchiveOrdersIfNeeded();
             }
             selectedItems.clear();
@@ -5090,15 +5091,17 @@
             try {
                 const patchBody = getStatusPatchBody(newStatus);
                 const promises = customerItems.map(it => {
-                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${it.orderKey}.json`;
+                    // [버그수정] 실제 저장 노드 키(firebasePhoneKey)로 PATCH → 전화번호 형식 불일치로 유령 생성 방지
+                    const phoneKey = it.firebasePhoneKey ? it.firebasePhoneKey : cleanPhone;
+                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(phoneKey)}/${encodeURIComponent(it.orderKey)}.json`;
                     const p = fetch(url, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(patchBody)
                     });
-                    
+
                     if (newStatus !== '배달완료') {
-                        fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${it.orderKey}.json`, {
+                        fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(phoneKey)}/${encodeURIComponent(it.orderKey)}.json`, {
                             method: 'DELETE'
                         }).catch(e => console.error("배달사진 이미지 삭제 실패:", e));
                     }
@@ -5175,8 +5178,13 @@
                 const promises = [];
                 itemsToProcess.forEach(({ phone, orderKey, target }) => {
                     const cleanPhone = String(phone || "").replace(/\D/g, "");
-                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
-                    
+                    // [버그수정] 실제 주문이 저장된 Firebase 노드 키(firebasePhoneKey)로 PATCH.
+                    // 숫자만 정규화한 cleanPhone은 저장 키(821…, 010-xxxx… 등)와 형식이 달라 엉뚱한 경로에
+                    // 상태 플래그만 쓰여 유령이 생기던 문제를 방지 (target 없으면 cleanPhone 폴백).
+                    const phoneKey = (target && target.firebasePhoneKey) ? target.firebasePhoneKey : cleanPhone;
+                    const orderKeyForPath = (target && target.orderKey) ? target.orderKey : orderKey;
+                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(phoneKey)}/${encodeURIComponent(orderKeyForPath)}.json`;
+
                     const p = fetch(url, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
@@ -5188,7 +5196,7 @@
                                 syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
                             }
                             if (newStatus !== '배달완료') {
-                                fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`, {
+                                fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(phoneKey)}/${encodeURIComponent(orderKeyForPath)}.json`, {
                                     method: 'DELETE'
                                 }).catch(e => console.error("배달사진 이미지 삭제 실패:", e));
                             }
@@ -5262,8 +5270,11 @@
                 const promises = [];
                 itemsToProcess.forEach(({ phone, orderKey, target }) => {
                     const cleanPhone = String(phone || "").replace(/\D/g, "");
-                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
-                    
+                    // [버그수정] 실제 저장 노드 키(firebasePhoneKey)로 PATCH → 전화번호 형식 불일치로 유령 생성 방지
+                    const phoneKey = (target && target.firebasePhoneKey) ? target.firebasePhoneKey : cleanPhone;
+                    const orderKeyForPath = (target && target.orderKey) ? target.orderKey : orderKey;
+                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(phoneKey)}/${encodeURIComponent(orderKeyForPath)}.json`;
+
                     const p = fetch(url, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
@@ -5362,7 +5373,9 @@
             try {
                 const promises = canceledOrders.map(async (item) => {
                     const cleanPhone = String(item.phone || "").replace(/\D/g, "");
-                    const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${item.orderKey}.json`;
+                    // [버그수정] 실제 저장 노드 키(firebasePhoneKey)로 삭제 → 형식 불일치로 엉뚱한/없는 경로를 지우지 않게
+                    const phoneKey = item.firebasePhoneKey ? item.firebasePhoneKey : cleanPhone;
+                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(phoneKey)}/${encodeURIComponent(item.orderKey)}.json`;
                     const res = await fetch(url, { method: 'DELETE' });
                     if (!res.ok) {
                         throw new Error(`주문 삭제 실패: ${item.name} (${item.phone})`);
@@ -5389,49 +5402,8 @@
             const statusFilter = document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : 'all';
             const searchRange = document.getElementById('filterDateRange') ? document.getElementById('filterDateRange').value : 'day';
 
-            // 1단계: 날짜(년/월/일) 매칭 필터
-            let targetOrders = [];
-            if (search !== "") {
-                if (searchRange === "all") {
-                    targetOrders = [...rawOrders];
-                } else if (searchRange === "month") {
-                    targetOrders = rawOrders.filter(item => {
-                        const info = getOrderDateInfo(item);
-                        const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
-                        return itemYear === currentYear && info.month === currentMonth;
-                    });
-                } else if (searchRange === "week") {
-                    const todayStart = new Date();
-                    todayStart.setHours(0, 0, 0, 0);
-                    const minTime = todayStart.getTime() - (7 * 24 * 60 * 60 * 1000);
-                    const maxTime = todayStart.getTime() + (7 * 24 * 60 * 60 * 1000) + (24 * 60 * 60 * 1000 - 1);
-                    
-                    targetOrders = rawOrders.filter(item => {
-                        const info = getOrderDateInfo(item);
-                        if (!info.dateStr || info.dateStr === "기타") return false;
-                        
-                        const parts = info.dateStr.split('-');
-                        if (parts.length === 3) {
-                            const itemDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                            const itemTime = itemDate.getTime();
-                            return itemTime >= minTime && itemTime <= maxTime;
-                        }
-                        return false;
-                    });
-                } else { // "day"
-                    targetOrders = rawOrders.filter(item => {
-                        const info = getOrderDateInfo(item);
-                        const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
-                        return itemYear === currentYear && info.month === currentMonth && info.day === currentDay;
-                    });
-                }
-            } else {
-                targetOrders = rawOrders.filter(item => {
-                    const info = getOrderDateInfo(item);
-                    const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
-                    return itemYear === currentYear && info.month === currentMonth && info.day === currentDay;
-                });
-            }
+            // 1단계: 날짜(년/월/일) 탭 필터 — 검색 여부와 무관하게 현재 선택한 날짜 탭 범위 유지
+            let targetOrders = rawOrders.filter(item => matchesCurrentDateScope(item));
 
             // 2단계: 수령방법 및 검색 키워드 필터
             targetOrders = targetOrders.filter(item => {
@@ -5441,7 +5413,9 @@
                 let matchStatus = true;
                 const status = item.status || "대기";
                 if (statusFilter !== 'all') {
-                    if (statusFilter === '대기') matchStatus = status === '대기';
+                    const _canceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                    if (statusFilter === '취소') matchStatus = _canceled;
+                    else if (statusFilter === '대기') matchStatus = status === '대기';
                     else if (statusFilter === '입고') matchStatus = status === '입고';
                     else if (statusFilter === '픽업') matchStatus = status === '픽업';
                     else if (statusFilter === '배달완료') matchStatus = status === '배달완료';
@@ -9478,7 +9452,9 @@
                     
                     itemsToProcess.forEach(({ phone, orderKey, orderItem }) => {
                         const cleanPhone = String(phone).replace(/\D/g, "");
-                        
+                        // [버그수정] 실제 저장 노드 키(firebasePhoneKey)로 PATCH → 전화번호 형식 불일치로 유령 생성 방지
+                        const phoneKey = (orderItem && orderItem.firebasePhoneKey) ? orderItem.firebasePhoneKey : cleanPhone;
+
                         // Firebase 업데이트 본문 설정 (메타데이터만 orders 노드에 저장)
                         const updates = {
                             status: "배달완료",
@@ -9487,16 +9463,16 @@
                             deliveryPhotoExists: true,
                             deliveryPhotoTime: nowTime
                         };
-                        
-                        const p = fetch(`${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`, {
+
+                        const p = fetch(`${FIREBASE_DB_URL}orders/${encodeURIComponent(phoneKey)}/${encodeURIComponent(orderKey)}.json`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(updates)
                         }).then(async (res) => {
                             if (!res.ok) throw new Error("업데이트 실패");
-                            
+
                             // 실제 고용량 이미지 데이터는 delivery_photos 노드에 별도 저장
-                            await fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`, {
+                            await fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(phoneKey)}/${encodeURIComponent(orderKey)}.json`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ photo: base64Data })
