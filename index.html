@@ -647,7 +647,7 @@
         }
 
         .mobile-item-row {
-            padding: 14px 16px;
+            padding: 8px 16px;
             border-bottom: 1px solid var(--border);
         }
 
@@ -693,14 +693,18 @@
 
         .mobile-item-middle {
             display: flex;
-            justify-content: space-between;
+            align-items: baseline;
             font-size: 12px;
             color: var(--text-sub);
-            margin-bottom: 10px;
+            margin-bottom: 0;
             background: #f8fafc;
             padding: 6px 10px;
             border-radius: var(--radius-sub);
         }
+        .mobile-item-middle > span { flex: 1 1 0; min-width: 0; white-space: nowrap; }
+        .mobile-item-middle > span:nth-child(1) { text-align: left; }
+        .mobile-item-middle > span:nth-child(2) { text-align: center; }
+        .mobile-item-middle > span:nth-child(3) { text-align: right; }
 
         .mobile-item-bottom {
             display: flex;
@@ -2179,7 +2183,7 @@
 
                             <!-- 상품 사진 업로드 -->
                             <div class="form-group">
-                                <label>상품 사진 (최대 10장)</label>
+                                <label>상품 사진</label>
                                 <div class="file-upload-zone" id="uploadZone" onclick="triggerFileInput()" style="border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 24px; text-align: center; cursor: pointer; background: #fafafa; transition: var(--transition);">
                                     <div style="font-size: 32px; margin-bottom: 8px;">📸</div>
                                     <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">사진 첨부하기</div>
@@ -2192,6 +2196,9 @@
                                     <div id="selectedFilesList" style="display: flex; flex-direction: column; gap: 8px;"></div>
                                 </div>
                             </div>
+
+                            <!-- [신규] 수정 모드: 이 상품에 등록된 이미지 다운로드 -->
+                            <button type="button" id="btn-download-images" onclick="downloadProductImages()" style="display: none; width: 100%; height: 46px; margin-top: 16px; background: white; border: 1.5px solid #0284c7; color: #0284c7; border-radius: var(--radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">⬇️ 사진 다운로드</button>
 
                             <div style="display: flex; gap: 8px; margin-top: 24px;">
                                 <button type="button" id="btn-duplicate-form" onclick="duplicateFromForm(event)" style="display: none; flex: 1 1 0; min-width: 0; padding: 0; height: 50px; background: #7c3aed; color: white; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(124,58,237,0.25); transition: var(--transition);">👯 복제하기</button>
@@ -2567,9 +2574,9 @@
             <!-- B~D. 판매현황 -->
             <div class="card" style="padding: 14px; margin-bottom: 16px;">
                 <!-- [신규] 전체 데이터(보관함) 갱신 — 과거 자료는 마지막 갱신 데이터 기준으로 표시 -->
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-                    <div id="sales-archive-status" style="font-size:11px; color:var(--text-sub); font-weight:700;"></div>
-                    <button type="button" onclick="refreshSalesArchive()" style="flex-shrink:0; padding:7px 12px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">🔄 전체 데이터 갱신</button>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:nowrap; margin-bottom:10px;">
+                    <div id="sales-archive-status" style="font-size:11px; color:var(--text-sub); font-weight:700; min-width:0; flex:1 1 auto;"></div>
+                    <button type="button" onclick="refreshSalesArchive()" title="전체 데이터 갱신" style="flex-shrink:0; padding:6px 10px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:8px; font-size:14px; font-weight:800; cursor:pointer; white-space:nowrap; line-height:1;">🔄</button>
                 </div>
                 <!-- 컨트롤 패널: 집계기준 / 배송유형 / 기간을 하나의 틀로 정리 -->
                 <div style="background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:14px;">
@@ -3354,7 +3361,7 @@
             const c1 = document.getElementById('order-status-tabs');
             const c2 = document.getElementById('order-status-tabs2');
             if (!c1) return;
-            const sets = { all: new Set(), '대기': new Set(), '입고': new Set(), '픽업': new Set(), '배달완료': new Set(), '취소': new Set(), '배달미입금': new Set(), '입금완료': new Set() };
+            const sets = { all: new Set(), '대기': new Set(), '입고': new Set(), '픽업': new Set(), '배달완료': new Set(), '취소': new Set(), '배달미입금': new Set(), '픽업미입금': new Set() };
             (items || []).forEach(item => {
                 const status = item.status || '대기';
                 const asm = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
@@ -3370,12 +3377,12 @@
                 else if (status === '배달완료') sets['배달완료'].add(cardKey);
                 if (canceled) sets['취소'].add(cardKey);
                 if (asm === '배달주문' && !paid && !canceled && status !== '배달완료') sets['배달미입금'].add(cardKey);
-                if (paid && !canceled) sets['입금완료'].add(cardKey);
+                if (asm === '매장픽업' && !paid && !canceled && status !== '픽업') sets['픽업미입금'].add(cardKey);
             });
             const counts = {};
             Object.keys(sets).forEach(k => counts[k] = sets[k].size);
             const cur = document.getElementById('filterStatus').value;
-            const COLORS = { all:'#475569', '대기':'#94a3b8', '입고':'#d97706', '픽업':'#7c3aed', '배달완료':'#059669', '취소':'#dc2626', '배달미입금':'#dc2626', '입금완료':'#059669' };
+            const COLORS = { all:'#475569', '대기':'#94a3b8', '입고':'#d97706', '픽업':'#7c3aed', '배달완료':'#059669', '취소':'#dc2626', '배달미입금':'#dc2626', '픽업미입금':'#db2777' };
             const renderTab = (fill) => ([v, label]) => {
                 const active = (cur === v);
                 const c = COLORS[v] || 'var(--primary)';
@@ -3385,13 +3392,13 @@
                 // 숫자: 박스 없이 텍스트만
                 const numColor = active ? '#fff' : (zero ? '#cbd5e1' : c);
                 const flexRule = fill ? 'flex:1 1 0; min-width:0;' : 'flex:0 0 auto;';
-                return `<button type="button" onclick="selectOrderStatus('${v}')" style="${flexRule} display:inline-flex; align-items:center; justify-content:center; gap:2px; white-space:nowrap; padding:6px 1px; border-radius:8px; border:1.5px solid ${active ? c : 'var(--border)'}; background:${active ? c : '#fff'}; cursor:pointer; box-shadow:${active ? '0 2px 7px '+c+'44' : 'none'}; transition:all .12s;">
-                    <span style="font-size:10.5px; font-weight:800; color:${labelColor};">${label}</span>
-                    <span style="font-size:10.5px; font-weight:900; color:${numColor};">${cnt}</span>
+                return `<button type="button" onclick="selectOrderStatus('${v}')" style="${flexRule} display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; white-space:nowrap; padding:8px 2px; border-radius:8px; border:1.5px solid ${active ? c : 'var(--border)'}; background:${active ? c : '#fff'}; cursor:pointer; box-shadow:${active ? '0 2px 7px '+c+'44' : 'none'}; transition:all .12s;">
+                    <span style="font-size:12px; font-weight:800; color:${labelColor}; line-height:1;">${label}</span>
+                    <span style="font-size:16px; font-weight:900; color:${numColor}; line-height:1;">${cnt}</span>
                 </button>`;
             };
             // 8개 상태를 한 줄에 균등 분배
-            const row1 = [['all','전체'],['대기','대기'],['입고','입고'],['픽업','픽완'],['배달완료','배완'],['취소','취소'],['배달미입금','배미'],['입금완료','입완']];
+            const row1 = [['all','전체'],['대기','대기'],['입고','입고'],['픽업','픽완'],['배달완료','배완'],['취소','취소'],['배달미입금','배미'],['픽업미입금','픽미']];
             c1.innerHTML = row1.map(renderTab(true)).join('');
             if (c2) c2.innerHTML = '';
         }
@@ -3714,8 +3721,8 @@
                                     <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${customer.phone}', '${it.orderKey}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
                                 </div>
                                 <div class="mobile-item-middle">
-                                    <span>수량: <strong class="${qtyClass}">${qtyNum}</strong>개</span>
                                     <span>단가: ${parseInt(it.price || 0).toLocaleString()}원</span>
+                                    <span>수량: <strong class="${qtyClass}">${qtyNum}</strong>개</span>
                                     <span>합계: <strong>${parseInt(it.total || 0).toLocaleString()}원</strong></span>
                                 </div>
                             </div>
@@ -8621,40 +8628,21 @@
         function handleFileSelection(event) {
             const files = event.target.files;
             if (!files || files.length === 0) return;
-            
-            const currentCount = uploadSelectedFiles.length;
-            const limit = 10;
-            
-            if (currentCount >= limit) {
-                showToast("사진은 최대 10장까지만 등록 가능합니다.");
-                event.target.value = '';
-                return;
-            }
-            
-            let added = 0;
-            let truncated = false;
+
+            // [변경] 장수 제한 없음 — 선택한 사진 모두 추가
             for (let i = 0; i < files.length; i++) {
-                if (uploadSelectedFiles.length < limit) {
-                    uploadSelectedFiles.push({
-                        file: files[i],
-                        id: null,
-                        isExisting: false,
-                        displayName: files[i].name
-                    });
-                    added++;
-                } else {
-                    truncated = true;
-                }
+                uploadSelectedFiles.push({
+                    file: files[i],
+                    id: null,
+                    isExisting: false,
+                    displayName: files[i].name
+                });
             }
-            
-            if (truncated) {
-                showToast(`사진은 최대 10장까지만 등록 가능하여 일부 사진이 제외되었습니다.`);
-            }
-            
+
             if (uploadSelectedFiles.length > 0 && uploadThumbnailIndex === -1) {
                 uploadThumbnailIndex = 0;
             }
-            
+
             renderSelectedFilesList();
             event.target.value = '';
         }
@@ -8722,6 +8710,54 @@
                 uploadThumbnailIndex--;
             }
             renderSelectedFilesList();
+        }
+
+        // [신규] 수정 중인 상품의 사진들을 ZIP으로 묶어 다운로드
+        async function downloadProductImages() {
+            if (!uploadSelectedFiles || uploadSelectedFiles.length === 0) { showToast("다운로드할 사진이 없습니다."); return; }
+            if (typeof JSZip === 'undefined') { showToast("압축 라이브러리를 불러오지 못했습니다."); return; }
+            showLoader("⬇️ 사진 다운로드 준비 중...");
+            try {
+                const zip = new JSZip();
+                const rawName = (document.getElementById('productName').value || uploadEditProductKey || '상품').trim();
+                const nameBase = rawName.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40) || '상품';
+                let ok = 0, fail = 0;
+                for (let i = 0; i < uploadSelectedFiles.length; i++) {
+                    const item = uploadSelectedFiles[i];
+                    let blob = null, ext = 'jpg';
+                    try {
+                        if (item.file) {
+                            blob = item.file;
+                            ext = (String(item.file.name).split('.').pop() || 'jpg').toLowerCase();
+                        } else if (item.isExisting && item.id) {
+                            const s = String(item.id);
+                            const url = (s.startsWith('data:') || s.startsWith('http')) ? s : `https://lh3.googleusercontent.com/d/${item.id}`;
+                            const res = await fetch(url);
+                            if (!res.ok) throw new Error('HTTP ' + res.status);
+                            blob = await res.blob();
+                            const ct = blob.type || '';
+                            ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : ct.includes('gif') ? 'gif' : 'jpg';
+                        }
+                    } catch (e) { fail++; continue; }
+                    if (blob) {
+                        const isThumb = (i === uploadThumbnailIndex);
+                        zip.file(`${nameBase}_${String(i + 1).padStart(2, '0')}${isThumb ? '_대표' : ''}.${ext}`, blob);
+                        ok++;
+                    }
+                }
+                if (ok === 0) { hideLoader(); showToast("사진을 가져오지 못했습니다. (권한/네트워크 문제)"); return; }
+                const content = await zip.generateAsync({ type: 'blob' });
+                const url = URL.createObjectURL(content);
+                const a = document.createElement('a');
+                a.href = url; a.download = `${nameBase}_사진.zip`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 4000);
+                hideLoader();
+                showToast(`사진 ${ok}장 다운로드${fail ? ` (${fail}장 실패)` : ''}`);
+            } catch (e) {
+                hideLoader();
+                showToast("다운로드 실패: " + e.message);
+            }
         }
 
         // [신규] Firebase PUT 재시도 (일시적 네트워크/서버 오류로 저장이 '가끔' 안 되던 문제 대응)
@@ -9639,7 +9675,8 @@
 
             document.getElementById('form-card-title').innerText = `✏️ 상품 수정: ${prod.name}`;
             { const dupBtn = document.getElementById('btn-duplicate-form'); if (dupBtn) dupBtn.style.display = 'flex'; } // 수정 모드에선 복제하기 버튼 노출(제출버튼과 반반)
-            
+            { const dlBtn = document.getElementById('btn-download-images'); if (dlBtn) dlBtn.style.display = (prod.images && prod.images.length > 0) ? 'flex' : 'none'; } // 사진이 있을 때만 다운로드 버튼 노출
+
             // 버튼 ID 바인딩 교정 (submitBtn -> btn-submit-form, cancelBtn -> btn-cancel-edit)
             const submitBtn = document.getElementById('btn-submit-form');
             if (submitBtn) submitBtn.innerText = "💾 수정 완료";
@@ -9711,6 +9748,7 @@
 
             document.getElementById('form-card-title').innerText = "✨ 신규 상품 등록";
             { const dupBtn = document.getElementById('btn-duplicate-form'); if (dupBtn) dupBtn.style.display = 'none'; } // 신규 등록 모드에선 복제하기 숨김
+            { const dlBtn = document.getElementById('btn-download-images'); if (dlBtn) dlBtn.style.display = 'none'; } // 신규 등록 모드에선 사진 다운로드 숨김
             
             const submitBtn = document.getElementById('btn-submit-form');
             if (submitBtn) submitBtn.innerText = "📤 등록 완료";
