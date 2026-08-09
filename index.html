@@ -1706,10 +1706,10 @@
             padding-left: 8px;
         }
         #tab-admin-products .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 6px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
         }
         #tab-admin-products label {
             font-size: 13px;
@@ -2008,6 +2008,14 @@
     <!-- 탭 1: 주문 관리 영역 -->
     <div id="tab-admin-orders" class="admin-tab-content">
         <div class="container">
+            <!-- [신규] 하위 탭: 주문 내역 / 발주 내역(집계) -->
+            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:10px;">
+                <div class="segment-btn orders-sub-btn active" id="btn-orders-sub-list" onclick="switchOrderSubTab('list')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📋 주문 내역</div>
+                <div class="segment-btn orders-sub-btn" id="btn-orders-sub-purchase" onclick="switchOrderSubTab('purchase')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 발주 내역</div>
+            </div>
+            <!-- [신규] 발주 내역(집계) — 판매관리에서 이동. JS로 sales-sub-purchase를 여기로 옮김 -->
+            <div id="orders-sub-purchase" style="display:none;"></div>
+            <div id="orders-sub-list">
             <!-- 컨트롤 필터 바 (버튼 + 로직용 숨김 필터) -->
             <div class="controls-card no-print">
                 <!-- [숨김] 날짜범위: 검색은 전체 기준 / 상태: 상태 탭이 값을 설정 -->
@@ -2104,6 +2112,7 @@
             <div class="order-list-container" id="order-list-container">
                 <!-- 주문 목록 동적 렌더링 -->
             </div>
+            </div><!-- /orders-sub-list -->
         </div>
     </div>
 
@@ -2369,7 +2378,7 @@
             <div class="container" style="max-width: 1200px; margin: 0 auto;">
                 
                 <!-- 하위 카테고리 탭 (발주 등록 / 발주 목록) -->
-                <div class="sub-tabs-container no-print" style="margin-bottom: 12px; padding: 0;">
+                <div class="sub-tabs-container no-print" style="margin-bottom: 3px; padding: 0;">
                     <div class="segment-control two-cols" style="display: grid; grid-template-columns: 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
                         <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
@@ -2527,6 +2536,22 @@
         .sm-pickup.active   { background:#10b981; border-color:#10b981; color:#fff; }
         .sales-sub-btn { color:var(--text-sub); }
         .sales-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+        .orders-sub-btn { color:var(--text-sub); }
+        .orders-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+        /* [신규] 각 메인탭의 보조 세그먼트 버튼 박스 크기 통일 (당일/예약/상시·발주등록/목록·발주관리/판매현황·상품등록 대분류) */
+        [data-manage-delivery-type],
+        .purchase-sub-btn,
+        .sales-sub-btn,
+        #tab-admin-product-upload .segment-control [data-tab] {
+            height: 40px !important;
+            padding: 0 4px !important;
+            font-size: 12px !important;
+            line-height: 1 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+        }
         #tab-admin-sales table th, #tab-admin-sales table td { border-bottom:1px solid #f1f5f9; }
         #order-status-tabs, #order-status-tabs2, #sales-uprange-tabs, #sales-upcat-tabs, #sales-period-row1, #sales-period-row2 { -webkit-overflow-scrolling: touch; }
         #order-status-tabs::-webkit-scrollbar, #order-status-tabs2::-webkit-scrollbar, #sales-uprange-tabs::-webkit-scrollbar, #sales-upcat-tabs::-webkit-scrollbar, #sales-period-row1::-webkit-scrollbar, #sales-period-row2::-webkit-scrollbar { display: none; }
@@ -2538,10 +2563,10 @@
     <div id="tab-admin-sales" class="admin-tab-content" style="display: none;">
         <div class="container" style="max-width: 900px; margin: 0 auto;">
 
-            <!-- 하위 탭: 발주 관리 / 판매현황 -->
-            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:16px;">
-                <div class="segment-btn sales-sub-btn active" data-sales-sub="purchase" onclick="setSalesSubTab('purchase')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🧾 발주 관리</div>
-                <div class="segment-btn sales-sub-btn" data-sales-sub="status" onclick="setSalesSubTab('status')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📊 판매현황</div>
+            <!-- [변경] 발주 관리는 주문관리 탭으로 이동. 판매관리는 판매현황만 → 하위탭 세그먼트 숨김 -->
+            <div class="segment-control" style="display:none;">
+                <div class="segment-btn sales-sub-btn active" data-sales-sub="purchase" onclick="setSalesSubTab('purchase')"></div>
+                <div class="segment-btn sales-sub-btn" data-sales-sub="status" onclick="setSalesSubTab('status')"></div>
             </div>
 
             <!-- 발주 관리 (오늘 이후 주문 집계) -->
@@ -6816,7 +6841,7 @@
             } else if (tabName === 'purchase-history') {
                 initPurchaseHistoryTab();
             } else if (tabName === 'sales') {
-                setSalesSubTab('purchase'); // 탭 진입 시 항상 발주 관리부터
+                setSalesSubTab('status'); // [변경] 발주관리는 주문관리로 이동 → 판매관리는 판매현황부터
                 initSalesTab();
             }
         }
@@ -7340,9 +7365,12 @@
             const years = new Set([now.getFullYear()]);
             try { getSalesSourceOrders().forEach(o => { const d = salesOrderDate(o); if (d && !isNaN(d.getTime()) && d.getFullYear() >= 2000) years.add(d.getFullYear()); }); } catch(e){}
             const yearList = [...years].sort((a,b)=>b-a);
-            // 최근 3개월(오늘 기준, 연도 넘김 처리)
-            const months = [];
-            for (let i=0;i<3;i++){ const d = new Date(now.getFullYear(), now.getMonth()-i, 1); months.push({ y:d.getFullYear(), m:d.getMonth()+1 }); }
+            // [변경] 선택 연도에 데이터가 있는 모든 달을 최신월부터 표시 (없으면 이번 달)
+            const _selY = parseInt(salesYear) || now.getFullYear();
+            const _monthSet = new Set();
+            try { getSalesSourceOrders().forEach(o => { const d = salesOrderDate(o); if (d && !isNaN(d.getTime()) && d.getFullYear() === _selY) _monthSet.add(d.getMonth()+1); }); } catch(e){}
+            let months = [..._monthSet].sort((a,b)=>b-a).map(m => ({ y:_selY, m }));
+            if (months.length === 0) months = [{ y: now.getFullYear(), m: now.getMonth()+1 }];
             const btn = (label, active, onclick) => `<button type="button" onclick="${onclick}" class="sales-toggle-btn${active?' active':''}" style="flex-shrink:0;">${label}</button>`;
             // 1줄
             let h1 = `<select onchange="setSalesYear(this.value)" class="sales-toggle-btn" style="flex-shrink:0; padding:6px 8px;">`
@@ -7382,6 +7410,9 @@
                 return true;
             });
             let totalAmount = 0, totalQty = 0, deliveredAmount = 0, pickupDoneAmount = 0, unpaidAmount = 0, deliveryQty = 0, pickupQty = 0;
+            // [신규] 상품 카테고리(과일/공동구매/상시판매)별 판매액 — 상품명으로 상품 매칭해 분류
+            const _prodByName = {}; (typeof uploadProducts !== 'undefined' ? uploadProducts : []).forEach(p => { if (p && p.name) _prodByName[p.name] = p; });
+            const catAmt = { fruit: 0, group: 0, other: 0 };
             // [수정] '건수'는 주문현황과 동일하게 고객(이름_전화번호) 단위로 집계 (주문시각이 달라도 같은 고객이면 1건)
             const custGroups = new Map(); // key: 사람_날짜 → 'delivery' | 'pickup' — 주문건수(고객×날짜)용
             const peopleSet = new Set();  // [신규] 순수 주문자 인원: 전화번호(숫자만) 기준 중복 제거
@@ -7413,6 +7444,11 @@
                 const nm = String(o.item || '상품명 없음');
                 if (!itemMap.has(nm)) itemMap.set(nm, { qty: 0, amount: 0 });
                 const im = itemMap.get(nm); im.qty += q; im.amount += amt;
+                // [신규] 카테고리별 판매액 누적 (과일 / 공동구매(+사다드림) / 상시판매)
+                const _cat = salesProductCategory(_prodByName[nm], nm);
+                if (_cat === 'fruit') catAmt.fruit += amt;
+                else if (_cat === 'group' || _cat === 'sada') catAmt.group += amt;
+                else catAmt.other += amt;
                 const dd = salesOrderDate(o);
                 if (dd && dd.getFullYear() >= 2000) { // 날짜 깨진 주문(1970 등)은 추이 그래프에서 제외
                     const ds = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
@@ -7430,18 +7466,19 @@
             let repeatCustomers = 0, maxOrders = 0; perPerson.forEach(c => { if (c >= 2) repeatCustomers++; if (c > maxOrders) maxOrders = c; });
             const avgOrders = peopleSet.size > 0 ? (custTotal / peopleSet.size) : 0;
             const qcChip = (qty, cnt) => `${qty.toLocaleString()}개<span style="font-size:12px; color:var(--text-sub); font-weight:800; margin-left:1px;">(${cnt.toLocaleString()}건)</span>`;
+            // [변경] 3칸 그리드로 표기. 수량 대신 건수 사용.
             if (metrics) metrics.innerHTML = [
                 // 1줄: 금액 (총판매액=배달+픽업 완료)
                 salesStatChip('총 판매액', (deliveredAmount + pickupDoneAmount).toLocaleString() + '원'),
                 salesStatChip('배달', deliveredAmount.toLocaleString() + '원', '#059669'),
                 salesStatChip('픽업', pickupDoneAmount.toLocaleString() + '원', pickupDoneAmount > 0 ? '#7c3aed' : null),
-                // 2줄: 수량
-                salesStatChip('총 판매수량', qcChip(totalQty, custTotal)),
-                salesStatChip('배달 수량', qcChip(deliveryQty, custDelivery)),
-                salesStatChip('픽업 수량', qcChip(pickupQty, custPickup)),
-                // 3줄: 주문자 지표
-                salesStatChip('주문자 수', peopleSet.size.toLocaleString() + '명'),
-                salesStatChip('평균 주문횟수', avgOrders.toFixed(2) + '회'),
+                // 2줄: 건수
+                salesStatChip('총 판매건수', custTotal.toLocaleString() + '건'),
+                salesStatChip('배달 건수', custDelivery.toLocaleString() + '건', '#059669'),
+                salesStatChip('픽업 건수', custPickup.toLocaleString() + '건', pickupDoneAmount > 0 ? '#7c3aed' : null),
+                // 3줄: 주문자 지표 (모객수+평균주문횟수 합침, 객단가 추가)
+                salesStatChip('모객수(평균 주문수)', peopleSet.size.toLocaleString() + '명 (' + avgOrders.toFixed(2) + '회)'),
+                salesStatChip('객단가', (custTotal > 0 ? Math.round((deliveredAmount + pickupDoneAmount) / custTotal) : 0).toLocaleString() + '원'),
                 salesStatChip('재주문 고객', repeatCustomers.toLocaleString() + '명 / 최대 ' + maxOrders + '회')
             ].join('');
 
@@ -7450,12 +7487,19 @@
             const denom = completedAmount > 0 ? completedAmount : 1;
             const deliveredPct = Math.round(deliveredAmount / denom * 100);
             const pickupPct = Math.max(0, 100 - deliveredPct);
-            if (paidBox) paidBox.innerHTML = `
-                <div style="height:10px; background:#e5e7eb; border-radius:6px; overflow:hidden; display:flex;">
-                    <div style="width:${deliveredPct}%; height:100%; background:#059669;"></div>
-                    <div style="width:${pickupPct}%; height:100%; background:#7c3aed;"></div>
-                </div>
-                <div style="font-size:11px; color:var(--text-sub); margin-top:3px;">배달 ${deliveredPct}% · 픽업 ${pickupPct}%</div>`;
+            // [신규] 카테고리 비율(과일/공동구매/상시판매)
+            const catTotal = catAmt.fruit + catAmt.group + catAmt.other;
+            const cdenom = catTotal > 0 ? catTotal : 1;
+            const fruitPct = Math.round(catAmt.fruit / cdenom * 100);
+            const groupPct = Math.round(catAmt.group / cdenom * 100);
+            const otherPct = Math.max(0, 100 - fruitPct - groupPct);
+            // [신규] 막대 안에 라벨+퍼센트 표기 (좁은 칸은 퍼센트만/생략)
+            const _seg = (pct, color, label) => pct <= 0 ? '' : `<div style="width:${pct}%; height:100%; background:${color}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:800; white-space:nowrap; overflow:hidden;">${pct >= 14 ? label + ' ' + pct + '%' : (pct >= 7 ? pct + '%' : '')}</div>`;
+            const _bar = (segs) => `<div style="height:26px; background:#e5e7eb; border-radius:7px; overflow:hidden; display:flex;">${segs}</div>`;
+            if (paidBox) paidBox.innerHTML =
+                _bar(_seg(fruitPct, '#ef4444', '과일') + _seg(groupPct, '#3b82f6', '공동구매') + _seg(otherPct, '#f59e0b', '상시판매'))
+                + `<div style="height:8px;"></div>`
+                + _bar(_seg(deliveredPct, '#059669', '배달') + _seg(pickupPct, '#7c3aed', '픽업'));
 
             _salesRankingCache = [...itemMap.entries()];
             _salesCustRankCache = [...custRankMap.values()].map(v => ({ name: v.name, phone: v.phone, count: v.days.size, amount: v.amount }));
@@ -7648,22 +7692,34 @@
             // 일/주/월 탭 활성 표시
             ['day','week','month'].forEach(u => { const b = document.getElementById('trend-unit-' + u); if (b) b.classList.toggle('active', u === unit); });
 
-            const buckets = new Map(); // key -> { label, amount }
+            const buckets = new Map(); // key -> { label, range, amount }
             dayMap.forEach((amt, ds) => {
                 const p = ds.split('-');
-                let key, label;
+                const _pad = n => String(n).padStart(2, '0');
+                let key, label, range = '', startISO = ds, endISO = ds;
                 if (unit === 'week') {
-                    const wk = Math.ceil((+p[2]) / 7); // 1~5주차 (1~7일=1주차)
+                    // [변경] 달 안에서 월~일로 끊음. 첫주는 1일부터, 마지막주는 말일까지 (달을 넘기지 않음)
+                    const y = +p[0], m = +p[1], dd = +p[2];
+                    const firstDow = (new Date(y, m - 1, 1).getDay() + 6) % 7; // 1일의 요일: 월=0 ~ 일=6
+                    const wk = Math.ceil((dd + firstDow) / 7);                 // 그 달의 몇째 주
+                    const lastDay = new Date(y, m, 0).getDate();
+                    const startDay = Math.max(1, (wk - 1) * 7 - firstDow + 1);
+                    const endDay = Math.min(lastDay, wk * 7 - firstDow);
                     key = `${p[0]}-${p[1]}-W${wk}`;
                     label = `${wk}주차`;
+                    range = `${m}/${startDay}-${m}/${endDay}`;
+                    startISO = `${p[0]}-${p[1]}-${_pad(startDay)}`;
+                    endISO = `${p[0]}-${p[1]}-${_pad(endDay)}`;
                 } else if (unit === 'month') {
                     key = `${p[0]}-${p[1]}`;
                     label = `${p[0].slice(2)}/${+p[1]}`; // 예: 26/8
+                    startISO = `${p[0]}-${p[1]}-01`;
+                    endISO = `${p[0]}-${p[1]}-${_pad(new Date(+p[0], +p[1], 0).getDate())}`;
                 } else {
                     key = ds;
                     label = `${+p[1]}/${+p[2]}`;
                 }
-                if (!buckets.has(key)) buckets.set(key, { label, amount: 0 });
+                if (!buckets.has(key)) buckets.set(key, { label, range, amount: 0, startISO, endISO });
                 buckets.get(key).amount += amt;
             });
 
@@ -7676,14 +7732,92 @@
             const max = Math.max.apply(null, entries.map(e => e[1].amount).concat([1]));
             box.innerHTML = `<div style="display:flex; flex-direction:column; gap:4px;">` + entries.map(([k, v]) => {
                 const pct = Math.round(v.amount / max * 100);
-                return `<div style="display:flex; align-items:center; gap:8px;">
-                    <div style="width:44px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0;">${v.label}</div>
-                    <div style="flex:1; background:#f1f5f9; border-radius:4px; overflow:hidden; height:18px;">
+                const lbl = v.range ? `${v.label}(${v.range})` : v.label;
+                const _t = escapeArg(lbl);
+                return `<div onclick="showTrendDetail('${v.startISO}','${v.endISO}','${_t}')" style="display:flex; align-items:center; gap:8px; cursor:pointer;" title="클릭 시 판매 상품 내역">
+                    <div style="width:${v.range ? 100 : 48}px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${lbl}</div>
+                    <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:22px;">
                         <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
+                        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}원</span><span style="color:#64748b; font-size:10px;">▶</span></div>
                     </div>
-                    <div style="width:92px; font-size:11px; font-weight:800; text-align:right; flex-shrink:0;">${v.amount.toLocaleString()}원</div>
                 </div>`;
             }).join('') + `</div>`;
+        }
+
+        // [신규] 매출 추이 막대 클릭 → 그 일/주/월의 판매 상품 내역(상품명·건수·금액) 모달
+        let _trendDetail = { rows: [], sort: { key: 'amount', dir: 'desc' } };
+        function _trendArrow(key){ return _trendDetail.sort.key === key ? (_trendDetail.sort.dir === 'asc' ? ' ▲' : ' ▼') : ''; }
+        function sortTrendDetail(key){
+            const s = _trendDetail.sort;
+            if (s.key === key) s.dir = (s.dir === 'asc') ? 'desc' : 'asc';
+            else { s.key = key; s.dir = (key === 'name') ? 'asc' : 'desc'; } // 이름=가나다, 숫자=큰순 기본
+            renderTrendDetailTable();
+        }
+        function renderTrendDetailTable(){
+            const cont = document.getElementById('trend-detail-table');
+            if (!cont) return;
+            const { rows, sort } = _trendDetail;
+            if (rows.length === 0){ cont.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-sub); font-size:13px;">판매 내역이 없습니다.</div>'; return; }
+            const sorted = [...rows].sort((a, b) => {
+                if (sort.key === 'name') return sort.dir === 'asc' ? String(a[0]).localeCompare(b[0]) : String(b[0]).localeCompare(a[0]);
+                const av = (sort.key === 'cnt') ? a[1].cnt : a[1].amount;
+                const bv = (sort.key === 'cnt') ? b[1].cnt : b[1].amount;
+                return sort.dir === 'asc' ? av - bv : bv - av;
+            });
+            const th = 'padding:8px; cursor:pointer; user-select:none; white-space:nowrap; font-weight:800;';
+            cont.innerHTML = `<table style="width:100%; border-collapse:collapse; font-size:13px;">
+                <thead><tr style="color:#475569; background:#f8fafc;">
+                    <th onclick="sortTrendDetail('name')" style="${th} text-align:left;">상품명${_trendArrow('name')}</th>
+                    <th onclick="sortTrendDetail('cnt')" style="${th} text-align:right;">건수${_trendArrow('cnt')}</th>
+                    <th onclick="sortTrendDetail('amount')" style="${th} text-align:right;">금액${_trendArrow('amount')}</th>
+                </tr></thead>
+                <tbody>${sorted.map(([nm, v]) => `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:8px; word-break:break-all;">${nm}</td><td style="padding:8px; text-align:right; white-space:nowrap; font-weight:800; color:#2563eb;">${v.cnt}건</td><td style="padding:8px; text-align:right; white-space:nowrap; font-weight:700;">${v.amount.toLocaleString()}원</td></tr>`).join('')}</tbody>
+            </table>`;
+        }
+        function showTrendDetail(startISO, endISO, title){
+            const start = new Date(startISO + 'T00:00:00');
+            const end = new Date(endISO + 'T23:59:59');
+            const items = new Map();
+            let totalAmt = 0, totalCnt = 0;
+            (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : []).forEach(o => {
+                if (isSalesCanceled(o)) return;
+                const st = String(o.status || '');
+                if (st !== '배달완료' && st !== '픽업') return;
+                const d = salesOrderDate(o);
+                if (!d || isNaN(d.getTime()) || d < start || d > end) return;
+                const isDel = isSalesDelivery(o);
+                if (salesMethodFilter === 'delivery' && !isDel) return;
+                if (salesMethodFilter === 'pickup' && isDel) return;
+                const nm = String(o.item || '상품명 없음');
+                if (!items.has(nm)) items.set(nm, { cnt: 0, amount: 0 });
+                const it = items.get(nm);
+                it.cnt += 1; it.amount += parseInt(o.total || 0) || 0;
+                totalCnt += 1; totalAmt += parseInt(o.total || 0) || 0;
+            });
+            _trendDetail.rows = [...items.entries()];
+            _trendDetail.sort = { key: 'amount', dir: 'desc' }; // 열 때마다 금액 많은순 기본
+            const old = document.getElementById('trend-detail-modal'); if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'trend-detail-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.innerHTML = `<div class="summary-modal-content">
+                <div class="summary-modal-header"><h2>📊 ${title} 판매 내역</h2><button class="summary-modal-close" onclick="closeTrendDetail()">&times;</button></div>
+                <div class="summary-modal-body">
+                    <div style="display:flex; gap:8px; margin-bottom:12px;">
+                        <div style="flex:1; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:8px 12px;"><div style="font-size:11px; color:#166534; font-weight:700;">총 판매액</div><div style="font-size:16px; font-weight:900; color:#166534;">${totalAmt.toLocaleString()}원</div></div>
+                        <div style="flex:1; background:#faf5ff; border:1px solid #e9d5ff; border-radius:10px; padding:8px 12px;"><div style="font-size:11px; color:#7c3aed; font-weight:700;">총 건수</div><div style="font-size:16px; font-weight:900; color:#7c3aed;">${totalCnt.toLocaleString()}건</div></div>
+                    </div>
+                    <div id="trend-detail-table"></div>
+                </div>
+                <div class="summary-modal-footer"><button class="btn-modal-close" onclick="closeTrendDetail()">닫기</button></div>
+            </div>`;
+            document.body.appendChild(modal);
+            renderTrendDetailTable();
+            setTimeout(() => modal.classList.add('active'), 10);
+        }
+        function closeTrendDetail(){
+            const m = document.getElementById('trend-detail-modal');
+            if (m){ m.classList.remove('active'); setTimeout(() => m.remove(), 250); }
         }
 
         function setSalesDateBasis(b){
@@ -7728,14 +7862,37 @@
 
         // 판매 관리 하위 탭 전환: 'purchase'(발주 관리) | 'status'(판매현황) | 'overdue'(지난 미완료)
         function setSalesSubTab(which){
+            // [변경] 발주 관리(sales-sub-purchase)는 주문관리 탭으로 이동 → 여기선 건드리지 않음
+            if (which === 'purchase') which = 'status';
             document.querySelectorAll('.sales-sub-btn').forEach(b => b.classList.toggle('active', b.dataset.salesSub === which));
-            const pur = document.getElementById('sales-sub-purchase');
             const st = document.getElementById('sales-sub-status');
             const od = document.getElementById('sales-sub-overdue');
-            if (pur) pur.style.display = (which === 'purchase') ? 'block' : 'none';
             if (st) st.style.display = (which === 'status') ? 'block' : 'none';
             if (od) od.style.display = (which === 'overdue') ? 'block' : 'none';
             if (which === 'overdue') renderSalesOverdue();
+        }
+
+        // [신규] 발주 집계(sales-sub-purchase)를 주문관리 탭 하위로 물리적 이동
+        function _relocatePurchaseAgg(){
+            const src = document.getElementById('sales-sub-purchase');
+            const dst = document.getElementById('orders-sub-purchase');
+            if (src && dst && src.parentElement !== dst){ src.style.display = 'block'; dst.appendChild(src); }
+        }
+        // [신규] 주문관리 하위탭: 주문 내역 / 발주 내역(집계)
+        async function switchOrderSubTab(which){
+            _relocatePurchaseAgg();
+            document.querySelectorAll('.orders-sub-btn').forEach(b => b.classList.toggle('active', b.id === 'btn-orders-sub-' + which));
+            const list = document.getElementById('orders-sub-list');
+            const pur = document.getElementById('orders-sub-purchase');
+            if (list) list.style.display = (which === 'list') ? 'block' : 'none';
+            if (pur) pur.style.display = (which === 'purchase') ? 'block' : 'none';
+            if (which === 'purchase'){
+                if (typeof uploadProducts === 'undefined' || !uploadProducts || uploadProducts.length === 0){
+                    try { await loadProductsFromServer(); } catch(e){}
+                }
+                try { loadSalesArchiveFromCache(); } catch(e){}
+                renderSalesUpcoming();
+            }
         }
 
         // 지난 미완료: 오늘 이전 예정일인데 배달완료/픽업완료/취소가 아닌 주문 (고객별 그룹)
@@ -10043,6 +10200,7 @@
 
         // 초기 시작
         window.onload = function() {
+            _relocatePurchaseAgg();          // [신규] 발주집계를 주문관리 하위로 이동 (판매관리에 안 보이게)
             // 캐시가 있으면 즉시 화면에 먼저 그려주고, 실시간 리스너로 최신 데이터를 이어받음
             loadOrdersFromCache();
             hydrateArchiveFromCache();       // [신규] 보관함 공유 캐시로 과거자료 준비(네트워크 X)
@@ -10469,12 +10627,27 @@
             }
         }
 
+        // [신규] 발주 저장 날짜를 date 입력칸(YYYY-MM-DD)이 받는 형식으로 변환 (한글·2자리연도 등 옛 형식 대응)
+        function poDateToISO(s) {
+            s = String(s == null ? '' : s).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+            let m = s.match(/(\d{2,4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/); // 26년 6월 2일 / 2026년 5월 15일
+            if (m) { const y = m[1].length === 2 ? '20' + m[1] : m[1]; return `${y}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`; }
+            m = s.match(/^(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+            if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+            m = s.match(/^(\d{2})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+            if (m) return `20${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+            m = s.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/); // 월/일만 → 올해
+            if (m) return `${new Date().getFullYear()}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
+            return ''; // 파싱 불가(잘못 입력된 값) → 빈 값
+        }
+
         function editPurchaseOrder(id) {
             const item = purchaseOrders.find(it => it.id === id);
             if (!item) return;
-            
+
             document.getElementById('purchase-editing-id').value = id;
-            document.getElementById('purchase-date').value = item.date || "";
+            document.getElementById('purchase-date').value = poDateToISO(item.date);
             document.getElementById('purchase-supplier').value = item.supplier || "";
             document.getElementById('purchase-item-name').value = item.itemName || "";
             document.getElementById('purchase-qty').value = item.qty || "";
