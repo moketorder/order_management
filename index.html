@@ -2023,6 +2023,8 @@
                     <option value="입고">입고</option>
                     <option value="픽업">픽업</option>
                     <option value="배달완료">배달완료</option>
+                    <option value="미픽업">미픽업</option>
+                    <option value="미배달">미배달</option>
                     <option value="취소">취소</option>
                     <option value="배달미입금">배달미입금</option>
                     <option value="픽업미입금">픽업미입금</option>
@@ -2052,16 +2054,20 @@
             </div>
 
             <!-- [신규] 상태별 탭 (개수 표시, 클릭 시 그 상태만) -->
-            <div id="order-status-tabs" class="no-print" style="display:flex; flex-wrap:nowrap; gap:3px; padding:4px 0 2px; margin:4px 0 0; overflow-x:auto; -webkit-overflow-scrolling:touch;"></div>
-            <div id="order-status-tabs2" class="no-print" style="display:flex; flex-wrap:wrap; gap:4px; padding:2px 0 8px; margin:0 0 6px;"></div>
+            <div id="order-status-tabs" class="no-print" style="display:flex; flex-wrap:nowrap; gap:3px; padding:0; margin:0 0 12px; overflow-x:auto; -webkit-overflow-scrolling:touch;"></div>
+            <div id="order-status-tabs2" class="no-print" style="display:none;"></div>
 
             <!-- [신규] 수령방법(작게) + 검색(크게) -->
             <div class="no-print" style="display:flex; gap:8px; align-items:center; margin-bottom:4px;">
-                <select id="filterShipping" class="select-filter" style="flex:0 0 108px; width:108px; min-width:108px; padding-left:6px; padding-right:6px;" onchange="handleFilterChange()">
+                <!-- [신규] 수령방법 순환 토글 (전체→픽업→배달→전체). 값은 숨긴 select#filterShipping과 연동 -->
+                <button type="button" id="filter-shipping-btn" onclick="cycleShipping()" class="no-print" title="누를 때마다 전체→픽업→배달 전환" style="flex:0 0 auto; border:1.5px solid #475569; background:#f1f5f9; color:#475569; border-radius:8px; font-size:13px; font-weight:800; padding:8px 12px; cursor:pointer; white-space:nowrap;">전체</button>
+                <select id="filterShipping" style="display:none;" onchange="handleFilterChange()">
                     <option value="all" selected>수령방법</option>
                     <option value="배달주문">🚚 배달주문</option>
                     <option value="매장픽업">📍 픽업주문</option>
                 </select>
+                <!-- [신규] 일/주/월 범위 토글 (버튼 하나로 순환: 일→주→월→일. 일=선택일, 주=±7일, 월=±15일) -->
+                <button type="button" id="order-day-range-btn" onclick="cycleOrderDayRange()" class="no-print" title="누를 때마다 일→주→월 전환" style="flex:0 0 auto; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:8px; font-size:13px; font-weight:800; padding:8px 12px; cursor:pointer; white-space:nowrap;">일</button>
                 <div class="search-wrapper" style="flex:1; min-width:0;">
                     <input type="text" id="searchInput" class="search-input" style="width:100%; padding-right:35px;" placeholder="고객명·연락처·상품명 검색..." onkeyup="handleSearchInput()">
                     <button id="clearSearchBtn" class="clear-search-btn" onclick="clearSearch()">&times;</button>
@@ -2105,7 +2111,7 @@
     <div id="tab-admin-products">
         <!-- 탭 2: 상품 등록 영역 -->
         <div id="tab-admin-product-upload" class="admin-tab-content" style="display: none;">
-            <div class="container" style="max-width: 480px; margin: 0 auto; padding: 15px;">
+            <div class="container" style="max-width: 480px; margin: 0 auto;">
                 <!-- 구버전 tab-upload 컨테이너 복원 (세그먼트 탭 렌더링 선택자 에러 완벽 해결) -->
                 <div id="tab-upload" class="tab-content active">
                     <div class="card">
@@ -2213,14 +2219,14 @@
 
         <!-- 탭 3: 상품 목록 영역 -->
         <div id="tab-admin-product-list" class="admin-tab-content" style="display: none;">
-            <div class="container" style="max-width: 480px; margin: 0 auto; padding: 15px;">
+            <div class="container" style="max-width: 480px; margin: 0 auto;">
                 <!-- 구버전 tab-manage 컨테이너 복원 -->
                 <div id="tab-manage" class="tab-content active">
                     <!-- 배송 유형 대분류 필터 탭 -->
                     <div class="segment-control" id="manage-delivery-type-tabs" style="margin-bottom: 12px; display: grid; grid-template-columns: 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px;">
                         <div class="segment-btn active" data-manage-delivery-type="today" onclick="selectManageDeliveryType('today')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 당일구매</div>
                         <div class="segment-btn" data-manage-delivery-type="reserve" onclick="selectManageDeliveryType('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 예약구매</div>
-                        <div class="segment-btn" data-manage-delivery-type="inventory" onclick="selectManageDeliveryType('inventory')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📦 재고관리</div>
+                        <div class="segment-btn" data-manage-delivery-type="inventory" onclick="selectManageDeliveryType('inventory')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📦 상시판매</div>
                     </div>
                     <!-- 상품 목록 대분류 필터 탭 -->
                     <div class="segment-control five-cols" id="manage-category-tabs" style="margin-bottom: 12px; display: grid; grid-template-columns: repeat(5, 1fr); row-gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 12px;">
@@ -2271,7 +2277,7 @@
         
         <!-- 탭 4: 섬네일 생성 영역 -->
         <div id="tab-admin-thumbnail-generator" class="admin-tab-content" style="display: none;">
-            <div class="container" style="max-width: 950px; margin: 0 auto; padding: 15px;">
+            <div class="container" style="max-width: 950px; margin: 0 auto;">
                 <div class="card" style="padding: 20px;">
                     <div class="card-title" style="margin-bottom: 15px; font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px;">
                         🎨 섬네일 일괄 생성기
@@ -2360,10 +2366,10 @@
 
         <!-- 탭 5: 발주 내역 관리 영역 -->
         <div id="tab-admin-purchase-history" class="admin-tab-content" style="display: none;">
-            <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 15px;">
+            <div class="container" style="max-width: 1200px; margin: 0 auto;">
                 
                 <!-- 하위 카테고리 탭 (발주 등록 / 발주 목록) -->
-                <div class="sub-tabs-container no-print" style="margin-bottom: 20px;">
+                <div class="sub-tabs-container no-print" style="margin-bottom: 12px; padding: 0;">
                     <div class="segment-control two-cols" style="display: grid; grid-template-columns: 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
                         <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
@@ -2530,7 +2536,7 @@
         #sales-metrics > div > div:last-child span { font-size:10px !important; }
     </style>
     <div id="tab-admin-sales" class="admin-tab-content" style="display: none;">
-        <div class="container" style="max-width: 900px; margin: 0 auto; padding: 15px;">
+        <div class="container" style="max-width: 900px; margin: 0 auto;">
 
             <!-- 하위 탭: 발주 관리 / 판매현황 -->
             <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:16px;">
@@ -3269,7 +3275,7 @@
                 const btn = document.createElement('button');
                 const isToday = isTodayMonth && (day === todayDayStr);
                 btn.className = `date-btn ${day === currentDay ? 'active' : ''}${isToday ? ' today-tab' : ''}`;
-                btn.innerText = day;
+                btn.innerText = String(day).replace('일', ''); // '일' 제거해 한 줄에 더 많이 표시(내부값 currentDay는 그대로)
                 if (isToday) {
                     // 오늘 버튼은 다른 날짜를 눌러도 구분되도록 굵은 앰버색 테두리 표시
                     btn.style.border = '3.5px solid #f59e0b';
@@ -3323,6 +3329,28 @@
 
         // 3. 필터링 및 렌더링
         // [신규] 현재 연/월/일 탭 스코프 매칭 (전체 지원): 월=전체 → 그 연도 전부, 일=전체 → 그 달 전부
+        // [신규] 수령방법 순환 토글: 전체→픽업→배달→전체 (값은 숨긴 select#filterShipping과 연동)
+        function cycleShipping(){
+            const seq = [['all', '전체', '#475569', '#f1f5f9'], ['매장픽업', '픽업', '#7c3aed', '#f5f3ff'], ['배달주문', '배달', '#2563eb', '#eff6ff']];
+            const sel = document.getElementById('filterShipping');
+            let i = seq.findIndex(s => s[0] === sel.value);
+            i = (i + 1) % seq.length;
+            sel.value = seq[i][0];
+            const btn = document.getElementById('filter-shipping-btn');
+            if (btn) { btn.innerText = seq[i][1]; btn.style.borderColor = seq[i][2]; btn.style.color = seq[i][2]; btn.style.background = seq[i][3]; }
+            handleFilterChange();
+        }
+
+        // [신규] 일/주/월 범위 토글: 버튼 하나로 순환. 일=선택일만, 주=선택일 ±7일, 월=선택일 ±15일
+        let orderDayRange = 'day';
+        function cycleOrderDayRange(){
+            const seq = ['day', 'week', 'month'];
+            orderDayRange = seq[(seq.indexOf(orderDayRange) + 1) % seq.length];
+            const btn = document.getElementById('order-day-range-btn');
+            if (btn) btn.innerText = (orderDayRange === 'day') ? '일' : (orderDayRange === 'week') ? '주' : '월';
+            renderFilteredOrders();
+        }
+
         function matchesCurrentDateScope(item){
             const info = getOrderDateInfo(item);
             const itemYear = info.dateStr && info.dateStr !== "기타" ? (info.dateStr.split('-')[0] + "년") : "기타";
@@ -3338,6 +3366,18 @@
             }
             if (currentMonth === "전체") return itemYear === currentYear;
             if (currentDay === "전체") return itemYear === currentYear && info.month === currentMonth;
+            // [신규] 주/월 토글: 선택한 날짜 기준 ±7일(주)·±15일(월) 범위로 확장
+            if (orderDayRange === 'week' || orderDayRange === 'month') {
+                if (!info.dateStr || info.dateStr === "기타") return false;
+                const selY = parseInt(currentYear), selM = parseInt(currentMonth), selD = parseInt(currentDay);
+                if (isNaN(selY) || isNaN(selM) || isNaN(selD)) return false;
+                const sel = new Date(selY, selM - 1, selD);
+                const N = (orderDayRange === 'week') ? 7 : 15;
+                const lo = new Date(sel); lo.setDate(lo.getDate() - N); lo.setHours(0, 0, 0, 0);
+                const hi = new Date(sel); hi.setDate(hi.getDate() + N); hi.setHours(23, 59, 59, 999);
+                const p = info.dateStr.split('-'); const d = new Date(+p[0], +p[1] - 1, +p[2]);
+                return d >= lo && d <= hi;
+            }
             return itemYear === currentYear && info.month === currentMonth && info.day === currentDay;
         }
 
@@ -3361,7 +3401,7 @@
             const c1 = document.getElementById('order-status-tabs');
             const c2 = document.getElementById('order-status-tabs2');
             if (!c1) return;
-            const sets = { all: new Set(), '대기': new Set(), '입고': new Set(), '픽업': new Set(), '배달완료': new Set(), '취소': new Set(), '배달미입금': new Set(), '픽업미입금': new Set() };
+            const sets = { all: new Set(), '대기': new Set(), '입고': new Set(), '미픽업': new Set(), '미배달': new Set(), '취소': new Set(), '배달미입금': new Set(), '픽업미입금': new Set(), _총픽업: new Set(), _총배달: new Set(), _사다픽업총: new Set() };
             (items || []).forEach(item => {
                 const status = item.status || '대기';
                 const asm = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
@@ -3370,35 +3410,46 @@
                 const info = getOrderDateInfo(item);
                 const dateStr = info.dateStr || "기타";
                 const cardKey = `${item.name}_${item.phone}_${asm}_${dateStr}`; // 카드 그룹 키와 동일
+                const isSada = String(item.item || '').trim().startsWith('[사다드림]'); // 말머리 [사다드림]
                 sets.all.add(cardKey);
                 if (status === '대기') sets['대기'].add(cardKey);
                 else if (status === '입고') sets['입고'].add(cardKey);
-                else if (status === '픽업') sets['픽업'].add(cardKey);
-                else if (status === '배달완료') sets['배달완료'].add(cardKey);
                 if (canceled) sets['취소'].add(cardKey);
+                // [신규] 미픽업 = 픽업주문인데 아직 픽업완료 아님 / 미배달 = 배달주문인데 아직 배달완료 아님 (취소 제외)
+                if (asm === '매장픽업' && !canceled) sets['_총픽업'].add(cardKey); // 전체 픽업주문(취소 제외)
+                if (asm === '배달주문' && !canceled) sets['_총배달'].add(cardKey); // 전체 배달주문(취소 제외)
+                if (asm === '매장픽업' && !canceled && status !== '픽업') sets['미픽업'].add(cardKey);
+                if (asm === '배달주문' && !canceled && status !== '배달완료') sets['미배달'].add(cardKey);
                 if (asm === '배달주문' && !paid && !canceled && status !== '배달완료') sets['배달미입금'].add(cardKey);
-                if (asm === '매장픽업' && !paid && !canceled && status !== '픽업') sets['픽업미입금'].add(cardKey);
+                // [변경] 픽미 = [사다드림] 픽업 상품 기준. 미입금/전체 형식으로 표시
+                if (asm === '매장픽업' && !canceled && isSada) sets['_사다픽업총'].add(cardKey); // 전체 사다드림 픽업(취소 제외)
+                if (asm === '매장픽업' && !paid && !canceled && status !== '픽업' && isSada) sets['픽업미입금'].add(cardKey);
             });
             const counts = {};
             Object.keys(sets).forEach(k => counts[k] = sets[k].size);
             const cur = document.getElementById('filterStatus').value;
-            const COLORS = { all:'#475569', '대기':'#94a3b8', '입고':'#d97706', '픽업':'#7c3aed', '배달완료':'#059669', '취소':'#dc2626', '배달미입금':'#dc2626', '픽업미입금':'#db2777' };
+            const COLORS = { all:'#475569', '대기':'#94a3b8', '입고':'#d97706', '미픽업':'#7c3aed', '미배달':'#059669', '취소':'#dc2626', '배달미입금':'#dc2626', '픽업미입금':'#db2777' };
             const renderTab = (fill) => ([v, label]) => {
                 const active = (cur === v);
                 const c = COLORS[v] || 'var(--primary)';
                 const cnt = counts[v];
                 const zero = (cnt === 0);
+                // 미픽/미배는 "미완료/전체" 형식으로 표시 (예: 4/4)
+                const numText = (v === '미픽업') ? `${cnt}/${counts['_총픽업']}`
+                              : (v === '미배달') ? `${cnt}/${counts['_총배달']}`
+                              : (v === '픽업미입금') ? `${cnt}/${counts['_사다픽업총']}`
+                              : `${cnt}`;
                 const labelColor = active ? '#fff' : (zero ? '#94a3b8' : 'var(--text-main)');
                 // 숫자: 박스 없이 텍스트만
                 const numColor = active ? '#fff' : (zero ? '#cbd5e1' : c);
                 const flexRule = fill ? 'flex:1 1 0; min-width:0;' : 'flex:0 0 auto;';
                 return `<button type="button" onclick="selectOrderStatus('${v}')" style="${flexRule} display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; white-space:nowrap; padding:8px 2px; border-radius:8px; border:1.5px solid ${active ? c : 'var(--border)'}; background:${active ? c : '#fff'}; cursor:pointer; box-shadow:${active ? '0 2px 7px '+c+'44' : 'none'}; transition:all .12s;">
                     <span style="font-size:12px; font-weight:800; color:${labelColor}; line-height:1;">${label}</span>
-                    <span style="font-size:16px; font-weight:900; color:${numColor}; line-height:1;">${cnt}</span>
+                    <span style="font-size:16px; font-weight:900; color:${numColor}; line-height:1;">${numText}</span>
                 </button>`;
             };
             // 8개 상태를 한 줄에 균등 분배
-            const row1 = [['all','전체'],['대기','대기'],['입고','입고'],['픽업','픽완'],['배달완료','배완'],['취소','취소'],['배달미입금','배미'],['픽업미입금','픽미']];
+            const row1 = [['all','전체'],['미배달','미배'],['미픽업','미픽'],['취소','취소'],['배달미입금','배미'],['픽업미입금','픽미']];
             c1.innerHTML = row1.map(renderTab(true)).join('');
             if (c2) c2.innerHTML = '';
         }
@@ -3482,8 +3533,10 @@
                         if (statusFilter === '입고') return status === '입고';
                         if (statusFilter === '픽업') return status === '픽업';
                         if (statusFilter === '배달완료') return status === '배달완료';
+                        if (statusFilter === '미픽업') return (actualShippingMethod === '매장픽업') && !canceled && status !== '픽업';
+                        if (statusFilter === '미배달') return (actualShippingMethod === '배달주문') && !canceled && status !== '배달완료';
                         if (statusFilter === '배달미입금') return (actualShippingMethod === '배달주문') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '배달완료';
-                        if (statusFilter === '픽업미입금') return (actualShippingMethod === '매장픽업') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '픽업';
+                        if (statusFilter === '픽업미입금') return (actualShippingMethod === '매장픽업') && String(item.item || '').trim().startsWith('[사다드림]') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '픽업';
                         if (statusFilter === '입금완료') return (item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true");
                         return true;
                     });
@@ -5612,8 +5665,8 @@
                         <!-- 주요 지표 카드 -->
                         <div class="summary-stats-grid">
                             <div class="summary-stat-card card-purple">
-                                <div class="stat-label">총 주문수량</div>
-                                <div class="stat-value">${totalQty.toLocaleString()}개</div>
+                                <div class="stat-label">총 주문건수</div>
+                                <div class="stat-value">${(deliveryCustomers + pickupCustomers).toLocaleString()}건</div>
                                 <div class="stat-sub-value" style="font-size: 13px; margin-top: 4px; opacity: 0.85; font-weight: 600; color: var(--purple);">
                                     (배달 ${deliveryCustomers}건 / 픽업 ${pickupCustomers}건)
                                 </div>
@@ -5623,46 +5676,6 @@
                                 <div class="stat-value">${totalAmount.toLocaleString()}원</div>
                                 <div class="stat-sub-value" style="font-size: 13px; margin-top: 4px; opacity: 0.85; font-weight: 600; color: var(--primary);">
                                     (배달 ${deliveryAmount.toLocaleString()}원 / 픽업 ${pickupAmount.toLocaleString()}원)
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 입금 & 수령 현황 -->
-                        <div class="summary-details-section">
-                            <h3>👥 고객 현황 (총 ${Object.keys(customerGroups).length}명)</h3>
-                            <div class="summary-details-grid">
-                                <div class="details-box">
-                                    <div class="details-title">💵 입금 상태</div>
-                                    <div class="details-row">
-                                        <span>입금완료</span>
-                                        <span class="badge-success">${paidCustomers}명</span>
-                                    </div>
-                                    <div class="details-row" style="border-top:1px dashed #eee; padding-top:6px; margin-top:6px;">
-                                        <span style="font-weight:700; color:#b45309;">🚚 배달 미입금</span>
-                                        <button class="badge-warning" style="display: inline-flex; align-items: center; gap: 2px; background:#fff7ed; border-color:#fed7aa; color:#c2410c;" onclick="showUnpaidListModal('배달')">
-                                            ${unpaidDeliveryCustomers}명 <span style="font-size: 8px;">🔍</span>
-                                        </button>
-                                    </div>
-                                    <div class="details-row">
-                                        <span style="font-weight:700; color:#3b82f6;">📍 픽업 미입금</span>
-                                        <button class="badge-warning" style="display: inline-flex; align-items: center; gap: 2px; background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8;" onclick="showUnpaidListModal('픽업')">
-                                            ${unpaidPickupCustomers}명 <span style="font-size: 8px;">🔍</span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="details-box">
-                                    <div class="details-title">📍 수령/배달 (픽업 상태)</div>
-                                    <div class="details-row">
-                                        <span>픽업 주문</span>
-                                        <span class="badge-info">${pickupCustomers}명</span>
-                                    </div>
-                                    <div class="details-row" style="font-size:11px; color:var(--text-sub); margin-top:-2px; margin-bottom:6px;">
-                                        <span>(픽업완료: ${completedPickupCustomers}명 / 미완료: ${pickupCustomers - completedPickupCustomers}명)</span>
-                                    </div>
-                                    <div class="details-row">
-                                        <span>배달 주문</span>
-                                        <span class="badge-blue">${deliveryCustomers}명</span>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -7886,8 +7899,8 @@
             if (!container) return;
             container.innerHTML = '';
 
-            // [수정] 재고관리·예약구매는 한 줄 가로 스크롤(개수 가변), 나머지는 그리드
-            if (uploadManageDeliveryType === 'inventory' || uploadManageDeliveryType === 'reserve') {
+            // [수정] 예약구매만 한 줄 가로 스크롤(날짜 개수 가변). 상시판매(5그룹 고정)·나머지는 5열 그리드로 균등 분배
+            if (uploadManageDeliveryType === 'reserve') {
                 // '#tab-admin-products .segment-control { display:grid !important }'를 이기려면 인라인에도 !important 필요
                 container.classList.remove('five-cols');
                 container.style.setProperty('display', 'flex', 'important');
@@ -7920,12 +7933,10 @@
                 container.innerHTML = '';
                 uploadManageTab = 'today-fruit';
             } else if (uploadManageDeliveryType === 'inventory') {
-                // [신규] 재고관리 — 선반/보관 위치 카테고리 10개
-                const shelves = [
-                    ['inv-all', '전체'], ['shelf-1', '선반1'], ['shelf-2', '선반2'], ['shelf-3', '선반3'],
-                    ['fridge-1', '냉장1'], ['fridge-2', '냉장2'], ['freezer-4', '냉동4'], ['freezer-5', '냉동5'],
-                    ['freezer-6', '냉동6'], ['freezer-7', '냉동7'], ['other', '기타']
-                ];
+                // [신규] 상시판매 — 상단 그룹(전체·선반·냉장·냉동·기타). 하위 선반은 서브탭에서.
+                const shelves = [['inv-all', '전체']].concat(
+                    Object.entries(INV_GROUPS).map(([key, g]) => [key, g.label])
+                );
                 container.innerHTML = shelves.map(([key, label]) =>
                     `<div class="segment-btn ${uploadManageTab === key ? 'active' : ''}" data-manage-tab="${key}" onclick="selectManageTab('${key}')" style="flex:0 0 auto; min-width:52px; text-align:center; padding:10px 12px; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px; white-space:nowrap;">${label}</div>`
                 ).join('');
@@ -7938,8 +7949,11 @@
                     if (d) dateSet.add(d);
                 });
                 const dates = [...dateSet].sort().reverse(); // 가장 먼 날짜 먼저
+                const _now = new Date();
+                const _todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
                 const cats = [['all', '전체']];
-                dates.forEach(d => cats.push([d, fmtMD(d)]));
+                dates.filter(d => d >= _todayStr).forEach(d => cats.push([d, fmtMD(d)])); // 오늘 이후(포함) 날짜만 개별 탭
+                if (dates.some(d => d < _todayStr)) cats.push(['_이전', '이전']); // 오늘 이전 날짜들은 '이전' 하나로 모음
                 container.innerHTML = cats.map(([key, label]) =>
                     `<div class="segment-btn ${uploadManageTab === key ? 'active' : ''}" data-manage-tab="${key}" onclick="selectManageTab('${key}')" style="flex:0 0 auto; min-width:52px; text-align:center; padding:10px 12px; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px; white-space:nowrap;">${label}</div>`
                 ).join('');
@@ -8043,17 +8057,34 @@
                 } else {
                     subContainer.style.display = 'none';
                 }
-            } 
+            }
+            else if (uploadManageDeliveryType === 'inventory' && INV_GROUPS[uploadManageTab]) {
+                // [신규] 상시판매 그룹 선택 시 하위 선반 서브탭 (전체 + 선반들)
+                const grp = INV_GROUPS[uploadManageTab];
+                subContainer.style.display = 'flex';
+                const subs = [['all', '전체']].concat(grp.shelves);
+                subContainer.innerHTML = subs.map(([key, label]) =>
+                    `<button type="button" class="sub-tab-btn ${uploadSubTab === key ? 'active' : ''}" data-sub-tab="${key}" onclick="selectManageSubTab('${key}')">${label}</button>`
+                ).join('');
+            }
             else {
                 subContainer.style.display = 'none';
             }
         }
 
+        // [신규] 상시판매(재고관리) 2단계 분류: 상단 그룹 → 하위 선반
+        const INV_GROUPS = {
+            'inv-grp-shelf':   { label: '선반', shelves: [['shelf-1', '선반1'], ['shelf-2', '선반2'], ['shelf-3', '선반3']] },
+            'inv-grp-fridge':  { label: '냉장', shelves: [['fridge-1', '냉장1'], ['fridge-2', '냉장2']] },
+            'inv-grp-freezer': { label: '냉동', shelves: [['freezer-4', '냉동4'], ['freezer-5', '냉동5'], ['freezer-6', '냉동6'], ['freezer-7', '냉동7']] },
+            'inv-grp-other':   { label: '기타', shelves: [['other', '기타'], ['', '미지정']] }
+        };
+
         const onsiteCategories = ["냉동", "냉장", "상온"];
         const fruitCategories = [
-            { key: "과일_예약", label: "과일" },
-            { key: "야채_예약", label: "야채" },
-            { key: "기타_예약", label: "기타" }
+            { key: "과일", label: "과일" },
+            { key: "야채", label: "야채" },
+            { key: "기타", label: "기타" }
         ];
         const costcoCategories = ["코스트코 냉동", "코스트코 냉장", "코스트코 상온"];
         // [신규] 상품 등록/수정 폼의 선반위치(장소) 옵션 — 재고관리 탭의 선반 분류와 동일
@@ -8148,6 +8179,12 @@
                 });
                 container.appendChild(select);
             }
+
+            // [신규] 탭별로 박스 높이가 달라지지 않도록 카테고리 영역의 모든 컨트롤 높이를 45px로 통일
+            container.querySelectorAll('select, input').forEach(el => {
+                el.style.height = '45px';
+                el.style.boxSizing = 'border-box';
+            });
         }
 
         function toggleUnlimitedStock() {
@@ -8441,6 +8478,8 @@
             genScale = item.scale || 1.2;
             updateGenImgTransform();
             
+            const bgImg = document.getElementById('gen-bg-image'); // [버그수정] bgImg는 전역이 아니라 여기서 직접 참조
+            if (!bgImg) return;
             if (item.imgId) {
                 bgImg.src = "";
                 bgImg.crossOrigin = "anonymous";
@@ -8855,7 +8894,13 @@
                     const isStorage = /냉동|냉장|상온|실온/.test(mk) || /냉동|냉장|상온|실온/.test(st);
                     if (!isStorage) return false; // 공동구매 날짜/과일/코스트코 등은 제외
                     if (uploadManageTab === 'inv-all') return true;
-                    return String(prod.shelf || "") === uploadManageTab;
+                    const prodShelf = String(prod.shelf || "");
+                    const grp = INV_GROUPS[uploadManageTab];
+                    if (grp) { // 그룹 선택: 하위 선반이 '전체'면 그룹 내 모든 선반, 특정 선반이면 그 선반만
+                        if (uploadSubTab && uploadSubTab !== 'all') return prodShelf === uploadSubTab;
+                        return grp.shelves.some(([k]) => k === prodShelf);
+                    }
+                    return prodShelf === uploadManageTab; // 하위호환(직접 선반 키)
                 });
             } else {
                 // [수정] 예약구매: 사다드림 + 공동구매(날짜)만 표시. 탭 = 전체 또는 특정 날짜.
@@ -8863,6 +8908,12 @@
                     if (prod.name === "배달비") return false;
                     if (!isReserveListProduct(prod)) return false;
                     if (uploadManageTab === 'all') return true;
+                    if (uploadManageTab === '_이전') { // 오늘 이전 날짜 상품 모아보기
+                        const _n = new Date();
+                        const _t = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`;
+                        const gd = getReserveGroupDate(prod);
+                        return gd && gd < _t;
+                    }
                     return getReserveGroupDate(prod) === uploadManageTab;
                 });
             }
@@ -8944,9 +8995,9 @@
                 else if (mKey === "냉동") displayTitle = "🧊 냉동 상품";
                 else if (mKey === "냉장") displayTitle = "❄️ 냉장 상품";
                 else if (mKey === "상온") displayTitle = "🌡️ 상온/실온 상품";
-                else if (mKey === "과일_예약") displayTitle = "🍎 과일";
-                else if (mKey === "야채_예약") displayTitle = "🥬 야채";
-                else if (mKey === "기타_예약") displayTitle = "📦 기타";
+                else if (mKey === "과일") displayTitle = "🍎 과일";
+                else if (mKey === "야채") displayTitle = "🥬 야채";
+                else if (mKey === "기타") displayTitle = "📦 기타";
                 else if (/^\d{4}-\d{2}-\d{2}$/.test(mKey)) {
                     displayTitle = `🗓️ 공동구매 수령일: ${mKey}`;
                 }
