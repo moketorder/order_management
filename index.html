@@ -920,8 +920,14 @@
                 overflow: hidden;
             }
             .admin-nav-tabs .admin-nav-btn {
-                padding: 10px 2px !important;
-                font-size: 11px !important;
+                height: 36px !important;
+                padding: 0 2px !important;
+                font-size: 12px !important;
+                line-height: 1 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                box-sizing: border-box !important;
                 white-space: nowrap;
                 text-align: center;
             }
@@ -1994,12 +2000,11 @@
 
     <!-- [신규] 관리자 메뉴 대분류 탭 -->
     <div class="admin-nav-tabs no-print" style="max-width: 1200px; margin: 15px auto 0 auto; padding: 0 15px;">
-        <div class="segment-control five-cols" style="display: grid; grid-template-columns: repeat(5, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px;">
+        <div class="segment-control four-cols" style="display: grid; grid-template-columns: repeat(4, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px;">
             <div class="segment-btn admin-nav-btn active" data-tab="orders" onclick="switchAdminTab('orders')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 주문 관리</div>
-            <div class="segment-btn admin-nav-btn" data-tab="product-upload" onclick="switchAdminTab('product-upload')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📦 상품 등록</div>
-            <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 상품 목록 <span id="product-count" style="display: none;">(0)</span></div>
-            <div class="segment-btn admin-nav-btn" data-tab="purchase-history" onclick="switchAdminTab('purchase-history')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🚚 발주 내역</div>
-            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 판매 관리</div>
+            <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🛒 상품 관리 <span id="product-count" style="display: none;">(0)</span></div>
+            <div class="segment-btn admin-nav-btn" data-tab="purchase-history" onclick="switchAdminTab('purchase-history')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🚚 발주 관리</div>
+            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 판매 통계</div>
             <!-- [숨김] 섬네일 탭 — 버튼만 숨기고 기능(tab-admin-thumbnail-generator, switchAdminTab)은 그대로 유지 -->
             <div class="segment-btn admin-nav-btn" data-tab="thumbnail-generator" onclick="switchAdminTab('thumbnail-generator')" style="display:none; text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🎨 섬네일</div>
         </div>
@@ -2011,40 +2016,32 @@
             <!-- [신규] 하위 탭: 주문 내역 / 발주 내역(집계) -->
             <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:10px;">
                 <div class="segment-btn orders-sub-btn active" id="btn-orders-sub-list" onclick="switchOrderSubTab('list')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📋 주문 내역</div>
-                <div class="segment-btn orders-sub-btn" id="btn-orders-sub-purchase" onclick="switchOrderSubTab('purchase')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 발주 내역</div>
+                <div class="segment-btn orders-sub-btn" id="btn-orders-sub-purchase" onclick="switchOrderSubTab('purchase')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 발주 집계</div>
             </div>
             <!-- [신규] 발주 내역(집계) — 판매관리에서 이동. JS로 sales-sub-purchase를 여기로 옮김 -->
             <div id="orders-sub-purchase" style="display:none;"></div>
             <div id="orders-sub-list">
             <!-- 컨트롤 필터 바 (버튼 + 로직용 숨김 필터) -->
-            <div class="controls-card no-print">
-                <!-- [숨김] 날짜범위: 검색은 전체 기준 / 상태: 상태 탭이 값을 설정 -->
-                <select id="filterDateRange" style="display:none;">
-                    <option value="day">일</option>
-                    <option value="week">주</option>
-                    <option value="month">월</option>
-                    <option value="all" selected>전체</option>
-                </select>
-                <select id="filterStatus" style="display:none;">
-                    <option value="all" selected>상태</option>
-                    <option value="대기">대기</option>
-                    <option value="입고">입고</option>
-                    <option value="픽업">픽업</option>
-                    <option value="배달완료">배달완료</option>
-                    <option value="미픽업">미픽업</option>
-                    <option value="미배달">미배달</option>
-                    <option value="취소">취소</option>
-                    <option value="배달미입금">배달미입금</option>
-                    <option value="픽업미입금">픽업미입금</option>
-                    <option value="입금완료">입금완료</option>
-                </select>
-                <div class="controls-row button-row">
-                    <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
-                    <button class="btn-common" style="border: 1.5px solid #dc2626; background: #fef2f2; color: #dc2626; font-weight: 700;" onclick="showOverdueModal()">⚠️ 지난 미완료</button>
-                    <button class="btn-common" style="border: 1.5px solid #d32f2f; background: #fff5f5; color: #d32f2f; font-weight: 700;" onclick="deleteCanceledOrders()">🗑️ 취소주문 삭제</button>
-                    <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 주문 CSV</button>
-                </div>
-            </div>
+            <!-- [숨김] 날짜범위: 검색은 전체 기준 / 상태: 상태 탭이 값을 설정 -->
+            <select id="filterDateRange" style="display:none;">
+                <option value="day">일</option>
+                <option value="week">주</option>
+                <option value="month">월</option>
+                <option value="all" selected>전체</option>
+            </select>
+            <select id="filterStatus" style="display:none;">
+                <option value="all" selected>상태</option>
+                <option value="대기">대기</option>
+                <option value="입고">입고</option>
+                <option value="픽업">픽업</option>
+                <option value="배달완료">배달완료</option>
+                <option value="미픽업">미픽업</option>
+                <option value="미배달">미배달</option>
+                <option value="취소">취소</option>
+                <option value="배달미입금">배달미입금</option>
+                <option value="픽업미입금">픽업미입금</option>
+                <option value="입금완료">입금완료</option>
+            </select>
 
             <!-- 분류 탭 (연도 + 월 / 일) -->
             <div class="tabs-section">
@@ -2058,6 +2055,14 @@
                     <input type="date" id="order-custom-from" class="form-control" style="width:auto; height:36px;" onchange="handleFilterChange()">
                     <span style="font-size:12px;">~</span>
                     <input type="date" id="order-custom-to" class="form-control" style="width:auto; height:36px;" onchange="handleFilterChange()">
+                </div>
+            </div>
+
+            <div class="controls-card no-print">
+                <div class="controls-row button-row">
+                    <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
+                    <button class="btn-common" style="border: 1.5px solid #dc2626; background: #fef2f2; color: #dc2626; font-weight: 700;" onclick="showOverdueModal()">⚠️ 미완료</button>
+                    <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="exportToCSV('month')">📤 CSV</button>
                 </div>
             </div>
 
@@ -2121,10 +2126,15 @@
         <!-- 탭 2: 상품 등록 영역 -->
         <div id="tab-admin-product-upload" class="admin-tab-content" style="display: none;">
             <div class="container" style="max-width: 480px; margin: 0 auto;">
+                <!-- [신규] 상품 관리 하위 탭: 상품 목록 / 상품 등록 -->
+                <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:10px;">
+                    <div class="segment-btn" onclick="switchAdminTab('product-list')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📋 상품 목록</div>
+                    <div class="segment-btn active" onclick="switchAdminTab('product-upload')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📦 상품 등록</div>
+                </div>
                 <!-- 구버전 tab-upload 컨테이너 복원 (세그먼트 탭 렌더링 선택자 에러 완벽 해결) -->
                 <div id="tab-upload" class="tab-content active">
                     <div class="card">
-                        <div class="card-title" id="form-card-title">✨ 신규 상품 등록</div>
+                        <div class="card-title" id="form-card-title" style="display:none;"></div>
 
                         <form id="productForm" onsubmit="submitForm(event)">
                             <!-- 대분류 세그먼트 -->
@@ -2229,12 +2239,17 @@
         <!-- 탭 3: 상품 목록 영역 -->
         <div id="tab-admin-product-list" class="admin-tab-content" style="display: none;">
             <div class="container" style="max-width: 480px; margin: 0 auto;">
+                <!-- [신규] 상품 관리 하위 탭: 상품 목록 / 상품 등록 -->
+                <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:10px;">
+                    <div class="segment-btn active" onclick="switchAdminTab('product-list')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📋 상품 목록</div>
+                    <div class="segment-btn" onclick="switchAdminTab('product-upload')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📦 상품 등록</div>
+                </div>
                 <!-- 구버전 tab-manage 컨테이너 복원 -->
                 <div id="tab-manage" class="tab-content active">
                     <!-- 배송 유형 대분류 필터 탭 -->
                     <div class="segment-control" id="manage-delivery-type-tabs" style="margin-bottom: 12px; display: grid; grid-template-columns: 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px;">
                         <div class="segment-btn active" data-manage-delivery-type="today" onclick="selectManageDeliveryType('today')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 당일구매</div>
-                        <div class="segment-btn" data-manage-delivery-type="reserve" onclick="selectManageDeliveryType('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 예약구매</div>
+                        <div class="segment-btn" data-manage-delivery-type="reserve" onclick="selectManageDeliveryType('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 공동구매</div>
                         <div class="segment-btn" data-manage-delivery-type="inventory" onclick="selectManageDeliveryType('inventory')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📦 상시판매</div>
                     </div>
                     <!-- 상품 목록 대분류 필터 탭 -->
@@ -2380,13 +2395,13 @@
                 <!-- 하위 카테고리 탭 (발주 등록 / 발주 목록) -->
                 <div class="sub-tabs-container no-print" style="margin-bottom: 3px; padding: 0;">
                     <div class="segment-control two-cols" style="display: grid; grid-template-columns: 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
-                        <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
-                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
+                        <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
+                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
                     </div>
                 </div>
 
                 <!-- 하위 섹션 1: 발주 내역 등록/수정 -->
-                <div id="purchase-section-register" class="purchase-sub-section">
+                <div id="purchase-section-register" class="purchase-sub-section" style="display: none;">
                     <div class="card" style="background: #ffffff; border-radius: 16px; padding: 20px; box-shadow: var(--shadow); margin-bottom: 20px; border: 1px solid var(--border);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
                             <h2 id="purchase-form-title" style="font-size: 17px; font-weight: 800; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
@@ -2466,7 +2481,7 @@
                 </div>
 
                 <!-- 하위 섹션 2: 발주 내역 목록 -->
-                <div id="purchase-section-list" class="purchase-sub-section" style="display: none;">
+                <div id="purchase-section-list" class="purchase-sub-section">
                     <!-- 검색 및 필터 바 -->
                     <div class="card" style="background: #ffffff; border-radius: 16px; padding: 16px; box-shadow: var(--shadow); margin-bottom: 16px; border: 1px solid var(--border);">
                         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
@@ -2543,7 +2558,7 @@
         .purchase-sub-btn,
         .sales-sub-btn,
         #tab-admin-product-upload .segment-control [data-tab] {
-            height: 40px !important;
+            height: 36px !important;
             padding: 0 4px !important;
             font-size: 12px !important;
             line-height: 1 !important;
@@ -2552,11 +2567,17 @@
             justify-content: center !important;
             box-sizing: border-box !important;
         }
+        /* 섬네일 메인탭 버튼은 계속 숨김 유지 (admin-nav-btn flex 규칙이 display:none을 덮어쓰지 않도록) */
+        .admin-nav-tabs .admin-nav-btn[data-tab="thumbnail-generator"] { display: none !important; }
+        /* 발주관리 하위탭(발주 목록/등록) 높이를 주문관리·상품관리 하위탭과 동일하게(36px/12px) 통일 */
+        #tab-admin-purchase-history .segment-control.two-cols .purchase-sub-btn.segment-btn { height:36px !important; padding:10px 0 !important; font-size:12px !important; }
         #tab-admin-sales table th, #tab-admin-sales table td { border-bottom:1px solid #f1f5f9; }
         #order-status-tabs, #order-status-tabs2, #sales-uprange-tabs, #sales-upcat-tabs, #sales-period-row1, #sales-period-row2 { -webkit-overflow-scrolling: touch; }
         #order-status-tabs::-webkit-scrollbar, #order-status-tabs2::-webkit-scrollbar, #sales-uprange-tabs::-webkit-scrollbar, #sales-upcat-tabs::-webkit-scrollbar, #sales-period-row1::-webkit-scrollbar, #sales-period-row2::-webkit-scrollbar { display: none; }
-        /* 판매현황 지표 카드: 값이 한 줄에 들어가도록 폰트·여백 축소 */
-        #sales-metrics > div { padding:8px 6px !important; min-width:0 !important; overflow:hidden; }
+        /* 발주 집계 요약칩: 화면 폭을 균등하게 꽉 채움 */
+        #sales-upcoming-summary > div { flex: 1 1 0; min-width: 0; text-align: center; }
+        /* 판매현황 지표 카드: 값이 한 줄에 들어가도록 폰트·여백 축소 + 주문 내역 날짜필터 박스와 동일 디자인(흰 배경·라운드·그림자) */
+        #sales-metrics > div { padding:8px 6px !important; min-width:0 !important; overflow:hidden; background:#fff !important; border-radius:var(--radius-main) !important; box-shadow:var(--shadow) !important; text-align:center !important; }
         #sales-metrics > div > div:last-child { font-size:13px !important; white-space:nowrap; }
         #sales-metrics > div > div:last-child span { font-size:10px !important; }
     </style>
@@ -2572,9 +2593,9 @@
             <!-- 발주 관리 (오늘 이후 주문 집계) -->
             <div id="sales-sub-purchase">
             <!-- A. 오늘 이후 주문 집계 (준비·발주) -->
-            <div class="card" style="padding: 14px; margin-bottom: 16px;">
-                <!-- 컨트롤 패널: 기간 / 분류 / 요약을 하나의 틀로 정리 -->
-                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px;">
+            <div class="card" style="padding: 12px 2px; margin-bottom: 16px;">
+                <!-- 컨트롤 패널: 기간 / 분류 / 요약 — 주문 내역 날짜필터 박스와 동일 디자인 -->
+                <div style="background:white; border:1px solid var(--border); border-radius:var(--radius-main); box-shadow:var(--shadow); padding:10px 8px; margin-bottom:12px;">
                     <div id="sales-uprange-tabs" style="display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; align-items:center; margin-bottom:9px;"></div>
                     <div id="sales-upcoming-range" style="display:none; gap:6px; margin-bottom:9px; align-items:center; flex-wrap:wrap;">
                         <input type="date" id="sales-up-from" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
@@ -2585,16 +2606,16 @@
                         <button type="button" data-sales-upcat="all" onclick="setSalesUpcomingCat('all')" class="sales-toggle-btn up-cat-all active" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">전체</button>
                         <button type="button" data-sales-upcat="fruit" onclick="setSalesUpcomingCat('fruit')" class="sales-toggle-btn up-cat-fruit" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">과일</button>
                         <button type="button" data-sales-upcat="group" onclick="setSalesUpcomingCat('group')" class="sales-toggle-btn up-cat-group" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">공동구매</button>
+                        <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn up-cat-other" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">상시판매</button>
                         <button type="button" data-sales-upcat="sada" onclick="setSalesUpcomingCat('sada')" class="sales-toggle-btn up-cat-sada" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">사다드림</button>
-                        <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn up-cat-other" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">그외</button>
                     </div>
-                    <div id="sales-upcoming-summary" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+                    <div id="sales-upcoming-summary" style="display:flex; gap:8px; flex-wrap:nowrap;"></div>
                 </div>
                 <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px; width:100%;">
                     <input type="text" id="sales-upcoming-search" placeholder="🔍 상품 검색" oninput="renderSalesUpcoming()" style="flex:1 1 0; min-width:0; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; box-sizing:border-box;">
                     <button type="button" onclick="initSalesTab()" style="flex-shrink:0; padding:8px 10px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">🔄 새로고침</button>
                 </div>
-                <div id="sales-upcoming-sortbar" style="display:flex; gap:5px; margin-bottom:8px; flex-wrap:wrap; align-items:center;"></div>
+                <div id="sales-upcoming-sortbar" style="display:flex; gap:4px; margin-bottom:8px; flex-wrap:nowrap; align-items:center;"></div>
                 <div id="sales-upcoming-list"></div>
             </div>
 
@@ -2603,21 +2624,16 @@
             <!-- 판매현황 -->
             <div id="sales-sub-status" style="display:none;">
             <!-- B~D. 판매현황 -->
-            <div class="card" style="padding: 14px; margin-bottom: 16px;">
+            <div class="card" style="padding: 12px 2px; margin-bottom: 16px;">
                 <!-- [신규] 전체 데이터(보관함) 갱신 — 과거 자료는 마지막 갱신 데이터 기준으로 표시 -->
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:nowrap; margin-bottom:10px;">
                     <div id="sales-archive-status" style="font-size:11px; color:var(--text-sub); font-weight:700; min-width:0; flex:1 1 auto;"></div>
                     <button type="button" onclick="refreshSalesArchive()" title="전체 데이터 갱신" style="flex-shrink:0; padding:6px 10px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:8px; font-size:14px; font-weight:800; cursor:pointer; white-space:nowrap; line-height:1;">🔄</button>
                 </div>
-                <!-- 컨트롤 패널: 집계기준 / 배송유형 / 기간을 하나의 틀로 정리 -->
-                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:14px;">
-                    <div style="display:flex; gap:6px; margin-bottom:9px; flex-wrap:wrap; align-items:center;">
-                        <button type="button" data-sales-method="all" onclick="setSalesMethod('all')" class="sales-toggle-btn sm-all active">전체</button>
-                        <button type="button" data-sales-method="delivery" onclick="setSalesMethod('delivery')" class="sales-toggle-btn sm-delivery">🚚 배달</button>
-                        <button type="button" data-sales-method="pickup" onclick="setSalesMethod('pickup')" class="sales-toggle-btn sm-pickup">📍 픽업</button>
-                    </div>
+                <!-- 컨트롤 패널: 집계기준 / 배송유형 / 기간 — 주문 내역 날짜필터 박스와 동일 디자인 -->
+                <div style="background:white; border:1px solid var(--border); border-radius:var(--radius-main); box-shadow:var(--shadow); padding:10px 8px; margin-bottom:14px;">
                     <div id="sales-period-row1" style="display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; align-items:center; margin-bottom:8px;"></div>
-                    <div id="sales-period-row2" style="display:flex; gap:4px; flex-wrap:nowrap; align-items:center;"></div>
+                    <div id="sales-period-row2" style="display:flex; gap:4px; flex-wrap:nowrap; align-items:center; overflow-x:auto; -webkit-overflow-scrolling:touch;"></div>
                     <div id="sales-custom-range" style="display:none; gap:6px; margin-top:8px; align-items:center; flex-wrap:wrap;">
                         <input type="date" id="sales-custom-from" class="form-control" style="width:auto; height:36px;" onchange="onSalesCustomRangeChange()">
                         <span style="font-size:12px;">~</span>
@@ -2633,18 +2649,13 @@
 
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 0 8px 0; flex-wrap:wrap;">
                     <div class="card-title" id="sales-trend-title" style="margin:0; font-size:14px;">📈 매출 추이</div>
-                    <div style="display:flex; gap:5px;">
-                        <button type="button" id="trend-unit-day" onclick="setSalesTrendUnit('day')" class="sales-toggle-btn" style="padding:5px 13px; font-size:11px;">일</button>
-                        <button type="button" id="trend-unit-week" onclick="setSalesTrendUnit('week')" class="sales-toggle-btn" style="padding:5px 13px; font-size:11px;">주</button>
-                        <button type="button" id="trend-unit-month" onclick="setSalesTrendUnit('month')" class="sales-toggle-btn" style="padding:5px 13px; font-size:11px;">월</button>
-                    </div>
                 </div>
                 <div id="sales-daily-trend" style="margin-bottom:16px;"></div>
 
                 <div style="display:flex; gap:5px; margin:6px 0 8px 0; flex-wrap:nowrap; overflow-x:auto;">
-                    <button type="button" id="rank-tab-product" onclick="setSalesRankTab('product')" class="sales-toggle-btn active" style="flex:1; white-space:nowrap; padding:7px 8px;">🏆 상품 순위</button>
+                    <button type="button" id="rank-tab-stats" onclick="setSalesRankTab('stats')" class="sales-toggle-btn active" style="flex:1; white-space:nowrap; padding:7px 8px;">👥 고객 통계</button>
+                    <button type="button" id="rank-tab-product" onclick="setSalesRankTab('product')" class="sales-toggle-btn" style="flex:1; white-space:nowrap; padding:7px 8px;">🏆 상품 순위</button>
                     <button type="button" id="rank-tab-customer" onclick="setSalesRankTab('customer')" class="sales-toggle-btn" style="flex:1; white-space:nowrap; padding:7px 8px;">👑 고객 순위</button>
-                    <button type="button" id="rank-tab-stats" onclick="setSalesRankTab('stats')" class="sales-toggle-btn" style="flex:1; white-space:nowrap; padding:7px 8px;">👥 고객 통계</button>
                 </div>
                 <div id="sales-ranking-table-wrap" style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse; font-size:13px;">
@@ -3474,7 +3485,7 @@
                 </button>`;
             };
             // 8개 상태를 한 줄에 균등 분배
-            const row1 = [['all','전체'],['미배달','미배'],['미픽업','미픽'],['취소','취소'],['배달미입금','배미'],['픽업미입금','픽미']];
+            const row1 = [['all','전체'],['미배달','미배'],['배달미입금','배미'],['미픽업','미픽'],['픽업미입금','픽미'],['취소','취소']];
             c1.innerHTML = row1.map(renderTab(true)).join('');
             if (c2) c2.innerHTML = '';
         }
@@ -3829,13 +3840,8 @@
                                 <button class="btn-action-sm no-print" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #d97706; border-color: rgba(217, 119, 6, 0.25);" onclick="editCustomerMemo('${customer.name}', '${customer.phone}', '${orderTime}')">수정</button>
                             </div>
                         `;
-                    } else {
-                        orderMemoHtml += `
-                            <div class="memo-section no-print" style="margin-right: auto;">
-                                <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editCustomerMemo('${customer.name}', '${customer.phone}', '${orderTime}')">📝 주문메모 추가</button>
-                            </div>
-                        `;
                     }
+                    // [변경] 메모 없을 때 추가버튼 제거 → '메모' 버튼(모달)에서 추가
                     
                     // 2. 고객 고정 메모
                     let fixedMemoHtml = '';
@@ -3849,13 +3855,8 @@
                                 <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #c2410c; border-color: rgba(194, 65, 12, 0.25);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">수정</button>
                             </div>
                         `;
-                    } else {
-                        fixedMemoHtml += `
-                            <div style="margin-right: auto;">
-                                <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editFixedMemo('${customer.name}', '${customer.phone}')">📌 고정메모 추가</button>
-                            </div>
-                        `;
                     }
+                    // [변경] 고정메모 없을 때 추가버튼 제거 → '메모' 버튼(모달)에서 추가
 
                     // 3. 인쇄용 고객 고정 메모 (인쇄 시 노출되지만 수정 버튼은 숨김, 별개 작성)
                     let printableFixedMemoHtml = '';
@@ -3869,13 +3870,8 @@
                                 <button class="btn-action-sm no-print" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; flex-shrink: 0; color: #c2410c; border-color: rgba(194, 65, 12, 0.25);" onclick="editPrintFixedMemo('${customer.name}', '${customer.phone}')">수정</button>
                             </div>
                         `;
-                    } else {
-                        printableFixedMemoHtml = `
-                            <div style="margin-right: auto;">
-                                <button class="btn-action-sm" style="font-size: 11px; padding: 2px 6px; cursor: pointer; border-radius: 4px; line-height: 1; color: var(--text-sub); border-color: var(--border);" onclick="editPrintFixedMemo('${customer.name}', '${customer.phone}')">📌 인쇄용 고정메모 추가</button>
-                            </div>
-                        `;
                     }
+                    // [변경] 인쇄용 고정메모 없을 때 추가버튼 제거 → '메모' 버튼(모달)에서 추가
                     
                     const tsSeq = customerOrderSequences[baseKey] || [];
                     const orderIndex = tsSeq.indexOf(orderTime);
@@ -3964,8 +3960,9 @@
                                         ${isDelivery ? '📍 픽업전환' : '🚚 배달전환'}
                                     </button>
                                     <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #d97706; color: #d97706; background: white;" onclick="changeCustomerOrderDate('${customer.phone}', '${orderKeysStr}', '${isDelivery ? '배달일' : '픽업일'}')">
-                                        ${isDelivery ? '📅 배달일 변경' : '📅 픽업일 변경'}
+                                        📅 날짜변경
                                     </button>
+                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #64748b; color: #475569; background: white;" onclick="openMemoModal('${customer.name}', '${customer.phone}', '${orderTime}')">📝 메모</button>
                                 </div>
                             </div>
                             ${printableFixedMemoHtml ? `<div style="display:flex; flex-direction:column; width:100%; gap:6px; margin-top:8px;">${printableFixedMemoHtml}</div>` : ''}
@@ -4867,6 +4864,77 @@
         // [신규] 고객별 메모 수정 기능
         // [신규] 고객별 메모 수정 기능 (비인증/번호 유실 고객의 복제 현상 완벽 해결)
         // [신규] 고객별 메모 수정 기능 (비인증 및 날짜별 개별 주문 카드 단위 격리 메모 적용)
+        // [신규] 메모 모달 — 드롭다운(고정메모/주문메모/인쇄용)으로 종류 선택 후 그 자리에서 바로 작성
+        let _memoModal = { name: '', phone: '', orderTime: '', values: {} };
+        function openMemoModal(name, phone, orderTime){
+            const cleanPhone = String(phone || '').replace(/\D/g, '');
+            const baseKey = (!cleanPhone) ? ((name || '무명').trim() + '_비인증') : cleanPhone;
+            const memoKey = baseKey + '_' + String(orderTime).replace(/\s+/g, '');
+            _memoModal = { name, phone, orderTime, values: {
+                fixed: fixedMemos[baseKey] || '', order: customerMemos[memoKey] || '', print: printFixedMemos[baseKey] || ''
+            } };
+            const old = document.getElementById('memo-choice-modal'); if (old) old.remove();
+            const m = document.createElement('div');
+            m.id = 'memo-choice-modal'; m.className = 'summary-modal-overlay';
+            m.innerHTML = `<div class="summary-modal-content" style="max-width:380px;">
+                <div class="summary-modal-header"><h2>📝 ${name} 메모</h2><button class="summary-modal-close" onclick="closeMemoModal()">&times;</button></div>
+                <div class="summary-modal-body">
+                    <select id="memo-type-select" onchange="onMemoTypeChange()" class="form-control" style="width:100%; height:42px; margin-bottom:8px; font-size:13px; font-weight:800;">
+                        <option value="fixed">📌 고정메모 (모든 주문에 항상 표시)</option>
+                        <option value="order">📝 주문메모 (이 주문 카드에만)</option>
+                        <option value="print">🖨️ 인쇄용 고정메모 (영수증 인쇄 시)</option>
+                    </select>
+                    <textarea id="memo-textarea" placeholder="메모를 입력하세요 (비우고 저장하면 삭제됩니다)" style="width:100%; min-height:110px; padding:10px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; resize:vertical;"></textarea>
+                </div>
+                <div class="summary-modal-footer" style="display:flex; gap:8px;">
+                    <button class="btn-modal-close" onclick="closeMemoModal()" style="flex:0 0 auto;">닫기</button>
+                    <button onclick="saveMemoFromModal()" style="flex:1; padding:10px; background:var(--primary); color:#fff; border:none; border-radius:8px; font-weight:800; cursor:pointer;">💾 저장</button>
+                </div>
+            </div>`;
+            document.body.appendChild(m);
+            setTimeout(() => { m.classList.add('active'); onMemoTypeChange(); }, 10);
+        }
+        function onMemoTypeChange(){
+            const sel = document.getElementById('memo-type-select'); const ta = document.getElementById('memo-textarea');
+            if (sel && ta) ta.value = _memoModal.values[sel.value] || '';
+        }
+        async function saveMemoFromModal(){
+            const sel = document.getElementById('memo-type-select'); const ta = document.getElementById('memo-textarea');
+            if (!sel || !ta) return;
+            await saveMemoDirect(sel.value, _memoModal.name, _memoModal.phone, _memoModal.orderTime, ta.value);
+            closeMemoModal();
+        }
+        async function saveMemoDirect(type, name, phone, orderTime, value){
+            const cleanPhone = String(phone || '').replace(/\D/g, '');
+            const baseKey = (!cleanPhone) ? ((name || '무명').trim() + '_비인증') : cleanPhone;
+            const v = String(value || '').trim();
+            let url, applyLocal;
+            if (type === 'order'){
+                const memoKey = baseKey + '_' + String(orderTime).replace(/\s+/g, '');
+                const dbKey = memoKey.replace(/[\.\#\$\[\]\/]/g, '_').trim();
+                url = `${FIREBASE_DB_URL}customer_memos/${dbKey}.json`;
+                applyLocal = () => { if (v === '') delete customerMemos[memoKey]; else customerMemos[memoKey] = v; };
+            } else if (type === 'fixed'){
+                const dbKey = baseKey.replace(/[\.\#\$\[\]\/]/g, '_').trim();
+                url = `${FIREBASE_DB_URL}fixed_memos/${dbKey}.json`;
+                applyLocal = () => { if (v === '') delete fixedMemos[baseKey]; else fixedMemos[baseKey] = v; };
+            } else {
+                const dbKey = baseKey.replace(/[\.\#\$\[\]\/]/g, '_').trim();
+                url = `${FIREBASE_DB_URL}print_fixed_memos/${dbKey}.json`;
+                applyLocal = () => { if (v === '') delete printFixedMemos[baseKey]; else printFixedMemos[baseKey] = v; };
+            }
+            showLoader('메모 저장 중...');
+            try {
+                const res = await fetch(url, { method: v === '' ? 'DELETE' : 'PUT', headers: { 'Content-Type': 'application/json' }, body: v === '' ? null : JSON.stringify(v) });
+                if (!res.ok) throw new Error('Firebase 메모 저장 실패');
+                applyLocal();
+                showToast('메모가 저장되었습니다.');
+                renderFilteredOrders();
+            } catch (e) { console.error(e); showToast('메모 저장 실패: ' + e.toString()); }
+            finally { hideLoader(); }
+        }
+        function closeMemoModal(){ const m = document.getElementById('memo-choice-modal'); if (m){ m.classList.remove('active'); setTimeout(() => m.remove(), 200); } }
+
         async function editCustomerMemo(name, phone, orderTime) {
             const cleanPhone = String(phone || "").replace(/\D/g, "");
             const baseKey = (!cleanPhone) ? ((name || "무명").trim() + "_비인증") : cleanPhone;
@@ -6275,20 +6343,25 @@
                 const d = new Date(+p[0], +p[1]-1, +p[2]);
                 if (d.getFullYear() < 2000 || d >= today) return; // 오늘 이전만
                 const paid = (o.paid === true || o.paid === "true");
-                items.push({ dateStr: info.dateStr, status: st, name: o.name || '무명', phone: String(o.phone || ''), item: o.item || '상품명 없음', qty: parseInt(o.qty || 0) || 0, paid });
+                const asm = (o.shippingMethod === '배달주문' || (o.shippingMethod !== '매장픽업' && o.address && String(o.address).trim() !== "")) ? '배달주문' : '매장픽업';
+                items.push({ dateStr: info.dateStr, status: st, name: o.name || '무명', phone: String(o.phone || ''), item: o.item || '상품명 없음', qty: parseInt(o.qty || 0) || 0, paid, asm, pk: (o.firebasePhoneKey || String(o.phone || '').replace(/\D/g, '')), ok: o.orderKey });
             });
             const groups = new Map();
             items.forEach(it => {
                 const k = it.name + '_' + it.phone;
-                if (!groups.has(k)) groups.set(k, { name: it.name, phone: it.phone, items: [], oldest: it.dateStr });
+                if (!groups.has(k)) groups.set(k, { name: it.name, phone: it.phone, items: [], oldest: it.dateStr, asm: it.asm, refs: [] });
                 const g = groups.get(k); g.items.push(it); if (it.dateStr < g.oldest) g.oldest = it.dateStr;
+                if (it.ok) g.refs.push({ pk: it.pk, ok: it.ok });
             });
             const arr = [...groups.values()].sort((a, b) => a.oldest < b.oldest ? -1 : 1); // 오래된 순
 
             const listHtml = arr.length === 0
                 ? `<div style="padding:24px; text-align:center; color:var(--text-sub); font-size:13px;">오늘 이전 미완료(픽업/배달 안 된) 주문이 없습니다. 👍</div>`
-                : arr.map(g => {
+                : arr.map((g, gi) => {
                     const cleanPhone = g.phone.replace(/\D/g, '');
+                    const isDelivery = (g.asm === '배달주문');
+                    const sideColor = isDelivery ? '#059669' : '#7c3aed'; // 배달=초록 / 픽업=보라
+                    const refsEnc = encodeURIComponent(JSON.stringify(g.refs));
                     const itemsHtml = g.items.sort((a, b) => a.dateStr < b.dateStr ? -1 : 1).map(it => {
                         const stColor = it.status === '입고' ? '#d97706' : '#64748b';
                         return `<div style="display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 0; border-top:1px dashed #f1f5f9;">
@@ -6300,13 +6373,20 @@
                         + g.items.map(it => `· ${it.item} ×${it.qty} (${fmtMD(it.dateStr)}, ${it.status})`).join('\n')
                         + `\n확인 부탁드려요 🙏`;
                     const smsMsgEnc = encodeURIComponent(smsMsg);
-                    return `<div style="border:1px solid var(--border); border-left:3px solid #dc2626; border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff;">
+                    return `<div style="border:1px solid var(--border); border-left:4px solid ${sideColor}; border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff;">
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;">
-                            <div style="font-weight:800; font-size:13px;">${g.name} <span style="font-size:11px; color:var(--text-sub); font-weight:600;">${g.phone}</span></div>
-                            ${cleanPhone ? `<div style="flex-shrink:0; display:flex; gap:5px;">
-                                <a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:3px 8px; border-radius:6px;">📞 전화</a>
-                                <button type="button" onclick="copyTextAndSms(decodeURIComponent('${smsMsgEnc}'), '${cleanPhone}', '미완료 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:3px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>
-                            </div>` : ''}
+                            <div style="font-weight:800; font-size:13px;">${g.name}</div>
+                            <div style="flex-shrink:0; display:flex; gap:5px;">
+                                ${cleanPhone ? `<a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:3px 8px; border-radius:6px;">📞 전화</a>
+                                <button type="button" onclick="copyTextAndSms(decodeURIComponent('${smsMsgEnc}'), '${cleanPhone}', '미완료 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:3px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>` : ''}
+                                <button type="button" onclick="var m=document.getElementById('ovc-${gi}'); m.style.display=(m.style.display==='none'?'flex':'none');" style="font-size:11px; font-weight:800; color:#d97706; background:#fff; border:1.5px solid #d97706; padding:3px 8px; border-radius:6px; cursor:pointer;">🔁 변경</button>
+                            </div>
+                        </div>
+                        <div id="ovc-${gi}" style="display:none; gap:5px; margin:2px 0 6px;">
+                            ${isDelivery
+                                ? `<button type="button" onclick="overdueUpdateStatus('${refsEnc}','배달완료')" style="flex:1 1 0; font-size:12px; font-weight:800; color:#fff; background:#059669; border:none; padding:7px 4px; border-radius:6px; cursor:pointer;">🟢 배달완료</button>`
+                                : `<button type="button" onclick="overdueUpdateStatus('${refsEnc}','픽업')" style="flex:1 1 0; font-size:12px; font-weight:800; color:#fff; background:#7c3aed; border:none; padding:7px 4px; border-radius:6px; cursor:pointer;">🟣 픽업완료</button>`}
+                            <button type="button" onclick="overdueUpdateStatus('${refsEnc}','취소')" style="flex:1 1 0; font-size:12px; font-weight:800; color:#fff; background:#dc2626; border:none; padding:7px 4px; border-radius:6px; cursor:pointer;">🔴 취소</button>
                         </div>
                         ${itemsHtml}
                     </div>`;
@@ -6323,15 +6403,43 @@
                         <button class="summary-modal-close" onclick="closeSummaryModal()">&times;</button>
                     </div>
                     <div class="summary-modal-body">
-                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-                            ${salesStatChip('미완료 고객', arr.length + '명')}
-                            ${salesStatChip('미완료 건수', items.length + '건')}
+                        <div style="display:flex; gap:8px; margin-bottom:12px;">
+                            <div style="flex:1 1 0; min-width:0; background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:8px 6px; text-align:center;">
+                                <div style="font-size:11px; color:var(--text-sub); font-weight:700;">미완료 고객</div>
+                                <div style="font-size:16px; font-weight:900;">${arr.length}명</div>
+                            </div>
+                            <div style="flex:1 1 0; min-width:0; background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:8px 6px; text-align:center;">
+                                <div style="font-size:11px; color:var(--text-sub); font-weight:700;">미완료 건수</div>
+                                <div style="font-size:16px; font-weight:900;">${items.length}건</div>
+                            </div>
                         </div>
                         ${listHtml}
                     </div>
                 </div>`;
             document.body.appendChild(modal);
             setTimeout(() => modal.classList.add('active'), 10);
+        }
+
+        // [신규] 지난 미완료 카드에서 상태 변경(배달완료/픽업완료/취소) — 그 고객의 미완료 건들만
+        async function overdueUpdateStatus(refsEnc, newStatus){
+            let refs = [];
+            try { refs = JSON.parse(decodeURIComponent(refsEnc)); } catch(e){}
+            if (!refs.length) return;
+            if (newStatus === '취소' && !confirm('이 고객의 미완료 건을 취소 처리할까요?')) return;
+            showLoader(`[${newStatus === '픽업' ? '픽업완료' : newStatus}]로 변경 중...`);
+            try {
+                const patchBody = getStatusPatchBody(newStatus);
+                await Promise.all(refs.map(r => fetch(`${FIREBASE_DB_URL}orders/${encodeURIComponent(r.pk)}/${encodeURIComponent(r.ok)}.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody)
+                })));
+                // 로컬 rawOrders 갱신
+                refs.forEach(r => { const t = (rawOrders || []).find(o => (o.firebasePhoneKey === r.pk || String(o.phone || '').replace(/\D/g, '') === r.pk) && o.orderKey === r.ok); if (t) Object.assign(t, patchBody); });
+                showToast(`[${newStatus === '픽업' ? '픽업완료' : newStatus}]로 변경했습니다.`);
+                renderFilteredOrders();
+                closeSummaryModal();
+                setTimeout(showOverdueModal, 80); // 모달 새로고침(처리된 건은 목록에서 빠짐)
+            } catch(e){ console.error(e); showToast('변경 중 오류가 발생했습니다.'); }
+            finally { hideLoader(); }
         }
 
         // 6. CSV 내보내기 헬퍼 (일별 / 월별 선택)
@@ -6792,8 +6900,8 @@
 
         // 탭 전환 (주문 관리 / 상품 관리 전체 전환)
         function switchAdminTab(tabName) {
-            // [수정] 섬네일 페이지는 '상품 목록' 안에 있는 느낌을 주도록, 섬네일일 때도 상품 목록 탭을 선택 상태로 유지
-            const navActiveTab = (tabName === 'thumbnail-generator') ? 'product-list' : tabName;
+            // [수정] 섬네일·상품등록 페이지도 '상품 관리'(상품 목록) 메인 탭 아래에 있으므로 그 버튼을 선택 상태로 유지
+            const navActiveTab = (tabName === 'thumbnail-generator' || tabName === 'product-upload') ? 'product-list' : tabName;
             document.querySelectorAll('.admin-nav-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.tab === navActiveTab);
             });
@@ -6840,6 +6948,7 @@
                 initThumbnailGeneratorTab();
             } else if (tabName === 'purchase-history') {
                 initPurchaseHistoryTab();
+                switchPurchaseSubTab('list'); // 발주관리는 발주 목록을 기본으로 표시
             } else if (tabName === 'sales') {
                 setSalesSubTab('status'); // [변경] 발주관리는 주문관리로 이동 → 판매관리는 판매현황부터
                 initSalesTab();
@@ -6851,13 +6960,17 @@
         let salesMethodFilter = 'all'; // 'all' | 'delivery'(배달) | 'pickup'(픽업)
         let salesArchiveOrders = [];   // [신규] 보관함(orders_archive) 과거 주문 (판매현황 전체기간 집계용)
         let salesArchiveLoaded = false;
-        // salesPeriod: yearall(연도 전체) | month(특정 연·월) | today | thisweek | lastweek | recent_month(오늘-1달) | recent_year(오늘-1년)
-        let salesPeriod = 'month';
-        let salesYear = new Date().getFullYear();          // 연도 드롭다운 값(전체 버튼 기준)
-        let salesMonthY = new Date().getFullYear();          // 선택된 월의 연도
-        let salesMonthM = new Date().getMonth() + 1;         // 선택된 월(1~12) — 기본 이번달
+        // [신규] 판매 기간 선택: 상단=단위(salesUnit), 하단=선택 인스턴스(salesUnitIdx, 0=가장 최근/오늘)
+        // salesUnit: day(일·이전 7일 중 선택, 기본) | week(주·8주) | month(월·12개월) | quarter(분기·8분기) | year(년·4년)
+        let salesUnit = 'day';
+        let salesUnitIdx = 0;
+        let salesPeriod = 'day';   // (레거시 호환용, salesUnit과 동기화)
+        let salesYear = new Date().getFullYear();
+        let salesMonthY = new Date().getFullYear();
+        let salesMonthM = new Date().getMonth() + 1;
         let _salesRankingCache = [];
         let _salesDayCache = new Map();
+        let _salesHourCache = new Map(); // [신규] 오늘 시간대별 매출(시각 hour → 금액)
         let salesUpcomingRange = 'today_after'; // 발주 집계 범위: today_after(오늘 포함 이후) | today_only(오늘만) | after_today(내일 이후)
         let salesUpcomingCats = new Set(); // 발주 카테고리 필터: 비어있으면 '전체', 값이 있으면 그 카테고리만
 
@@ -6873,7 +6986,7 @@
         let salesUpcomingSort = { key: 'qty', dir: 'desc' };   // 발주 관리 정렬(기본: 주문수량 많은 순)
         let salesRankSort = { key: 'amount', dir: 'desc' };     // 판매 순위 정렬(기본: 판매액 많은 순)
         // [이동] 아래 상태들은 함수보다 먼저 선언되어야 초기 렌더 시 TDZ 에러가 안 남
-        let salesRankTab = 'product';                           // 순위 탭: product | customer
+        let salesRankTab = 'stats';                             // 순위 탭 기본: 고객 통계(stats) | product | customer
         let _salesCustRankCache = [];                           // 재주문 고객 순위 캐시
         let salesCustRankSort = { key: 'count', dir: 'desc' };  // 고객 순위 정렬(기본: 주문횟수 많은 순)
         let salesTrendUnitOverride = null;                      // 매출 추이 단위 직접선택(null=기간 기본)
@@ -6938,8 +7051,13 @@
             renderSalesUpcoming();
         }
         function setSalesUpcomingCat(cat){
-            if (cat === 'all') { salesUpcomingCats.clear(); } // 전체: 개별 선택 모두 해제 → 전부 표시
-            else { if (salesUpcomingCats.has(cat)) salesUpcomingCats.delete(cat); else salesUpcomingCats.add(cat); }
+            // [변경] 단일 선택: 한 번에 한 분류만. 전체 또는 이미 선택된 분류 재클릭 시 전체로.
+            if (cat === 'all' || (salesUpcomingCats.size === 1 && salesUpcomingCats.has(cat))) {
+                salesUpcomingCats.clear();
+            } else {
+                salesUpcomingCats.clear();
+                salesUpcomingCats.add(cat);
+            }
             // 버튼 상태 동기화: 전체는 아무것도 선택 안됐을 때 활성, 개별은 선택된 것만 활성
             const allBtn = document.querySelector('[data-sales-upcat="all"]');
             if (allBtn) allBtn.classList.toggle('active', salesUpcomingCats.size === 0);
@@ -7259,7 +7377,7 @@
             if (sortbar) sortbar.innerHTML = upCols.map(c => {
                 const active = salesUpcomingSort.key === c.key;
                 const arrow = active ? (salesUpcomingSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
-                return `<button type="button" onclick="sortSalesUpcoming('${c.key}')" class="sales-toggle-btn${active ? ' active' : ''}" style="padding:5px 9px; font-size:11px;">${c.label}${arrow}</button>`;
+                return `<button type="button" onclick="sortSalesUpcoming('${c.key}')" class="sales-toggle-btn${active ? ' active' : ''}" style="flex:1 1 0; min-width:0; padding:6px 2px; font-size:11px; white-space:nowrap;">${c.label}${arrow}</button>`;
             }).join('');
             const us = salesUpcomingSort;
             filteredRows.sort((a, b) => {
@@ -7328,67 +7446,59 @@
                 salesStatChip('총 주문액', totalAmount.toLocaleString() + '원');
         }
 
+        // [신규] 선택 단위(salesUnit)+인덱스(salesUnitIdx, 0=최근)로 기간 계산
         function getSalesPeriodRange(){
             const today = salesTodayMidnight();
             const endToday = new Date(today); endToday.setHours(23,59,59,999);
-            if (salesPeriod === 'yearall') return { from: new Date(salesYear,0,1,0,0,0,0), to: new Date(salesYear,11,31,23,59,59,999) };
-            if (salesPeriod === 'month') return { from: new Date(salesMonthY, salesMonthM-1, 1,0,0,0,0), to: new Date(salesMonthY, salesMonthM, 0, 23,59,59,999) };
-            if (salesPeriod === 'today') return { from: today, to: endToday };
-            if (salesPeriod === 'thisweek'){
-                const from = new Date(today); const day = (from.getDay()+6)%7; from.setDate(from.getDate()-day); // 월요일 시작
-                const to = new Date(from); to.setDate(from.getDate()+6); to.setHours(23,59,59,999);
-                return { from, to };
-            }
-            if (salesPeriod === 'lastweek'){
-                const from = new Date(today); const day = (from.getDay()+6)%7; from.setDate(from.getDate()-day-7);
-                const to = new Date(from); to.setDate(from.getDate()+6); to.setHours(23,59,59,999);
-                return { from, to };
-            }
-            if (salesPeriod === 'recent_month'){ const from = new Date(today); from.setMonth(from.getMonth()-1); return { from, to: endToday }; }
-            if (salesPeriod === 'recent_year'){ const from = new Date(today); from.setFullYear(from.getFullYear()-1); return { from, to: endToday }; }
-            if (salesPeriod === 'custom'){
-                const f = document.getElementById('sales-custom-from');
-                const t = document.getElementById('sales-custom-to');
-                return { from: (f && f.value) ? new Date(f.value + 'T00:00:00') : null, to: (t && t.value) ? new Date(t.value + 'T23:59:59') : null };
-            }
+            const i = salesUnitIdx || 0;
+            if (salesUnit === 'today') return { from: today, to: endToday };
+            if (salesUnit === 'day'){ const d = new Date(today); d.setDate(d.getDate()-i); const to = new Date(d); to.setHours(23,59,59,999); return { from: d, to }; }
+            if (salesUnit === 'week'){ const mon = new Date(today); mon.setDate(mon.getDate()-((mon.getDay()+6)%7)-i*7); const to = new Date(mon); to.setDate(to.getDate()+6); to.setHours(23,59,59,999); return { from: mon, to }; }
+            if (salesUnit === 'month'){ const from = new Date(today.getFullYear(), today.getMonth()-i, 1, 0,0,0,0); const to = new Date(from.getFullYear(), from.getMonth()+1, 0, 23,59,59,999); return { from, to }; }
+            if (salesUnit === 'quarter'){ const cq = Math.floor(today.getMonth()/3); const qi = cq-i; const y = today.getFullYear()+Math.floor(qi/4); const q = ((qi%4)+4)%4; const from = new Date(y, q*3, 1, 0,0,0,0); const to = new Date(y, q*3+3, 0, 23,59,59,999); return { from, to }; }
+            if (salesUnit === 'year'){ const y = today.getFullYear()-i; return { from: new Date(y,0,1,0,0,0,0), to: new Date(y,11,31,23,59,59,999) }; }
             return { from: null, to: null };
         }
         function onSalesCustomRangeChange(){ if (salesPeriod === 'custom') renderSalesStatus(); }
 
-        // [신규] 판매현황 기간 탭(2줄) 동적 생성: 1줄=연도▼·전체·실제월3개 / 2줄=오늘·이번주·저번주·최근한달·최근1년
+        // [신규] 기간 탭: 1줄=단위(오늘/일/주/월/분기/년), 2줄=선택 단위의 인스턴스(오늘은 없음)
         function buildSalesPeriodTabs(){
             const row1 = document.getElementById('sales-period-row1');
             const row2 = document.getElementById('sales-period-row2');
             if (!row1 || !row2) return;
-            const now = new Date();
-            // 데이터에 존재하는 연도 수집(없으면 올해)
-            const years = new Set([now.getFullYear()]);
-            try { getSalesSourceOrders().forEach(o => { const d = salesOrderDate(o); if (d && !isNaN(d.getTime()) && d.getFullYear() >= 2000) years.add(d.getFullYear()); }); } catch(e){}
-            const yearList = [...years].sort((a,b)=>b-a);
-            // [변경] 선택 연도에 데이터가 있는 모든 달을 최신월부터 표시 (없으면 이번 달)
-            const _selY = parseInt(salesYear) || now.getFullYear();
-            const _monthSet = new Set();
-            try { getSalesSourceOrders().forEach(o => { const d = salesOrderDate(o); if (d && !isNaN(d.getTime()) && d.getFullYear() === _selY) _monthSet.add(d.getMonth()+1); }); } catch(e){}
-            let months = [..._monthSet].sort((a,b)=>b-a).map(m => ({ y:_selY, m }));
-            if (months.length === 0) months = [{ y: now.getFullYear(), m: now.getMonth()+1 }];
-            const btn = (label, active, onclick) => `<button type="button" onclick="${onclick}" class="sales-toggle-btn${active?' active':''}" style="flex-shrink:0;">${label}</button>`;
-            // 1줄
-            let h1 = `<select onchange="setSalesYear(this.value)" class="sales-toggle-btn" style="flex-shrink:0; padding:6px 8px;">`
-                + yearList.map(y => `<option value="${y}"${y===salesYear?' selected':''}>${String(y).slice(2)}년</option>`).join('') + `</select>`;
-            h1 += btn('전체', salesPeriod==='yearall', "setSalesPeriod('yearall')");
-            months.forEach(mm => { h1 += btn(mm.m+'월', (salesPeriod==='month' && salesMonthY===mm.y && salesMonthM===mm.m), `setSalesMonth(${mm.y},${mm.m})`); });
-            h1 += btn('📅 직접', salesPeriod==='custom', "setSalesPeriod('custom')");
-            row1.innerHTML = h1;
-            // 직접 입력칸 표시/숨김
-            const cr = document.getElementById('sales-custom-range');
-            if (cr) cr.style.display = (salesPeriod === 'custom') ? 'flex' : 'none';
-            // 2줄 (한 화면에 균등 분배)
-            const btn2 = (label, active, onclick) => `<button type="button" onclick="${onclick}" class="sales-toggle-btn${active?' active':''}" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:11px; white-space:nowrap;">${label}</button>`;
-            row2.innerHTML = btn2('오늘', salesPeriod==='today', "setSalesPeriod('today')")
-                + btn2('이번주', salesPeriod==='thisweek', "setSalesPeriod('thisweek')")
-                + btn2('저번주', salesPeriod==='lastweek', "setSalesPeriod('lastweek')")
-                + btn2('최근한달', salesPeriod==='recent_month', "setSalesPeriod('recent_month')")
-                + btn2('최근1년', salesPeriod==='recent_year', "setSalesPeriod('recent_year')");
+            // 1줄: 단위 버튼 (균등 분배)
+            const units = [['day','일'],['week','주'],['month','월'],['quarter','분기'],['year','년']];
+            const ubtn = (u, label) => `<button type="button" onclick="setSalesUnit('${u}')" class="sales-toggle-btn${salesUnit===u?' active':''}" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">${label}</button>`;
+            row1.innerHTML = units.map(([u,l]) => ubtn(u, l)).join('');
+            const cr = document.getElementById('sales-custom-range'); if (cr) cr.style.display = 'none';
+            // 2줄: 인스턴스 버튼 (오늘은 비움, 나머지는 가로 스크롤)
+            row2.innerHTML = buildSalesInstanceButtons();
+        }
+        // [신규] 선택 단위의 인스턴스 버튼 목록 생성 (idx 0=가장 최근)
+        function buildSalesInstanceButtons(){
+            if (salesUnit === 'today') return '';
+            const today = salesTodayMidnight();
+            const w = ['일','월','화','수','목','금','토'];
+            const items = [];
+            if (salesUnit === 'day'){
+                for (let i=0;i<7;i++){ const d=new Date(today); d.setDate(d.getDate()-i); items.push({ idx:i, label:`${d.getMonth()+1}/${d.getDate()}(${w[d.getDay()]})` }); }
+            } else if (salesUnit === 'week'){
+                const mon=new Date(today); mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+                for (let i=0;i<8;i++){ const s=new Date(mon); s.setDate(s.getDate()-i*7); const e=new Date(s); e.setDate(e.getDate()+6); items.push({ idx:i, label:`${s.getMonth()+1}/${s.getDate()}~${e.getMonth()+1}/${e.getDate()}` }); }
+            } else if (salesUnit === 'month'){
+                for (let i=0;i<12;i++){ const d=new Date(today.getFullYear(), today.getMonth()-i, 1); items.push({ idx:i, label:`${String(d.getFullYear()).slice(2)}/${d.getMonth()+1}월` }); }
+            } else if (salesUnit === 'quarter'){
+                const cq=Math.floor(today.getMonth()/3);
+                for (let i=0;i<4;i++){ const qi=cq-i; const y=today.getFullYear()+Math.floor(qi/4); const q=((qi%4)+4)%4; items.push({ idx:i, label:`${String(y).slice(2)}년 ${q+1}분기` }); }
+            } else if (salesUnit === 'year'){
+                // 데이터에 기록된 모든 연도(최근순). idx = 올해로부터의 오프셋(비연속 연도도 정확)
+                const ty = today.getFullYear();
+                const yset = new Set([ty]);
+                try { getSalesSourceOrders().forEach(o => { const d = salesOrderDate(o); if (d && !isNaN(d.getTime()) && d.getFullYear() >= 2000) yset.add(d.getFullYear()); }); } catch(e){}
+                [...yset].sort((a,b)=>b-a).forEach(y => items.push({ idx: ty - y, label: `${y}년` }));
+            }
+            const ibtn = (it) => `<button type="button" onclick="setSalesUnitIdx(${it.idx})" class="sales-toggle-btn${salesUnitIdx===it.idx?' active':''}" style="flex:0 0 auto; padding:6px 10px; font-size:12px; white-space:nowrap;">${it.label}</button>`;
+            return items.map(ibtn).join('');
         }
 
         // B~D. 판매현황
@@ -7412,13 +7522,14 @@
             let totalAmount = 0, totalQty = 0, deliveredAmount = 0, pickupDoneAmount = 0, unpaidAmount = 0, deliveryQty = 0, pickupQty = 0;
             // [신규] 상품 카테고리(과일/공동구매/상시판매)별 판매액 — 상품명으로 상품 매칭해 분류
             const _prodByName = {}; (typeof uploadProducts !== 'undefined' ? uploadProducts : []).forEach(p => { if (p && p.name) _prodByName[p.name] = p; });
-            const catAmt = { fruit: 0, group: 0, other: 0 };
+            const catAmt = { fruit: 0, group: 0, sada: 0, other: 0 };
             // [수정] '건수'는 주문현황과 동일하게 고객(이름_전화번호) 단위로 집계 (주문시각이 달라도 같은 고객이면 1건)
             const custGroups = new Map(); // key: 사람_날짜 → 'delivery' | 'pickup' — 주문건수(고객×날짜)용
             const peopleSet = new Set();  // [신규] 순수 주문자 인원: 전화번호(숫자만) 기준 중복 제거
             const custRankMap = new Map(); // [신규] 재주문 고객 순위용: 사람 → {name, phone, days(횟수), amount}
             const itemMap = new Map();
             const dayMap = new Map();
+            const hourMap = new Map(); // [신규] 오늘 시간대별 매출: 주문시각(timestamp) 시(hour) → 금액
             inRange.forEach(o => {
                 const amt = parseInt(o.total || 0) || 0;
                 const q = parseInt(o.qty || 0) || 0;
@@ -7447,13 +7558,17 @@
                 // [신규] 카테고리별 판매액 누적 (과일 / 공동구매(+사다드림) / 상시판매)
                 const _cat = salesProductCategory(_prodByName[nm], nm);
                 if (_cat === 'fruit') catAmt.fruit += amt;
-                else if (_cat === 'group' || _cat === 'sada') catAmt.group += amt;
+                else if (_cat === 'sada') catAmt.sada += amt;
+                else if (_cat === 'group') catAmt.group += amt;
                 else catAmt.other += amt;
                 const dd = salesOrderDate(o);
                 if (dd && dd.getFullYear() >= 2000) { // 날짜 깨진 주문(1970 등)은 추이 그래프에서 제외
                     const ds = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
                     dayMap.set(ds, (dayMap.get(ds) || 0) + amt);
                 }
+                // [신규] 시간대별(오늘) 매출: 주문시각의 시(hour) 기준 누적
+                const _ot = parseTimestampToDate(o.timestamp);
+                if (_ot && !isNaN(_ot.getTime()) && _ot.getFullYear() >= 2000) hourMap.set(_ot.getHours(), (hourMap.get(_ot.getHours()) || 0) + amt);
             });
 
             const metrics = document.getElementById('sales-metrics');
@@ -7487,24 +7602,28 @@
             const denom = completedAmount > 0 ? completedAmount : 1;
             const deliveredPct = Math.round(deliveredAmount / denom * 100);
             const pickupPct = Math.max(0, 100 - deliveredPct);
-            // [신규] 카테고리 비율(과일/공동구매/상시판매)
-            const catTotal = catAmt.fruit + catAmt.group + catAmt.other;
+            // [신규] 카테고리 비율(과일/공동구매/사다드림/상시판매) — [사다드림]은 공동구매에서 분리
+            const catTotal = catAmt.fruit + catAmt.group + catAmt.sada + catAmt.other;
             const cdenom = catTotal > 0 ? catTotal : 1;
             const fruitPct = Math.round(catAmt.fruit / cdenom * 100);
             const groupPct = Math.round(catAmt.group / cdenom * 100);
-            const otherPct = Math.max(0, 100 - fruitPct - groupPct);
-            // [신규] 막대 안에 라벨+퍼센트 표기 (좁은 칸은 퍼센트만/생략)
-            const _seg = (pct, color, label) => pct <= 0 ? '' : `<div style="width:${pct}%; height:100%; background:${color}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:800; white-space:nowrap; overflow:hidden;">${pct >= 14 ? label + ' ' + pct + '%' : (pct >= 7 ? pct + '%' : '')}</div>`;
-            const _bar = (segs) => `<div style="height:26px; background:#e5e7eb; border-radius:7px; overflow:hidden; display:flex;">${segs}</div>`;
+            const sadaPct = Math.round(catAmt.sada / cdenom * 100);
+            const otherPct = Math.max(0, 100 - fruitPct - groupPct - sadaPct);
+            // [신규] 막대 안 표기. hideLabel=true(카테고리)면 퍼센트+돋보기만, 아니면 라벨+퍼센트(배달/픽업)
+            const _seg = (pct, color, label, click, hideLabel) => pct <= 0 ? '' : `<div ${click ? `onclick="${click}"` : ''} style="width:${pct}%; height:100%; background:${color}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:800; white-space:nowrap; overflow:hidden;${click ? ' cursor:pointer;' : ''}">${hideLabel ? (pct >= 12 ? pct + '%' + (click ? ' 🔍' : '') : (pct >= 6 ? pct + '%' : '')) : (pct >= 16 ? label + ' ' + pct + '%' + (click ? ' 🔍' : '') : (pct >= 14 ? label + ' ' + pct + '%' : (pct >= 7 ? pct + '%' : '')))}</div>`;
+            const _bar = (segs) => `<div style="height:26px; background:#e5e7eb; border-radius:7px; overflow:hidden; display:flex; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.04);">${segs}</div>`;
+            // [신규] 카테고리 구분(범례) — 막대 아래 한 줄에 꽉 차게 균등 분배, 클릭 시 내역
+            const _leg = (color, label, pct, click) => `<div onclick="${click}" style="flex:1 1 0; min-width:0; display:flex; align-items:center; justify-content:center; gap:4px; font-size:11px; font-weight:800; color:#334155; cursor:pointer;"><span style="width:10px; height:10px; border-radius:3px; background:${color}; flex-shrink:0;"></span><span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label} ${pct}%</span></div>`;
             if (paidBox) paidBox.innerHTML =
-                _bar(_seg(fruitPct, '#ef4444', '과일') + _seg(groupPct, '#3b82f6', '공동구매') + _seg(otherPct, '#f59e0b', '상시판매'))
-                + `<div style="height:8px;"></div>`
+                _bar(_seg(fruitPct, '#ef4444', '과일', "showCategoryDetail('fruit','과일')", true) + _seg(groupPct, '#3b82f6', '공동구매', "showCategoryDetail('group','공동구매')", true) + _seg(sadaPct, '#06b6d4', '사다드림', "showCategoryDetail('sada','사다드림')", true) + _seg(otherPct, '#f59e0b', '상시판매', "showCategoryDetail('other','상시판매')", true))
+                + `<div style="display:flex; gap:6px; margin:5px 0 8px;">${_leg('#ef4444','과일',fruitPct,"showCategoryDetail('fruit','과일')") + _leg('#3b82f6','공동구매',groupPct,"showCategoryDetail('group','공동구매')") + _leg('#06b6d4','사다드림',sadaPct,"showCategoryDetail('sada','사다드림')") + _leg('#f59e0b','상시판매',otherPct,"showCategoryDetail('other','상시판매')")}</div>`
                 + _bar(_seg(deliveredPct, '#059669', '배달') + _seg(pickupPct, '#7c3aed', '픽업'));
 
             _salesRankingCache = [...itemMap.entries()];
             _salesCustRankCache = [...custRankMap.values()].map(v => ({ name: v.name, phone: v.phone, count: v.days.size, amount: v.amount }));
             renderSalesRanking();
 
+            _salesHourCache = hourMap;
             renderSalesDailyTrend(dayMap);
             _salesDayCache = dayMap;
         }
@@ -7558,11 +7677,13 @@
             });
 
             const totalCust = periodMap.size;
-            const genderDist={}, ageDist={}; let delCust=0, pickCust=0, newC=0, retC=0, gVIP=0,gDangol=0,gRe=0,gNew=0;
+            const genderDist={}, ageDist={}; let delCust=0, pickCust=0, mixedCust=0, newC=0, retC=0, gVIP=0,gDangol=0,gRe=0,gNew=0;
             periodMap.forEach((g,k)=>{
                 genderDist[g.gender||'미선택'] = (genderDist[g.gender||'미선택']||0)+1;
                 ageDist[g.age||'미선택'] = (ageDist[g.age||'미선택']||0)+1;
-                if (g.del>=g.pick) delCust++; else pickCust++;
+                // [변경] 6:4(60%) 기준: 배달 60%↑=배달 위주, 픽업 60%↑=픽업 위주, 그 사이(40~60%)=반반
+                const _tot = g.del + g.pick; const _dr = _tot>0 ? g.del/_tot : 0;
+                if (_dr >= 0.6) delCust++; else if (_dr <= 0.4) pickCust++; else mixedCust++;
                 const am = allMap.get(k);
                 if (am && from && am.first < from.getTime()) retC++; else newC++;
                 const c = am ? am.days.size : 1;
@@ -7574,19 +7695,23 @@
             if (totalCust === 0){ box.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-sub); font-size:13px;">해당 기간 고객이 없습니다.</div>`; return; }
 
             const ordered = (dist, order) => [...order.filter(k=>k in dist), ...Object.keys(dist).filter(k=>!order.includes(k))];
-            const bar = (label, count, total, color) => {
-                const pct = total>0 ? Math.round(count/total*100) : 0;
-                return `<div style="display:flex; align-items:center; gap:8px; margin:3px 0;">
-                    <div style="width:66px; font-size:12px; color:${label==='미선택'?'#94a3b8':'var(--text-sub)'}; flex-shrink:0; ${label==='미선택'?'font-style:italic;':'font-weight:700;'}">${label}</div>
-                    <div style="flex:1; min-width:36px; background:#f1f5f9; border-radius:4px; height:15px; overflow:hidden;"><div style="width:${pct}%; height:100%; background:${color};"></div></div>
-                    <div style="width:70px; text-align:right; font-size:12px; font-weight:800; flex-shrink:0;">${count}명·${pct}%</div>
-                </div>`;
+            // [변경] 각 분포를 한 줄 누적 막대 + 범례로 표시 (과일/공동구매/사다드림 비율 그래프와 동일 스타일)
+            const _csSeg = (pct, color) => pct<=0 ? '' : `<div style="width:${pct}%; height:100%; background:${color}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:800; white-space:nowrap; overflow:hidden;">${pct>=10?pct+'%':''}</div>`;
+            const _csBar = segs => `<div style="height:22px; background:#e5e7eb; border-radius:6px; overflow:hidden; display:flex; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.04);">${segs}</div>`;
+            const _csLeg = (color,label,count,pct) => `<div style="display:flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#334155;"><span style="width:9px; height:9px; border-radius:2px; background:${color}; flex-shrink:0;"></span><span style="white-space:nowrap;">${label} ${count}명·${pct}%</span></div>`;
+            const distBar = (items) => {
+                const total = items.reduce((s,it)=>s+(it.count||0),0) || 1;
+                const wp = items.filter(it=>(it.count||0)>0).map(it=>({ ...it, pct: Math.round(it.count/total*100) }));
+                return _csBar(wp.map(it=>_csSeg(it.pct, it.color)).join(''))
+                    + `<div style="display:flex; flex-wrap:wrap; gap:6px 12px; margin:5px 0 4px;">${wp.map(it=>_csLeg(it.color, it.label, it.count, it.pct)).join('')}</div>`;
             };
             const sec = t => `<div style="font-size:13px; font-weight:800; color:#334155; margin:14px 0 5px;">${t}</div>`;
 
             const genderKeys = ordered(genderDist, ['여성','남성','미선택']);
             const ageKeys = ordered(ageDist, ['10대','20대','30대','40대','50대','60대 이상','미선택']);
             const gColor = k => k==='여성'?'#ec4899':(k==='남성'?'#3b82f6':'#cbd5e1');
+            const agePalette = { '10대':'#f472b6','20대':'#a78bfa','30대':'#60a5fa','40대':'#34d399','50대':'#fbbf24','60대 이상':'#fb923c','미선택':'#cbd5e1' };
+            const aColor = k => agePalette[k] || '#8b5cf6';
 
             box.innerHTML = `
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
@@ -7595,23 +7720,19 @@
                     ${salesStatChip('이탈위험(30일+)', churn+'명', churn>0?'#dc2626':null)}
                 </div>
                 ${sec('👩 성별 분포')}
-                ${genderKeys.map(k=>bar(k, genderDist[k], totalCust, gColor(k))).join('')}
+                ${distBar(genderKeys.map(k=>({label:k, count:genderDist[k], color:gColor(k)})))}
                 ${sec('🎂 연령대 분포')}
-                ${ageKeys.map(k=>bar(k, ageDist[k], totalCust, k==='미선택'?'#cbd5e1':'#8b5cf6')).join('')}
+                ${distBar(ageKeys.map(k=>({label:k, count:ageDist[k], color:aColor(k)})))}
                 ${sec('🔁 신규 vs 재구매')}
-                ${bar('신규', newC, totalCust, '#10b981')}
-                ${bar('재구매', retC, totalCust, '#2563eb')}
+                ${distBar([{label:'신규', count:newC, color:'#10b981'},{label:'재구매', count:retC, color:'#2563eb'}])}
                 ${sec('🏅 단골 등급 (전체 이력)')}
-                ${bar('👑 VIP(10+)', gVIP, totalCust, '#d97706')}
-                ${bar('⭐ 단골(5+)', gDangol, totalCust, '#7c3aed')}
-                ${bar('🔁 재구매(2+)', gRe, totalCust, '#2563eb')}
-                ${bar('🌱 신규(1)', gNew, totalCust, '#94a3b8')}
+                ${distBar([{label:'10+', count:gVIP, color:'#d97706'},{label:'5+', count:gDangol, color:'#7c3aed'},{label:'2+', count:gRe, color:'#2563eb'},{label:'1', count:gNew, color:'#94a3b8'}])}
                 ${sec('🚚 배달 / 픽업 고객')}
-                ${bar('배달 위주', delCust, totalCust, '#3b82f6')}
-                ${bar('픽업 위주', pickCust, totalCust, '#7c3aed')}
+                ${distBar([{label:'배달 위주', count:delCust, color:'#3b82f6'},{label:'픽업 위주', count:pickCust, color:'#7c3aed'},{label:'반반', count:mixedCust, color:'#94a3b8'}])}
                 <div style="font-size:11px; color:var(--text-sub); margin-top:12px; line-height:1.5;">
                     · 성별·연령·배달픽업 = <b>선택 기간</b> 내 고객 기준 · 미선택은 별도 표시<br>
                     · 신규/재구매·등급·이탈 = <b>전체 이력</b> 기준 (신규=이 기간 처음 방문 / 재구매=이전에도 방문)<br>
+                    · 배달/픽업 = 고객별 완료주문 중 <b>60% 이상</b>인 쪽으로 분류, 그 사이(40~60%)는 <b>반반</b><br>
                     · 이탈위험 = 마지막 주문이 <b>30일 이상</b> 지난 전체 고객 수
                 </div>`;
         }
@@ -7648,8 +7769,8 @@
                     <tr onclick="showCustomerCardModal('${encodeURIComponent(r.phone||'')}','${encodeURIComponent(r.name||'')}')" style="cursor:pointer;" title="고객 카드 보기">
                         <td style="padding:8px; font-weight:800; color:${i < 3 ? '#d97706' : '#94a3b8'};">${i + 1}</td>
                         <td style="padding:8px; color:var(--primary); font-weight:700; text-decoration:underline;">${r.name || '이름없음'}${r.phone ? `<span style="font-size:11px; color:var(--text-sub); font-weight:400; text-decoration:none;"> ${r.phone}</span>` : ''}</td>
-                        <td style="padding:8px; text-align:right; font-weight:800;">${r.count.toLocaleString()}회</td>
-                        <td style="padding:8px; text-align:right;">${r.amount.toLocaleString()}원</td>
+                        <td style="padding:8px; text-align:right; font-weight:800; white-space:nowrap;">${r.count.toLocaleString()}회</td>
+                        <td style="padding:8px; text-align:right; white-space:nowrap;">${r.amount.toLocaleString()}원</td>
                     </tr>`).join('');
                 return;
             }
@@ -7680,10 +7801,126 @@
             renderSalesDailyTrend(_salesDayCache || new Map());
         }
 
+        // [신규] 일/주/월/분기/년 기간에서 고정 개수의 추이 버킷 생성(빈 구간도 0으로 채워 줄 수 고정)
+        function salesFixedTrendBuckets(unit, count){
+            const _pad = n => String(n).padStart(2,'0');
+            const iso = d => `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())}`;
+            const today = salesTodayMidnight();
+            const out = [];
+            if (unit === 'day'){
+                for (let i=count-1; i>=0; i--){ const d=new Date(today); d.setDate(d.getDate()-i); const k=iso(d); out.push({ key:k, label:`${d.getMonth()+1}/${d.getDate()}`, startISO:k, endISO:k, amount:0 }); }
+            } else if (unit === 'week'){
+                const mon=new Date(today); mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+                for (let i=count-1; i>=0; i--){ const s=new Date(mon); s.setDate(s.getDate()-i*7); const e=new Date(s); e.setDate(e.getDate()+6); out.push({ key:iso(s), label:`${s.getMonth()+1}/${s.getDate()}~${e.getMonth()+1}/${e.getDate()}`, startISO:iso(s), endISO:iso(e), amount:0 }); }
+            } else if (unit === 'month'){
+                for (let i=count-1; i>=0; i--){ const d=new Date(today.getFullYear(), today.getMonth()-i, 1); const last=new Date(d.getFullYear(), d.getMonth()+1, 0); out.push({ key:`${d.getFullYear()}-${_pad(d.getMonth()+1)}`, label:`${String(d.getFullYear()).slice(2)}/${d.getMonth()+1}`, startISO:iso(d), endISO:iso(last), amount:0 }); }
+            } else if (unit === 'quarter'){
+                const cq=Math.floor(today.getMonth()/3);
+                for (let i=count-1; i>=0; i--){ const qi=cq-i; const y=today.getFullYear()+Math.floor(qi/4); const q=((qi%4)+4)%4; const s=new Date(y, q*3, 1); const e=new Date(y, q*3+3, 0); out.push({ key:`${y}-Q${q+1}`, label:`${String(y).slice(2)}년 ${q+1}분기`, startISO:iso(s), endISO:iso(e), amount:0 }); }
+            } else if (unit === 'year'){
+                for (let i=count-1; i>=0; i--){ const y=today.getFullYear()-i; out.push({ key:`${y}`, label:`${y}년`, startISO:`${y}-01-01`, endISO:`${y}-12-31`, amount:0 }); }
+            }
+            return out;
+        }
+        // [신규] 날짜문자열(YYYY-MM-DD)을 단위별 버킷 키로 변환
+        function salesTrendKeyForDate(ds, unit){
+            const p=ds.split('-'); const y=+p[0], m=+p[1], d=+p[2]; const _pad=n=>String(n).padStart(2,'0');
+            if (unit === 'day') return ds;
+            if (unit === 'month') return `${p[0]}-${p[1]}`;
+            if (unit === 'year') return `${p[0]}`;
+            if (unit === 'quarter'){ const q=Math.floor((m-1)/3); return `${y}-Q${q+1}`; }
+            if (unit === 'week'){ const dt=new Date(y,m-1,d); const mon=new Date(dt); mon.setDate(dt.getDate()-((dt.getDay()+6)%7)); return `${mon.getFullYear()}-${_pad(mon.getMonth()+1)}-${_pad(mon.getDate())}`; }
+            return ds;
+        }
+        // [신규] 선택된 단위(주/월/분기/년) 기간을 하위 구간으로 쪼갠 버킷 생성 + 날짜→키 함수 반환
+        function salesSubTrendBuckets(){
+            const _pad = n => String(n).padStart(2,'0');
+            const iso = d => `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())}`;
+            const { from } = getSalesPeriodRange();
+            const out = [];
+            const w = ['일','월','화','수','목','금','토'];
+            if (salesUnit === 'week'){
+                // 그 주의 7일
+                for (let i=0;i<7;i++){ const d=new Date(from); d.setDate(d.getDate()+i); const k=iso(d); out.push({ key:k, label:`${d.getMonth()+1}/${d.getDate()}(${w[d.getDay()]})`, startISO:k, endISO:k, amount:0 }); }
+                return { buckets: out, keyOf: ds => ds };
+            }
+            if (salesUnit === 'month'){
+                // 그 달의 주차(월~일, 달 경계 클램프)
+                const y=from.getFullYear(), m=from.getMonth();
+                const firstDow=(new Date(y,m,1).getDay()+6)%7;
+                const lastDay=new Date(y,m+1,0).getDate();
+                const numWeeks=Math.ceil((lastDay+firstDow)/7);
+                for (let wk=1; wk<=numWeeks; wk++){ const sd=Math.max(1,(wk-1)*7-firstDow+1); const ed=Math.min(lastDay,wk*7-firstDow); out.push({ key:`W${wk}`, label:`${wk}주(${m+1}/${sd}~${m+1}/${ed})`, startISO:`${y}-${_pad(m+1)}-${_pad(sd)}`, endISO:`${y}-${_pad(m+1)}-${_pad(ed)}`, amount:0 }); }
+                const keyOf = ds => { const dd=+ds.split('-')[2]; return `W${Math.ceil((dd+firstDow)/7)}`; };
+                return { buckets: out, keyOf };
+            }
+            if (salesUnit === 'quarter'){
+                // 그 분기의 3개월
+                const y=from.getFullYear(), sm=from.getMonth();
+                for (let i=0;i<3;i++){ const d=new Date(y,sm+i,1); const last=new Date(y,sm+i+1,0); out.push({ key:`${d.getFullYear()}-${_pad(d.getMonth()+1)}`, label:`${d.getMonth()+1}월`, startISO:iso(d), endISO:iso(last), amount:0 }); }
+                return { buckets: out, keyOf: ds => ds.slice(0,7) };
+            }
+            if (salesUnit === 'year'){
+                // 그 해의 4분기 (1분기→4분기)
+                const y=from.getFullYear();
+                for (let q=0; q<4; q++){ const d=new Date(y,q*3,1); const last=new Date(y,q*3+3,0); out.push({ key:`Q${q+1}`, label:`${q+1}분기(${q*3+1}~${q*3+3}월)`, startISO:iso(d), endISO:iso(last), amount:0 }); }
+                const keyOf = ds => { const m=+ds.split('-')[1]; return `Q${Math.floor((m-1)/3)+1}`; };
+                return { buckets: out, keyOf };
+            }
+            return { buckets: [], keyOf: ds => ds };
+        }
+
         function renderSalesDailyTrend(dayMap){
             const box = document.getElementById('sales-daily-trend');
             const titleEl = document.getElementById('sales-trend-title');
             if (!box) return;
+            // [신규] 일: 시간대별(4시간 6구간, 24시간제) — 00시부터 오름차순(00-04시가 맨 위 → 20-24시), 전체 높이 고정, 막대 클릭 시 주문내역
+            if (salesUnit === 'today' || salesUnit === 'day'){
+                if (titleEl) titleEl.innerText = '📈 시간대별 매출 추이';
+                const hourMap = _salesHourCache || new Map();
+                const _p2 = n => String(n).padStart(2,'0');
+                const bands = [];
+                for (let b=0; b<6; b++) bands.push({ s:b*4, e:b*4+4, amount:0 });
+                hourMap.forEach((amt, h) => { bands[Math.min(5, Math.floor(h/4))].amount += amt; });
+                // 00시부터 오름차순 (생성 순서 그대로 유지)
+                const hmax = Math.max.apply(null, bands.map(b => b.amount).concat([1]));
+                box.innerHTML = `<div style="display:flex; flex-direction:column; gap:5px; height:196px;">` + bands.map(v => {
+                    const pct = Math.round(v.amount / hmax * 100);
+                    const bandLabel = `${_p2(v.s)}-${_p2(v.e)}시`;
+                    const _t = escapeArg(bandLabel);
+                    return `<div onclick="showHourBandDetail(${v.s},${v.e},'${_t}')" style="display:flex; align-items:center; gap:8px; flex:1 1 0; min-height:0; cursor:pointer;" title="클릭 시 판매 상품 내역">
+                        <div style="width:64px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${bandLabel}</div>
+                        <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:100%;">
+                            <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
+                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}원</span><span style="color:#64748b; font-size:10px;">▶</span></div>
+                        </div>
+                    </div>`;
+                }).join('') + `</div>`;
+                return;
+            }
+            // [신규] 주/월/분기/년: 선택 기간을 하위 구간으로 쪼개 표시 — 일자(기간) 내림차순(최근이 위), 전체 높이 고정
+            if (salesUnit === 'week' || salesUnit === 'month' || salesUnit === 'quarter' || salesUnit === 'year'){
+                const _tmap = { week:'일별', month:'주별', quarter:'월별', year:'분기별' };
+                if (titleEl) titleEl.innerText = `📈 ${_tmap[salesUnit]} 매출 추이`;
+                const { buckets, keyOf } = salesSubTrendBuckets();
+                const bmap = new Map(buckets.map(b => [b.key, b]));
+                dayMap.forEach((amt, ds) => { const k = keyOf(ds); if (bmap.has(k)) bmap.get(k).amount += amt; });
+                // 전부 오름차순(생성 순서 그대로): 주=월→일, 월=1주→막주, 분기=첫달→끝달, 년=1분기→4분기
+                const max = Math.max.apply(null, buckets.map(b => b.amount).concat([1]));
+                const lblW = (salesUnit === 'week') ? 66 : (salesUnit === 'month') ? 104 : (salesUnit === 'year') ? 92 : 44;
+                box.innerHTML = `<div style="display:flex; flex-direction:column; gap:5px; height:196px;">` + buckets.map(v => {
+                    const pct = Math.round(v.amount / max * 100);
+                    const _t = escapeArg(v.label);
+                    return `<div onclick="showTrendDetail('${v.startISO}','${v.endISO}','${_t}')" style="display:flex; align-items:center; gap:8px; cursor:pointer; flex:1 1 0; min-height:0;" title="클릭 시 판매 상품 내역">
+                        <div style="width:${lblW}px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${v.label}</div>
+                        <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:100%;">
+                            <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
+                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}원</span><span style="color:#64748b; font-size:10px;">▶</span></div>
+                        </div>
+                    </div>`;
+                }).join('') + `</div>`;
+                return;
+            }
             // [기본] 기간에 맞는 대표 단위: 이번달=주, 전체=월, 그외=일  / 탭으로 직접 선택 시 그 단위 우선
             const autoUnit = (salesPeriod === 'yearall' || salesPeriod === 'recent_year') ? 'month'
                            : (salesPeriod === 'month' || salesPeriod === 'recent_month') ? 'week' : 'day';
@@ -7795,6 +8032,34 @@
                 totalCnt += 1; totalAmt += parseInt(o.total || 0) || 0;
             });
             _trendDetail.rows = [...items.entries()];
+            _openSalesDetailModal(title, totalAmt, totalCnt);
+        }
+        // [신규] 시간대(4시간 구간) 클릭 → 그 날짜·시간대의 판매 상품 내역 (주문시각 hour 기준)
+        function showHourBandDetail(hStart, hEnd, title){
+            const { from, to } = getSalesPeriodRange();
+            const items = new Map(); let totalAmt = 0, totalCnt = 0;
+            (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : []).forEach(o => {
+                if (isSalesCanceled(o)) return;
+                const st = String(o.status || ''); if (st !== '배달완료' && st !== '픽업') return;
+                const d = salesOrderDate(o); if (!d || isNaN(d.getTime())) return;
+                if (from && d < from) return; if (to && d > to) return;
+                const isDel = isSalesDelivery(o);
+                if (salesMethodFilter === 'delivery' && !isDel) return;
+                if (salesMethodFilter === 'pickup' && isDel) return;
+                const ot = parseTimestampToDate(o.timestamp);
+                if (!ot || isNaN(ot.getTime())) return;
+                const h = ot.getHours();
+                if (h < hStart || h >= hEnd) return;
+                const nm = String(o.item || '상품명 없음');
+                if (!items.has(nm)) items.set(nm, { cnt: 0, amount: 0 });
+                const it = items.get(nm); it.cnt += 1; it.amount += parseInt(o.total || 0) || 0;
+                totalCnt += 1; totalAmt += parseInt(o.total || 0) || 0;
+            });
+            _trendDetail.rows = [...items.entries()];
+            _openSalesDetailModal(title, totalAmt, totalCnt);
+        }
+        // [공용] 판매 상세 모달 (정렬 헤더 있는 표) — 매출추이·카테고리 공용
+        function _openSalesDetailModal(title, totalAmt, totalCnt){
             _trendDetail.sort = { key: 'amount', dir: 'desc' }; // 열 때마다 금액 많은순 기본
             const old = document.getElementById('trend-detail-modal'); if (old) old.remove();
             const modal = document.createElement('div');
@@ -7815,6 +8080,31 @@
             renderTrendDetailTable();
             setTimeout(() => modal.classList.add('active'), 10);
         }
+        // [신규] 카테고리(과일/공동구매/상시판매) 클릭 → 현재 기간의 그 분류 판매 상품 내역
+        function showCategoryDetail(cat, title){
+            const range = (typeof getSalesPeriodRange === 'function') ? getSalesPeriodRange() : { from: null, to: null };
+            const from = range.from, to = range.to;
+            const prodByName = {}; (typeof uploadProducts !== 'undefined' ? uploadProducts : []).forEach(p => { if (p && p.name) prodByName[p.name] = p; });
+            const items = new Map(); let totalAmt = 0, totalCnt = 0;
+            (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : []).forEach(o => {
+                if (isSalesCanceled(o)) return;
+                const st = String(o.status || ''); if (st !== '배달완료' && st !== '픽업') return;
+                const d = salesOrderDate(o); if (!d || isNaN(d.getTime())) return;
+                if (from && d < from) return; if (to && d > to) return;
+                const isDel = isSalesDelivery(o);
+                if (salesMethodFilter === 'delivery' && !isDel) return;
+                if (salesMethodFilter === 'pickup' && isDel) return;
+                const nm = String(o.item || '상품명 없음');
+                const c = salesProductCategory(prodByName[nm], nm);
+                const bucket = (c === 'fruit') ? 'fruit' : (c === 'sada') ? 'sada' : (c === 'group') ? 'group' : 'other';
+                if (bucket !== cat) return;
+                if (!items.has(nm)) items.set(nm, { cnt: 0, amount: 0 });
+                const it = items.get(nm); it.cnt += 1; it.amount += parseInt(o.total || 0) || 0;
+                totalCnt += 1; totalAmt += parseInt(o.total || 0) || 0;
+            });
+            _trendDetail.rows = [...items.entries()];
+            _openSalesDetailModal(title, totalAmt, totalCnt);
+        }
         function closeTrendDetail(){
             const m = document.getElementById('trend-detail-modal');
             if (m){ m.classList.remove('active'); setTimeout(() => m.remove(), 250); }
@@ -7833,29 +8123,16 @@
             document.querySelectorAll('[data-sales-method]').forEach(b => b.classList.toggle('active', b.dataset.salesMethod === m));
             renderSalesStatus();
         }
-        function setSalesPeriod(p){
-            salesPeriod = p;
-            salesTrendUnitOverride = null; // 기간 바꾸면 매출 추이 단위도 기간에 맞는 기본으로 되돌림
-            if (p === 'custom'){ // 직접: 비어있으면 이번달 1일~오늘로 기본 채움
-                const f = document.getElementById('sales-custom-from'), t = document.getElementById('sales-custom-to');
-                const now = new Date();
-                const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                if (f && !f.value) f.value = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
-                if (t && !t.value) t.value = ymd(now);
-            }
-            buildSalesPeriodTabs();        // 활성 버튼 갱신
-            renderSalesStatus();
-        }
-        function setSalesYear(y){
-            salesYear = parseInt(y) || new Date().getFullYear();
-            salesPeriod = 'yearall';       // 연도 선택 = 그 연도 전체
+        // [신규] 단위 선택(상단): 인덱스는 최근(0)으로 초기화
+        function setSalesUnit(u){
+            salesUnit = u; salesUnitIdx = 0; salesPeriod = u;
             salesTrendUnitOverride = null;
             buildSalesPeriodTabs();
             renderSalesStatus();
         }
-        function setSalesMonth(y, m){
-            salesPeriod = 'month'; salesMonthY = y; salesMonthM = m;
-            salesTrendUnitOverride = null;
+        // [신규] 인스턴스 선택(하단)
+        function setSalesUnitIdx(i){
+            salesUnitIdx = parseInt(i) || 0;
             buildSalesPeriodTabs();
             renderSalesStatus();
         }
@@ -7954,13 +8231,10 @@
             }).join('');
         }
         function salesPeriodLabel(){
-            if (salesPeriod === 'yearall') return String(salesYear) + '년 전체';
-            if (salesPeriod === 'month') return salesMonthY + '년 ' + salesMonthM + '월';
-            if (salesPeriod === 'custom'){
-                const f = document.getElementById('sales-custom-from'), t = document.getElementById('sales-custom-to');
-                return '직접(' + ((f&&f.value)||'') + '~' + ((t&&t.value)||'') + ')';
-            }
-            return ({ today:'오늘', thisweek:'이번주', lastweek:'저번주', recent_month:'최근 한달', recent_year:'최근 1년' })[salesPeriod] || salesPeriod;
+            const { from, to } = getSalesPeriodRange();
+            const f = d => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
+            const unitName = ({ today:'오늘', day:'일', week:'주', month:'월', quarter:'분기', year:'년' })[salesUnit] || salesUnit;
+            return `${unitName}(${f(from)}~${f(to)})`;
         }
 
         function exportSalesCSV(){
@@ -8246,6 +8520,23 @@
         const costcoCategories = ["코스트코 냉동", "코스트코 냉장", "코스트코 상온"];
         // [신규] 상품 등록/수정 폼의 선반위치(장소) 옵션 — 재고관리 탭의 선반 분류와 동일
         const SHELF_OPTS_FORM = [['', '📦 미지정'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']];
+        // [신규] 상시판매 보관분류별 선반 옵션 (냉동→냉동4~7, 냉장→냉장1~2, 상온→선반1~3, 공통: 미지정·기타)
+        const SHELF_GROUPS = {
+            '냉동': [['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['', '📦 미지정'], ['other', '🧺 기타']],
+            '냉장': [['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['', '📦 미지정'], ['other', '🧺 기타']],
+            '상온': [['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['', '📦 미지정'], ['other', '🧺 기타']]
+        };
+        // 보관분류(categoryValue) 값에 맞춰 선반(productShelf) 옵션을 채움. desiredShelf가 새 목록에 있으면 유지, 없으면 미지정
+        function populateShelfOptions(desiredShelf){
+            const catSel = document.getElementById('categoryValue');
+            const shelfSel = document.getElementById('productShelf');
+            if (!catSel || !shelfSel) return;
+            const opts = SHELF_GROUPS[catSel.value] || SHELF_OPTS_FORM;
+            const want = (desiredShelf !== undefined && desiredShelf !== null) ? desiredShelf : shelfSel.value;
+            shelfSel.innerHTML = '';
+            opts.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.innerText = l; shelfSel.appendChild(o); });
+            shelfSel.value = opts.some(([v]) => v === want) ? want : '';
+        }
 
         function selectMainTab(tab) {
             uploadCurrentTab = tab;
@@ -8297,18 +8588,14 @@
                 shelfSelect.className = 'form-control';
                 shelfSelect.style.flex = '1';
                 shelfSelect.style.minWidth = '0';
-                SHELF_OPTS_FORM.forEach(([v, l]) => {
-                    const opt = document.createElement('option');
-                    opt.value = v;
-                    opt.innerText = l;
-                    shelfSelect.appendChild(opt);
-                });
-                // 수정 모드일 때만 기존 선반위치 반영, 신규 등록은 항상 미지정
-                shelfSelect.value = uploadIsEditMode ? (uploadEditShelf || '') : '';
+                // [신규] 보관분류 바뀌면 선반 옵션도 관련된 것만 갱신
+                select.onchange = () => populateShelfOptions();
 
                 row.appendChild(select);
                 row.appendChild(shelfSelect);
                 container.appendChild(row);
+                // 현재 보관분류(기본 냉동, 수정 시엔 이후 editProduct가 다시 세팅)에 맞춰 선반 옵션 채움
+                populateShelfOptions(uploadIsEditMode ? (uploadEditShelf || '') : '');
             }
             else if (tab === 'fruit') {
                 document.getElementById('categoryLabel').innerText = "과채류 분류 선택";
@@ -9881,7 +10168,7 @@
 
             switchAdminTab('product-upload');
 
-            document.getElementById('form-card-title').innerText = `✏️ 상품 수정: ${prod.name}`;
+            { const fct = document.getElementById('form-card-title'); fct.innerText = `✏️ 상품 수정: ${prod.name}`; fct.style.display = ''; }
             { const dupBtn = document.getElementById('btn-duplicate-form'); if (dupBtn) dupBtn.style.display = 'flex'; } // 수정 모드에선 복제하기 버튼 노출(제출버튼과 반반)
             { const dlBtn = document.getElementById('btn-download-images'); if (dlBtn) dlBtn.style.display = (prod.images && prod.images.length > 0) ? 'flex' : 'none'; } // 사진이 있을 때만 다운로드 버튼 노출
 
@@ -9930,6 +10217,8 @@
                 uploadSelectedDate = prod.date || "";
             } else {
                 document.getElementById('categoryValue').value = prod.matchKey || "";
+                // [신규] 상시판매: 보관분류(matchKey)에 맞춰 선반 옵션 갱신 + 기존 선반값 반영
+                populateShelfOptions(uploadEditShelf || '');
             }
 
             uploadSelectedFiles = [];
@@ -9954,7 +10243,7 @@
             uploadEditProductKey = null;
             uploadEditProductRef = null;
 
-            document.getElementById('form-card-title').innerText = "✨ 신규 상품 등록";
+            { const fct = document.getElementById('form-card-title'); fct.innerText = ""; fct.style.display = 'none'; }
             { const dupBtn = document.getElementById('btn-duplicate-form'); if (dupBtn) dupBtn.style.display = 'none'; } // 신규 등록 모드에선 복제하기 숨김
             { const dlBtn = document.getElementById('btn-download-images'); if (dlBtn) dlBtn.style.display = 'none'; } // 신규 등록 모드에선 사진 다운로드 숨김
             
