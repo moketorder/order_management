@@ -6241,6 +6241,69 @@
             }
         }
 
+        // [신규] 고객 모달 상태: 자주 산 상품 정렬 / 날짜별 상세용 데이터
+        let _custModalTop = { rows: [], sort: { key: 'qty', dir: 'desc' } };
+        let _custModalOrders = [];
+        let _custModalName = '';
+        function _custTopArrow(key){ return _custModalTop.sort.key === key ? (_custModalTop.sort.dir === 'asc' ? ' ▲' : ' ▼') : ''; }
+        function sortCustTop(key){
+            const s = _custModalTop.sort;
+            if (s.key === key) s.dir = (s.dir === 'asc') ? 'desc' : 'asc';
+            else { s.key = key; s.dir = 'desc'; }
+            renderCustTop();
+        }
+        function renderCustTop(){
+            const head = document.getElementById('cust-top-head');
+            const body = document.getElementById('cust-top-body');
+            if (!body) return;
+            const s = _custModalTop.sort;
+            const rows = [..._custModalTop.rows].sort((a,b) => s.dir === 'asc' ? (a[s.key]-b[s.key]) : (b[s.key]-a[s.key])).slice(0, 10);
+            if (head) head.innerHTML = `<tr style="font-size:11px; color:var(--text-sub);">
+                <th style="padding:4px; text-align:left;">상품명</th>
+                <th style="padding:4px; text-align:right; cursor:pointer; white-space:nowrap;" onclick="sortCustTop('qty')">수량${_custTopArrow('qty')}</th>
+                <th style="padding:4px; text-align:right; cursor:pointer; white-space:nowrap;" onclick="sortCustTop('amount')">금액${_custTopArrow('amount')}</th>
+            </tr>`;
+            body.innerHTML = rows.length ? rows.map((r,i)=>`
+                <tr style="border-top:1px dashed #f1f5f9;">
+                    <td style="padding:5px 4px; font-size:12px; word-break:break-all;"><b style="color:${i<3?'#d97706':'#94a3b8'};">${i+1}</b> ${r.name}</td>
+                    <td style="padding:5px 4px; text-align:right; font-size:12px; font-weight:800; color:#2563eb; white-space:nowrap;">${r.qty}개</td>
+                    <td style="padding:5px 4px; text-align:right; font-size:12px; white-space:nowrap;">${r.amount.toLocaleString()}원</td>
+                </tr>`).join('') : `<tr><td colspan="3" style="padding:8px; font-size:12px; color:var(--text-sub);">완료 구매 내역 없음</td></tr>`;
+        }
+        // [신규] 최근 주문일 버튼 클릭 → 그 날짜에 무엇을 주문했는지 상세(고객카드) 모달
+        function showCustDayOrders(dateStr){
+            const items = (_custModalOrders || []).filter(o => {
+                const d = salesOrderDate(o);
+                if (!d || isNaN(d.getTime())) return false;
+                const dk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                return dk === dateStr;
+            });
+            if (!items.length){ if (typeof showToast==='function') showToast('해당 날짜 주문이 없습니다.'); return; }
+            let totalAmt = 0;
+            const rowsHtml = items.map(o => {
+                const amt = parseInt(o.total||0)||0; totalAmt += amt;
+                const st = String(o.status||'대기');
+                const canceled = (o.canceled===true||String(o.canceled).toUpperCase()==='TRUE');
+                const badge = canceled ? '🔴 취소' : (st==='배달완료'?'🟢 배달완료':(st==='픽업'?'🟣 픽업완료':(st==='입고'?'🟡 입고':'🔘 대기')));
+                return `<div style="display:flex; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px dashed #f1f5f9; font-size:12px; ${canceled?'opacity:0.55; text-decoration:line-through;':''}">
+                    <span style="word-break:break-all;">${o.item||'상품명 없음'} <span style="color:var(--text-sub);">×${parseInt(o.qty||0)||0}</span></span>
+                    <span style="flex-shrink:0; white-space:nowrap; text-align:right;"><b>${amt.toLocaleString()}원</b> <span style="font-size:10px; color:var(--text-sub);">${badge}</span></span>
+                </div>`;
+            }).join('');
+            const old = document.getElementById('cust-day-modal'); if (old) old.remove();
+            const m = document.createElement('div');
+            m.id = 'cust-day-modal'; m.className = 'summary-modal-overlay'; m.style.zIndex = '10002';
+            m.innerHTML = `<div class="summary-modal-content" style="max-width:420px;">
+                <div class="summary-modal-header"><h2>🧾 ${fmtMD(dateStr)} 주문 · ${_custModalName || '고객'}</h2><button class="summary-modal-close" onclick="document.getElementById('cust-day-modal').remove()">&times;</button></div>
+                <div class="summary-modal-body">
+                    ${rowsHtml}
+                    <div style="display:flex; justify-content:space-between; margin-top:10px; padding-top:8px; border-top:1.5px solid var(--border); font-weight:900;"><span>합계(취소 포함)</span><span>${totalAmt.toLocaleString()}원</span></div>
+                </div>
+            </div>`;
+            document.body.appendChild(m);
+            setTimeout(()=>m.classList.add('active'), 10);
+        }
+
         // [신규] 고객 카드 모달 — 재주문 고객 순위에서 고객 클릭 시. 가게 운영에 필요한 요약을 한눈에.
         function showCustomerCardModal(phoneEnc, nameEnc){
             const phone = decodeURIComponent(phoneEnc || '');
@@ -6301,7 +6364,11 @@
                 g.items.add(String(o.item||''));
                 if (!isDone(o)) g.allDone = false;
             });
-            const recentDates = [...dateGroups.values()].sort((a,b)=>b.ts-a.ts).slice(0,10);
+            const recentDates = [...dateGroups.values()].sort((a,b)=>b.ts-a.ts).slice(0,5);
+            // [신규] 모달 상태 저장 (자주 산 상품 정렬 / 날짜별 상세용)
+            _custModalTop = { rows: [...itemMap.entries()].map(([nm,v]) => ({ name: nm, qty: v.qty, amount: v.amount })), sort: { key: 'qty', dir: 'desc' } };
+            _custModalOrders = all;
+            _custModalName = name || '고객';
 
             // 단골 등급
             let grade = '🌱 신규', gradeColor = '#64748b';
@@ -6328,10 +6395,10 @@
                 </div>`).join('') : '<div style="color:var(--text-sub); font-size:12px; padding:4px 0;">완료 구매 내역 없음</div>';
 
             const recentHtml = recentDates.length ? recentDates.map(g=>`
-                <div style="display:flex; justify-content:space-between; gap:8px; padding:4px 0; border-top:1px dashed #f1f5f9; font-size:12px;">
-                    <span style="color:var(--text-main);">${fmtMD(g.dateStr)} <span style="color:var(--text-sub);">· 상품 ${g.items.size}종 ${g.qty}개</span>${g.allDone?'':' <span style="color:#d97706; font-weight:800;">·진행중</span>'}</span>
+                <button type="button" onclick="showCustDayOrders('${g.dateStr}')" title="이 날짜에 주문한 상품 보기" style="width:100%; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 4px; border:none; border-top:1px dashed #f1f5f9; background:none; cursor:pointer; font-size:12px; text-align:left;">
+                    <span style="color:var(--text-main);">${fmtMD(g.dateStr)} <span style="color:var(--text-sub);">· 상품 ${g.items.size}종 ${g.qty}개</span>${g.allDone?'':' <span style="color:#d97706; font-weight:800;">·진행중</span>'} <span style="color:var(--primary); font-size:10px;">▶</span></span>
                     <span style="flex-shrink:0; color:var(--text-main); font-weight:800;">${g.amount.toLocaleString()}원</span>
-                </div>`).join('') : '<div style="color:var(--text-sub); font-size:12px; padding:4px 0;">주문 내역 없음</div>';
+                </button>`).join('') : '<div style="color:var(--text-sub); font-size:12px; padding:4px 0;">주문 내역 없음</div>';
 
             const modalId = 'summary-modal';
             const oldModal = document.getElementById(modalId); if (oldModal) oldModal.remove();
@@ -6339,25 +6406,22 @@
             modal.id = modalId; modal.className = 'summary-modal-overlay';
             modal.innerHTML = `
                 <div class="summary-modal-content">
-                    <div class="summary-modal-header">
-                        <h2>👤 ${name || '고객'} <span style="font-size:12px; font-weight:800; color:${gradeColor};">${grade}</span></h2>
+                    <div class="summary-modal-header" style="align-items:flex-start;">
+                        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; min-width:0;">
+                            <h2 style="margin:0;">👤 ${name || '고객'}</h2>
+                            <span style="font-size:12px; font-weight:800; color:${gradeColor};">${grade}</span>
+                            ${gender ? `<span style="font-size:12px; font-weight:700; color:#334155;">${genderIcon} ${gender}</span>` : ''}
+                            ${ageGroup ? `<span style="font-size:12px; font-weight:700; color:#334155;">${ageGroup}</span>` : ''}
+                            ${cleanPhone ? `<a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:2px 8px; border-radius:6px;">📞 전화</a>
+                            <button type="button" onclick="copyTextAndSms(decodeURIComponent('${encodeURIComponent('[모켓] '+(name||'')+'님, 안녕하세요! 😊')}'), '${cleanPhone}', '고객 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:2px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>` : ''}
+                        </div>
                         <button class="summary-modal-close" onclick="closeSummaryModal()">&times;</button>
                     </div>
                     <div class="summary-modal-body">
-                        <div style="font-size:12px; color:var(--text-sub); margin-bottom:10px;">${phone || '연락처 없음'}${cleanPhone ? `
-                            <span style="display:inline-flex; gap:5px; margin-left:6px;">
-                                <a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:2px 7px; border-radius:6px;">📞 전화</a>
-                                <button type="button" onclick="copyTextAndSms(decodeURIComponent('${encodeURIComponent('[모켓] '+(name||'')+'님, 안녕하세요! 😊')}'), '${cleanPhone}', '고객 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:2px 7px; border-radius:6px; cursor:pointer;">💬 문자</button>
-                            </span>` : ''}</div>
-                        ${(gender || ageGroup) ? `<div style="font-size:12px; margin-bottom:10px;">
-                            ${gender ? `<span style="font-weight:800; color:#334155;">${genderIcon} ${gender}</span>` : ''}${(gender && ageGroup) ? ' · ' : ''}${ageGroup ? `<span style="font-weight:800; color:#334155;">${ageGroup}</span>` : ''}
-                        </div>` : ''}
-
-                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px;">
                             ${salesStatChip('총 구매액', totalAmount.toLocaleString()+'원', '#059669')}
                             ${salesStatChip('주문 횟수', orderCount+'회')}
                             ${salesStatChip('1회 평균', avg.toLocaleString()+'원')}
-                            ${salesStatChip('총 수량', totalQty.toLocaleString()+'개')}
                         </div>
 
                         <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--text-sub); background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:12px;">
@@ -6371,14 +6435,18 @@
                             ${salesStatChip('미완료(챙길것)', pending.length+'건 · '+pendingAmt.toLocaleString()+'원', '#dc2626')}
                         </div>` : ''}
 
-                        <div style="font-size:13px; font-weight:800; color:#334155; margin:4px 0 4px;">🧡 자주 산 상품 TOP${topItems.length}</div>
-                        ${topHtml}
+                        <div style="font-size:13px; font-weight:800; color:#334155; margin:4px 0 4px;">🧡 자주 산 상품 <span style="font-size:11px; font-weight:700; color:var(--text-sub);">(수량·금액 눌러 정렬)</span></div>
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead id="cust-top-head"></thead>
+                            <tbody id="cust-top-body"></tbody>
+                        </table>
 
-                        <div style="font-size:13px; font-weight:800; color:#334155; margin:12px 0 4px;">🧾 최근 주문일 ${recentDates.length}일</div>
+                        <div style="font-size:13px; font-weight:800; color:#334155; margin:12px 0 4px;">🧾 최근 주문일 <span style="font-size:11px; font-weight:700; color:var(--text-sub);">(날짜를 누르면 주문 상세)</span></div>
                         ${recentHtml}
                     </div>
                 </div>`;
             document.body.appendChild(modal);
+            renderCustTop();
             setTimeout(() => modal.classList.add('active'), 10);
         }
 
