@@ -2576,6 +2576,10 @@
         #sales-upcoming-summary > div { flex: 1 1 0; min-width: 0; text-align: center; }
         /* 판매현황 지표 카드: 값이 한 줄에 들어가도록 폰트·여백 축소 + 주문 내역 날짜필터 박스와 동일 디자인(흰 배경·라운드·그림자) */
         #sales-metrics > div { padding:8px 6px !important; min-width:0 !important; overflow:hidden; background:#fff !important; border-radius:var(--radius-main) !important; box-shadow:var(--shadow) !important; text-align:center !important; }
+        /* 고객 모달 지표칩: 모바일에서 값이 한 줄에 들어가도록 폰트·여백 축소 */
+        #cust-metrics > div { min-width:0 !important; padding:7px 5px !important; overflow:hidden; }
+        #cust-metrics > div > div:first-child { font-size:10px !important; line-height:1.2; }
+        #cust-metrics > div > div:last-child { font-size:13px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         #sales-metrics > div > div:last-child { font-size:13px !important; white-space:nowrap; }
         #sales-metrics > div > div:last-child span { font-size:10px !important; }
     </style>
@@ -6257,7 +6261,7 @@
             const body = document.getElementById('cust-top-body');
             if (!body) return;
             const s = _custModalTop.sort;
-            const rows = [..._custModalTop.rows].sort((a,b) => s.dir === 'asc' ? (a[s.key]-b[s.key]) : (b[s.key]-a[s.key])).slice(0, 10);
+            const rows = [..._custModalTop.rows].sort((a,b) => s.dir === 'asc' ? (a[s.key]-b[s.key]) : (b[s.key]-a[s.key])).slice(0, 5);
             if (head) head.innerHTML = `<tr style="font-size:11px; color:var(--text-sub);">
                 <th style="padding:4px; text-align:left;">상품명</th>
                 <th style="padding:4px; text-align:right; cursor:pointer; white-space:nowrap;" onclick="sortCustTop('qty')">수량${_custTopArrow('qty')}</th>
@@ -6407,20 +6411,24 @@
             modal.innerHTML = `
                 <div class="summary-modal-content">
                     <div class="summary-modal-header" style="align-items:flex-start;">
-                        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; min-width:0;">
-                            <h2 style="margin:0;">👤 ${name || '고객'}</h2>
-                            <span style="font-size:12px; font-weight:800; color:${gradeColor};">${grade}</span>
-                            ${gender ? `<span style="font-size:12px; font-weight:700; color:#334155;">${genderIcon} ${gender}</span>` : ''}
-                            ${ageGroup ? `<span style="font-size:12px; font-weight:700; color:#334155;">${ageGroup}</span>` : ''}
-                            ${cleanPhone ? `<a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:2px 8px; border-radius:6px;">📞 전화</a>
-                            <button type="button" onclick="copyTextAndSms(decodeURIComponent('${encodeURIComponent('[모켓] '+(name||'')+'님, 안녕하세요! 😊')}'), '${cleanPhone}', '고객 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:2px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>` : ''}
+                        <div style="min-width:0;">
+                            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;">
+                                <h2 style="margin:0;"><span style="font-size:12px; vertical-align:middle;">👤</span> ${name || '고객'}</h2>
+                                ${cleanPhone ? `<a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:2px 8px; border-radius:6px;">📞 전화</a>
+                                <button type="button" onclick="copyTextAndSms(decodeURIComponent('${encodeURIComponent('[모켓] '+(name||'')+'님, 안녕하세요! 😊')}'), '${cleanPhone}', '고객 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:2px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>` : ''}
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:5px 8px; margin-top:6px;">
+                                <span style="font-size:12px; font-weight:800; color:${gradeColor};">${grade}</span>
+                                ${gender ? `<span style="font-size:12px; font-weight:700; color:#334155;">${genderIcon} ${gender}</span>` : ''}
+                                ${ageGroup ? `<span style="font-size:12px; font-weight:700; color:#334155;">🎂 ${ageGroup}</span>` : ''}
+                            </div>
                         </div>
                         <button class="summary-modal-close" onclick="closeSummaryModal()">&times;</button>
                     </div>
                     <div class="summary-modal-body">
-                        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px;">
+                        <div id="cust-metrics" style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:12px;">
                             ${salesStatChip('총 구매액', totalAmount.toLocaleString()+'원', '#059669')}
-                            ${salesStatChip('주문 횟수', orderCount+'회')}
+                            ${salesStatChip('주문수 (배달/픽업)', orderCount+'회 ('+delDays.size+'/'+pickDays.size+')')}
                             ${salesStatChip('1회 평균', avg.toLocaleString()+'원')}
                         </div>
 
@@ -6428,7 +6436,6 @@
                             <span>첫 방문일 <b style="color:var(--text-main);">${fmtY(firstD)}</b></span>
                             <span>마지막 방문일 <b style="color:var(--text-main);">${fmtY(lastD)}</b>${daysSince!==null?` <span style="color:${daysSince>=30?'#dc2626':'#94a3b8'};">(${daysSince}일 전)</span>`:''}</span>
                             <span>방문빈도 <b style="color:var(--text-main);">${freqText}</b></span>
-                            <span>배달/픽업 <b style="color:#3b82f6;">${delDays.size}</b>/<b style="color:#7c3aed;">${pickDays.size}</b> (배달 ${delRatio}%)</span>
                         </div>
 
                         ${pending.length ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
