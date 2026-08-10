@@ -68,9 +68,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
+            position: static;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
 
@@ -1999,7 +1997,7 @@
     </div>
 
     <!-- [신규] 관리자 메뉴 대분류 탭 -->
-    <div class="admin-nav-tabs no-print" style="max-width: 1200px; margin: 15px auto 0 auto; padding: 0 15px;">
+    <div class="admin-nav-tabs no-print" style="position: sticky; top: 0; z-index: 1000; background: #f8fafc; max-width: 1200px; margin: 0 auto; padding: 10px 15px 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
         <div class="segment-control four-cols" style="display: grid; grid-template-columns: repeat(4, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px;">
             <div class="segment-btn admin-nav-btn active" data-tab="orders" onclick="switchAdminTab('orders')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 주문 관리</div>
             <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🛒 상품 관리 <span id="product-count" style="display: none;">(0)</span></div>
@@ -2125,7 +2123,7 @@
     <div id="tab-admin-products">
         <!-- 탭 2: 상품 등록 영역 -->
         <div id="tab-admin-product-upload" class="admin-tab-content" style="display: none;">
-            <div class="container" style="max-width: 480px; margin: 0 auto;">
+            <div class="container" style="max-width: 760px; margin: 0 auto;">
                 <!-- [신규] 상품 관리 하위 탭: 상품 목록 / 상품 등록 -->
                 <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:10px;">
                     <div class="segment-btn" onclick="switchAdminTab('product-list')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📋 상품 목록</div>
@@ -2238,7 +2236,7 @@
 
         <!-- 탭 3: 상품 목록 영역 -->
         <div id="tab-admin-product-list" class="admin-tab-content" style="display: none;">
-            <div class="container" style="max-width: 480px; margin: 0 auto;">
+            <div class="container" style="max-width: 1000px; margin: 0 auto;">
                 <!-- [신규] 상품 관리 하위 탭: 상품 목록 / 상품 등록 -->
                 <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:10px;">
                     <div class="segment-btn active" onclick="switchAdminTab('product-list')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📋 상품 목록</div>
@@ -3091,8 +3089,10 @@
 
         // 2. 월/일 분류 탭 구축
         function buildDateTabs(isUserAction = false) {
+            // [신규] 탭/목록 계산 전에 보관함을 rawOrders에 항상 병합(멱등) — 실시간 갱신으로 빠져도 과거 달이 유지되도록
+            if (typeof mergeArchiveIntoRawOrders === 'function') mergeArchiveIntoRawOrders();
             const searchVal = document.getElementById('searchInput').value.trim();
-            
+
             // 1. 모든 고유 년도 추출
             const years = new Set();
             rawOrders.forEach(item => {
@@ -3208,30 +3208,35 @@
                 }
             }
 
-            // [수정] 월 탭은 현재월 + 직전 2개월 + 기타만 표시(현재 연도 기준). 다른 연도는 데이터의 월 전체.
+            // [변경] 캐시된 과거 주문(보관함 포함)의 '데이터가 있는 모든 달'을 탭으로 노출 (다운로드 없이 rawOrders에서 산출)
             let displayMonths;
-            const _nowYearStr = new Date().getFullYear() + "년";
-            if (currentYear === _nowYearStr) {
-                const nowMonthNum = new Date().getMonth() + 1;
-                displayMonths = [];
-                // [변경] 최근 3개월 중 실제 데이터가 있는 달만 표시(아카이브만 있어 비어있는 달 제외)
-                for (let i = 0; i < 3; i++) { const mn = nowMonthNum - i; if (mn >= 1 && sortedMonths.includes(mn + "월")) displayMonths.push(mn + "월"); }
+            {
+                const _allM = new Set();
+                rawOrders.forEach(it => {
+                    const info = getOrderDateInfo(it);
+                    if (info.dateStr && info.dateStr !== "기타" && (info.dateStr.split('-')[0] + "년") === currentYear) _allM.add(info.month);
+                });
+                displayMonths = [..._allM].sort((a, b) => parseInt(b) - parseInt(a)); // 최신월 → 과거월
+                if (displayMonths.length === 0) displayMonths = [...sortedMonths];
                 if (currentMonth && currentMonth !== "기타" && currentMonth !== "전체" && currentMonth !== "직접" && !displayMonths.includes(currentMonth)) displayMonths.unshift(currentMonth);
-            } else {
-                displayMonths = sortedMonths;
             }
             displayMonths = displayMonths.filter(m => m !== "기타"); // [변경] 기타 제거
-            displayMonths.unshift("전체"); // [신규] 월 탭 맨 앞 '전체'(해당 연도 전부)
-            displayMonths.push("직접"); // [변경] 기타 대신 직접 기간입력
+            displayMonths.push("직접"); // [변경] 전체 버튼 제거 — 월 토글로 대체 / 직접 기간입력만 유지
             displayMonths.forEach(month => {
                 const btn = document.createElement('button');
                 btn.className = `main-tab-btn ${month === currentMonth ? 'active' : ''}`;
                 btn.innerText = (month === "직접") ? "📅 직접" : month;
                 btn.onclick = () => {
-                    currentMonth = month;
-                    // [신규] 현재달은 오늘(특정일) 기본, 지난달/다른 달은 '전체'(그 달 전부) 기본
-                    const isCurMonth = (currentYear === (new Date().getFullYear() + "년") && month === ((new Date().getMonth() + 1) + "월"));
-                    currentDay = (month === "전체") ? "" : (isCurMonth ? "" : "전체");
+                    if (month !== "직접" && currentMonth === month) {
+                        // [변경] 토글: 같은 월 재클릭 시 해제 → 그 연도 전체
+                        currentMonth = "전체";
+                        currentDay = "";
+                    } else {
+                        currentMonth = month;
+                        // [신규] 현재달은 오늘(특정일) 기본, 지난달/다른 달은 '전체'(그 달 전부) 기본
+                        const isCurMonth = (currentYear === (new Date().getFullYear() + "년") && month === ((new Date().getMonth() + 1) + "월"));
+                        currentDay = (isCurMonth ? "" : "전체");
+                    }
                     buildDateTabs(true); // 일 탭 재구성 (사용자 액션 플래그 true)
                 };
                 monthContainer.appendChild(btn);
@@ -3295,12 +3300,7 @@
                 currentDay = sortedDays.includes(todayDayStr) ? todayDayStr : (sortedDays[0] || "");
             }
 
-            // [신규] '전체'(그 달 전부) 일 탭 — 맨 앞
-            const allDayBtn = document.createElement('button');
-            allDayBtn.className = `date-btn ${currentDay === "전체" ? 'active' : ''}`;
-            allDayBtn.innerText = "전체";
-            allDayBtn.onclick = () => { currentDay = "전체"; buildDayTabs(true); };
-            dayContainer.appendChild(allDayBtn);
+            // [변경] '전체' 일 탭 제거 — 날짜 토글로 대체(선택된 날짜 재클릭 시 해제 → 그 달 전체)
 
             // [신규] 현재 보고 있는 월/연도가 실제 오늘과 같을 때만 '오늘' 버튼 표시 (다른 달의 같은 날짜 오인 방지)
             const nowY = todayObj.getFullYear() + "년";
@@ -3318,7 +3318,7 @@
                     btn.title = '오늘';
                 }
                 btn.onclick = () => {
-                    currentDay = day;
+                    currentDay = (currentDay === day) ? "전체" : day; // [변경] 토글: 같은 날짜 재클릭 시 해제 → 그 달 전체
                     buildDayTabs(true); // 사용자 액션 플래그 true
                 };
                 dayContainer.appendChild(btn);
@@ -3498,6 +3498,8 @@
         }
 
         function renderFilteredOrders() {
+            // [신규] 렌더 직전 보관함 병합(멱등) — 과거 달/직접 기간 선택 시 목록이 비지 않도록
+            if (typeof mergeArchiveIntoRawOrders === 'function') mergeArchiveIntoRawOrders();
             window.deliveryPhotos = {};
             try {
                 const search = document.getElementById('searchInput').value.toLowerCase().trim();
@@ -3745,7 +3747,12 @@
                         listContainer.appendChild(header);
                         lastDateHeader = headerKey;
                     }
-                    const customerItems = customer.items;
+                    // [신규] 카드 내 상품: 취소된 항목은 아래로 (원본 보존 위해 복사 후 안정 정렬)
+                    const customerItems = [...customer.items].sort((a, b) => {
+                        const aC = (a.canceled === true || a.canceled === "true" || String(a.canceled).toUpperCase() === "TRUE");
+                        const bC = (b.canceled === true || b.canceled === "true" || String(b.canceled).toUpperCase() === "TRUE");
+                        return (aC === bC) ? 0 : (aC ? 1 : -1);
+                    });
                     const allSelected = customerItems.every(it => selectedItems.has(customer.phone + "|" + it.orderKey));
                     const anySelected = customerItems.some(it => selectedItems.has(customer.phone + "|" + it.orderKey));
                     
@@ -3956,13 +3963,13 @@
                                     <span class="total-price">${customer.totalPrice.toLocaleString()}원</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 6px;">
-                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid ${isDelivery ? 'var(--purple)' : 'var(--primary)'}; color: ${isDelivery ? 'var(--purple)' : 'var(--primary)'}; background: white;" onclick="toggleShippingMethod('${customer.phone}', '${orderKeysStr}', '${isDelivery ? '매장픽업' : '배달주문'}')">
-                                        ${isDelivery ? '📍 픽업전환' : '🚚 배달전환'}
+                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid ${isDelivery ? 'var(--purple)' : 'var(--primary)'}; color: ${isDelivery ? 'var(--purple)' : 'var(--primary)'}; background: white; white-space: nowrap;" onclick="toggleShippingMethod('${customer.phone}', '${orderKeysStr}', '${isDelivery ? '매장픽업' : '배달주문'}')">
+                                        ${isDelivery ? '📍 전환' : '🚚 전환'}
                                     </button>
-                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #d97706; color: #d97706; background: white;" onclick="changeCustomerOrderDate('${customer.phone}', '${orderKeysStr}', '${isDelivery ? '배달일' : '픽업일'}')">
-                                        📅 날짜변경
+                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #d97706; color: #d97706; background: white; white-space: nowrap;" onclick="changeCustomerOrderDate('${customer.phone}', '${orderKeysStr}', '${isDelivery ? '배달일' : '픽업일'}')">
+                                        📅 변경
                                     </button>
-                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #64748b; color: #475569; background: white;" onclick="openMemoModal('${customer.name}', '${customer.phone}', '${orderTime}')">📝 메모</button>
+                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #64748b; color: #475569; background: white; white-space: nowrap;" onclick="openMemoModal('${customer.name}', '${customer.phone}', '${orderTime}')">📝 메모</button>
                                 </div>
                             </div>
                             ${printableFixedMemoHtml ? `<div style="display:flex; flex-direction:column; width:100%; gap:6px; margin-top:8px;">${printableFixedMemoHtml}</div>` : ''}
@@ -4415,6 +4422,43 @@
                 patchBody.deliveryPhotoTime = null;
             }
             return patchBody;
+        }
+
+        // [신규] 주문관리에서 취소↔활성 전이 시 전역 재고 조정(복구/재차감).
+        // 상품의 실제 matchKey 기준 키로 계산해야 실재고에 반영됨. 취소상태 변화가 있을 때만 조정 → 중복 복구 방지.
+        async function applyStockDeltaForCancel(order, wasCanceled, willBeCanceled){
+            try {
+                wasCanceled = !!wasCanceled; willBeCanceled = !!willBeCanceled;
+                if (wasCanceled === willBeCanceled) return;                 // 취소상태 변화 없음 → 조정 안 함
+                const rawName = String((order && order.item) || '').replace(/\[취소\]/g, '').replace(/['"]/g, '').trim();
+                if (!rawName || rawName === '배달비') return;                // 배달비 등 재고 항목 아님
+                const prod = (typeof uploadProducts !== 'undefined' ? uploadProducts : []).find(p => p && (p.name === rawName || String(p.name).replace(/['"]/g, '') === rawName));
+                if (prod){
+                    const baseUnlimited = (prod.stock === '' || prod.stock == null || String(prod.stock).trim() === '무제한');
+                    if (baseUnlimited) return;                              // 무제한 상품은 조정 불필요
+                }
+                const keyMatchKey = (order.matchKey || (prod && prod.matchKey) || order.date || order.pickupDate || '');
+                const keyName = (prod && prod.name) ? prod.name : rawName;
+                const adjKey = fGetAdjKey(keyMatchKey, keyName);
+                const qty = parseInt(order.qty) || 1;
+                const delta = willBeCanceled ? qty : -qty;                  // 취소→+복구, 취소해제→-재차감
+                for (let attempt = 1; attempt <= 5; attempt++){
+                    try {
+                        const r = await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json?t=${Date.now()}`);
+                        if (!r.ok) throw new Error('읽기 실패');
+                        const cur = await r.json();
+                        if (cur === 'unlimited' || (cur !== null && String(cur).startsWith('unlimited'))) return; // 무제한
+                        const next = (parseInt(cur) || 0) + delta;
+                        const w = await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
+                            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next)
+                        });
+                        if (!w.ok) throw new Error('쓰기 실패');
+                        if (typeof uploadGlobalAdjustments !== 'undefined' && uploadGlobalAdjustments) uploadGlobalAdjustments[adjKey] = next;
+                        return;
+                    } catch(e){ await new Promise(res => setTimeout(res, 300 * attempt)); }
+                }
+                console.error('취소 재고 조정 최종 실패:', adjKey);
+            } catch(e){ console.error('applyStockDeltaForCancel 오류:', e); }
         }
 
         // 수령 방법 (배달 <-> 픽업) 전환 처리 함수
@@ -5227,11 +5271,13 @@
                 showToast(`상태를 [${newStatus}]로 변경 완료했습니다.`);
                 
                 // 로컬 데이터 갱신
+                const _wasCanceledS = target && (target.canceled === true || target.canceled === "true" || String(target.canceled).toUpperCase() === "TRUE");
                 if (target) {
                     Object.assign(target, patchBody);
                     syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
+                    await applyStockDeltaForCancel(target, _wasCanceledS, newStatus === '취소'); // [신규] 취소↔활성 시 재고 복구/재차감
                 }
-                
+
                 renderFilteredOrders();
 
                 if (newStatus === '취소' && target) {
@@ -5278,11 +5324,14 @@
                 showToast("이 고객의 모든 상품 상태가 변경되었습니다.");
                 
                 // 로컬 데이터 일괄 갱신
+                const _wasCanceledMap = customerItems.map(it => it && (it.canceled === true || it.canceled === "true" || String(it.canceled).toUpperCase() === "TRUE"));
                 customerItems.forEach(it => {
                     Object.assign(it, patchBody);
                     syncStatusToGoogleSheets(it.phone, it.timestamp, it.item, newStatus);
                 });
-                
+                // [신규] 취소↔활성 시 재고 복구/재차감 (같은 상품 경합 방지 위해 순차 처리)
+                for (let i = 0; i < customerItems.length; i++) await applyStockDeltaForCancel(customerItems[i], _wasCanceledMap[i], newStatus === '취소');
+
                 renderFilteredOrders();
 
                 if (newStatus === '취소') {
@@ -5326,7 +5375,7 @@
                     const isReceived = target && (target.received === true || target.received === "true" || String(target.received).toUpperCase() === "TRUE");
                     if (isCanceled || isDelivered || isReceived) { skippedDone++; return; }
                 }
-                itemsToProcess.push({ phone, orderKey, target });
+                itemsToProcess.push({ phone, orderKey, target, wasCanceled: isCanceled });
             });
 
             if (itemsToProcess.length === 0) {
@@ -5371,7 +5420,10 @@
                 });
                 
                 await Promise.all(promises);
-                
+
+                // [신규] 취소↔활성 전이 시 재고 복구/재차감 (같은 상품 경합 방지 위해 순차 처리)
+                for (const it of itemsToProcess) await applyStockDeltaForCancel(it.target, it.wasCanceled, newStatus === '취소');
+
                 showToast(`${itemsToProcess.length}개 주문 항목의 상태를 일괄 변경했습니다.` + (skippedDone > 0 ? ` (완료/취소 ${skippedDone}건 제외)` : ``));
                 selectedItems.clear();
                 updateSelectionCountText();
@@ -6432,8 +6484,15 @@
                 await Promise.all(refs.map(r => fetch(`${FIREBASE_DB_URL}orders/${encodeURIComponent(r.pk)}/${encodeURIComponent(r.ok)}.json`, {
                     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody)
                 })));
-                // 로컬 rawOrders 갱신
-                refs.forEach(r => { const t = (rawOrders || []).find(o => (o.firebasePhoneKey === r.pk || String(o.phone || '').replace(/\D/g, '') === r.pk) && o.orderKey === r.ok); if (t) Object.assign(t, patchBody); });
+                // 로컬 rawOrders 갱신 + [신규] 취소↔활성 시 재고 복구/재차감(순차)
+                for (const r of refs){
+                    const t = (rawOrders || []).find(o => (o.firebasePhoneKey === r.pk || String(o.phone || '').replace(/\D/g, '') === r.pk) && o.orderKey === r.ok);
+                    if (t){
+                        const _wasCanceledO = (t.canceled === true || t.canceled === "true" || String(t.canceled).toUpperCase() === "TRUE");
+                        Object.assign(t, patchBody);
+                        await applyStockDeltaForCancel(t, _wasCanceledO, newStatus === '취소');
+                    }
+                }
                 showToast(`[${newStatus === '픽업' ? '픽업완료' : newStatus}]로 변경했습니다.`);
                 renderFilteredOrders();
                 closeSummaryModal();
@@ -7038,12 +7097,14 @@
             const dates = [...dateSet].sort(); // 오름차순 (오늘 → 미래)
             const cur = salesUpcomingRange;
             const tab = (v, label) => `<button type="button" data-sales-uprange="${v}" onclick="setSalesUpcomingRange('${v}')" class="sales-toggle-btn${cur === v ? ' active' : ''}" style="flex-shrink:0;">${label}</button>`;
-            let html = tab('today_after', '전체');
+            let html = ''; // [변경] '전체' 버튼 제거 — 날짜 토글로 대체(아무 날짜도 선택 안 하면 오늘 이후 전체)
             dates.forEach(ds => { html += tab(ds, fmtMD(ds)); });
             bar.innerHTML = html;
         }
 
         function setSalesUpcomingRange(mode){
+            // [신규] 날짜 탭 토글: 이미 선택된 날짜를 다시 누르면 해제 → 전체(오늘 이후)
+            if (/^\d{4}-\d{2}-\d{2}$/.test(mode) && salesUpcomingRange === mode) mode = 'today_after';
             salesUpcomingRange = mode;
             document.querySelectorAll('[data-sales-uprange]').forEach(b => b.classList.toggle('active', b.dataset.salesUprange === mode));
             const rangeBox = document.getElementById('sales-upcoming-range');
@@ -7135,6 +7196,8 @@
             if (raw){
                 try { salesArchiveOrders = salesFlattenArchive(raw); salesArchiveLoaded = salesArchiveOrders.length > 0; } catch(e){ salesArchiveOrders = []; salesArchiveLoaded = false; }
                 try { archivedOrdersCache = flattenArchiveForOrders(raw); isArchiveLoaded = true; mergeArchiveIntoRawOrders(); } catch(e){}
+                // [신규] 보관함 병합 후 주문내역 월/일 탭 재생성(과거 달이 뒤늦게 노출되도록)
+                try { if (typeof buildDateTabs === 'function' && Array.isArray(rawOrders) && rawOrders.length && document.getElementById('month-tabs')) buildDateTabs(); } catch(e){}
             }
             updateSalesArchiveStatus();
         }
@@ -7178,7 +7241,9 @@
                 salesArchiveOrders = salesFlattenArchive(raw); salesArchiveLoaded = salesArchiveOrders.length > 0;
                 archivedOrdersCache = flattenArchiveForOrders(raw); isArchiveLoaded = true; mergeArchiveIntoRawOrders();
                 updateSalesArchiveStatus();
-                if (typeof renderFilteredOrders === 'function') renderFilteredOrders();
+                // [변경] 탭까지 재생성(과거 달 노출). buildDateTabs가 내부에서 목록도 다시 렌더
+                if (typeof buildDateTabs === 'function' && document.getElementById('month-tabs')) buildDateTabs();
+                else if (typeof renderFilteredOrders === 'function') renderFilteredOrders();
                 const salesTabEl = document.getElementById('tab-admin-sales');
                 if (typeof renderSalesTab === 'function' && salesTabEl && salesTabEl.style.display !== 'none') renderSalesTab();
                 if (typeof showToast === 'function') showToast('전체 데이터를 갱신했습니다. ✅');
@@ -7481,7 +7546,7 @@
             const w = ['일','월','화','수','목','금','토'];
             const items = [];
             if (salesUnit === 'day'){
-                for (let i=0;i<7;i++){ const d=new Date(today); d.setDate(d.getDate()-i); items.push({ idx:i, label:`${d.getMonth()+1}/${d.getDate()}(${w[d.getDay()]})` }); }
+                for (let i=0;i<7;i++){ const d=new Date(today); d.setDate(d.getDate()-i); items.push({ idx:i, label:`${d.getMonth()+1}/${d.getDate()}(${w[d.getDay()]})`, isToday:(i===0) }); }
             } else if (salesUnit === 'week'){
                 const mon=new Date(today); mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
                 for (let i=0;i<8;i++){ const s=new Date(mon); s.setDate(s.getDate()-i*7); const e=new Date(s); e.setDate(e.getDate()+6); items.push({ idx:i, label:`${s.getMonth()+1}/${s.getDate()}~${e.getMonth()+1}/${e.getDate()}` }); }
@@ -7497,7 +7562,7 @@
                 try { getSalesSourceOrders().forEach(o => { const d = salesOrderDate(o); if (d && !isNaN(d.getTime()) && d.getFullYear() >= 2000) yset.add(d.getFullYear()); }); } catch(e){}
                 [...yset].sort((a,b)=>b-a).forEach(y => items.push({ idx: ty - y, label: `${y}년` }));
             }
-            const ibtn = (it) => `<button type="button" onclick="setSalesUnitIdx(${it.idx})" class="sales-toggle-btn${salesUnitIdx===it.idx?' active':''}" style="flex:0 0 auto; padding:6px 10px; font-size:12px; white-space:nowrap;">${it.label}</button>`;
+            const ibtn = (it) => `<button type="button" onclick="setSalesUnitIdx(${it.idx})" class="sales-toggle-btn${salesUnitIdx===it.idx?' active':''}" style="flex:0 0 auto; padding:6px 10px; font-size:12px; white-space:nowrap;${it.isToday ? ' border:2.5px solid #f59e0b;' : ''}"${it.isToday ? ' title="오늘"' : ''}>${it.label}</button>`;
             return items.map(ibtn).join('');
         }
 
@@ -8277,7 +8342,7 @@
             } else if (type === 'inventory') {
                 uploadManageTab = 'inv-all';
             } else {
-                uploadManageTab = 'all';
+                uploadManageTab = 'all'; // [변경] 공동구매 기본: 아무 날짜도 선택 안 함 = 전체
             }
             
             // 다른 카테고리로 이동 시 선택 상태를 기억하도록 초기화 로직 제거
@@ -8382,20 +8447,25 @@
                 const dates = [...dateSet].sort().reverse(); // 가장 먼 날짜 먼저
                 const _now = new Date();
                 const _todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
-                const cats = [['all', '전체']];
-                dates.filter(d => d >= _todayStr).forEach(d => cats.push([d, fmtMD(d)])); // 오늘 이후(포함) 날짜만 개별 탭
-                if (dates.some(d => d < _todayStr)) cats.push(['_이전', '이전']); // 오늘 이전 날짜들은 '이전' 하나로 모음
-                container.innerHTML = cats.map(([key, label]) =>
-                    `<div class="segment-btn ${uploadManageTab === key ? 'active' : ''}" data-manage-tab="${key}" onclick="selectManageTab('${key}')" style="flex:0 0 auto; min-width:52px; text-align:center; padding:10px 12px; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px; white-space:nowrap;">${label}</div>`
-                ).join('');
+                const cats = []; // [변경] 전체·이전 버튼 제거 — 날짜 토글로 대체(아무것도 선택 안 하면 전체)
+                dates.filter(d => d >= _todayStr).forEach(d => cats.push([d, fmtMD(d)])); // 오늘 이후(포함) 날짜별 개별 탭
+                container.innerHTML = cats.map(([key, label]) => {
+                    const isToday = (key === _todayStr); // [신규] 오늘 날짜 테두리
+                    return `<div class="segment-btn ${uploadManageTab === key ? 'active' : ''}" data-manage-tab="${key}" onclick="selectManageTab('${key}')" style="flex:0 0 auto; min-width:52px; text-align:center; padding:10px 12px; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px; white-space:nowrap;${isToday ? ' border:2.5px solid #f59e0b;' : ''}"${isToday ? ' title="오늘"' : ''}>${label}</div>`;
+                }).join('');
             }
         }
 
         function selectManageTab(tab) {
-            uploadManageTab = tab;
+            // [신규] 공동구매(예약) 날짜/이전 탭은 토글: 이미 선택된 탭을 다시 누르면 해제 → 전체
+            if (uploadManageDeliveryType === 'reserve' && uploadManageTab === tab) {
+                uploadManageTab = 'all';
+            } else {
+                uploadManageTab = tab;
+            }
             uploadSubTab = "all";
             document.querySelectorAll('#manage-category-tabs .segment-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.manageTab === tab);
+                btn.classList.toggle('active', btn.dataset.manageTab === uploadManageTab); // [수정] 토글 해제 시 눌린 표시도 풀리도록 실제 선택값 기준
             });
             // 다른 카테고리로 이동 시 선택 상태를 기억하도록 초기화 로직 제거
             // uploadSelectedProductIndices.clear();
@@ -9352,13 +9422,12 @@
                     if (prod.name === "배달비") return false;
                     if (!isReserveListProduct(prod)) return false;
                     if (uploadManageTab === 'all') return true;
-                    if (uploadManageTab === '_이전') { // 오늘 이전 날짜 상품 모아보기
-                        const _n = new Date();
-                        const _t = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`;
-                        const gd = getReserveGroupDate(prod);
-                        return gd && gd < _t;
-                    }
-                    return getReserveGroupDate(prod) === uploadManageTab;
+                    const _n = new Date();
+                    const _t = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`;
+                    const gd = getReserveGroupDate(prod);
+                    if (uploadManageTab === '_upcoming') return gd && gd >= _t; // 오늘 포함 이후 날짜 상품 전부
+                    if (uploadManageTab === '_이전') return gd && gd < _t;       // 오늘 이전 날짜 상품 모아보기
+                    return gd === uploadManageTab;
                 });
             }
 
@@ -10183,7 +10252,8 @@
             const mKey = prod.matchKey || "";
             if (mKey.includes("냉동") || mKey.includes("냉장") || mKey.includes("상온") || mKey.includes("실온") || mKey.includes("상시판매") || mKey.includes("현장판매")) {
                 tabType = "onsite";
-            } else if (mKey.includes("예약") && (mKey.includes("과일") || mKey.includes("야채") || mKey.includes("기타"))) {
+            } else if (mKey.includes("과일") || mKey.includes("야채") || mKey.includes("기타")) {
+                // [수정] 과채류 matchKey에서 '_예약' 접미사 제거(2026-08-09) 이후 대응 — '예약' 포함 여부와 무관하게 과일탭으로 인식
                 tabType = "fruit";
             } else if (mKey.includes("코스트코")) {
                 tabType = "costco";
