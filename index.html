@@ -3898,7 +3898,7 @@
                                 <div class="customer-info-group" style="display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0;">
                                     <!-- 첫째줄: 닉네임, 전화번호 -->
                                     <div class="info-row-1" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                        <span class="customer-name" style="font-size: 15px; font-weight: 800; color: var(--text);">${customer.name}</span>
+                                        <button type="button" class="customer-name no-print" onclick="showCustomerCardModal('${encodeURIComponent(customer.phone||'')}','${encodeURIComponent(customer.name||'')}')" style="font-size: 15px; font-weight: 800; color: var(--primary); background:none; border:none; padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:3px;" title="이 고객 주문 내역 보기">${customer.name}</button>
                                         <a href="#" onclick="handlePhoneClick(event, '${customer.phone}')" class="customer-phone" style="font-size: 13px; color: var(--blue); text-decoration: none; font-weight: 700; margin-left: 0;">${customer.phone}</a>
                                     </div>
                                     
@@ -4354,11 +4354,14 @@
                 const [phone, orderKey] = key.split('|');
                 const item = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
                 if (item) {
+                    // [신규] 취소된 항목은 수량·합계에서 제외
+                    const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                    if (isCanceled) return;
                     totalQty += parseInt(item.qty || 0);
                     totalAmount += parseInt(item.total || 0);
                 }
             });
-            
+
             const qtyEl = document.getElementById('batch-total-qty');
             const amountEl = document.getElementById('batch-total-amount');
             if (qtyEl) qtyEl.innerText = totalQty.toLocaleString();
@@ -6298,7 +6301,7 @@
                 g.items.add(String(o.item||''));
                 if (!isDone(o)) g.allDone = false;
             });
-            const recentDates = [...dateGroups.values()].sort((a,b)=>b.ts-a.ts).slice(0,6);
+            const recentDates = [...dateGroups.values()].sort((a,b)=>b.ts-a.ts).slice(0,10);
 
             // 단골 등급
             let grade = '🌱 신규', gradeColor = '#64748b';
