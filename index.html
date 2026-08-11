@@ -3441,7 +3441,7 @@
             const c1 = document.getElementById('order-status-tabs');
             const c2 = document.getElementById('order-status-tabs2');
             if (!c1) return;
-            const sets = { all: new Set(), '대기': new Set(), '입고': new Set(), '미픽업': new Set(), '미배달': new Set(), '취소': new Set(), '배달미입금': new Set(), '픽업미입금': new Set(), _총픽업: new Set(), _총배달: new Set(), _사다픽업총: new Set() };
+            const sets = { all: new Set(), '대기': new Set(), '입고': new Set(), '미픽업': new Set(), '미배달': new Set(), '취소': new Set(), '배달미입금': new Set(), '픽업미입금': new Set(), '배달완료': new Set(), '픽업': new Set(), _총픽업: new Set(), _총배달: new Set(), _사다픽업총: new Set() };
             (items || []).forEach(item => {
                 const status = item.status || '대기';
                 const asm = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
@@ -3460,6 +3460,9 @@
                 if (asm === '배달주문' && !canceled) sets['_총배달'].add(cardKey); // 전체 배달주문(취소 제외)
                 if (asm === '매장픽업' && !canceled && status !== '픽업') sets['미픽업'].add(cardKey);
                 if (asm === '배달주문' && !canceled && status !== '배달완료') sets['미배달'].add(cardKey);
+                // [신규] 배달/픽업 3단 토글의 2단계(완료) 개수 — 상태 필터(filterStatus)와 동일 기준으로 계산
+                if (status === '배달완료') sets['배달완료'].add(cardKey);
+                if (status === '픽업') sets['픽업'].add(cardKey);
                 if (asm === '배달주문' && !paid && !canceled && status !== '배달완료') sets['배달미입금'].add(cardKey);
                 // [변경] 픽미 = [사다드림] 픽업 상품 기준. 미입금/전체 형식으로 표시
                 if (asm === '매장픽업' && !canceled && isSada) sets['_사다픽업총'].add(cardKey); // 전체 사다드림 픽업(취소 제외)
@@ -3469,29 +3472,51 @@
             Object.keys(sets).forEach(k => counts[k] = sets[k].size);
             const cur = document.getElementById('filterStatus').value;
             const COLORS = { all:'#475569', '대기':'#94a3b8', '입고':'#d97706', '미픽업':'#7c3aed', '미배달':'#059669', '취소':'#dc2626', '배달미입금':'#dc2626', '픽업미입금':'#db2777' };
+            // [공통] 탭 버튼 마크업 — next는 눌렀을 때 적용할 상태값
+            const tabBtnHtml = ({ active, c, label, numText, zero, next, fill, title }) => {
+                const labelColor = active ? '#fff' : (zero ? '#94a3b8' : 'var(--text-main)');
+                // 숫자: 박스 없이 텍스트만
+                const numColor = active ? '#fff' : (zero ? '#cbd5e1' : c);
+                const flexRule = fill ? 'flex:1 1 0; min-width:0;' : 'flex:0 0 auto;';
+                return `<button type="button" onclick="selectOrderStatus('${next}')"${title ? ` title="${title}"` : ''} style="${flexRule} display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; white-space:nowrap; padding:8px 2px; border-radius:8px; border:1.5px solid ${active ? c : 'var(--border)'}; background:${active ? c : '#fff'}; cursor:pointer; box-shadow:${active ? '0 2px 7px '+c+'44' : 'none'}; transition:all .12s;">
+                    <span style="font-size:12px; font-weight:800; color:${labelColor}; line-height:1;">${label}</span>
+                    <span style="font-size:16px; font-weight:900; color:${numColor}; line-height:1;">${numText}</span>
+                </button>`;
+            };
             const renderTab = (fill) => ([v, label]) => {
-                const active = (cur === v);
-                const c = COLORS[v] || 'var(--primary)';
                 const cnt = counts[v];
-                const zero = (cnt === 0);
                 // 미픽/미배는 "미완료/전체" 형식으로 표시 (예: 4/4)
                 const numText = (v === '미픽업') ? `${cnt}/${counts['_총픽업']}`
                               : (v === '미배달') ? `${cnt}/${counts['_총배달']}`
                               : (v === '배달미입금') ? `${cnt}/${counts['_총배달']}`
                               : (v === '픽업미입금') ? `${cnt}/${counts['_사다픽업총']}`
                               : `${cnt}`;
-                const labelColor = active ? '#fff' : (zero ? '#94a3b8' : 'var(--text-main)');
-                // 숫자: 박스 없이 텍스트만
-                const numColor = active ? '#fff' : (zero ? '#cbd5e1' : c);
-                const flexRule = fill ? 'flex:1 1 0; min-width:0;' : 'flex:0 0 auto;';
-                return `<button type="button" onclick="selectOrderStatus('${v}')" style="${flexRule} display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; white-space:nowrap; padding:8px 2px; border-radius:8px; border:1.5px solid ${active ? c : 'var(--border)'}; background:${active ? c : '#fff'}; cursor:pointer; box-shadow:${active ? '0 2px 7px '+c+'44' : 'none'}; transition:all .12s;">
-                    <span style="font-size:12px; font-weight:800; color:${labelColor}; line-height:1;">${label}</span>
-                    <span style="font-size:16px; font-weight:900; color:${numColor}; line-height:1;">${numText}</span>
-                </button>`;
+                return tabBtnHtml({ active: (cur === v), c: COLORS[v] || 'var(--primary)', label, numText, zero: (cnt === 0), next: v, fill });
+            };
+            // [신규] 배달·픽업은 3단 토글 버튼: 미완료 → 완료 → 전체(해제)
+            // 라벨은 지금 무엇을 보고 있는지를 나타낸다 (배달/배완, 픽업/픽완). 숫자는 항상 "해당 건수/전체 건수".
+            const cycleTab = (isDel) => {
+                const pendV = isDel ? '미배달' : '미픽업';   // 1단계: 미완료
+                const doneV = isDel ? '배달완료' : '픽업';    // 2단계: 완료
+                const totalKey = isDel ? '_총배달' : '_총픽업';
+                const c = COLORS[pendV];
+                const tot = counts[totalKey];
+                let label, cnt, next;
+                if (cur === pendV){        // 미완료 보는 중 → 다음은 완료
+                    label = isDel ? '배달' : '픽업'; cnt = counts[pendV]; next = doneV;
+                } else if (cur === doneV){ // 완료 보는 중 → 다음은 전체
+                    label = isDel ? '배완' : '픽완'; cnt = counts[doneV]; next = 'all';
+                } else {                   // 선택 안 됨 → 다음은 미완료
+                    label = isDel ? '배달' : '픽업'; cnt = counts[pendV]; next = pendV;
+                }
+                const active = (cur === pendV || cur === doneV);
+                const title = isDel ? '누를 때마다 배달 미완료 → 배달완료 → 전체' : '누를 때마다 픽업 미완료 → 픽업완료 → 전체';
+                return tabBtnHtml({ active, c, label, numText: `${cnt}/${tot}`, zero: (cnt === 0), next, fill: true, title });
             };
             // 8개 상태를 한 줄에 균등 분배
-            const row1 = [['all','전체'],['미배달','배달'],['미픽업','픽업'],['배달미입금','배미'],['픽업미입금','픽미'],['취소','취소']];
-            c1.innerHTML = row1.map(renderTab(true)).join('');
+            const head = [['all','전체']];
+            const tail = [['배달미입금','배미'],['픽업미입금','픽미'],['취소','취소']];
+            c1.innerHTML = head.map(renderTab(true)).join('') + cycleTab(true) + cycleTab(false) + tail.map(renderTab(true)).join('');
             if (c2) c2.innerHTML = '';
         }
         function selectOrderStatus(v){
@@ -8202,7 +8227,8 @@
             _openSalesDetailModal(title, totalAmt, totalCnt);
         }
         // [공용] 판매 상세 모달 (정렬 헤더 있는 표) — 매출추이·카테고리 공용
-        function _openSalesDetailModal(title, totalAmt, totalCnt){
+        // extraHtml: 표 위에 끼워 넣을 추가 분석 영역 (사다드림 고객 구성 등, 없으면 빈 문자열)
+        function _openSalesDetailModal(title, totalAmt, totalCnt, extraHtml){
             _trendDetail.sort = { key: 'amount', dir: 'desc' }; // 열 때마다 금액 많은순 기본
             const old = document.getElementById('trend-detail-modal'); if (old) old.remove();
             const modal = document.createElement('div');
@@ -8215,6 +8241,7 @@
                         <div style="flex:1; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:8px 12px;"><div style="font-size:11px; color:#166534; font-weight:700;">총 판매액</div><div style="font-size:16px; font-weight:900; color:#166534;">${totalAmt.toLocaleString()}원</div></div>
                         <div style="flex:1; background:#faf5ff; border:1px solid #e9d5ff; border-radius:10px; padding:8px 12px;"><div style="font-size:11px; color:#7c3aed; font-weight:700;">총 건수</div><div style="font-size:16px; font-weight:900; color:#7c3aed;">${totalCnt.toLocaleString()}건</div></div>
                     </div>
+                    ${extraHtml || ''}
                     <div id="trend-detail-table"></div>
                 </div>
                 <div class="summary-modal-footer"><button class="btn-modal-close" onclick="closeTrendDetail()">닫기</button></div>
@@ -8246,8 +8273,68 @@
                 totalCnt += 1; totalAmt += parseInt(o.total || 0) || 0;
             });
             _trendDetail.rows = [...items.entries()];
-            _openSalesDetailModal(title, totalAmt, totalCnt);
+            // [신규] 사다드림은 '사다드림만 산 고객 vs 다른 상품도 함께 산 고객' 구성을 함께 보여준다.
+            _openSalesDetailModal(title, totalAmt, totalCnt, (cat === 'sada') ? _sadaCustomerMixHtml() : '');
         }
+
+        // [신규] 사다드림 구매 고객을 '사다드림만' / '다른 상품도 함께'로 분류.
+        // 집계 기준은 카테고리 비율 그래프와 동일(현재 선택 기간·수령방법 필터, 취소 제외, 배달완료/픽업만).
+        // 같은 고객(이름+연락처)이 기간 안에서 산 내역 전체를 합쳐서 판단하며, 배달비는 상품으로 세지 않는다.
+        function _buildSadaCustomerMix(){
+            const range = (typeof getSalesPeriodRange === 'function') ? getSalesPeriodRange() : { from: null, to: null };
+            const from = range.from, to = range.to;
+            const prodByName = {}; (typeof uploadProducts !== 'undefined' ? uploadProducts : []).forEach(p => { if (p && p.name) prodByName[p.name] = p; });
+            const cust = new Map();
+            (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : []).forEach(o => {
+                if (isSalesCanceled(o)) return;
+                const st = String(o.status || ''); if (st !== '배달완료' && st !== '픽업') return;
+                const d = salesOrderDate(o); if (!d || isNaN(d.getTime())) return;
+                if (from && d < from) return; if (to && d > to) return;
+                const isDel = isSalesDelivery(o);
+                if (salesMethodFilter === 'delivery' && !isDel) return;
+                if (salesMethodFilter === 'pickup' && isDel) return;
+                const nm = String(o.item || '상품명 없음');
+                if (nm === '배달비') return; // 배달비를 '다른 상품'으로 세면 배달 고객이 전부 '함께 구매'가 되어버림
+                const phone = String(o.phone || '').replace(/\D/g, '');
+                const key = String(o.name || '무명') + '_' + phone;
+                if (!cust.has(key)) cust.set(key, { name: String(o.name || '무명'), phone: phone, sadaCnt: 0, sadaAmt: 0, etcCnt: 0, etcAmt: 0 });
+                const c = cust.get(key);
+                const amt = parseInt(o.total || 0) || 0;
+                if (salesProductCategory(prodByName[nm], nm) === 'sada'){ c.sadaCnt += 1; c.sadaAmt += amt; }
+                else { c.etcCnt += 1; c.etcAmt += amt; }
+            });
+            const only = [], mixed = [];
+            cust.forEach(c => { if (c.sadaCnt <= 0) return; (c.etcCnt > 0 ? mixed : only).push(c); });
+            return { only, mixed };
+        }
+
+        // [신규] 위 분류를 누적 막대 + 범례로 렌더 (카테고리 비율 그래프와 같은 스타일)
+        function _sadaCustomerMixHtml(){
+            const { only, mixed } = _buildSadaCustomerMix();
+            const total = only.length + mixed.length;
+            if (total === 0) return '';
+            const onlyPct = Math.round(only.length / total * 100);
+            const mixedPct = 100 - onlyPct;
+            const sum = (arr, k) => arr.reduce((s, c) => s + (c[k] || 0), 0);
+            const onlySada = sum(only, 'sadaAmt');
+            const mixedSada = sum(mixed, 'sadaAmt');
+            const mixedEtc = sum(mixed, 'etcAmt');
+            const seg = (pct, color) => pct <= 0 ? '' : `<div style="width:${pct}%; height:100%; background:${color}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:800; white-space:nowrap; overflow:hidden;">${pct >= 12 ? pct + '%' : ''}</div>`;
+            const leg = (color, label, cnt, pct) => `<div style="display:flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#334155;"><span style="width:9px; height:9px; border-radius:2px; background:${color}; flex-shrink:0;"></span><span style="white-space:nowrap;">${label} ${cnt}명·${pct}%</span></div>`;
+            const row = (label, val) => `<div style="display:flex; justify-content:space-between; gap:8px; font-size:11.5px; padding:3px 0; border-top:1px dashed #e2e8f0;"><span style="color:#64748b; font-weight:700;">${label}</span><span style="color:#334155; font-weight:800; white-space:nowrap;">${val}</span></div>`;
+            return `<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:12px;">
+                <div style="font-size:12px; font-weight:800; color:#334155; margin-bottom:6px;">🛍️ 사다드림 구매 고객 구성 <span style="font-weight:600; color:#94a3b8;">(총 ${total}명)</span></div>
+                <div style="height:22px; background:#e5e7eb; border-radius:6px; overflow:hidden; display:flex; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.04);">${seg(onlyPct, '#06b6d4') + seg(mixedPct, '#f59e0b')}</div>
+                <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;">${leg('#06b6d4', '사다드림만', only.length, onlyPct) + leg('#f59e0b', '다른 상품도 함께', mixed.length, mixedPct)}</div>
+                <div style="margin-top:8px;">
+                    ${row('사다드림만 산 고객 구매액', onlySada.toLocaleString() + '원')}
+                    ${row('함께 산 고객의 사다드림 구매액', mixedSada.toLocaleString() + '원')}
+                    ${row('함께 산 고객이 쓴 그 외 상품액', mixedEtc.toLocaleString() + '원')}
+                </div>
+                <div style="margin-top:6px; font-size:10.5px; color:#94a3b8; line-height:1.4;">※ 현재 선택한 기간·수령방법 기준. 같은 고객(이름+연락처)이 기간 내 산 내역을 합쳐 판단하며 배달비는 제외했습니다.</div>
+            </div>`;
+        }
+
         function closeTrendDetail(){
             const m = document.getElementById('trend-detail-modal');
             if (m){ m.classList.remove('active'); setTimeout(() => m.remove(), 250); }
