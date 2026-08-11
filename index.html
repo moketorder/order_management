@@ -2530,8 +2530,6 @@
         .sales-toggle-btn { padding:7px 12px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; }
         .sales-toggle-btn.active { border-color:var(--primary); background:var(--primary-light); color:var(--primary); }
         /* 발주 관리 분류 카테고리 색상 (비활성=컬러 테두리 / 활성=컬러 채움) */
-        .up-cat-all   { border-color:#94a3b8; color:#475569; }
-        .up-cat-all.active   { background:#475569; border-color:#475569; color:#fff; }
         .up-cat-fruit { border-color:#fca5a5; color:#dc2626; }
         .up-cat-fruit.active { background:#ef4444; border-color:#ef4444; color:#fff; }
         .up-cat-group { border-color:#93c5fd; color:#2563eb; }
@@ -2573,7 +2571,10 @@
         #order-status-tabs, #order-status-tabs2, #sales-uprange-tabs, #sales-upcat-tabs, #sales-period-row1, #sales-period-row2 { -webkit-overflow-scrolling: touch; }
         #order-status-tabs::-webkit-scrollbar, #order-status-tabs2::-webkit-scrollbar, #sales-uprange-tabs::-webkit-scrollbar, #sales-upcat-tabs::-webkit-scrollbar, #sales-period-row1::-webkit-scrollbar, #sales-period-row2::-webkit-scrollbar { display: none; }
         /* 발주 집계 요약칩: 화면 폭을 균등하게 꽉 채움 */
-        #sales-upcoming-summary > div { flex: 1 1 0; min-width: 0; text-align: center; }
+        #sales-upcoming-summary > div { flex: 1 1 0; min-width: 0 !important; text-align: center; padding: 8px 5px !important; overflow: hidden; }
+        /* [신규] 총 주문액처럼 값이 길어져도 모바일에서 두 줄로 접히지 않게 한 줄 고정 */
+        #sales-upcoming-summary > div > div:first-child { font-size: 10px !important; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #sales-upcoming-summary > div > div:last-child { font-size: 13px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         /* 판매현황 지표 카드: 값이 한 줄에 들어가도록 폰트·여백 축소 + 주문 내역 날짜필터 박스와 동일 디자인(흰 배경·라운드·그림자) */
         #sales-metrics > div { padding:8px 6px !important; min-width:0 !important; overflow:hidden; background:#fff !important; border-radius:var(--radius-main) !important; box-shadow:var(--shadow) !important; text-align:center !important; }
         /* 고객 모달 지표칩: 모바일에서 값이 한 줄에 들어가도록 폰트·여백 축소 */
@@ -2605,7 +2606,6 @@
                         <input type="date" id="sales-up-to" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
                     </div>
                     <div id="sales-upcat-tabs" style="display:flex; gap:4px; flex-wrap:nowrap; align-items:center; margin-bottom:9px;">
-                        <button type="button" data-sales-upcat="all" onclick="setSalesUpcomingCat('all')" class="sales-toggle-btn up-cat-all active" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">전체</button>
                         <button type="button" data-sales-upcat="fruit" onclick="setSalesUpcomingCat('fruit')" class="sales-toggle-btn up-cat-fruit" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">과일</button>
                         <button type="button" data-sales-upcat="group" onclick="setSalesUpcomingCat('group')" class="sales-toggle-btn up-cat-group" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">공동구매</button>
                         <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn up-cat-other" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">상시판매</button>
@@ -3477,6 +3477,7 @@
                 // 미픽/미배는 "미완료/전체" 형식으로 표시 (예: 4/4)
                 const numText = (v === '미픽업') ? `${cnt}/${counts['_총픽업']}`
                               : (v === '미배달') ? `${cnt}/${counts['_총배달']}`
+                              : (v === '배달미입금') ? `${cnt}/${counts['_총배달']}`
                               : (v === '픽업미입금') ? `${cnt}/${counts['_사다픽업총']}`
                               : `${cnt}`;
                 const labelColor = active ? '#fff' : (zero ? '#94a3b8' : 'var(--text-main)');
@@ -7021,6 +7022,7 @@
         let uploadEditProductRef = null; // [하드닝] 수정 대상 상품을 순번 대신 이름+분류+날짜로 식별
         let uploadForceDuplicate = false; // [신규] '복제하기': 현재 폼을 새 상품으로 강제 등록
         let uploadEditShelf = ''; // [신규] 수정 시 기존 선반위치(shelf)를 기억해 폼에 반영
+        let uploadEditIsSada = false; // [신규] 수정 시 '사다드림' 체크 상태를 기억해 폼에 반영
         let uploadSelectedDate = new Date().toISOString().split('T')[0];
         let uploadManageDeliveryType = "today";
         let uploadManageTab = "today-fruit";
@@ -7190,21 +7192,19 @@
             renderSalesUpcoming();
         }
         function setSalesUpcomingCat(cat){
-            // [변경] 단일 선택: 한 번에 한 분류만. 전체 또는 이미 선택된 분류 재클릭 시 전체로.
-            if (cat === 'all' || (salesUpcomingCats.size === 1 && salesUpcomingCats.has(cat))) {
-                salesUpcomingCats.clear();
-            } else {
-                salesUpcomingCats.clear();
-                salesUpcomingCats.add(cat);
-            }
-            // 버튼 상태 동기화: 전체는 아무것도 선택 안됐을 때 활성, 개별은 선택된 것만 활성
-            const allBtn = document.querySelector('[data-sales-upcat="all"]');
-            if (allBtn) allBtn.classList.toggle('active', salesUpcomingCats.size === 0);
+            // [변경] '전체' 버튼 제거 → 각 분류 버튼을 토글로. 아무것도 선택 안 하면 전체 표시.
+            //  단일 선택: 다른 분류를 누르면 이전 선택은 해제되고, 같은 버튼 재클릭 시 해제 → 전체.
+            const wasOn = salesUpcomingCats.has(cat);
+            salesUpcomingCats.clear();
+            if (!wasOn) salesUpcomingCats.add(cat);
+            syncSalesUpcomingCatButtons();
+            renderSalesUpcoming();
+        }
+        // 버튼 활성 상태 동기화 (선택된 분류만 활성, 비어 있으면 전부 비활성=전체)
+        function syncSalesUpcomingCatButtons(){
             document.querySelectorAll('[data-sales-upcat]').forEach(b => {
-                if (b.dataset.salesUpcat === 'all') return;
                 b.classList.toggle('active', salesUpcomingCats.has(b.dataset.salesUpcat));
             });
-            renderSalesUpcoming();
         }
         function sortSalesRanking(key){ toggleSalesSort(salesRankSort, key, key === 'name' ? 'asc' : 'desc'); renderSalesRanking(); }
 
@@ -8522,7 +8522,7 @@
                     const d = getReserveGroupDate(p);
                     if (d) dateSet.add(d);
                 });
-                const dates = [...dateSet].sort().reverse(); // 가장 먼 날짜 먼저
+                const dates = [...dateSet].sort(); // [변경] 날짜 오름차순(빠른 날짜부터)
                 const _now = new Date();
                 const _todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
                 const cats = []; // [변경] 전체·이전 버튼 제거 — 날짜 토글로 대체(아무것도 선택 안 하면 전체)
@@ -8599,7 +8599,7 @@
                     }
                 });
                 
-                dates.sort((a, b) => b.localeCompare(a));
+                dates.sort((a, b) => a.localeCompare(b)); // [변경] 날짜 오름차순(빠른 날짜부터)
                 
                 if (dates.length > 0) {
                     subContainer.style.display = 'flex';
@@ -8696,7 +8696,11 @@
             container.innerHTML = '';
 
             if (tab === 'reserve') {
-                document.getElementById('categoryLabel').innerText = "공동구매 날짜 선택";
+                document.getElementById('categoryLabel').innerText = "공동구매 날짜 선택  ·  사다드림 여부";
+                // [신규] 왼쪽=날짜(폭 축소), 오른쪽=사다드림 체크박스 배치
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; gap:8px; align-items:stretch;';
+
                 const input = document.createElement('input');
                 input.type = 'date';
                 input.id = 'categoryValue';
@@ -8708,11 +8712,43 @@
                 input.style.webkitAppearance = 'none';
                 input.style.appearance = 'none';
                 input.style.boxSizing = 'border-box';
+                input.style.flex = '1 1 auto';   // [수정] 날짜 박스 폭 축소 (체크박스와 나눠 씀)
+                input.style.minWidth = '0';
+                input.style.maxWidth = '230px';  // 날짜만 들어가면 되므로 과하게 넓어지지 않게 제한
                 input.onchange = () => {
                     uploadSelectedDate = input.value;
                 };
-                container.appendChild(input);
-            } 
+
+                // [신규] 체크 시 상품명 앞에 [사다드림] 말머리를 자동으로 붙여 저장.
+                //  이 페이지는 네이티브 체크박스를 전역 CSS로 숨기므로(.custom-checkbox 스팬으로 표시),
+                //  기존 패턴대로 input 바로 뒤에 .custom-checkbox 스팬을 붙여야 체크 표시가 보인다.
+                const sadaLabel = document.createElement('label');
+                sadaLabel.className = 'checkbox-container';
+                sadaLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; height:45px; padding:0 12px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; flex:0 0 auto; box-sizing:border-box;';
+                const sadaChk = document.createElement('input');
+                sadaChk.type = 'checkbox';
+                sadaChk.id = 'productIsSada';
+                sadaChk.checked = !!(uploadIsEditMode && uploadEditIsSada);
+                const sadaBox = document.createElement('span');
+                sadaBox.className = 'custom-checkbox';
+                const sadaTxt = document.createElement('span');
+                sadaTxt.innerText = '사다드림';
+                const paintSada = () => {
+                    const on = sadaChk.checked;
+                    sadaLabel.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
+                    sadaLabel.style.background = on ? 'var(--primary-light)' : '#ffffff';
+                    sadaLabel.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
+                };
+                sadaChk.onchange = paintSada;
+                paintSada();
+                sadaLabel.appendChild(sadaChk);
+                sadaLabel.appendChild(sadaBox);
+                sadaLabel.appendChild(sadaTxt);
+
+                row.appendChild(input);
+                row.appendChild(sadaLabel);
+                container.appendChild(row);
+            }
             else if (tab === 'onsite') {
                 document.getElementById('categoryLabel').innerText = "보관/분류 카테고리  ·  선반위치(장소)";
                 // [신규] 왼쪽=보관분류(냉동/냉장/상온), 오른쪽=선반위치(장소) 반반 배치
@@ -9644,14 +9680,13 @@
                     const isUnlimitedAdj = (adjValRaw === "unlimited" || (adjValRaw !== undefined && String(adjValRaw).startsWith("unlimited")));
 
                     const isUnlimited = isUnlimitedStock || isUnlimitedAdj;
+                    // 수량은 우측 입력칸에 이미 표시되므로 "N개 남음"은 생략, 품절 상태만 표기
                     let stockText = "";
-                    if (isUnlimited) {
-                        stockText = "무제한";
-                    } else {
+                    if (!isUnlimited) {
                         const rawStock = parseInt(prod.stock || 0);
                         const adjVal = parseInt(adjValRaw || 0);
                         const realStock = Math.max(0, rawStock + adjVal);
-                        stockText = realStock <= 0 ? `<span style="color: var(--red); font-weight: 800;">🔴 품절</span>` : `${realStock}개 남음`;
+                        stockText = realStock <= 0 ? `<span style="color: var(--red); font-weight: 800;">🔴 품절</span>` : "";
                     }
 
                     const hasImage = prod.images && prod.images.length > 0;
@@ -9711,8 +9746,7 @@
                             </div>
                             <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                 <span>${parseInt(prod.price).toLocaleString()}원</span>
-                                <span style="color: var(--text-sub);">|</span>
-                                <span>${stockText}</span>
+                                ${stockText ? `<span style="color: var(--text-sub);">|</span><span>${stockText}</span>` : ``}
                                 ${statusBadge}
                             </div>
                         </div>
@@ -9957,7 +9991,7 @@
             const forceDup = uploadForceDuplicate; // 이번 제출이 복제인지
             uploadForceDuplicate = false;
 
-            const name = document.getElementById('productName').value.trim();
+            let name = document.getElementById('productName').value.trim();
             const price = parseInt(document.getElementById('productPrice').value);
             const desc = document.getElementById('productDesc').value.trim();
             
@@ -9973,9 +10007,18 @@
                 date = catVal;      
             }
 
+            // [신규] 공동구매 탭의 '사다드림' 체크 → 상품명 앞에 [사다드림] 말머리 자동 부여.
+            //  기존 말머리는 항상 떼어낸 뒤 다시 붙여, 중복 표기·체크 해제 시 잔존을 방지한다.
+            name = name.replace(/^\s*\[\s*사다드림\s*\]\s*/, '').trim();
+
             if (!name) {
                 showToast("상품명을 입력해주세요.");
                 return;
+            }
+
+            const _sadaChkEl = document.getElementById('productIsSada');
+            if (uploadCurrentTab === 'reserve' && _sadaChkEl && _sadaChkEl.checked) {
+                name = '[사다드림]' + name;
             }
 
             try {
@@ -10282,27 +10325,44 @@
             const prevStock = prod.stock;
             const adjKey = fGetAdjKey(prod.matchKey, prod.name);
             const prevAdj = uploadGlobalAdjustments[adjKey];
-            // 로컬 즉시 반영: 기본재고=입력값, 조정값 0(무제한이면 'unlimited')
-            prod.stock = newStock;
-            prod.updatedAt = Date.now();
-            uploadGlobalAdjustments[adjKey] = wantUnlimited ? 'unlimited' : 0;
+            const adjIsUnlimited = (prevAdj === 'unlimited' || (prevAdj !== undefined && String(prevAdj).startsWith('unlimited')));
+            const curAdj = adjIsUnlimited ? 0 : (parseInt(prevAdj || 0) || 0);
 
+            // [버그수정] 조정값(판매 차감 원장)을 0으로 지우면, 화면을 연 뒤 들어온 주문의 차감분이
+            //  통째로 사라져 재고가 오히려 늘어난다. (예: 2건 주문 중 1건만 반영된 화면에서 변경 시)
+            //  입력값은 '실재고'이므로 조정값은 그대로 두고 기본재고 = 입력값 - 조정값 으로 환산해 저장한다.
+            //  이렇게 하면 내가 모르는 사이 들어온 주문의 차감이 서버 조정값에 그대로 남아 정확히 반영된다.
+            let clearAdj = false; // 조정값이 'unlimited'인데 숫자로 바꾸는 경우에만 초기화 필요
+            if (wantUnlimited) {
+                prod.stock = '';
+            } else if (adjIsUnlimited) {
+                prod.stock = newStock;
+                clearAdj = true;
+            } else {
+                prod.stock = newStock - curAdj;
+            }
+            prod.updatedAt = Date.now();
+            if (clearAdj) uploadGlobalAdjustments[adjKey] = 0;
+
+            let saved = false;
             try {
-                const [ok1, ok2] = await Promise.all([
-                    fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, uploadProducts),
-                    fbPutRetry(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, wantUnlimited ? 'unlimited' : 0)
-                ]);
-                if (!ok1 || !ok2) throw new Error(`저장 실패(재시도 후)`);
-                updatePublishedProductsTimestamp();
-                showToast(`'${prod.name}' 재고 → ${wantUnlimited ? '무제한' : newStock}`);
-                renderProductsList();
+                const jobs = [fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, uploadProducts)];
+                if (clearAdj) jobs.push(fbPutRetry(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, 0));
+                const results = await Promise.all(jobs);
+                if (results.some(ok => !ok)) throw new Error(`저장 실패(재시도 후)`);
+                saved = true;
             } catch (e) {
                 prod.stock = prevStock;
-                uploadGlobalAdjustments[adjKey] = prevAdj;
+                if (clearAdj) uploadGlobalAdjustments[adjKey] = prevAdj;
                 console.error('재고 변경 실패:', e);
                 showToast('재고 변경 실패: ' + e.toString());
-                renderProductsList();
             }
+            // [수정] 렌더링 예외가 저장 성공을 실패로 되돌리지 않도록 try 밖에서 처리
+            if (saved) {
+                updatePublishedProductsTimestamp();
+                showToast(`'${prod.name}' 재고 → ${wantUnlimited ? '무제한' : newStock}`);
+            }
+            renderProductsList();
         }
 
         function editProduct(index) {
@@ -10338,9 +10398,12 @@
             }
 
             uploadEditShelf = String(prod.shelf || ''); // [신규] 기존 선반위치를 폼에 반영 (selectMainTab에서 사용)
+            // [신규] 기존 [사다드림] 말머리 여부를 체크박스로 복원 (selectMainTab에서 사용)
+            uploadEditIsSada = /^\s*\[\s*사다드림\s*\]/.test(String(prod.name || ''));
             selectMainTab(tabType);
 
-            document.getElementById('productName').value = prod.name || "";
+            // 말머리는 체크박스가 담당하므로 입력칸에는 순수 상품명만 보여준다
+            document.getElementById('productName').value = String(prod.name || "").replace(/^\s*\[\s*사다드림\s*\]\s*/, '');
             document.getElementById('productPrice').value = prod.price || 0;
             document.getElementById('productDesc').value = prod.desc || "";
 
@@ -10406,6 +10469,7 @@
             document.getElementById('productStock').disabled = false;
 
             uploadEditShelf = ''; // [신규] 선반위치 기억값 초기화
+            uploadEditIsSada = false; // [신규] 사다드림 체크 기억값 초기화
             selectMainTab('fruit');
 
             uploadSelectedFiles = [];
