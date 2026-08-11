@@ -8712,9 +8712,8 @@
                 input.style.webkitAppearance = 'none';
                 input.style.appearance = 'none';
                 input.style.boxSizing = 'border-box';
-                input.style.flex = '1 1 auto';   // [수정] 날짜 박스 폭 축소 (체크박스와 나눠 씀)
+                input.style.flex = '1 1 auto';   // 남는 폭은 날짜칸이 차지 (사다드림은 버튼 크기 고정)
                 input.style.minWidth = '0';
-                input.style.maxWidth = '230px';  // 날짜만 들어가면 되므로 과하게 넓어지지 않게 제한
                 input.onchange = () => {
                     uploadSelectedDate = input.value;
                 };
@@ -8724,7 +8723,8 @@
                 //  기존 패턴대로 input 바로 뒤에 .custom-checkbox 스팬을 붙여야 체크 표시가 보인다.
                 const sadaLabel = document.createElement('label');
                 sadaLabel.className = 'checkbox-container';
-                sadaLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; height:45px; padding:0 12px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; flex:0 0 auto; box-sizing:border-box;';
+                // 버튼 크기로 고정 (남는 폭은 날짜칸이 채움)
+                sadaLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; height:45px; padding:0 14px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; flex:0 0 auto; box-sizing:border-box;';
                 const sadaChk = document.createElement('input');
                 sadaChk.type = 'checkbox';
                 sadaChk.id = 'productIsSada';
@@ -10003,8 +10003,17 @@
             let matchKey = catVal;
             let date = "";
             if (uploadCurrentTab === 'reserve') {
-                matchKey = catVal; 
-                date = catVal;      
+                matchKey = catVal;
+                date = catVal;
+            }
+
+            // [신규] 분류(matchKey)가 비면 주문서에서 어느 카테고리에도 못 들어가고
+            //  공동구매 전체상품에 '날짜 없는 빈 그룹'으로 새어 나온다. 저장 자체를 막는다.
+            if (!String(matchKey || '').trim()) {
+                showToast(uploadCurrentTab === 'reserve'
+                    ? "공동구매 날짜를 선택해주세요."
+                    : "카테고리를 선택해주세요.");
+                return;
             }
 
             // [신규] 공동구매 탭의 '사다드림' 체크 → 상품명 앞에 [사다드림] 말머리 자동 부여.
