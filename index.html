@@ -1964,6 +1964,22 @@
             background: #f0fdf4;
             color: #16a34a;
         }
+        /* [신규] 주문 품목 아래에 손님이 고른 상세옵션 표시 */
+        .order-option-text {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #c2610a;
+            background: #fff4e9;
+            border: 1px solid #ffd9b3;
+            border-radius: 6px;
+            padding: 3px 7px;
+            margin-top: 4px;
+            display: inline-block;
+            line-height: 1.5;
+            word-break: keep-all;
+            white-space: normal;
+        }
+
         .exposure-toggle-btn.active.purple {
             border-color: #7c3aed;
             background: #f5f3ff;
@@ -3854,7 +3870,7 @@
                                         <span class="custom-checkbox"></span>
                                     </label>
                                 </td>
-                                <td class="item-name-cell">${it.item} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}</td>
+                                <td class="item-name-cell">${it.item} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${it.optionText ? `<div class="order-option-text">└ ${it.optionText}</div>` : ''}</td>
                                 <td style="width:70px;"><strong class="${qtyClass}">${qtyNum}</strong>개</td>
                                 <td style="width:100px;">${parseInt(it.price || 0).toLocaleString()}원</td>
                                 <td style="width:100px;"><strong>${parseInt(it.total || 0).toLocaleString()}원</strong></td>
@@ -3872,7 +3888,7 @@
                                         <input type="checkbox" class="item-checkbox" data-phone="${customer.phone}" data-key="${it.orderKey}" ${selectedItems.has(customer.phone + "|" + it.orderKey) ? 'checked' : ''} onchange="handleItemSelect(this)">
                                         <span class="custom-checkbox"></span>
                                     </label>
-                                    <span class="mobile-item-name">${it.item} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}</span>
+                                    <span class="mobile-item-name">${it.item} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${it.optionText ? `<div class="order-option-text">└ ${it.optionText}</div>` : ''}</span>
                                     <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${customer.phone}', '${it.orderKey}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
                                 </div>
                                 <div class="mobile-item-middle">
@@ -6345,7 +6361,7 @@
                 const canceled = (o.canceled===true||String(o.canceled).toUpperCase()==='TRUE');
                 const badge = canceled ? '🔴 취소' : (st==='배달완료'?'🟢 배달완료':(st==='픽업'?'🟣 픽업완료':(st==='입고'?'🟡 입고':'🔘 대기')));
                 return `<div style="display:flex; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px dashed #f1f5f9; font-size:12px; ${canceled?'opacity:0.55; text-decoration:line-through;':''}">
-                    <span style="word-break:break-all;">${o.item||'상품명 없음'} <span style="color:var(--text-sub);">×${parseInt(o.qty||0)||0}</span></span>
+                    <span style="word-break:break-all;">${o.item||'상품명 없음'} <span style="color:var(--text-sub);">×${parseInt(o.qty||0)||0}</span>${o.optionText ? `<span style="display:block; font-size:11px; font-weight:700; color:#c2610a;">└ ${o.optionText}</span>` : ''}</span>
                     <span style="flex-shrink:0; white-space:nowrap; text-align:right;"><b>${amt.toLocaleString()}원</b> <span style="font-size:10px; color:var(--text-sub);">${badge}</span></span>
                 </div>`;
             }).join('');
@@ -6550,7 +6566,7 @@
                     const itemsHtml = g.items.sort((a, b) => a.dateStr < b.dateStr ? -1 : 1).map(it => {
                         const stColor = it.status === '입고' ? '#d97706' : '#64748b';
                         return `<div style="display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 0; border-top:1px dashed #f1f5f9;">
-                            <span style="color:var(--text-main); word-break:break-all;">${it.item} <b>×${it.qty}</b></span>
+                            <span style="color:var(--text-main); word-break:break-all;">${it.item} <b>×${it.qty}</b>${it.optionText ? `<span style="display:block; font-size:11px; font-weight:700; color:#c2610a;">└ ${it.optionText}</span>` : ''}</span>
                             <span style="flex-shrink:0; color:var(--text-sub); white-space:nowrap;">${fmtMD(it.dateStr)} · <b style="color:${stColor};">${it.status}</b> · ${it.paid ? '<b style="color:#059669;">입금</b>' : '<b style="color:#dc2626;">미입금</b>'}</span>
                         </div>`;
                     }).join('');
@@ -6882,7 +6898,7 @@
 
                         printHtml += `
                             <tr style="border-bottom:none;">
-                                <td style="padding:4px 0;">${it.item}${statusBadge}</td>
+                                <td style="padding:4px 0;">${it.item}${statusBadge}${it.optionText ? `<div style="font-size:11px; color:#555; padding-left:6px;">└ ${it.optionText}</div>` : ''}</td>
                                 <td class="text-right" style="padding:4px 0;">${it.qty}</td>
                                 <td class="text-right" style="padding:4px 0;">${(parseInt(String(it.total || 0).replace(/,/g, "")) || 0).toLocaleString()}원</td>
                             </tr>
@@ -8169,12 +8185,15 @@
                 else { if (d < today) return; } // 전체(오늘 포함 이후)
                 const _q = (parseInt(o.qty || 0) || 0);
                 if (_done) { doneMap.set(key, (doneMap.get(key) || 0) + _q); return; } // 완료 수량은 별도 집계(발주 목록엔 미포함)
-                if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, qty: 0, amount: 0, dates: new Set(), dateQty: new Map() });
+                if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, qty: 0, amount: 0, dates: new Set(), dateQty: new Map(), optionQty: new Map() });
                 const g = map.get(key);
                 g.qty += _q;
                 g.amount += (parseInt(o.total || 0) || 0);
                 g.dates.add(info.dateStr);
                 g.dateQty.set(info.dateStr, (g.dateQty.get(info.dateStr) || 0) + _q); // [신규] 날짜별 주문수량
+                // [신규] 상세옵션별 주문수량 — 무엇을 몇 개 사와야 하는지 바로 보이게
+                const _opt = String(o.optionText || '').trim();
+                if (_opt) g.optionQty.set(_opt, (g.optionQty.get(_opt) || 0) + _q);
             });
             const rows = [...map.values()].map(g => {
                 const stock = g.prod ? salesRealStock(g.prod) : null;   // 주문으로 차감된 현재 재고
@@ -8243,6 +8262,9 @@
                 // [신규] 날짜별 주문수량 상세 (카드 클릭 시 펼침)
                 const detailRows = [...r.dateQty.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1)
                     .map(([ds, q]) => `<div style="display:flex; justify-content:space-between; padding:3px 2px; border-top:1px dashed #f1f5f9;"><span style="color:var(--text-sub);">${fmtMD(ds)}</span><b style="color:#2563eb; font-weight:900;">${q}개</b></div>`).join('');
+                // [신규] 선택 옵션별 주문수량 (많이 팔린 순)
+                const optionRows = [...(r.optionQty || new Map()).entries()].sort((a, b) => b[1] - a[1])
+                    .map(([txt, q]) => `<div style="display:flex; justify-content:space-between; gap:8px; padding:2px 2px; font-size:11.5px;"><span style="color:var(--text-main); word-break:keep-all;">${txt}</span><b style="flex-shrink:0; color:#c2610a; font-weight:900;">${q}개</b></div>`).join('');
                 return `<div onclick="const d=this.querySelector('.sales-card-detail'); if(d) d.style.display=(d.style.display==='none'?'block':'none');" style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff; cursor:pointer;">
                     <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
                         <div style="font-weight:700; font-size:13px; word-break:break-all; line-height:1.3;">${r.name}</div>
@@ -8260,6 +8282,10 @@
                             <button type="button" onclick="event.stopPropagation(); salesUpdateStock(${idx}, document.getElementById('sales-stock-input-${idx}').value)" style="padding:5px 11px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button>
                         </div>` : ''}
                     </div>
+                    ${optionRows ? `<div style="margin-top:6px; padding-top:5px; border-top:1px dashed var(--border);">
+                        <div style="font-size:10px; font-weight:800; color:#c2610a; margin-bottom:3px;">선택 옵션</div>
+                        ${optionRows}
+                    </div>` : ''}
                     <div class="sales-card-detail" style="display:none; margin-top:7px; padding-top:5px; border-top:1px solid var(--border); font-size:12px;">
                         ${detailRows || '<div style="color:var(--text-sub); padding:3px 2px;">날짜 정보 없음</div>'}
                     </div>
@@ -9097,7 +9123,7 @@
                 const itemsHtml = g.items.sort((a, b) => a.dateStr < b.dateStr ? -1 : 1).map(it => {
                     const stColor = it.status === '입고' ? '#d97706' : '#64748b';
                     return `<div style="display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 0; border-top:1px dashed #f1f5f9;">
-                        <span style="color:var(--text-main); word-break:break-all;">${it.item} <b>×${it.qty}</b></span>
+                        <span style="color:var(--text-main); word-break:break-all;">${it.item} <b>×${it.qty}</b>${it.optionText ? `<span style="display:block; font-size:11px; font-weight:700; color:#c2610a;">└ ${it.optionText}</span>` : ''}</span>
                         <span style="flex-shrink:0; color:var(--text-sub); white-space:nowrap;">${fmtMD(it.dateStr)} · <b style="color:${stColor};">${it.status}</b> · ${it.paid ? '<b style="color:#059669;">입금</b>' : '<b style="color:#dc2626;">미입금</b>'}</span>
                     </div>`;
                 }).join('');
