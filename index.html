@@ -2801,14 +2801,14 @@
             return `(${m}/${d} ${hh}:${mm})`;
         }
 
-        // [신규] 상세옵션을 상품명 아래에 한 줄에 하나씩 보여준다.
-        //  주문서는 '초코, 우유 1개'처럼 한 줄로 저장하지만, 화면에서는 쉼표로 나눠 각각 표시한다.
+        // [수정] 상세옵션을 상품명 아래에 가로로 이어서 보여준다.
+        //  한 줄에 하나씩 세로로 쌓으면 주문이 많은 카드가 너무 길어져, 가운뎃점으로 이어 붙인다.
         function gOptionLines(optionText, opt) {
             const items = String(optionText || '').split(',').map(s => s.trim()).filter(Boolean);
             if (items.length === 0) return '';
             const cls = (opt && opt.cls) ? ` class="${opt.cls}"` : '';
             const st = (opt && opt.style) ? ` style="${opt.style}"` : '';
-            return items.map(t => `<div${cls}${st}>└ ${t}</div>`).join('');
+            return `<div${cls}${st}>└ ${items.join(' · ')}</div>`;
         }
 
         let currentYear = "";  // 현재 선택된 년도
@@ -8275,7 +8275,7 @@
                 else { if (d < today) return; } // 전체(오늘 포함 이후)
                 const _q = (parseInt(o.qty || 0) || 0);
                 if (_done) { doneMap.set(key, (doneMap.get(key) || 0) + _q); return; } // 완료 수량은 별도 집계(발주 목록엔 미포함)
-                if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, qty: 0, amount: 0, dates: new Set(), dateQty: new Map(), optionQty: new Map() });
+                if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, qty: 0, amount: 0, dates: new Set(), dateQty: new Map(), optionQty: new Map(), optionItemQty: new Map() });
                 const g = map.get(key);
                 g.qty += _q;
                 g.amount += (parseInt(o.total || 0) || 0);
@@ -8283,7 +8283,20 @@
                 g.dateQty.set(info.dateStr, (g.dateQty.get(info.dateStr) || 0) + _q); // [신규] 날짜별 주문수량
                 // [신규] 상세옵션별 주문수량 — 무엇을 몇 개 사와야 하는지 바로 보이게
                 const _opt = String(o.optionText || '').trim();
-                if (_opt) g.optionQty.set(_opt, (g.optionQty.get(_opt) || 0) + _q);
+                if (_opt) {
+                    g.optionQty.set(_opt, (g.optionQty.get(_opt) || 0) + _q);
+                    // [신규] 옵션 항목별 총 개수 — 조합('초코, 우유 ×2')이 아니라 실제로 사와야 할 수량을 센다.
+                    //  '이름 ×N'의 N은 주문 1개당 개수이므로 주문수량(_q)을 곱한다.
+                    _opt.split(',').forEach(part => {
+                        const t = part.trim();
+                        if (!t) return;
+                        const m = t.match(/^(.*?)\s*[×xX]\s*(\d+)$/);
+                        const nm = m ? m[1].trim() : t;
+                        const per = m ? (parseInt(m[2]) || 1) : 1;
+                        if (!nm) return;
+                        g.optionItemQty.set(nm, (g.optionItemQty.get(nm) || 0) + per * _q);
+                    });
+                }
             });
             const rows = [...map.values()].map(g => {
                 const stock = g.prod ? salesRealStock(g.prod) : null;   // 주문으로 차감된 현재 재고
@@ -8352,9 +8365,13 @@
                 // [신규] 날짜별 주문수량 상세 (카드 클릭 시 펼침)
                 const detailRows = [...r.dateQty.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1)
                     .map(([ds, q]) => `<div style="display:flex; justify-content:space-between; padding:3px 2px; border-top:1px dashed #f1f5f9;"><span style="color:var(--text-sub);">${fmtMD(ds)}</span><b style="color:#2563eb; font-weight:900;">${q}개</b></div>`).join('');
-                // [신규] 선택 옵션별 주문수량 (많이 팔린 순)
+                // [신규] 주문별 옵션 조합 (많이 팔린 순) — 펼침 영역에 둔다
                 const optionRows = [...(r.optionQty || new Map()).entries()].sort((a, b) => b[1] - a[1])
-                    .map(([txt, q]) => `<div style="display:flex; justify-content:space-between; gap:8px; padding:2px 2px; font-size:11.5px;"><span style="color:var(--text-main); word-break:keep-all;">${txt}</span><b style="flex-shrink:0; color:#c2610a; font-weight:900;">${q}개</b></div>`).join('');
+                    .map(([txt, q]) => `<div style="display:flex; justify-content:space-between; gap:8px; padding:2px 2px; font-size:11.5px;"><span style="color:var(--text-sub); word-break:keep-all;">${txt}</span><b style="flex-shrink:0; color:#c2610a; font-weight:900;">${q}개</b></div>`).join('');
+
+                // [신규] 옵션 항목별 총 개수 — 발주할 때 실제로 세야 하는 숫자라 카드에 바로 보여준다
+                const optionItemRows = [...(r.optionItemQty || new Map()).entries()].sort((a, b) => b[1] - a[1])
+                    .map(([nm, q]) => `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:4px 2px; border-top:1px dashed #ffe0bf;"><span style="color:var(--text-main); font-weight:700; font-size:12.5px; word-break:keep-all;">${nm}</span><b style="flex-shrink:0; color:#c2610a; font-weight:900; font-size:14px;">${q}개</b></div>`).join('');
                 return `<div onclick="const d=this.querySelector('.sales-card-detail'); if(d) d.style.display=(d.style.display==='none'?'block':'none');" style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff; cursor:pointer;">
                     <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
                         <div style="font-weight:700; font-size:13px; word-break:break-all; line-height:1.3;">${r.name}</div>
@@ -8372,12 +8389,16 @@
                             <button type="button" onclick="event.stopPropagation(); salesUpdateStock(${idx}, document.getElementById('sales-stock-input-${idx}').value)" style="padding:5px 11px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button>
                         </div>` : ''}
                     </div>
-                    ${optionRows ? `<div style="margin-top:6px; padding-top:5px; border-top:1px dashed var(--border);">
-                        <div style="font-size:10px; font-weight:800; color:#c2610a; margin-bottom:3px;">선택 옵션</div>
-                        ${optionRows}
+                    ${optionItemRows ? `<div style="margin-top:6px; padding:6px 9px 7px; background:#fff8f0; border:1px solid #ffe0bf; border-radius:6px;">
+                        <div style="font-size:10.5px; font-weight:800; color:#c2610a;">옵션별 사올 개수</div>
+                        ${optionItemRows}
                     </div>` : ''}
                     <div class="sales-card-detail" style="display:none; margin-top:7px; padding-top:5px; border-top:1px solid var(--border); font-size:12px;">
                         ${detailRows || '<div style="color:var(--text-sub); padding:3px 2px;">날짜 정보 없음</div>'}
+                        ${optionRows ? `<div style="margin-top:7px; padding-top:5px; border-top:1px dashed var(--border);">
+                            <div style="font-size:10px; font-weight:800; color:#c2610a; margin-bottom:3px;">주문별 옵션 조합</div>
+                            ${optionRows}
+                        </div>` : ''}
                     </div>
                 </div>`;
             };
