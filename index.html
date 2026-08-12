@@ -1969,6 +1969,31 @@
             background: #f5f3ff;
             color: #7c3aed;
         }
+        /* [신규] 가격 칸 옆 옵션 설정 버튼 */
+        #tab-admin-products .price-option-btn {
+            /* 가격 입력칸 옆에 고정 폭으로 붙어 모바일에서도 한 줄 유지 */
+            flex: 0 0 auto;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 800;
+            white-space: nowrap;
+            border-radius: var(--radius-sub);
+            border: 1.5px solid var(--border);
+            background: #ffffff;
+            color: var(--text-sub);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        #tab-admin-products .price-option-btn:hover {
+            border-color: #7c3aed;
+            color: #7c3aed;
+        }
+        /* 옵션이 설정된 상태 표시용 */
+        #tab-admin-products .price-option-btn.active {
+            border-color: #7c3aed;
+            background: #f5f3ff;
+            color: #7c3aed;
+        }
     </style>
 </head>
 
@@ -2161,7 +2186,11 @@
                             <!-- 가격 -->
                             <div class="form-group">
                                 <label>가격 (원)</label>
-                                <input type="number" id="productPrice" class="form-control" placeholder="예: 15000" min="0" required>
+                                <!-- [신규] 가격 칸 오른쪽에 상세옵션 버튼 배치 (모바일에서도 줄바꿈 없이 한 줄 유지) -->
+                                <div style="display: flex; flex-wrap: nowrap; gap: 6px; align-items: stretch;">
+                                    <input type="number" id="productPrice" class="form-control" placeholder="예: 15000" min="0" required style="flex: 1 1 auto; width: auto; min-width: 0;">
+                                    <button type="button" id="btn-detail-option" class="price-option-btn" onclick="openDetailOptionSetting()">상세옵션</button>
+                                </div>
                             </div>
 
                             <!-- 보관방법 지정 -->
@@ -6986,6 +7015,635 @@
             updateExposureButtonsUI();
         }
 
+        // ===== [신규] 상품 상세옵션 설정 =====
+        // 옵션 그룹 구조: { name, selectType: 'single'(한 개만 선택) | 'multi'(여러 개 선택), items: [{ name, price }] }
+        let uploadUseOptions = true;     // 상세옵션 사용 여부 (끄면 설정은 남겨둔 채 아래 기능을 모두 쓰지 않음)
+        let uploadUseChoiceOptions = false; // 선택옵션(옵션 그룹) 사용 여부
+        let uploadUsePersonLimit = false; // 사람당 주문 개수 제한 사용 여부
+        let uploadMaxPerPerson = 0;      // 한 사람이 주문할 수 있는 최대 개수
+        let uploadUseAmountLimit = false; // 금액 옵션 사용 여부 (옵션 합계가 최저~최대 범위 안이어야 주문 가능)
+        let uploadMinAmount = 0;         // 최저금액 (상품 가격과 무관. 0이면 하한 없음)
+        let uploadMaxAmount = 0;         // 최대금액 (0이면 상한 없음)
+        let uploadProductOptions = [];   // 폼에 반영된 옵션 그룹 목록
+        let uploadUseAgencyFee = false;  // 사다드림 대행료 사용 여부
+        let uploadAgencyFeeTiers = [];   // 금액 구간별 대행료: [{ from: 기준금액(이상), fee: 대행료 }]
+        let optionModalDraft = null;     // 모달에서 편집 중인 임시 사본 (저장 눌러야 폼에 반영)
+
+        // [신규] 기본 설정(금액 옵션 · 사다드림 대행료): 한 번 저장해 두면 새 상품을 등록할 때마다 같은 값이 미리 채워진다.
+        //  서버(Firebase)에 보관해 기기가 바뀌어도 같은 값을 쓰고, localStorage는 즉시 반영용 캐시.
+        const DEFAULT_PRODUCT_SETTINGS_KEY = 'moket_default_product_settings';
+        let defaultProductSettings = {
+            personLimit: { use: false, max: 0 },
+            amountLimit: { use: false, min: 0, max: 0 },
+            agencyFee: { use: false, tiers: [] }
+        };
+
+        function applyDefaultProductSettings() {
+            const d = defaultProductSettings || {};
+            const pl = d.personLimit || {};
+            const al = d.amountLimit || {};
+            const af = d.agencyFee || {};
+
+            // [수정] 새 상품은 '상세옵션 사용'만 켜진 채로 시작하고, 세부 옵션(금액 옵션 · 대행료)은 꺼둔다.
+            //  저장해 둔 금액/구간 값은 그대로 채워두므로, 켜기만 하면 바로 쓸 수 있다.
+            uploadUseOptions = true;
+            uploadUseChoiceOptions = false;
+            uploadUsePersonLimit = false;
+            uploadUseAmountLimit = false;
+            uploadUseAgencyFee = false;
+
+            uploadMaxPerPerson = parseInt(pl.max) || 0;
+            uploadMinAmount = parseInt(al.min) || 0;
+            uploadMaxAmount = parseInt(al.max) || 0;
+            uploadAgencyFeeTiers = JSON.parse(JSON.stringify(af.tiers || []));
+        }
+
+        // 저장된 형태가 맞는지 확인 (깨진 값이 들어오면 무시)
+        function isValidDefaultSettings(d) {
+            return !!(d && d.amountLimit && d.agencyFee && Array.isArray(d.agencyFee.tiers));
+        }
+
+        async function loadDefaultProductSettings() {
+            // 1) 로컬 캐시 먼저 적용 (네트워크 없이도 바로 사용)
+            try {
+                const cached = localStorage.getItem(DEFAULT_PRODUCT_SETTINGS_KEY);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    if (isValidDefaultSettings(parsed)) defaultProductSettings = parsed;
+                }
+            } catch (e) { console.error("기본 설정 캐시 읽기 실패:", e); }
+
+            // 2) 서버 값으로 덮어쓰기
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}settings/default_product_options.json?t=${Date.now()}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (isValidDefaultSettings(data)) {
+                        defaultProductSettings = {
+                            // personLimit은 나중에 추가된 항목이라 없을 수도 있음
+                            personLimit: { use: (data.personLimit || {}).use === true, max: parseInt((data.personLimit || {}).max) || 0 },
+                            amountLimit: {
+                                use: data.amountLimit.use === true,
+                                min: parseInt(data.amountLimit.min) || 0,
+                                max: parseInt(data.amountLimit.max) || 0
+                            },
+                            agencyFee: { use: data.agencyFee.use === true, tiers: data.agencyFee.tiers }
+                        };
+                        localStorage.setItem(DEFAULT_PRODUCT_SETTINGS_KEY, JSON.stringify(defaultProductSettings));
+                    }
+                }
+            } catch (e) { console.error("기본 설정 불러오기 실패:", e); }
+
+            // 신규 등록 폼이면 바로 반영 (수정 중이면 그 상품 값이 우선)
+            if (!uploadIsEditMode) {
+                applyDefaultProductSettings();
+                updateDetailOptionButtonUI();
+                updatePriceFieldForAmountLimit();
+            }
+        }
+
+        async function saveDefaultProductSettings() {
+            defaultProductSettings = {
+                personLimit: { use: uploadUsePersonLimit, max: uploadMaxPerPerson },
+                amountLimit: { use: uploadUseAmountLimit, min: uploadMinAmount, max: uploadMaxAmount },
+                agencyFee: { use: uploadUseAgencyFee, tiers: JSON.parse(JSON.stringify(uploadAgencyFeeTiers || [])) }
+            };
+            try {
+                localStorage.setItem(DEFAULT_PRODUCT_SETTINGS_KEY, JSON.stringify(defaultProductSettings));
+            } catch (e) { console.error("기본 설정 캐시 저장 실패:", e); }
+
+            const ok = await fbPutRetry(`${FIREBASE_DB_URL}settings/default_product_options.json`, defaultProductSettings);
+            if (!ok) showToast("기본 설정을 서버에 저장하지 못했습니다. (이 기기에서만 적용됩니다)");
+        }
+
+        function escapeAttrValue(v) {
+            return String(v === undefined || v === null ? "" : v)
+                .replace(/&/g, "&amp;")
+                .replace(/"/g, "&quot;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+        }
+
+        // 상세옵션 버튼에 현재 설정 상태 표시
+        function updateDetailOptionButtonUI() {
+            const btn = document.getElementById('btn-detail-option');
+            if (!btn) return;
+            const count = (uploadProductOptions || []).length;
+            const feeCount = (uploadAgencyFeeTiers || []).length;
+            const hasSetting = count > 0 || uploadUsePersonLimit || uploadUseAmountLimit || feeCount > 0;
+            // '상세옵션 사용'이 꺼져 있으면 아래 기능이 전부 꺼진 것으로 본다
+            const choiceOn = uploadUseChoiceOptions && count > 0;
+            const isOn = uploadUseOptions
+                      && (choiceOn || uploadUsePersonLimit || uploadUseAmountLimit || (uploadUseAgencyFee && feeCount > 0));
+
+            if (!hasSetting) {
+                btn.classList.remove('active');
+                btn.innerText = '상세옵션';
+            } else if (!isOn) {
+                // 설정은 남아 있지만 모두 꺼둔 상태
+                btn.classList.remove('active');
+                btn.innerText = '상세옵션 OFF';
+            } else {
+                btn.classList.add('active');
+                btn.innerText = choiceOn ? `상세옵션 ${count}` : '상세옵션';
+            }
+        }
+
+        // 가격칸을 잠금 해제된 빈 숫자칸으로 되돌린다 (이전 상품에서 잠겨 있던 흔적 제거)
+        function resetPriceField() {
+            const input = document.getElementById('productPrice');
+            if (!input) return;
+            input.type = 'number';
+            input.value = '';
+            delete input.dataset.prevValue;
+            input.readOnly = false;
+            input.required = true;
+            input.style.background = '';
+            input.style.color = '';
+            input.style.fontWeight = '';
+            input.style.textAlign = '';
+        }
+
+        // 금액 옵션을 쓰는 동안에는 기본 가격칸을 잠그고 '금액 옵션 설정중'으로 표시
+        //  (최저/최대금액은 상세옵션 안의 값만 쓰므로 가격칸 값은 사용되지 않는다)
+        function updatePriceFieldForAmountLimit() {
+            const input = document.getElementById('productPrice');
+            if (!input) return;
+
+            // '상세옵션 사용'이 꺼져 있으면 금액 옵션도 적용되지 않으므로 가격칸을 잠그지 않는다
+            if (uploadUseOptions && uploadUseAmountLimit) {
+                if (input.type === 'number') input.dataset.prevValue = input.value; // 원래 값 보관
+                input.type = 'text';
+                input.value = '금액 옵션 설정중';
+                input.readOnly = true;
+                input.required = false;
+                input.style.background = '#f5f3ff';
+                input.style.color = '#7c3aed';
+                input.style.fontWeight = '800';
+                input.style.textAlign = 'center';
+            } else {
+                if (input.type !== 'number') {
+                    input.type = 'number';
+                    input.value = input.dataset.prevValue || '';
+                }
+                input.readOnly = false;
+                input.required = true;
+                input.style.background = '';
+                input.style.color = '';
+                input.style.fontWeight = '';
+                input.style.textAlign = '';
+            }
+        }
+
+        function openDetailOptionSetting() {
+            optionModalDraft = {
+                useOptions: uploadUseOptions,
+                useChoiceOptions: uploadUseChoiceOptions,
+                usePersonLimit: uploadUsePersonLimit,
+                maxPerPerson: uploadMaxPerPerson,
+                useAmountLimit: uploadUseAmountLimit,
+                minAmount: uploadMinAmount,
+                maxAmount: uploadMaxAmount,
+                groups: JSON.parse(JSON.stringify(uploadProductOptions || [])),
+                useAgencyFee: uploadUseAgencyFee,
+                feeTiers: JSON.parse(JSON.stringify(uploadAgencyFeeTiers || []))
+            };
+
+            const old = document.getElementById('product-option-modal');
+            if (old) old.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'product-option-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10050';
+            modal.innerHTML = `
+                <div class="summary-modal-content" style="max-width: 560px;">
+                    <div class="summary-modal-header">
+                        <h2>상세옵션 설정</h2>
+                        <button type="button" class="summary-modal-close" onclick="closeDetailOptionSetting()">&times;</button>
+                    </div>
+                    <div class="summary-modal-body" id="product-option-modal-body"></div>
+                    <div style="padding: 14px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px;">
+                        <button type="button" onclick="closeDetailOptionSetting()" style="flex: 1; height: 46px; border-radius: var(--radius-sub); border: 1.5px solid var(--border); background: #fff; font-size: 14px; font-weight: 800; color: var(--text-sub); cursor: pointer;">취소</button>
+                        <button type="button" onclick="saveDetailOptionSetting()" style="flex: 1; height: 46px; border-radius: var(--radius-sub); border: none; background: var(--text-main); color: #fff; font-size: 14px; font-weight: 800; cursor: pointer;">저장</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            renderDetailOptionBody();
+            setTimeout(() => modal.classList.add('active'), 10);
+        }
+
+        function closeDetailOptionSetting() {
+            const modal = document.getElementById('product-option-modal');
+            optionModalDraft = null;
+            if (!modal) return;
+            modal.classList.remove('active');
+            setTimeout(() => modal.remove(), 250);
+        }
+
+        function saveDetailOptionSetting() {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+
+            // 이름이 비어 있는 항목은 버리고, 이름·항목이 모두 빈 옵션은 저장하지 않음
+            const groups = optionModalDraft.groups.map(g => ({
+                name: String(g.name || "").trim(),
+                selectType: g.selectType === 'multi' ? 'multi' : 'single',
+                // 여러 개 선택일 때만 의미 있는 값 (항목별 수량 선택 허용 여부)
+                allowQty: (g.selectType === 'multi') && (g.allowQty === true || g.allowQty === 'true'),
+                items: (g.items || [])
+                    .filter(it => String(it.name || "").trim() !== "")
+                    .map(it => ({ name: String(it.name).trim(), price: parseInt(it.price) || 0 }))
+            })).filter(g => g.name !== "" || g.items.length > 0);
+
+            // 대행료 구간은 기준금액 오름차순으로 정리해 저장
+            const feeTiers = (optionModalDraft.feeTiers || [])
+                .map(t => ({ from: parseInt(t.from) || 0, fee: parseInt(t.fee) || 0 }))
+                .sort((a, b) => a.from - b.from);
+
+            // 사람당 주문 개수 제한을 켰는데 개수가 비어 있으면 저장을 막는다
+            if (optionModalDraft.useOptions && optionModalDraft.usePersonLimit
+                && (parseInt(optionModalDraft.maxPerPerson) || 0) <= 0) {
+                showToast("사람당 주문 개수를 입력해 주세요.");
+                return;
+            }
+
+            // 금액 옵션을 켰는데 최저/최대가 둘 다 비어 있으면 조건이 없는 것과 같으므로 저장을 막는다
+            const draftMin = parseInt(optionModalDraft.minAmount) || 0;
+            const draftMax = parseInt(optionModalDraft.maxAmount) || 0;
+            if (optionModalDraft.useOptions && optionModalDraft.useAmountLimit) {
+                if (draftMin <= 0 && draftMax <= 0) {
+                    showToast("최저금액이나 최대금액 중 하나는 입력해 주세요.");
+                    return;
+                }
+                if (draftMin > 0 && draftMax > 0 && draftMax < draftMin) {
+                    showToast("최대금액이 최저금액보다 작습니다.");
+                    return;
+                }
+            }
+
+            uploadUseOptions = !!optionModalDraft.useOptions;
+            uploadUseChoiceOptions = !!optionModalDraft.useChoiceOptions;
+            uploadUsePersonLimit = !!optionModalDraft.usePersonLimit;
+            uploadMaxPerPerson = parseInt(optionModalDraft.maxPerPerson) || 0;
+            uploadUseAmountLimit = !!optionModalDraft.useAmountLimit;
+            uploadMinAmount = draftMin;
+            uploadMaxAmount = draftMax;
+            uploadProductOptions = groups;
+            uploadUseAgencyFee = !!optionModalDraft.useAgencyFee;
+            uploadAgencyFeeTiers = feeTiers;
+
+            updateDetailOptionButtonUI();
+            updatePriceFieldForAmountLimit();
+            closeDetailOptionSetting();
+
+            // 최저금액·대행료는 다음 상품 등록 때도 그대로 쓰도록 기본값으로 보관
+            saveDefaultProductSettings().catch(e => console.error("기본 설정 저장 실패:", e));
+
+            showToast("상세옵션이 폼에 반영되었습니다. 등록/수정 완료를 눌러야 실제 저장됩니다.");
+        }
+
+        // 다시 그리기 전에 화면에 입력된 값을 임시 사본으로 옮겨 담는다 (입력 중 값 유실 방지)
+        function syncDetailOptionDraft() {
+            if (!optionModalDraft) return;
+            document.querySelectorAll('#product-option-modal-body [data-opt-role]').forEach(el => {
+                const g = optionModalDraft.groups[parseInt(el.dataset.gi)];
+                if (!g) return;
+                const ii = (el.dataset.ii === undefined) ? -1 : parseInt(el.dataset.ii);
+                if (el.dataset.optRole === 'group-name') {
+                    g.name = el.value;
+                } else if (el.dataset.optRole === 'item-name' && g.items[ii]) {
+                    g.items[ii].name = el.value;
+                } else if (el.dataset.optRole === 'item-price' && g.items[ii]) {
+                    g.items[ii].price = parseInt(el.value) || 0;
+                }
+            });
+
+            const personEl = document.querySelector('#product-option-modal-body [data-person-role="max"]');
+            if (personEl) optionModalDraft.maxPerPerson = parseInt(personEl.value) || 0;
+
+            const minEl = document.querySelector('#product-option-modal-body [data-amount-role="min"]');
+            if (minEl) optionModalDraft.minAmount = parseInt(minEl.value) || 0;
+            const maxEl = document.querySelector('#product-option-modal-body [data-amount-role="max"]');
+            if (maxEl) optionModalDraft.maxAmount = parseInt(maxEl.value) || 0;
+
+            document.querySelectorAll('#product-option-modal-body [data-fee-role]').forEach(el => {
+                const t = optionModalDraft.feeTiers[parseInt(el.dataset.fi)];
+                if (!t) return;
+                if (el.dataset.feeRole === 'fee-from') t.from = parseInt(el.value) || 0;
+                else if (el.dataset.feeRole === 'fee-amount') t.fee = parseInt(el.value) || 0;
+            });
+        }
+
+        function toggleDraftUseAgencyFee() {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.useAgencyFee = !optionModalDraft.useAgencyFee;
+            renderDetailOptionBody();
+        }
+
+        function addAgencyFeeTier() {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.feeTiers.push({ from: 0, fee: 0 });
+            renderDetailOptionBody();
+        }
+
+        function removeAgencyFeeTier(fi) {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.feeTiers.splice(fi, 1);
+            renderDetailOptionBody();
+        }
+
+        function toggleDraftUseOptions() {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.useOptions = !optionModalDraft.useOptions;
+            renderDetailOptionBody();
+        }
+
+        function toggleDraftUseChoiceOptions() {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.useChoiceOptions = !optionModalDraft.useChoiceOptions;
+            renderDetailOptionBody();
+        }
+
+        function toggleDraftPersonLimit() {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.usePersonLimit = !optionModalDraft.usePersonLimit;
+            renderDetailOptionBody();
+        }
+
+        function toggleDraftAmountLimit() {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.useAmountLimit = !optionModalDraft.useAmountLimit;
+            renderDetailOptionBody();
+        }
+
+        function addDetailOptionGroup() {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.groups.push({ name: "", selectType: 'single', allowQty: false, items: [{ name: "", price: 0 }] });
+            renderDetailOptionBody();
+        }
+
+        function removeDetailOptionGroup(gi) {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.groups.splice(gi, 1);
+            renderDetailOptionBody();
+        }
+
+        function setDetailOptionSelectType(gi, type) {
+            syncDetailOptionDraft();
+            if (!optionModalDraft || !optionModalDraft.groups[gi]) return;
+            optionModalDraft.groups[gi].selectType = type;
+            renderDetailOptionBody();
+        }
+
+        // [신규] 여러 개 선택 옵션에서 항목별 수량 선택을 허용할지
+        function toggleDetailOptionAllowQty(gi) {
+            syncDetailOptionDraft();
+            if (!optionModalDraft || !optionModalDraft.groups[gi]) return;
+            const g = optionModalDraft.groups[gi];
+            g.allowQty = !(g.allowQty === true || g.allowQty === 'true');
+            renderDetailOptionBody();
+        }
+
+        function addDetailOptionItem(gi) {
+            syncDetailOptionDraft();
+            if (!optionModalDraft || !optionModalDraft.groups[gi]) return;
+            optionModalDraft.groups[gi].items.push({ name: "", price: 0 });
+            renderDetailOptionBody();
+        }
+
+        function removeDetailOptionItem(gi, ii) {
+            syncDetailOptionDraft();
+            if (!optionModalDraft || !optionModalDraft.groups[gi]) return;
+            optionModalDraft.groups[gi].items.splice(ii, 1);
+            renderDetailOptionBody();
+        }
+
+        function renderDetailOptionBody() {
+            const body = document.getElementById('product-option-modal-body');
+            if (!body || !optionModalDraft) return;
+
+            const useOn = !!optionModalDraft.useOptions;
+            const choiceOn = !!optionModalDraft.useChoiceOptions;
+            const personOn = !!optionModalDraft.usePersonLimit;
+            const minOn = !!optionModalDraft.useAmountLimit;
+            const feeOn = !!optionModalDraft.useAgencyFee;
+
+            // 1) 상세옵션 사용 여부 (끄면 아래 설정은 그대로 남기고 주문서에서만 옵션을 쓰지 않음)
+            let html = `
+                <div style="border: 1.5px solid ${useOn ? '#7c3aed' : 'var(--border)'}; background: ${useOn ? '#f5f3ff' : '#f8fafc'}; border-radius: var(--radius-sub); padding: 14px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <div style="min-width: 0;">
+                            <div style="font-size: 13px; font-weight: 800; color: var(--text-main);">상세옵션 사용</div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-sub); margin-top: 4px; line-height: 1.5;">
+                                ${useOn
+                                    ? '아래 설정(선택옵션 · 개수 제한 · 금액 옵션 · 사다드림 대행료)이 모두 적용됩니다.'
+                                    : '<b>꺼져 있습니다.</b> 아래 설정은 그대로 보관되고, 선택옵션 · 개수 제한 · 금액 옵션 · 대행료가 <b>모두</b> 적용되지 않습니다.'}
+                            </div>
+                        </div>
+                        <button type="button" onclick="toggleDraftUseOptions()" style="flex: 0 0 auto; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; border: 1.5px solid ${useOn ? '#7c3aed' : 'var(--border)'}; background: ${useOn ? '#7c3aed' : '#fff'}; color: ${useOn ? '#fff' : 'var(--text-sub)'};">${useOn ? 'ON' : 'OFF'}</button>
+                    </div>
+                </div>
+
+                <div style="${useOn ? '' : 'opacity: 0.45; pointer-events: none;'}">
+
+                <!-- 2) 선택옵션 (헤더 + 옵션 목록이 한 틀 안에) -->
+                <div style="border: 1.5px solid ${choiceOn ? '#7c3aed' : 'var(--border)'}; background: ${choiceOn ? '#f5f3ff' : '#f8fafc'}; border-radius: var(--radius-sub); padding: 14px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <div style="min-width: 0;">
+                            <div style="font-size: 13px; font-weight: 800; color: var(--text-main);">선택옵션</div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-sub); margin-top: 4px; line-height: 1.5;">
+                                ${choiceOn
+                                    ? '주문자가 아래 옵션 중에서 골라 담습니다.'
+                                    : '<b>꺼져 있습니다.</b> 아래 옵션은 그대로 보관되고, 주문서에는 표시되지 않습니다.'}
+                            </div>
+                        </div>
+                        <button type="button" onclick="toggleDraftUseChoiceOptions()" style="flex: 0 0 auto; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; border: 1.5px solid ${choiceOn ? '#7c3aed' : 'var(--border)'}; background: ${choiceOn ? '#7c3aed' : '#fff'}; color: ${choiceOn ? '#fff' : 'var(--text-sub)'};">${choiceOn ? 'ON' : 'OFF'}</button>
+                    </div>
+
+                    <div style="margin-top: 12px; ${choiceOn ? '' : 'opacity: 0.45; pointer-events: none;'}">`;
+
+            // 2-1) 옵션 그룹 목록
+            if (optionModalDraft.groups.length === 0) {
+                html += `
+                <div style="padding: 26px 12px; text-align: center; font-size: 13px; font-weight: 700; color: var(--text-sub); background: #fff; border: 1.5px dashed var(--border); border-radius: var(--radius-sub); margin-bottom: 12px; line-height: 1.6;">
+                    아직 만든 옵션이 없습니다.<br>아래 <b>+ 옵션 추가</b> 버튼을 눌러 만들어 주세요.
+                </div>`;
+            }
+
+            optionModalDraft.groups.forEach((g, gi) => {
+                const isMulti = g.selectType === 'multi';
+                const allowQty = (g.allowQty === true || g.allowQty === 'true');
+                html += `
+                <div style="border: 1.5px solid var(--border); border-radius: var(--radius-sub); padding: 14px; margin-bottom: 12px; background: #fff;">
+                    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 10px;">
+                        <input type="text" data-opt-role="group-name" data-gi="${gi}" value="${escapeAttrValue(g.name)}" placeholder="옵션 이름 (예: 과일 종류)"
+                            style="flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 700; outline: none;">
+                        <button type="button" onclick="removeDetailOptionGroup(${gi})" title="이 옵션 삭제"
+                            style="flex: 0 0 auto; width: 38px; height: 38px; border: 1.5px solid var(--border); background: #fff; border-radius: 8px; font-size: 17px; font-weight: 800; color: var(--red); cursor: pointer;">&times;</button>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 10px; margin-bottom: 12px;">
+                        <div onclick="setDetailOptionSelectType(${gi}, 'single')" style="text-align: center; padding: 9px 0; font-size: 12px; font-weight: 800; cursor: pointer; border-radius: 8px; background: ${!isMulti ? '#fff' : 'transparent'}; color: ${!isMulti ? 'var(--text-main)' : 'var(--text-sub)'};">한 개만 선택</div>
+                        <div onclick="setDetailOptionSelectType(${gi}, 'multi')" style="text-align: center; padding: 9px 0; font-size: 12px; font-weight: 800; cursor: pointer; border-radius: 8px; background: ${isMulti ? '#fff' : 'transparent'}; color: ${isMulti ? 'var(--text-main)' : 'var(--text-sub)'};">여러 개 선택</div>
+                    </div>
+
+                    <!-- [신규] 여러 개 선택일 때만: 항목마다 수량을 고를 수 있게 할지 -->
+                    <div style="display: ${isMulti ? 'flex' : 'none'}; align-items: center; justify-content: space-between; gap: 10px; background: ${allowQty ? '#f5f3ff' : '#f8fafc'}; border: 1.5px solid ${allowQty ? '#7c3aed' : 'var(--border)'}; border-radius: 8px; padding: 9px 12px; margin-bottom: 12px;">
+                        <div style="min-width: 0;">
+                            <div style="font-size: 12px; font-weight: 800; color: var(--text-main);">수량 선택 허용</div>
+                            <div style="font-size: 11px; font-weight: 600; color: var(--text-sub); margin-top: 2px; line-height: 1.5;">켜면 주문자가 항목마다 개수를 정할 수 있습니다. (예: 우유 2개)</div>
+                        </div>
+                        <button type="button" onclick="toggleDetailOptionAllowQty(${gi})" style="flex: 0 0 auto; padding: 7px 13px; border-radius: 8px; font-size: 11px; font-weight: 800; cursor: pointer; border: 1.5px solid ${allowQty ? '#7c3aed' : 'var(--border)'}; background: ${allowQty ? '#7c3aed' : '#fff'}; color: ${allowQty ? '#fff' : 'var(--text-sub)'};">${allowQty ? 'ON' : 'OFF'}</button>
+                    </div>
+
+                    <div style="font-size: 11px; font-weight: 800; color: var(--text-sub); margin-bottom: 6px;">선택 항목 <span style="font-weight: 700;">(오른쪽 칸은 금액)</span></div>`;
+
+                (g.items || []).forEach((it, ii) => {
+                    html += `
+                    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
+                        <input type="text" data-opt-role="item-name" data-gi="${gi}" data-ii="${ii}" value="${escapeAttrValue(it.name)}" placeholder="항목명 (예: 사과)"
+                            style="flex: 1 1 auto; min-width: 0; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 600; outline: none;">
+                        <input type="number" data-opt-role="item-price" data-gi="${gi}" data-ii="${ii}" value="${parseInt(it.price) || 0}" min="0"
+                            style="flex: 0 0 90px; width: 90px; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
+                        <button type="button" onclick="removeDetailOptionItem(${gi}, ${ii})" title="이 항목 삭제"
+                            style="flex: 0 0 auto; width: 34px; height: 34px; border: 1.5px solid var(--border); background: #fff; border-radius: 8px; font-size: 15px; font-weight: 800; color: var(--text-sub); cursor: pointer;">&times;</button>
+                    </div>`;
+                });
+
+                html += `
+                    <button type="button" onclick="addDetailOptionItem(${gi})"
+                        style="width: 100%; margin-top: 4px; padding: 10px 0; border: 1.5px dashed var(--border); background: #f8fafc; border-radius: 8px; font-size: 12px; font-weight: 800; color: var(--text-sub); cursor: pointer;">+ 항목 추가</button>
+                </div>`;
+            });
+
+            // 2-2) 옵션 추가 버튼 (여기까지가 '선택옵션' 묶음)
+            html += `
+                <button type="button" onclick="addDetailOptionGroup()"
+                    style="width: 100%; padding: 14px 0; border: 1.5px dashed #7c3aed; background: #fff; border-radius: var(--radius-sub); font-size: 13px; font-weight: 800; color: #7c3aed; cursor: pointer;">+ 옵션 추가</button>
+                    </div>
+                </div>`; // 선택옵션 틀 끝
+
+            // 3) 사람당 주문 개수 제한 (헤더 + 개수 입력이 한 틀 안에)
+            html += `
+                <div style="border: 1.5px solid ${personOn ? '#7c3aed' : 'var(--border)'}; background: ${personOn ? '#f5f3ff' : '#fff'}; border-radius: var(--radius-sub); padding: 14px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <div style="min-width: 0;">
+                            <div style="font-size: 13px; font-weight: 800; color: var(--text-main);">사람당 주문 개수 제한</div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-sub); margin-top: 4px; line-height: 1.5;">
+                                한 사람이 이 상품을 아래 개수까지만 주문할 수 있습니다.
+                            </div>
+                        </div>
+                        <button type="button" onclick="toggleDraftPersonLimit()" style="flex: 0 0 auto; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; border: 1.5px solid ${personOn ? '#7c3aed' : 'var(--border)'}; background: ${personOn ? '#7c3aed' : '#fff'}; color: ${personOn ? '#fff' : 'var(--text-sub)'};">${personOn ? 'ON' : 'OFF'}</button>
+                    </div>
+                    <div style="display: ${personOn ? 'flex' : 'none'}; align-items: center; gap: 6px; margin-top: 12px;">
+                        <span style="flex: 0 0 52px; font-size: 12px; font-weight: 800; color: var(--text-sub);">1인당</span>
+                        <input type="number" data-person-role="max" value="${parseInt(optionModalDraft.maxPerPerson) || 0}" min="0" placeholder="예: 2"
+                            style="flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 800; outline: none; text-align: right; background: #fff;">
+                        <span style="flex: 0 0 auto; font-size: 12px; font-weight: 800; color: var(--text-sub);">개까지</span>
+                    </div>
+                </div>`;
+
+            // 4) 금액 옵션: 최저·최대 (켜고 끄기 + 금액 직접 입력. 상품 가격과는 무관)
+            html += `
+                <div style="border: 1.5px solid ${minOn ? '#7c3aed' : 'var(--border)'}; background: ${minOn ? '#f5f3ff' : '#fff'}; border-radius: var(--radius-sub); padding: 14px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <div style="min-width: 0;">
+                            <div style="font-size: 13px; font-weight: 800; color: var(--text-main);">최저 · 최대 금액 옵션</div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-sub); margin-top: 4px; line-height: 1.5;">
+                                주문자가 고른 옵션 금액 합계가 아래 범위 안이어야 주문할 수 있습니다.<br>
+                                <span style="color: #94a3b8;">상품 가격과는 별개로 여기에 적은 금액만 사용됩니다. 0으로 두면 그쪽 제한은 없습니다.</span>
+                            </div>
+                        </div>
+                        <button type="button" onclick="toggleDraftAmountLimit()" style="flex: 0 0 auto; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; border: 1.5px solid ${minOn ? '#7c3aed' : 'var(--border)'}; background: ${minOn ? '#7c3aed' : '#fff'}; color: ${minOn ? '#fff' : 'var(--text-sub)'};">${minOn ? 'ON' : 'OFF'}</button>
+                    </div>
+                    <div style="display: ${minOn ? 'block' : 'none'}; margin-top: 12px;">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                            <span style="flex: 0 0 52px; font-size: 12px; font-weight: 800; color: var(--text-sub);">최저</span>
+                            <input type="number" data-amount-role="min" value="${parseInt(optionModalDraft.minAmount) || 0}" min="0" placeholder="예: 10000"
+                                style="flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 800; outline: none; text-align: right; background: #fff;">
+                            <span style="flex: 0 0 auto; font-size: 12px; font-weight: 800; color: var(--text-sub);">원 이상</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="flex: 0 0 52px; font-size: 12px; font-weight: 800; color: var(--text-sub);">최대</span>
+                            <input type="number" data-amount-role="max" value="${parseInt(optionModalDraft.maxAmount) || 0}" min="0" placeholder="0 = 제한 없음"
+                                style="flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 800; outline: none; text-align: right; background: #fff;">
+                            <span style="flex: 0 0 auto; font-size: 12px; font-weight: 800; color: var(--text-sub);">원 이하</span>
+                        </div>
+                    </div>
+                </div>`;
+
+            // 4) 사다드림 대행료 (헤더 + 구간표가 한 틀 안에. '상세옵션 사용'을 끄면 이것까지 함께 꺼진다)
+            html += `
+                <div style="border: 1.5px solid ${feeOn ? '#0284c7' : 'var(--border)'}; background: ${feeOn ? '#f0f9ff' : '#f8fafc'}; border-radius: var(--radius-sub); padding: 14px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <div style="min-width: 0;">
+                            <div style="font-size: 13px; font-weight: 800; color: var(--text-main);">사다드림 대행료</div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-sub); margin-top: 4px; line-height: 1.5;">
+                                ${feeOn
+                                    ? '최종금액에 따라 아래 표의 대행료가 붙습니다.'
+                                    : '<b>꺼져 있습니다.</b> 아래 표는 그대로 보관되고, 대행료는 붙지 않습니다.'}
+                            </div>
+                        </div>
+                        <button type="button" onclick="toggleDraftUseAgencyFee()" style="flex: 0 0 auto; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; border: 1.5px solid ${feeOn ? '#0284c7' : 'var(--border)'}; background: ${feeOn ? '#0284c7' : '#fff'}; color: ${feeOn ? '#fff' : 'var(--text-sub)'};">${feeOn ? 'ON' : 'OFF'}</button>
+                    </div>
+
+                    <div style="margin-top: 12px; ${feeOn ? '' : 'opacity: 0.45; pointer-events: none;'}">
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-sub); margin-bottom: 8px; line-height: 1.6;">
+                        최종금액이 기준금액 이상이면 그 줄의 대행료가 적용되고, 조건에 맞는 줄이 여러 개면 <b>기준금액이 가장 큰 줄</b>이 적용됩니다.<br>
+                        예) 0원 이상 → 3,000원 / 30,000원 이상 → 0원
+                    </div>
+                    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 4px;">
+                        <div style="flex: 1 1 0; font-size: 11px; font-weight: 800; color: var(--text-sub);">최종금액 (이상)</div>
+                        <div style="flex: 1 1 0; font-size: 11px; font-weight: 800; color: var(--text-sub);">대행료</div>
+                        <div style="flex: 0 0 34px;"></div>
+                    </div>`;
+
+            if ((optionModalDraft.feeTiers || []).length === 0) {
+                html += `
+                    <div style="padding: 20px 12px; text-align: center; font-size: 12px; font-weight: 700; color: var(--text-sub); background: #fff; border: 1.5px dashed var(--border); border-radius: var(--radius-sub); margin-bottom: 8px; line-height: 1.6;">
+                        아직 만든 구간이 없습니다.<br>아래 <b>+ 구간 추가</b> 버튼을 눌러 만들어 주세요.
+                    </div>`;
+            }
+
+            (optionModalDraft.feeTiers || []).forEach((t, fi) => {
+                html += `
+                    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
+                        <div style="flex: 1 1 0; display: flex; align-items: center; gap: 4px; min-width: 0;">
+                            <input type="number" data-fee-role="fee-from" data-fi="${fi}" value="${parseInt(t.from) || 0}" min="0"
+                                style="flex: 1 1 0; min-width: 0; padding: 9px 10px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
+                            <span style="flex: 0 0 auto; font-size: 11px; font-weight: 800; color: var(--text-sub);">원</span>
+                        </div>
+                        <div style="flex: 1 1 0; display: flex; align-items: center; gap: 4px; min-width: 0;">
+                            <input type="number" data-fee-role="fee-amount" data-fi="${fi}" value="${parseInt(t.fee) || 0}" min="0"
+                                style="flex: 1 1 0; min-width: 0; padding: 9px 10px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
+                            <span style="flex: 0 0 auto; font-size: 11px; font-weight: 800; color: var(--text-sub);">원</span>
+                        </div>
+                        <button type="button" onclick="removeAgencyFeeTier(${fi})" title="이 구간 삭제"
+                            style="flex: 0 0 34px; width: 34px; height: 34px; border: 1.5px solid var(--border); background: #fff; border-radius: 8px; font-size: 15px; font-weight: 800; color: var(--text-sub); cursor: pointer;">&times;</button>
+                    </div>`;
+            });
+
+            html += `
+                    <button type="button" onclick="addAgencyFeeTier()"
+                        style="width: 100%; margin-top: 4px; padding: 12px 0; border: 1.5px dashed #0284c7; background: #fff; border-radius: var(--radius-sub); font-size: 13px; font-weight: 800; color: #0284c7; cursor: pointer;">+ 구간 추가</button>
+                    </div>
+                </div>
+
+                </div>`; // '상세옵션 사용' OFF일 때 통째로 비활성화되는 영역 끝
+
+            body.innerHTML = html;
+        }
+
         // 매주 노출 상품 자동 날짜 갱신 헬퍼 함수
         function checkAndRunWeeklyProductsAutoUpdate(data) {
             if (!data) return false;
@@ -9575,6 +10233,9 @@
                 buildManageCategoryTabs();
                 buildSubTabs();
                 renderProductsList();
+
+                // [신규] 저장해 둔 기본 대행료 불러오기 (신규 등록 폼에 미리 채움)
+                loadDefaultProductSettings().catch(e => console.error("기본 설정 로드 실패:", e));
             } catch (e) {
                 console.error("데이터 로드 실패:", e);
                 showToast("데이터 로드에 실패했습니다.");
@@ -10079,7 +10740,10 @@
             uploadForceDuplicate = false;
 
             let name = document.getElementById('productName').value.trim();
-            const price = parseInt(document.getElementById('productPrice').value);
+            // [수정] 금액 옵션을 쓰는 상품은 가격칸이 잠겨 있으므로 가격을 0으로 저장 (최저/최대금액만 사용)
+            const price = (uploadUseOptions && uploadUseAmountLimit)
+                ? 0
+                : (parseInt(document.getElementById('productPrice').value) || 0);
             const desc = document.getElementById('productDesc').value.trim();
             
             const isUnlimited = document.getElementById('unlimitedStock').checked;
@@ -10163,6 +10827,17 @@
                     showToday: showToday,
                     showReserve: showReserve,
                     showWeekly: showWeekly,
+                    // [신규] 상세옵션 설정
+                    useOptions: uploadUseOptions,
+                    useChoiceOptions: uploadUseChoiceOptions,
+                    usePersonLimit: uploadUsePersonLimit,
+                    maxPerPerson: uploadMaxPerPerson,
+                    useAmountLimit: uploadUseAmountLimit,
+                    minAmount: uploadMinAmount,
+                    maxAmount: uploadMaxAmount,
+                    options: uploadProductOptions,
+                    useAgencyFee: uploadUseAgencyFee,
+                    agencyFeeTiers: uploadAgencyFeeTiers,
                     updatedAt: Date.now()
                 };
 
@@ -10500,6 +11175,8 @@
 
             // 말머리는 체크박스가 담당하므로 입력칸에는 순수 상품명만 보여준다
             document.getElementById('productName').value = String(prod.name || "").replace(/^\s*\[\s*사다드림\s*\]\s*/, '');
+            // 이전 상품에서 잠겨 있었을 수 있으므로 가격칸을 먼저 깨끗한 숫자칸으로 되돌린 뒤 값을 넣는다
+            resetPriceField();
             document.getElementById('productPrice').value = prod.price || 0;
             document.getElementById('productDesc').value = prod.desc || "";
 
@@ -10518,6 +11195,20 @@
             isShowReserve = (prod.showReserve !== false);
             isShowWeekly = (prod.showWeekly === true);
             updateExposureButtonsUI();
+
+            // [신규] 저장된 상세옵션 복원 (useOptions 필드가 없는 기존 상품은 켜짐으로 간주)
+            uploadUseOptions = (prod.useOptions !== false && prod.useOptions !== 'false');
+            uploadUseChoiceOptions = (prod.useChoiceOptions === true || prod.useChoiceOptions === 'true');
+            uploadUsePersonLimit = (prod.usePersonLimit === true || prod.usePersonLimit === 'true');
+            uploadMaxPerPerson = parseInt(prod.maxPerPerson) || 0;
+            uploadUseAmountLimit = (prod.useAmountLimit === true || prod.useAmountLimit === 'true');
+            uploadMinAmount = parseInt(prod.minAmount) || 0;
+            uploadMaxAmount = parseInt(prod.maxAmount) || 0;
+            uploadProductOptions = Array.isArray(prod.options) ? JSON.parse(JSON.stringify(prod.options)) : [];
+            uploadUseAgencyFee = (prod.useAgencyFee === true || prod.useAgencyFee === 'true');
+            uploadAgencyFeeTiers = Array.isArray(prod.agencyFeeTiers) ? JSON.parse(JSON.stringify(prod.agencyFeeTiers)) : [];
+            updateDetailOptionButtonUI();
+            updatePriceFieldForAmountLimit();
 
             if (tabType === 'reserve') {
                 document.getElementById('categoryValue').value = prod.date || "";
@@ -10576,6 +11267,14 @@
             isShowReserve = true;
             isShowWeekly = false;
             updateExposureButtonsUI();
+
+            // [신규] 상세옵션 초기화
+            //  금액/대행료 값은 저장해 둔 기본값으로 채우되, 세부 옵션 스위치는 꺼진 상태로 시작
+            uploadProductOptions = [];
+            resetPriceField(); // 잠겨 있던 가격칸을 깨끗한 숫자칸으로 되돌림
+            applyDefaultProductSettings();
+            updateDetailOptionButtonUI();
+            updatePriceFieldForAmountLimit();
 
             if (wasEditMode) {
                 switchAdminTab('product-list');
