@@ -2050,7 +2050,7 @@
             <div class="segment-btn admin-nav-btn active" data-tab="orders" onclick="switchAdminTab('orders')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 주문 관리</div>
             <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🛒 상품 관리 <span id="product-count" style="display: none;">(0)</span></div>
             <div class="segment-btn admin-nav-btn" data-tab="purchase-history" onclick="switchAdminTab('purchase-history')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🚚 발주 관리</div>
-            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 판매 통계</div>
+            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 자료 정리</div>
             <!-- [숨김] 섬네일 탭 — 버튼만 숨기고 기능(tab-admin-thumbnail-generator, switchAdminTab)은 그대로 유지 -->
             <div class="segment-btn admin-nav-btn" data-tab="thumbnail-generator" onclick="switchAdminTab('thumbnail-generator')" style="display:none; text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🎨 섬네일</div>
         </div>
@@ -2656,6 +2656,36 @@
     <div id="tab-admin-sales" class="admin-tab-content" style="display: none;">
         <div class="container" style="max-width: 900px; margin: 0 auto;">
 
+            <!-- [신규] 자료 정리 하위 탭: 판매 통계 / 아파트 관리 -->
+            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
+                <div class="segment-btn data-sub-btn active" id="btn-data-sub-sales" onclick="switchDataSubTab('sales')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📊 판매 통계</div>
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-apart" onclick="switchDataSubTab('apart')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🏢 아파트 관리</div>
+            </div>
+
+            <!-- 아파트 관리 -->
+            <div id="data-sub-apart" style="display:none;">
+                <div class="card" style="padding: 12px;">
+                    <div class="card-title" style="margin:0 0 4px; font-size:14px;">🏢 아파트 자료</div>
+                    <div style="font-size:11.5px; color:var(--text-sub); font-weight:700; line-height:1.6; margin-bottom:12px; word-break:keep-all;">
+                        배달 주소에서 아파트를 알아보는 기준입니다. 지번이 있으면 지번을 먼저 보고, 없으면 이름(키워드)을 긴 것부터 맞춰 봅니다.
+                        별칭은 주문 검색창에서 그 단어로 찾을 수 있게 해 줍니다.
+                    </div>
+                    <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+                        <input type="text" id="apart-test-input" placeholder="🔍 주소를 넣어 어떻게 인식되는지 확인" oninput="renderApartmentTest()" style="flex:1 1 0; min-width:0; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; box-sizing:border-box;">
+                    </div>
+                    <div id="apart-test-result" style="margin-bottom:14px;"></div>
+                    <div id="apart-summary" style="margin-bottom:14px;"></div>
+                    <div class="card-title" style="margin:0 0 6px; font-size:13px;">📋 기본 아파트 표 <span style="font-size:11px; font-weight:700; color:var(--text-sub);">· 주문 많은 순</span></div>
+                    <div id="apart-table-wrap" style="overflow-x:auto; margin-bottom:18px;"></div>
+                    <div class="card-title" style="margin:0 0 6px; font-size:13px;">✏️ 내가 묶은 구역</div>
+                    <div id="apart-custom-list" style="margin-bottom:18px;"></div>
+                    <div id="apart-unmatched"></div>
+                </div>
+            </div>
+
+            <!-- 판매 통계 -->
+            <div id="data-sub-sales">
+
             <!-- [변경] 발주 관리는 주문관리 탭으로 이동. 판매관리는 판매현황만 → 하위탭 세그먼트 숨김 -->
             <div class="segment-control" style="display:none;">
                 <div class="segment-btn sales-sub-btn active" data-sales-sub="purchase" onclick="setSalesSubTab('purchase')"></div>
@@ -2737,6 +2767,8 @@
                 <div id="sales-customer-stats" style="display:none;"></div>
             </div>
             </div><!-- /sales-sub-status -->
+
+            </div><!-- /data-sub-sales -->
 
         </div>
     </div>
@@ -3418,32 +3450,142 @@
             renderFilteredOrders();
         }
 
-        // [신규] 주소 별칭(아파트명) 매핑 헬퍼
-        function getAddressAliases(address) {
-            if (!address) return [];
-            const normalizedAddr = String(address).replace(/\s+/g, ""); // 모든 공백 제거
-            const aliases = [];
-            
-            // 주소 키워드와 대응되는 아파트 별칭 정의
-            const mapping = {
-                "선동433": ["푸르지오", "미사강변2차푸르지오", "미사강변2차", "미사강변도시24단지"],
-                "선동436": ["더샵", "리버포레", "미사강변더샵리버포레"],
-                "선동427": ["자이", "센트럴자이", "미사강변센트럴자이"],
-                "선동430": ["자이", "리버뷰자이", "미사강변리버뷰자이"],
-                "선동434": ["베라체", "21단지", "미사강변도시21단지"],
-                "선동435": ["리버나인", "9단지", "미사강변도시9단지"],
-                "선동432": ["칸타빌", "리버스위트칸타빌"],
-                "망월동1100": ["골든센트로", "28단지"],
-                "망월동1110": ["부영", "사랑으로", "31단지"],
-                "망월동1090": ["센트럴포레", "29단지"]
-            };
-            
-            for (const key in mapping) {
-                if (normalizedAddr.includes(key)) {
-                    aliases.push(...mapping[key]);
-                }
+        // [신규] 아파트 자료 한 곳 모음.
+        //  예전에는 (1) 검색 별칭표와 (2) 표시 이름표가 따로 있어서 서로 어긋났다.
+        //  아데나·호반처럼 이름은 뽑히는데 검색은 안 되는 곳이 있었고,
+        //  '리버뷰자이'가 목록 순서 때문에 '자이'로 잡히기도 했다. 이제 이 표 하나만 본다.
+        //   name    : 화면·인쇄에 쓰는 짧은 이름
+        //   lots    : 지번 (공백 없이). 가장 확실한 근거라 제일 먼저 본다
+        //   keywords: 주소 문자열에 이 단어가 있으면 이 아파트로 본다 (긴 단어부터 매칭)
+        //   aliases : 검색창에서 이 단어로 찾을 수 있게 한다
+        const APARTMENT_DATA = [
+            { name: "푸르지오2차", lots: ["선동433"], keywords: ["미사강변2차푸르지오"], aliases: ["푸르지오", "미사강변2차푸르지오", "미사강변2차", "미사강변도시24단지"] },
+            { name: "더샵",        lots: ["선동436"], keywords: ["미사강변더샵리버포레", "리버포레", "더샵"], aliases: ["더샵", "리버포레", "미사강변더샵리버포레"] },
+            { name: "자이",        lots: ["선동427"], keywords: ["미사강변센트럴자이", "센트럴자이"], aliases: ["자이", "센트럴자이", "미사강변센트럴자이"] },
+            { name: "리버뷰자이",  lots: ["선동430"], keywords: ["미사강변리버뷰자이", "리버뷰자이"], aliases: ["자이", "리버뷰자이", "미사강변리버뷰자이"] },
+            { name: "베라체",      lots: ["선동434"], keywords: ["베라체"], aliases: ["베라체", "21단지", "미사강변도시21단지"] },
+            { name: "리버나인",    lots: ["선동435"], keywords: ["리버나인"], aliases: ["리버나인", "9단지", "미사강변도시9단지"] },
+            { name: "칸타빌",      lots: ["선동432"], keywords: ["리버스위트칸타빌", "칸타빌"], aliases: ["칸타빌", "리버스위트칸타빌"] },
+            { name: "골든센트로",  lots: ["망월동1100"], keywords: ["골든센트로"], aliases: ["골든센트로", "28단지"] },
+            { name: "부영",        lots: ["망월동1110"], keywords: ["사랑으로부영", "부영"], aliases: ["부영", "사랑으로", "31단지"] },
+            { name: "센트럴포레",  lots: ["망월동1090"], keywords: ["센트럴포레"], aliases: ["센트럴포레", "29단지"] },
+            // 지번은 아직 모르고 이름(키워드)으로만 찾는 곳
+            { name: "e편한세상",   lots: [], keywords: ["e편한", "이편한"], aliases: ["e편한세상", "e편한", "이편한"] },
+            { name: "서희스타힐스", lots: [], keywords: ["서희스타힐스"], aliases: ["서희스타힐스", "스타힐스"] },
+            { name: "힐스테이트",  lots: [], keywords: ["힐스테이트"], aliases: ["힐스테이트"] },
+            { name: "신안인스빌",  lots: [], keywords: ["신안인스빌"], aliases: ["신안인스빌", "인스빌"] },
+            { name: "루나리움",    lots: [], keywords: ["루나리움"], aliases: ["루나리움"] },
+            { name: "디에트르",    lots: [], keywords: ["디에트르"], aliases: ["디에트르"] },
+            { name: "아이파크",    lots: [], keywords: ["아이파크"], aliases: ["아이파크"] },
+            { name: "롯데캐슬",    lots: [], keywords: ["롯데캐슬"], aliases: ["롯데캐슬"] },
+            { name: "센트리버",    lots: [], keywords: ["센트리버"], aliases: ["센트리버"] },
+            { name: "아데나",      lots: [], keywords: ["아데나"], aliases: ["아데나"] },
+            { name: "호반",        lots: [], keywords: ["호반"], aliases: ["호반"] },
+            { name: "동원",        lots: [], keywords: ["동원"], aliases: ["동원"] },
+            { name: "스타힐스",    lots: [], keywords: ["스타힐스"], aliases: ["스타힐스"] },
+            // 위에서 못 찾았을 때만 걸리도록 짧은 단어는 맨 뒤에 둔다.
+            // [수정] 그냥 '푸르지오'는 2차(선동433)와 다른 1차를 가리킨다. 1차로 부른다.
+            { name: "푸르지오1차", lots: [], keywords: ["미사강변1차푸르지오", "푸르지오1차", "1차푸르지오", "푸르지오"], aliases: ["푸르지오1차", "푸르지오", "미사강변1차푸르지오", "미사강변푸르지오", "1차"] },
+            { name: "자이",        lots: [], keywords: ["자이"], aliases: ["자이"] }
+        ];
+
+        const gNormAddr = (address) => String(address || "").replace(/\s+/g, "");
+
+        // [신규] 사장님이 직접 묶는 '구역'. Firebase(apartment_custom)에 저장한다.
+        //  빌라처럼 주소가 제각각이어도 같은 동네면 한 이름으로 묶어 보려고 만든 것이라,
+        //  구역 하나에 주소를 여러 개 담는다. 위 APARTMENT_DATA(기본 표)보다 먼저 본다.
+        //   { key: 저장 키, name: 부를 이름, matches: [주소조각, ...] }
+        let APARTMENT_CUSTOM = [];
+
+        async function loadApartmentCustom() {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}apartment_custom.json`);
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                const data = await res.json();
+                APARTMENT_CUSTOM = Object.entries(data || {}).map(([key, v]) => {
+                    v = v || {};
+                    // matches(여러 주소)가 기본. 예전에 저장한 match(주소 하나)도 읽어 준다.
+                    const list = Array.isArray(v.matches) ? v.matches
+                               : (v.matches && typeof v.matches === 'object') ? Object.values(v.matches)
+                               : (v.match ? [v.match] : []);
+                    return {
+                        key: key,
+                        name: String(v.name || "").trim(),
+                        matches: [...new Set(list.map(gNormAddr).filter(Boolean))]
+                    };
+                }).filter(g => g.name && g.matches.length > 0);
+            } catch (e) {
+                console.warn("구역 자료 불러오기 실패:", e);
             }
-            return aliases;
+            return APARTMENT_CUSTOM;
+        }
+
+        // [신규] 아파트를 부를 명칭. Firebase(apartment_nick)에 아파트명을 키로 저장한다.
+        //  인쇄물 '배송지' 줄에 이 이름이 찍히고 검색어에도 더해진다. 따로 정하지 않으면 아파트명 그대로.
+        let APARTMENT_NICK = {};
+
+        async function loadApartmentNick() {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}apartment_nick.json`);
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                const data = await res.json();
+                APARTMENT_NICK = {};
+                Object.entries(data || {}).forEach(([k, v]) => {
+                    const nick = String((v && v.nick) || v || "").trim();
+                    const name = String((v && v.name) || "").trim();
+                    if (nick) APARTMENT_NICK[name || k] = nick;
+                });
+            } catch (e) {
+                console.warn("아파트 명칭 불러오기 실패:", e);
+            }
+            return APARTMENT_NICK;
+        }
+
+        // 주소 하나가 어느 구역에 속하는지. 긴 주소조각부터 맞춰 본다.
+        function gFindCustomZone(normAddr) {
+            let best = null, bestLen = 0;
+            APARTMENT_CUSTOM.forEach(g => {
+                g.matches.forEach(m => {
+                    if (m.length > bestLen && normAddr.includes(m)) { best = g; bestLen = m.length; }
+                });
+            });
+            return best;
+        }
+
+        // 주소에 해당하는 아파트 한 곳을 찾는다. 지번이 있으면 지번이 우선,
+        // 없으면 키워드를 긴 것부터 맞춰 본다. (짧은 '자이'가 '리버뷰자이'를 가로채지 않게)
+        function gFindApartment(address) {
+            const addr = gNormAddr(address);
+            if (!addr) return null;
+
+            // [수정] 기본 표(지번·키워드)를 먼저 본다.
+            //  직접 묶은 구역은 '기본 표로 못 찾는 주소'를 모으려고 만든 것이라 마지막에 본다.
+            //  구역을 먼저 보면 '미사'처럼 짧은 조각 하나가 다른 아파트까지 전부 삼켜 버린다.
+            for (const apt of APARTMENT_DATA) {
+                if (apt.lots.some(lot => addr.includes(lot))) return apt;
+            }
+
+            let best = null, bestLen = 0;
+            APARTMENT_DATA.forEach(apt => {
+                apt.keywords.forEach(kw => {
+                    if (kw.length > bestLen && addr.includes(kw)) { best = apt; bestLen = kw.length; }
+                });
+            });
+            if (best) return best;
+
+            const zone = gFindCustomZone(addr);
+            if (zone) {
+                return { name: zone.name, lots: zone.matches, keywords: [], aliases: [zone.name], __custom: true, __key: zone.key };
+            }
+            return null;
+        }
+
+        // [수정] 검색용 별칭 — 위 표에서 뽑아 쓴다
+        function getAddressAliases(address) {
+            const apt = gFindApartment(address);
+            if (!apt) return [];
+            const nick = APARTMENT_NICK[apt.name];
+            return [...new Set([apt.name].concat(apt.aliases).concat(nick ? [nick] : []))];
         }
 
         // 3. 필터링 및 렌더링
@@ -3606,6 +3748,38 @@
             renderFilteredOrders();
         }
 
+        // [신규] 배달비 정산 표시용 공통 처리.
+        //  주문서에서 배달비를 붙이거나 빼줄 때 기존 기록을 고치지 않고 '배달비 차감'(마이너스) 줄을
+        //  새로 쌓는다. 여기서는 같은 금액끼리 짝지어 감춰서, 최종으로 남는 배달비만 보이게 한다.
+        //  짝이 없는 줄은 그대로 남겨 금액이 어긋나지 않게 한다.
+        const FEE_REFUND_NAME = "배달비 차감";
+
+        function gFeeRowName(it) {
+            return String((it && it.item) || "").replace(/\[취소\]/g, "").trim();
+        }
+
+        function gIsFeeRow(it) {
+            const n = gFeeRowName(it);
+            return n === "배달비" || n === FEE_REFUND_NAME;
+        }
+
+        function gOffsetFeeRows(items) {
+            const isCanceled = (it) => (it.canceled === true || it.canceled === "true" || String(it.canceled).toUpperCase() === "TRUE");
+            const amountOf = (it) => Math.abs(parseInt(String(it.total !== undefined ? it.total : it.price || 0).replace(/,/g, "")) || 0);
+
+            const feeRows = items.filter(it => !isCanceled(it) && gFeeRowName(it) === "배달비");
+            const refundRows = items.filter(it => !isCanceled(it) && gFeeRowName(it) === FEE_REFUND_NAME);
+            if (!feeRows.length || !refundRows.length) return items;
+
+            const dropped = new Set();
+            refundRows.forEach(rr => {
+                const match = feeRows.find(fr => !dropped.has(fr) && amountOf(fr) === amountOf(rr));
+                if (match) { dropped.add(match); dropped.add(rr); }
+            });
+            if (!dropped.size) return items;
+            return items.filter(it => !dropped.has(it));
+        }
+
         function renderFilteredOrders() {
             // [신규] 렌더 직전 보관함 병합(멱등) — 과거 달/직접 기간 선택 시 목록이 비지 않도록
             if (typeof mergeArchiveIntoRawOrders === 'function') mergeArchiveIntoRawOrders();
@@ -3719,6 +3893,17 @@
                     if (!isCanceled) {
                         grouped[customerKey].totalPrice += parseInt(item.total || 0);
                     }
+                });
+
+                // [신규] 배달비와 배달비 차감을 상쇄시켜 최종으로 남는 것만 카드에 보여준다.
+                Object.values(grouped).forEach(card => {
+                    const netItems = gOffsetFeeRows(card.items);
+                    if (netItems === card.items) return;
+                    card.items = netItems;
+                    card.totalPrice = netItems.reduce((a, it) => {
+                        const isCanceled = (it.canceled === true || it.canceled === "true");
+                        return a + (isCanceled ? 0 : (parseInt(it.total) || 0));
+                    }, 0);
                 });
 
                 const isCardFullyCanceled = (card) => {
@@ -3857,10 +4042,13 @@
                         lastDateHeader = headerKey;
                     }
                     // [신규] 카드 내 상품: 취소된 항목은 아래로 (원본 보존 위해 복사 후 안정 정렬)
+                    // [수정] 상쇄하고 남은 배달비는 상품 뒤, 취소 항목 앞에 오도록 한 단계 더 정렬한다.
+                    const feeRank = (it) => (gIsFeeRow(it) ? 1 : 0);
                     const customerItems = [...customer.items].sort((a, b) => {
                         const aC = (a.canceled === true || a.canceled === "true" || String(a.canceled).toUpperCase() === "TRUE");
                         const bC = (b.canceled === true || b.canceled === "true" || String(b.canceled).toUpperCase() === "TRUE");
-                        return (aC === bC) ? 0 : (aC ? 1 : -1);
+                        if (aC !== bC) return aC ? 1 : -1;
+                        return feeRank(a) - feeRank(b);
                     });
                     const allSelected = customerItems.every(it => selectedItems.has(customer.phone + "|" + it.orderKey));
                     const anySelected = customerItems.some(it => selectedItems.has(customer.phone + "|" + it.orderKey));
@@ -5228,58 +5416,14 @@
             return;
         }
 
-        // 활성 금액이 기준액(15,000원) 이상이 되는 경우 배달비를 자동 제거하는 함수
+        // [수정] 배달비 자동 제거 로직을 없앴다.
+        //  예전에는 총액이 15,000원을 넘으면 여기서 배달비 기록을 통째로 DELETE 했다.
+        //  그러면 "배달비를 받았다가 안 받기로 했다"는 흔적이 사라지고, 주문서 쪽에서 쓰는
+        //  '배달비 차감' 방식과도 규칙이 어긋난다.
+        //  배달비를 붙이고 빼는 판단은 주문서(주문·취소)에서 한 곳으로 처리하고,
+        //  여기서는 상쇄하고 남은 최종 배달비만 카드 맨 아래에 보여준다.
         async function checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, pickupDate) {
-            const cleanPhone = String(phone || "").replace(/\D/g, "");
-            if (!cleanPhone) return;
-
-            // 1. 해당 고객의 동일 날짜 주문 필터링
-            const customerDayOrders = rawOrders.filter(o => 
-                String(o.phone).replace(/\D/g, "") === cleanPhone && 
-                o.pickupDate === pickupDate
-            );
-
-            if (customerDayOrders.length === 0) return;
-
-            // 2. 취소되지 않은 일반 상품들의 가격 합산
-            let activeTotal = 0;
-            customerDayOrders.forEach(o => {
-                const isCanceled = o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE";
-                if (!isCanceled && o.item !== '배달비') {
-                    activeTotal += parseInt(o.total || 0);
-                }
-            });
-
-            // 3. 만약 총액이 15,000원 이상인 경우, 기존의 활성 배달비 항목을 자동 삭제
-            if (activeTotal >= 15000) {
-                const deliveryFeeItems = customerDayOrders.filter(o => 
-                    o.item === '배달비' && 
-                    !(o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE")
-                );
-
-                if (deliveryFeeItems.length > 0) {
-                    showLoader("배달비 자동 제거 중...");
-                    try {
-                        const promises = deliveryFeeItems.map(async (feeItem) => {
-                            const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${feeItem.orderKey}.json`;
-                            const res = await fetch(url, { method: 'DELETE' });
-                            if (res.ok) {
-                                // 구글 시트에도 삭제 전송
-                                syncStatusToGoogleSheets(feeItem.phone, feeItem.timestamp, "배달비", "취소");
-                            }
-                        });
-                        await Promise.all(promises);
-                        showToast("🎉 주문 총액이 15,000원 이상이 되어 배달비가 자동으로 제거되었습니다.");
-                        const feeKeys = new Set(deliveryFeeItems.map(it => (it.phone || "") + "_" + it.orderKey));
-                        rawOrders = rawOrders.filter(o => !feeKeys.has((o.phone || "") + "_" + o.orderKey));
-                        renderFilteredOrders();
-                    } catch (e) {
-                        console.error(e);
-                    } finally {
-                        hideLoader();
-                    }
-                }
-            }
+            return;
         }
 
         function escapeArg(str) {
@@ -6777,47 +6921,24 @@
             document.body.removeChild(link);
         }
 
-        // [신규] 아파트 이름만 추출하는 헬퍼 함수 (아파트가 없는 경우 짧은 배송지 주소 유지)
+        // [수정] 아파트 이름만 추출 — 위의 APARTMENT_DATA 한 곳만 본다.
+        //  (아파트를 못 찾으면 예전처럼 짧은 배송지 주소를 그대로 쓴다)
         function extractApartmentName(address) {
             if (!address) return "";
-            const normalized = String(address).replace(/\s+/g, "");
+            const normalized = gNormAddr(address);
+            const apt = gFindApartment(address);
+            if (!apt) return formatShortAddress(address);
 
-            // [신규] 푸르지오 1차/2차 구분: 1차=망월동(미사강변대로 165), 2차=선동(선동 433)
-            const puChasu = normalized.includes("2차") ? "2차"
-                          : normalized.includes("1차") ? "1차"
-                          : normalized.includes("선동433") ? "2차"
-                          : "";
+            // 푸르지오는 1차와 2차가 다른 단지다. 지번(선동433)이 없어도 '2차'라고 적혀 있으면 2차로 본다.
+            if (apt.name === "푸르지오1차" && normalized.includes("2차")) return "푸르지오2차";
+            return apt.name;
+        }
 
-            // 1. 지번/동 매칭 매칭 우선 확인
-            if (normalized.includes("선동433")) return "푸르지오2차";
-            if (normalized.includes("선동436")) return "더샵";
-            if (normalized.includes("선동427")) return "자이";
-            if (normalized.includes("선동430")) return "리버뷰자이";
-            if (normalized.includes("선동434")) return "베라체";
-            if (normalized.includes("선동435")) return "리버나인";
-            if (normalized.includes("선동432")) return "칸타빌";
-            if (normalized.includes("망월동1100")) return "골든센트로";
-            if (normalized.includes("망월동1110")) return "부영";
-            if (normalized.includes("망월동1090")) return "센트럴포레";
-            
-            // 2. 키워드 매칭
-            const keywords = [
-                "푸르지오", "더샵", "자이", "베라체", "리버나인", "칸타빌", "골든센트로", "부영", "센트럴포레",
-                "아데나", "신안인스빌", "동원", "호반", "루나리움", "힐스테이트", "디에트르", "아이파크",
-                "e편한", "이편한", "리버뷰자이", "센트럴자이", "리버포레", "롯데캐슬", "스타힐스", "서희스타힐스",
-                "센트리버"
-            ];
-            
-            for (const keyword of keywords) {
-                if (normalized.includes(keyword)) {
-                    if (keyword === "이편한" || keyword === "e편한") return "e편한세상";
-                    if (keyword === "푸르지오") return "푸르지오" + puChasu; // 1차/2차 표기
-                    return keyword;
-                }
-            }
-            
-            // 3. 찾지 못했다면 포맷팅된 짧은 주소 반환
-            return formatShortAddress(address);
+        // [신규] 인쇄에 찍을 이름. 따로 정한 명칭이 있으면 그것, 없으면 아파트 이름 그대로.
+        //  기사님이 부르는 이름과 단지 정식 이름이 다를 때 인쇄물만 바꿔 쓰려고 만든 것.
+        function gApartmentPrintName(address) {
+            const base = extractApartmentName(address);
+            return APARTMENT_NICK[base] || base;
         }
 
         // 6.5 선택된 주문 카드 인쇄 헬퍼
@@ -6891,7 +7012,7 @@
                                     <h2>${customer.name} (☎ ${displayPhone})</h2>
                                     ${isDelivery ? `
                                         <div class="address-text">
-                                            배송지: ${extractApartmentName(customer.address)}<br>
+                                            배송지: ${gApartmentPrintName(customer.address)}<br>
                                             상세주소: ${customer.addressDetail}<br>
                                             공동현관키: ${customer.entrance || '없음'}
                                         </div>
@@ -6919,7 +7040,11 @@
                                 <tbody>
                     `;
 
-                    customer.items.forEach(it => {
+                    // 인쇄물도 화면과 같게 — 상쇄된 배달비는 빼고, 남은 배달비는 맨 아래에 둔다
+                    const printItems = gOffsetFeeRows(customer.items)
+                        .slice()
+                        .sort((a, b) => (gIsFeeRow(a) ? 1 : 0) - (gIsFeeRow(b) ? 1 : 0));
+                    printItems.forEach(it => {
                         let statusBadge = '';
                         
                         // 1. 입금 완료 여부 뱃지 생성 (입고 상태 및 수령 여부는 전면 제외)
@@ -6943,7 +7068,7 @@
                                 </tbody>
                             </table>
                             <div class="card-footer">
-                                합계금액: ${customer.totalPrice.toLocaleString()}원
+                                합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원
                             </div>
                         </div>
                     `;
@@ -8000,8 +8125,498 @@
                 initPurchaseHistoryTab();
                 switchPurchaseSubTab('list'); // 발주관리는 발주 목록을 기본으로 표시
             } else if (tabName === 'sales') {
-                setSalesSubTab('status'); // [변경] 발주관리는 주문관리로 이동 → 판매관리는 판매현황부터
+                switchDataSubTab('sales'); // [신규] 자료 정리는 판매 통계부터
+                setSalesSubTab('status');  // [변경] 발주관리는 주문관리로 이동 → 판매관리는 판매현황부터
                 initSalesTab();
+            }
+        }
+
+        // ===== [신규] 자료 정리 — 하위 탭 (판매 통계 / 아파트 관리) =====
+        function switchDataSubTab(which) {
+            const isApart = (which === 'apart');
+            document.getElementById('data-sub-sales').style.display = isApart ? 'none' : 'block';
+            document.getElementById('data-sub-apart').style.display = isApart ? 'block' : 'none';
+            document.getElementById('btn-data-sub-sales').classList.toggle('active', !isApart);
+            document.getElementById('btn-data-sub-apart').classList.toggle('active', isApart);
+            if (isApart) renderApartmentAdmin();
+        }
+
+        // 주소 한 줄을 넣어 어떻게 인식되는지 바로 확인 (지번을 새로 알았을 때 확인용)
+        function renderApartmentTest() {
+            const box = document.getElementById('apart-test-result');
+            const val = (document.getElementById('apart-test-input')?.value || "").trim();
+            if (!val) { box.innerHTML = ''; return; }
+
+            const apt = gFindApartment(val);
+            const shown = extractApartmentName(val);
+            const aliases = getAddressAliases(val);
+            box.innerHTML = apt
+                ? `<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px; font-size:12.5px; font-weight:700; color:#166534; line-height:1.7; word-break:keep-all;">
+                       <b>${shown}</b> 로 인식됩니다.
+                       <div style="color:#3f6212; font-weight:600; margin-top:4px;">검색어: ${aliases.join(' · ')}</div>
+                   </div>`
+                : `<div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:10px 12px; font-size:12.5px; font-weight:700; color:#9a3412; line-height:1.7; word-break:keep-all;">
+                       아파트를 못 찾았습니다. 주소를 그대로 <b>${shown}</b> 로 표시합니다.
+                   </div>`;
+        }
+
+        // 주소에서 도로명(길·로 + 번호) 부분만 뽑는다. 없으면 짧은 주소를 그대로 쓴다.
+        function gExtractRoad(address) {
+            const s = String(address || "").replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+            const m = s.match(/([가-힣A-Za-z0-9]*(?:대로|로|길)\s*[0-9]+(?:-[0-9]+)?)/);
+            return m ? m[1].replace(/\s+/g, "") : "";
+        }
+
+        async function renderApartmentAdmin() {
+            await Promise.all([loadApartmentCustom(), loadApartmentNick()]);
+            renderApartmentTest();
+
+            // 지금 들어와 있는 배달 주문을 아파트별로 세어 본다 (취소 건 제외)
+            const counts = {};
+            const roadHits = {};  // 아파트 → { 도로명: 건수 }  (실제 주문에서 뽑는다)
+            const unmatched = {}; // 정규화 주소 → { display, raw, count }
+            (rawOrders || []).forEach(o => {
+                const isCanceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                if (isCanceled) return;
+                const full = `${o.address || ''} ${o.addressDetail || ''}`.trim();
+                if (!full) return;
+                const apt = gFindApartment(full);
+                if (apt) {
+                    counts[apt.name] = (counts[apt.name] || 0) + 1;
+                    const road = gExtractRoad(o.address || full);
+                    if (road) {
+                        if (!roadHits[apt.name]) roadHits[apt.name] = {};
+                        roadHits[apt.name][road] = (roadHits[apt.name][road] || 0) + 1;
+                    }
+                } else {
+                    // 이름을 지정할 때 쓰려고 원본 주소(동·호수 뺀 것)를 그대로 들고 있는다
+                    const raw = String(o.address || full).trim();
+                    const key = gNormAddr(raw);
+                    if (!unmatched[key]) unmatched[key] = { display: formatShortAddress(raw) || raw, raw: raw, count: 0 };
+                    unmatched[key].count++;
+                }
+            });
+
+            const totalMatched = Object.values(counts).reduce((a, b) => a + b, 0);
+            const unmatchedKeys = Object.keys(unmatched).sort((a, b) => unmatched[b].count - unmatched[a].count);
+            const totalUnmatched = unmatchedKeys.reduce((a, k) => a + unmatched[k].count, 0);
+
+            const cell = (v, extra) => `<td style="padding:7px 8px; border-bottom:1px solid #f1f5f9; ${extra || ''}">${v}</td>`;
+            const chip = (t, color, bg) => `<span style="display:inline-block; margin:1px 3px 1px 0; padding:1px 6px; border-radius:5px; font-size:11px; font-weight:700; color:${color}; background:${bg};">${t}</span>`;
+
+            document.getElementById('apart-summary').innerHTML = `
+                <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
+                    ${[['등록된 아파트', APARTMENT_DATA.length + '곳', '#0284c7', '#f0f9ff'],
+                       ['인식된 주문', totalMatched.toLocaleString() + '건', '#166534', '#f0fdf4'],
+                       ['못 찾은 주문', totalUnmatched.toLocaleString() + '건', totalUnmatched > 0 ? '#9a3412' : '#64748b', totalUnmatched > 0 ? '#fff7ed' : '#f8fafc']]
+                      .map(([label, val, color, bg]) => `
+                        <div style="background:${bg}; border-radius:10px; padding:9px 10px; text-align:center;">
+                            <div style="font-size:11px; font-weight:700; color:var(--text-sub);">${label}</div>
+                            <div style="font-size:16px; font-weight:900; color:${color}; margin-top:2px;">${val}</div>
+                        </div>`).join('')}
+                </div>`;
+
+            // 내가 묶은 구역 목록 (이름 바꾸기 · 주소 빼기 · 구역 지우기)
+            document.getElementById('apart-custom-list').innerHTML = APARTMENT_CUSTOM.length === 0
+                ? `<div style="font-size:12px; font-weight:700; color:var(--text-sub); background:#f8fafc; border-radius:8px; padding:10px 12px; line-height:1.6; word-break:keep-all;">
+                       묶어 놓은 구역이 아직 없습니다. 아래 '등록 안 된 주소'에서 <b>구역에 넣기</b>를 눌러 보세요.<br>
+                       빌라처럼 주소가 제각각이어도 한 이름으로 묶을 수 있습니다.
+                   </div>`
+                : APARTMENT_CUSTOM.map(g => {
+                    const n = counts[g.name] || 0;
+                    return `<div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:9px 10px; margin-bottom:6px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div style="flex:1; min-width:0; font-size:13px; font-weight:900; color:#5b21b6; word-break:keep-all;">
+                                ${g.name}
+                                <span style="font-size:11px; font-weight:700; color:#7c3aed;">주소 ${g.matches.length}개 · ${n}건</span>
+                            </div>
+                            <button type="button" onclick="openApartmentGroupRename('${escapeArg(g.key)}', '${escapeArg(g.name)}')" style="flex-shrink:0; padding:5px 9px; border:1.5px solid #7c3aed; background:#fff; color:#7c3aed; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">이름</button>
+                            <button type="button" onclick="deleteApartmentName('${escapeArg(g.key)}', '${escapeArg(g.name)}')" style="flex-shrink:0; padding:5px 9px; border:1.5px solid #ef4444; background:#fff; color:#ef4444; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">삭제</button>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:3px; margin-top:7px;">
+                            ${g.matches.map(m => `
+                                <div style="display:flex; align-items:center; gap:6px; background:#fff; border-radius:6px; padding:5px 8px;">
+                                    <span style="flex:1; min-width:0; font-size:11px; font-weight:600; color:#6d28d9; word-break:break-all;">${m}</span>
+                                    <span onclick="removeApartmentMatch('${escapeArg(g.key)}', '${escapeArg(m)}')" title="이 주소를 구역에서 빼기" style="flex-shrink:0; font-size:15px; font-weight:800; color:#c4b5fd; cursor:pointer; line-height:1; padding:0 2px;">&times;</span>
+                                </div>`).join('')}
+                        </div>
+                    </div>`;
+                }).join('');
+
+            // 주문이 많은 곳부터 (같으면 이름순)
+            const sortedApts = APARTMENT_DATA.slice().sort((a, b) => {
+                const d = (counts[b.name] || 0) - (counts[a.name] || 0);
+                return d !== 0 ? d : a.name.localeCompare(b.name);
+            });
+
+            const rows = sortedApts.map(apt => {
+                const n = counts[apt.name] || 0;
+                const nick = APARTMENT_NICK[apt.name] || "";
+                // 실제 주문에서 많이 나온 도로명 순서대로 (최대 2개)
+                const roads = Object.entries(roadHits[apt.name] || {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
+
+                // 명칭은 눌러서 바로 고칠 수 있게 칸 전체를 클릭 대상으로 둔다.
+                // 따로 정하지 않았으면 빈칸으로 둔다. (인쇄에는 아파트명이 그대로 나간다)
+                const nickCell = nick
+                    ? `<span onclick="openApartmentNickTool('${escapeArg(apt.name)}')" style="cursor:pointer; display:inline-block; padding:2px 7px; border-radius:5px; font-size:11.5px; font-weight:800; color:#b45309; background:#fffbeb; border:1px solid #fde68a;">${nick}</span>`
+                    : `<span onclick="openApartmentNickTool('${escapeArg(apt.name)}')" title="눌러서 명칭 넣기" style="cursor:pointer; display:inline-block; min-width:52px; height:20px; border-radius:5px; border:1px dashed #edf2f7;"></span>`;
+
+                return `<tr>
+                    ${cell(`<b>${apt.name}</b>`, 'white-space:nowrap;')}
+                    ${cell(nickCell, 'white-space:nowrap;')}
+                    ${cell(roads.length ? roads.map(([r]) => chip(r, '#0369a1', '#f0f9ff')).join('') : '<span style="color:#cbd5e1;">—</span>')}
+                    ${cell(apt.lots.length ? apt.lots.map(l => chip(l, '#0f766e', '#ecfeff')).join('') : '<span style="color:#cbd5e1;">—</span>')}
+                    ${cell(apt.keywords.map(k => chip(k, '#475569', '#f1f5f9')).join(''))}
+                    ${cell(apt.aliases.map(k => chip(k, '#7c3aed', '#f5f3ff')).join(''))}
+                    ${cell(n > 0 ? `<b style="color:#166534;">${n}</b>` : '<span style="color:#cbd5e1;">0</span>', 'text-align:right; white-space:nowrap;')}
+                </tr>`;
+            }).join('');
+
+            document.getElementById('apart-table-wrap').innerHTML = `
+                <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                    <thead>
+                        <tr style="background:#f8fafc;">
+                            <th style="padding:7px 8px; text-align:left; white-space:nowrap;">아파트명</th>
+                            <th style="padding:7px 8px; text-align:left; white-space:nowrap;">명칭</th>
+                            <th style="padding:7px 8px; text-align:left; white-space:nowrap;">도로명주소</th>
+                            <th style="padding:7px 8px; text-align:left;">지번</th>
+                            <th style="padding:7px 8px; text-align:left;">인식 키워드</th>
+                            <th style="padding:7px 8px; text-align:left;">검색 별칭</th>
+                            <th style="padding:7px 8px; text-align:right; white-space:nowrap;">주문</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+
+            document.getElementById('apart-unmatched').innerHTML = unmatchedKeys.length === 0
+                ? `<div style="font-size:12px; font-weight:700; color:#166534; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px;">
+                       못 찾은 배달 주소가 없습니다.
+                   </div>`
+                : `<div class="card-title" style="margin:0 0 6px; font-size:13px;">❓ 아직 등록 안 된 주소 (${unmatchedKeys.length}종)</div>
+                   <div style="font-size:11.5px; color:var(--text-sub); font-weight:700; margin-bottom:8px; word-break:keep-all;">
+                       아파트로 인식되지 않아 주소가 그대로 표시되는 곳입니다. <b>구역에 넣기</b>를 누르면 원하는 이름으로 묶을 수 있습니다.
+                   </div>
+                   <div style="display:flex; flex-direction:column; gap:4px;">
+                       ${unmatchedKeys.slice(0, 30).map(k => {
+                           const u = unmatched[k];
+                           return `
+                           <div style="display:flex; align-items:center; gap:8px; background:#f8fafc; border-radius:6px; padding:7px 9px; font-size:12px;">
+                               <span style="font-weight:700; color:var(--text-main); flex:1; min-width:0; word-break:break-all;">${u.display}</span>
+                               <span style="font-weight:800; color:#9a3412; white-space:nowrap;">${u.count}건</span>
+                               <button type="button" onclick="openApartmentNameTool('${escapeArg(u.raw)}')" style="flex-shrink:0; padding:5px 9px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:7px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">구역에 넣기</button>
+                           </div>`;
+                       }).join('')}
+                   </div>`;
+        }
+
+        // [신규] 주소를 '구역'에 넣는 도구.
+        //  빌라는 주소가 제각각이라 하나씩 이름을 붙일 수 없다. 대신 구역 하나에 주소를 여러 개 담고,
+        //  배달 주소에 그중 한 조각이라도 들어 있으면 그 구역 이름으로 부른다.
+        //  주소는 동·호수를 빼고 건물까지만 남겨야 그 건물 주문이 모두 걸린다.
+        function gCountAddrHits(normMatch) {
+            if (!normMatch) return 0;
+            let hit = 0;
+            (rawOrders || []).forEach(o => {
+                const isCanceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                if (isCanceled) return;
+                if (gNormAddr(`${o.address || ''} ${o.addressDetail || ''}`).includes(normMatch)) hit++;
+            });
+            return hit;
+        }
+
+        let _apartZonePick = ''; // 모달에서 고른 기존 구역 key ('' = 새 구역)
+
+        function openApartmentNameTool(rawAddress) {
+            closeApartmentNameTool();
+            const raw = String(rawAddress || "").trim();
+            _apartZonePick = '';
+
+            const zoneBtns = APARTMENT_CUSTOM.map(g =>
+                `<button type="button" data-zone-key="${escapeArg(g.key)}" onclick="pickApartmentZone('${escapeArg(g.key)}')" class="apart-zone-btn" style="padding:7px 11px; border:1.5px solid var(--border); background:#fff; color:var(--text-main); border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap;">${g.name}</button>`
+            ).join('');
+
+            const modal = document.createElement('div');
+            modal.id = 'apart-name-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10050';
+            modal.innerHTML =
+                `<div class="summary-modal-content" style="max-width:430px; width:92%; padding:0; overflow:hidden;">` +
+                `<div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">구역에 넣기</div>` +
+                `<span onclick="closeApartmentNameTool()" style="font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="padding:14px 18px; max-height:64vh; overflow-y:auto;">` +
+                `<div style="font-size:11.5px; font-weight:700; color:var(--text-sub); margin-bottom:4px;">넣을 주소</div>` +
+                `<input type="text" id="apart-name-match" value="${String(raw).replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box; padding:9px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-weight:700; margin-bottom:4px;">` +
+                `<div style="font-size:11px; font-weight:600; color:var(--text-sub); line-height:1.6; margin-bottom:12px; word-break:keep-all;">` +
+                `동·호수는 지우고 <b>건물까지만</b> 남겨 주세요. 띄어쓰기는 무시합니다.` +
+                `</div>` +
+                (zoneBtns ? `<div style="font-size:11.5px; font-weight:700; color:var(--text-sub); margin-bottom:5px;">이미 만든 구역에 넣기</div>` +
+                            `<div id="apart-zone-btns" style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:12px;">${zoneBtns}</div>` : '') +
+                `<div style="font-size:11.5px; font-weight:700; color:var(--text-sub); margin-bottom:4px;">${zoneBtns ? '또는 새 구역 이름' : '구역 이름'}</div>` +
+                `<input type="text" id="apart-name-value" placeholder="예: 미사 빌라촌" oninput="pickApartmentZone('')" style="width:100%; box-sizing:border-box; padding:9px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; font-weight:800;">` +
+                `<div id="apart-name-preview" style="margin-top:10px;"></div>` +
+                `</div>` +
+                `<div style="padding:14px 18px; border-top:1px solid var(--border); display:flex; gap:8px;">` +
+                `<button type="button" onclick="closeApartmentNameTool()" style="flex:1; height:44px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">취소</button>` +
+                `<button type="button" onclick="saveApartmentName()" style="flex:1.4; height:44px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">저장</button>` +
+                `</div></div>`;
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => modal.classList.add('active'));
+
+            document.getElementById('apart-name-match').addEventListener('input', updateApartmentPreview);
+            updateApartmentPreview();
+            setTimeout(() => document.getElementById('apart-name-value')?.focus(), 100);
+        }
+
+        function pickApartmentZone(key) {
+            _apartZonePick = key || '';
+            document.querySelectorAll('.apart-zone-btn').forEach(b => {
+                const on = (b.dataset.zoneKey === _apartZonePick && _apartZonePick !== '');
+                b.style.borderColor = on ? 'var(--primary)' : 'var(--border)';
+                b.style.background = on ? 'var(--primary-light)' : '#fff';
+                b.style.color = on ? 'var(--primary)' : 'var(--text-main)';
+            });
+            if (_apartZonePick) {
+                const el = document.getElementById('apart-name-value');
+                if (el) el.value = '';
+            }
+            updateApartmentPreview();
+        }
+
+        function updateApartmentPreview() {
+            const box = document.getElementById('apart-name-preview');
+            if (!box) return;
+            const m = gNormAddr(document.getElementById('apart-name-match')?.value);
+            if (!m) { box.innerHTML = ''; return; }
+
+            const zone = _apartZonePick ? APARTMENT_CUSTOM.find(g => g.key === _apartZonePick) : null;
+            const label = zone ? zone.name : (String(document.getElementById('apart-name-value')?.value || '').trim() || '새 구역');
+            const hit = gCountAddrHits(m);
+            const already = zone ? zone.matches.reduce((a, x) => a + gCountAddrHits(x), 0) : 0;
+            const tooShort = m.length < 6;
+
+            if (tooShort) {
+                box.innerHTML = `<div style="font-size:12px; font-weight:700; color:#9a3412; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:8px 10px; line-height:1.6; word-break:keep-all;">
+                    주소가 너무 짧습니다. 이대로 두면 주문 <b>${hit}건</b>이 걸려 엉뚱한 집까지 들어옵니다. 건물까지 남겨 주세요.
+                </div>`;
+                return;
+            }
+
+            box.innerHTML = `<div style="font-size:12px; font-weight:700; color:${hit > 0 ? '#166534' : '#9a3412'}; background:${hit > 0 ? '#f0fdf4' : '#fff7ed'}; border:1px solid ${hit > 0 ? '#bbf7d0' : '#fed7aa'}; border-radius:8px; padding:8px 10px; line-height:1.6; word-break:keep-all;">
+                이 주소로 주문 <b>${hit}건</b>이 <b>${label}</b>에 묶입니다.
+                ${zone ? `<div style="font-weight:600; color:#3f6212; margin-top:3px;">이미 담긴 주소 ${zone.matches.length}개 · ${already}건</div>` : ''}
+            </div>`;
+        }
+
+        function closeApartmentNameTool() {
+            const m = document.getElementById('apart-name-modal');
+            if (m) m.remove();
+        }
+
+        // 구역 하나를 통째로 저장한다 (matches 배열째 덮어쓰기)
+        async function gPutApartmentZone(key, name, matches) {
+            const body = JSON.stringify({ name: name, matches: matches, updatedAt: Date.now() });
+            let lastErr = null;
+            for (let a = 1; a <= 5; a++) {
+                try {
+                    const res = await fetch(`${FIREBASE_DB_URL}apartment_custom/${key}.json`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: body
+                    });
+                    if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                    return true;
+                } catch (e) {
+                    lastErr = e;
+                    await new Promise(r => setTimeout(r, 400 * a));
+                }
+            }
+            console.error("구역 저장 실패:", lastErr);
+            return false;
+        }
+
+        async function saveApartmentName() {
+            const match = gNormAddr(document.getElementById('apart-name-match')?.value);
+            const newName = String(document.getElementById('apart-name-value')?.value || "").trim();
+            if (!match) { showToast("넣을 주소를 입력해 주세요."); return; }
+            // '미사'처럼 짧은 조각은 엉뚱한 주소까지 다 걸려서 막는다
+            if (match.length < 6) { showToast("주소가 너무 짧습니다. 동네 이름만으로는 다른 집까지 걸립니다."); return; }
+
+            const zone = _apartZonePick ? APARTMENT_CUSTOM.find(g => g.key === _apartZonePick) : null;
+            if (!zone && !newName) { showToast("구역을 고르거나 새 이름을 입력해 주세요."); return; }
+
+            const key = zone ? zone.key : ('z_' + Date.now());
+            const name = zone ? zone.name : newName;
+            const matches = [...new Set((zone ? zone.matches : []).concat([match]))];
+
+            showLoader("구역 저장 중...");
+            try {
+                const ok = await gPutApartmentZone(key, name, matches);
+                if (!ok) throw new Error("저장 실패");
+                closeApartmentNameTool();
+                await renderApartmentAdmin();
+                renderFilteredOrders(); // 카드 표시도 새 이름으로 갱신
+                showToast(`'${name}'에 넣었습니다.`);
+            } catch (e) {
+                showToast("저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // [신규] 아파트를 부를 명칭 정하기. 인쇄물 '배송지' 줄에 이 이름이 찍히고, 검색어에도 더해진다.
+        function openApartmentNickTool(aptName) {
+            closeApartmentNameTool();
+            const cur = APARTMENT_NICK[aptName] || ""; // 정한 적 없으면 빈칸으로 연다
+
+            const modal = document.createElement('div');
+            modal.id = 'apart-name-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10050';
+            modal.innerHTML =
+                `<div class="summary-modal-content" style="max-width:400px; width:92%; padding:0; overflow:hidden;">` +
+                `<div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">${aptName} 명칭</div>` +
+                `<span onclick="closeApartmentNameTool()" style="font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="padding:14px 18px;">` +
+                `<input type="text" id="apart-nick-value" value="${String(cur).replace(/"/g, '&quot;')}" placeholder="${String(aptName).replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box; padding:10px; border:1.5px solid var(--border); border-radius:8px; font-size:15px; font-weight:800;">` +
+                `<div style="font-size:11.5px; font-weight:600; color:var(--text-sub); margin-top:8px; line-height:1.6; word-break:keep-all;">` +
+                `여기에 넣은 이름이 주문 인쇄물의 <b>배송지</b> 줄에 찍히고, 주문 검색에도 더해집니다.<br>비워 두면 원래 이름(<b>${aptName}</b>)이 그대로 나갑니다.` +
+                `</div></div>` +
+                `<div style="padding:14px 18px; border-top:1px solid var(--border); display:flex; gap:8px;">` +
+                `<button type="button" onclick="closeApartmentNameTool()" style="flex:1; height:44px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">취소</button>` +
+                `<button type="button" onclick="saveApartmentNick('${escapeArg(aptName)}')" style="flex:1.4; height:44px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">저장</button>` +
+                `</div></div>`;
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => modal.classList.add('active'));
+            setTimeout(() => document.getElementById('apart-nick-value')?.focus(), 100);
+        }
+
+        async function saveApartmentNick(aptName) {
+            let nick = String(document.getElementById('apart-nick-value')?.value || "").trim();
+            if (nick === aptName) nick = ""; // 원래 이름과 같으면 따로 저장하지 않는다
+            const key = fSafeKey(aptName);
+            showLoader("명칭 저장 중...");
+            try {
+                let ok = false, lastErr = null;
+                for (let a = 1; a <= 5 && !ok; a++) {
+                    try {
+                        const res = nick
+                            ? await fetch(`${FIREBASE_DB_URL}apartment_nick/${key}.json`, {
+                                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name: aptName, nick: nick, updatedAt: Date.now() })
+                              })
+                            : await fetch(`${FIREBASE_DB_URL}apartment_nick/${key}.json`, { method: 'DELETE' });
+                        if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                        ok = true;
+                    } catch (e) {
+                        lastErr = e;
+                        await new Promise(r => setTimeout(r, 400 * a));
+                    }
+                }
+                if (!ok) throw lastErr || new Error("저장 실패");
+                closeApartmentNameTool();
+                await renderApartmentAdmin();
+                showToast(nick ? `'${nick}'(으)로 바꿨습니다.` : `'${aptName}' 원래 이름으로 되돌렸습니다.`);
+            } catch (e) {
+                console.error("명칭 저장 실패:", e);
+                showToast("저장에 실패했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // 구역 이름만 바꾸기
+        function openApartmentGroupRename(key, currentName) {
+            const zone = APARTMENT_CUSTOM.find(g => g.key === key);
+            if (!zone) return;
+            closeApartmentNameTool();
+
+            const modal = document.createElement('div');
+            modal.id = 'apart-name-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10050';
+            modal.innerHTML =
+                `<div class="summary-modal-content" style="max-width:400px; width:92%; padding:0; overflow:hidden;">` +
+                `<div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">구역 이름 바꾸기</div>` +
+                `<span onclick="closeApartmentNameTool()" style="font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="padding:14px 18px;">` +
+                `<input type="text" id="apart-rename-value" value="${String(currentName || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box; padding:10px; border:1.5px solid var(--border); border-radius:8px; font-size:15px; font-weight:800;">` +
+                `<div style="font-size:11.5px; font-weight:600; color:var(--text-sub); margin-top:8px; line-height:1.6;">담긴 주소 ${zone.matches.length}개는 그대로 유지됩니다.</div>` +
+                `</div>` +
+                `<div style="padding:14px 18px; border-top:1px solid var(--border); display:flex; gap:8px;">` +
+                `<button type="button" onclick="closeApartmentNameTool()" style="flex:1; height:44px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">취소</button>` +
+                `<button type="button" onclick="saveApartmentGroupRename('${escapeArg(key)}')" style="flex:1.4; height:44px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">저장</button>` +
+                `</div></div>`;
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => modal.classList.add('active'));
+            setTimeout(() => document.getElementById('apart-rename-value')?.focus(), 100);
+        }
+
+        async function saveApartmentGroupRename(key) {
+            const zone = APARTMENT_CUSTOM.find(g => g.key === key);
+            const name = String(document.getElementById('apart-rename-value')?.value || "").trim();
+            if (!zone) return;
+            if (!name) { showToast("이름을 입력해 주세요."); return; }
+
+            showLoader("이름 바꾸는 중...");
+            try {
+                const ok = await gPutApartmentZone(key, name, zone.matches);
+                if (!ok) throw new Error("저장 실패");
+                closeApartmentNameTool();
+                await renderApartmentAdmin();
+                renderFilteredOrders();
+                showToast(`'${name}'으로 바꿨습니다.`);
+            } catch (e) {
+                showToast("저장에 실패했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // 구역에서 주소 하나만 빼기 (마지막 하나면 구역째 지운다)
+        async function removeApartmentMatch(key, match) {
+            const zone = APARTMENT_CUSTOM.find(g => g.key === key);
+            if (!zone) return;
+            const left = zone.matches.filter(m => m !== match);
+
+            showLoader("주소 빼는 중...");
+            try {
+                let ok;
+                if (left.length === 0) {
+                    const res = await fetch(`${FIREBASE_DB_URL}apartment_custom/${key}.json`, { method: 'DELETE' });
+                    ok = res.ok;
+                } else {
+                    ok = await gPutApartmentZone(key, zone.name, left);
+                }
+                if (!ok) throw new Error("저장 실패");
+                await renderApartmentAdmin();
+                renderFilteredOrders();
+                showToast(left.length === 0 ? `'${zone.name}' 구역을 없앴습니다.` : "주소를 뺐습니다.");
+            } catch (e) {
+                showToast("처리에 실패했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function deleteApartmentName(key, name) {
+            if (!key) return;
+            if (!confirm(`'${name}' 구역을 없앨까요?\n담긴 주소도 함께 지워집니다.`)) return;
+            showLoader("삭제 중...");
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}apartment_custom/${key}.json`, { method: 'DELETE' });
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                await renderApartmentAdmin();
+                renderFilteredOrders();
+                showToast("구역을 없앴습니다.");
+            } catch (e) {
+                console.error("구역 삭제 실패:", e);
+                showToast("삭제에 실패했습니다.");
+            } finally {
+                hideLoader();
             }
         }
 
@@ -11785,6 +12400,10 @@
         // 초기 시작
         window.onload = function() {
             _relocatePurchaseAgg();          // [신규] 발주집계를 주문관리 하위로 이동 (판매관리에 안 보이게)
+            // [신규] 사장님이 묶은 구역·명칭을 먼저 읽어 둔다 (카드·인쇄 표시와 검색에 바로 반영)
+            Promise.all([loadApartmentCustom(), loadApartmentNick()]).then(() => {
+                if (APARTMENT_CUSTOM.length > 0 && typeof renderFilteredOrders === 'function') renderFilteredOrders();
+            });
             // 캐시가 있으면 즉시 화면에 먼저 그려주고, 실시간 리스너로 최신 데이터를 이어받음
             loadOrdersFromCache();
             hydrateArchiveFromCache();       // [신규] 보관함 공유 캐시로 과거자료 준비(네트워크 X)
