@@ -1990,8 +1990,13 @@
         /* [신규] 가격 칸 옆 옵션 설정 버튼 */
         #tab-admin-products .price-option-btn {
             /* 가격 입력칸 옆에 고정 폭으로 붙어 모바일에서도 한 줄 유지 */
+            /* [수정] 분류탭·상세옵션 두 버튼이 세로로 놓였을 때 폭이 어긋나 보이지 않도록 같은 크기로 고정.
+               상세옵션은 '상세옵션 3'처럼 옵션 개수가 붙어 글자 수가 바뀌므로 폭을 정해두어야 한다. */
             flex: 0 0 auto;
-            padding: 10px 16px;
+            width: 116px;
+            box-sizing: border-box;
+            text-align: center;
+            padding: 10px 8px;
             font-size: 13px;
             font-weight: 800;
             white-space: nowrap;
@@ -2195,6 +2200,33 @@
                                 <div id="categoryContainer"></div>
                             </div>
 
+                            <!-- [신규] 주문서에서 이 상품이 들어갈 탭을 직접 지정한다.
+                                 기본 분류는 지금처럼 상품명·분류(matchKey)로 판단하고, 이 값은 그보다 '우선'하는 덮어쓰기다.
+                                 지정하지 않으면 '없음'이라 기존 동작 그대로다. -->
+
+                            <div class="form-group">
+                                <label>분류탭 설정 <span style="font-weight:600; color:var(--text-sub);">(주문서에서 보일 위치)</span></label>
+                                <div style="display: flex; flex-wrap: nowrap; gap: 6px; align-items: stretch;">
+                                    <input type="text" id="displayTabLabel" class="form-control" readonly value="없음"
+                                        onclick="openDisplayTabSetting()"
+                                        style="flex: 1 1 auto; width: auto; min-width: 0; background-color:#f8fafc; cursor:pointer; font-weight:700;">
+                                    <button type="button" id="btn-display-tab" class="price-option-btn" onclick="openDisplayTabSetting()">분류탭</button>
+                                </div>
+                                <div style="margin-top:6px; font-size:11.5px; font-weight:700; color:var(--text-sub); line-height:1.5;">
+                                    지정하면 기존 분류보다 우선해서 그 탭에 보입니다.
+                                </div>
+                            </div>
+
+                            <!-- 노출 설정 (분류탭 설정과 함께 '어디에 보일지'를 정하는 항목이라 붙여 둔다) -->
+                            <div class="form-group">
+                                <label>노출 설정</label>
+                                <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
+                                    <button type="button" id="btnShowToday" class="exposure-toggle-btn active green" onclick="toggleExposure('Today')" style="flex: 1; min-width: 100px;">당일구매 노출</button>
+                                    <button type="button" id="btnShowReserve" class="exposure-toggle-btn active" onclick="toggleExposure('Reserve')" style="flex: 1; min-width: 100px;">예약구매 노출</button>
+                                    <button type="button" id="btnShowWeekly" class="exposure-toggle-btn" onclick="toggleExposure('Weekly')" style="flex: 1.5; min-width: 180px;">매주 노출 (자동 연장)</button>
+                                </div>
+                            </div>
+
                             <!-- 상품명 -->
                             <div class="form-group">
                                 <label>상품명</label>
@@ -2233,16 +2265,6 @@
                                     </label>
                                 </div>
                                 <input type="number" id="productStock" class="form-control" placeholder="예: 50" min="0" required>
-                            </div>
-
-                            <!-- 노출 설정 -->
-                            <div class="form-group">
-                                <label>노출 설정</label>
-                                <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
-                                    <button type="button" id="btnShowToday" class="exposure-toggle-btn active green" onclick="toggleExposure('Today')" style="flex: 1; min-width: 100px;">당일구매 노출</button>
-                                    <button type="button" id="btnShowReserve" class="exposure-toggle-btn active" onclick="toggleExposure('Reserve')" style="flex: 1; min-width: 100px;">예약구매 노출</button>
-                                    <button type="button" id="btnShowWeekly" class="exposure-toggle-btn" onclick="toggleExposure('Weekly')" style="flex: 1.5; min-width: 180px;">매주 노출 (자동 연장)</button>
-                                </div>
                             </div>
 
                             <!-- 상세 설명 -->
@@ -7231,13 +7253,11 @@
             const isOn = uploadUseOptions
                       && (choiceOn || uploadUsePersonLimit || uploadUseAmountLimit || (uploadUseAgencyFee && hasFeeRule));
 
-            if (!hasSetting) {
+            // [수정] 버튼 글자는 '상세옵션'으로 고정한다. 켜짐/꺼짐은 테두리·배경색으로 구분되므로
+            //  'OFF' 같은 꼬리말을 붙이면 분류탭 버튼과 글자 수만 달라져 보기 어수선해진다.
+            if (!hasSetting || !isOn) {
                 btn.classList.remove('active');
                 btn.innerText = '상세옵션';
-            } else if (!isOn) {
-                // 설정은 남아 있지만 모두 꺼둔 상태
-                btn.classList.remove('active');
-                btn.innerText = '상세옵션 OFF';
             } else {
                 btn.classList.add('active');
                 btn.innerText = choiceOn ? `상세옵션 ${count}` : '상세옵션';
@@ -7811,6 +7831,108 @@
         let uploadEditProductRef = null; // [하드닝] 수정 대상 상품을 순번 대신 이름+분류+날짜로 식별
         let uploadForceDuplicate = false; // [신규] '복제하기': 현재 폼을 새 상품으로 강제 등록
         let uploadEditShelf = ''; // [신규] 수정 시 기존 선반위치(shelf)를 기억해 폼에 반영
+        // ===== [신규] 분류탭 설정 =====
+        //  주문서ver2의 세부 탭 구성을 그대로 옮겨 둔 목록. 상품마다 어느 탭에 넣을지 직접 고른다.
+        //  값(key)은 주문서의 currentMainTab 값과 같게 맞춰, 나중에 연결할 때 변환이 필요 없게 했다.
+        let uploadDisplayTab = '';
+
+        const DISPLAY_TAB_GROUPS = [
+            {
+                group: '당일구매',
+                items: [
+                    { key: 'today-fruit', label: '과일 / 야채', desc: '당일 수령하는 과일·야채' },
+                    { key: 'today-reserve', label: '공동구매', desc: '오늘 날짜 공동구매 (해당 상품이 있을 때만 탭이 생김)' }
+                ]
+            },
+            {
+                group: '상시판매',
+                items: [
+                    { key: 'onsite-frozen', label: '냉동', desc: '' },
+                    { key: 'onsite-refrigerated', label: '냉장', desc: '' },
+                    { key: 'onsite-room', label: '상온', desc: '' }
+                ]
+            },
+            {
+                group: '예약구매',
+                items: [
+                    { key: 'reserve', label: '공동구매', desc: '날짜별로 묶여 보이는 예약 상품' },
+                    { key: 'sada', label: '사다드림', desc: '무료배달 기준 제외 · 대행료 적용 대상' },
+                    { key: 'costco', label: '코스트코', desc: '코스트코 상품이 있고 오후 3시 전일 때만 탭이 생김' }
+                ]
+            }
+        ];
+
+        //  [수정] 이 설정은 기존 분류보다 '우선'하는 덮어쓰기다. 지정하지 않으면 '없음'이고,
+        //   그때는 예전처럼 상품명·분류(matchKey)로 판단한다.
+        function gDisplayTabLabel(key) {
+            if (!key) return '없음';
+            for (const g of DISPLAY_TAB_GROUPS) {
+                const hit = g.items.find(it => it.key === key);
+                if (hit) return `${g.group} › ${hit.label}`;
+            }
+            return '없음';
+        }
+
+        function updateDisplayTabUI() {
+            const el = document.getElementById('displayTabLabel');
+            if (el) el.value = gDisplayTabLabel(uploadDisplayTab);
+        }
+
+        function openDisplayTabSetting() {
+            const old = document.getElementById('display-tab-modal');
+            if (old) old.remove();
+
+            const row = (key, label, desc) => {
+                const on = (uploadDisplayTab === key);
+                return `<div onclick="pickDisplayTab('${key}')" style="display:flex; align-items:flex-start; gap:9px; padding:11px 12px; margin-bottom:6px; cursor:pointer;` +
+                    ` border:1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}; background:${on ? 'var(--primary-light)' : '#fff'}; border-radius:10px;">` +
+                    `<span style="flex:0 0 auto; width:17px; height:17px; margin-top:1px; border-radius:50%; border:2px solid ${on ? 'var(--primary)' : '#cfd6dc'};` +
+                    ` background:${on ? 'var(--primary)' : '#fff'}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:900;">${on ? '✓' : ''}</span>` +
+                    `<span style="flex:1; min-width:0;">` +
+                    `<span style="display:block; font-size:13.5px; font-weight:800; color:var(--text-main);">${label}</span>` +
+                    (desc ? `<span style="display:block; font-size:11.5px; font-weight:600; color:var(--text-sub); margin-top:2px; line-height:1.45;">${desc}</span>` : ``) +
+                    `</span></div>`;
+            };
+
+            let html = row('', '없음', '따로 지정하지 않습니다. 기존 분류 방법(상품명·분류)대로 보입니다.');
+            DISPLAY_TAB_GROUPS.forEach(g => {
+                html += `<div style="font-size:11.5px; font-weight:900; color:var(--text-sub); margin:14px 0 6px;">${g.group}</div>`;
+                g.items.forEach(it => { html += row(it.key, it.label, it.desc); });
+            });
+
+            const modal = document.createElement('div');
+            modal.id = 'display-tab-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10050';
+            modal.innerHTML =
+                `<div class="summary-modal-content" style="max-width:420px; width:92%; max-height:86vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">` +
+                `<div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">분류탭 설정</div>` +
+                `<span onclick="closeDisplayTabSetting()" style="font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="flex:1; overflow-y:auto; padding:14px 18px;">` +
+                `<div style="font-size:12px; font-weight:700; color:var(--text-sub); margin-bottom:10px; line-height:1.55;">여기서 고른 탭에 <b>우선</b> 노출됩니다. 고르지 않으면 기존 분류 방법대로 보입니다.<br>고른 값은 <b>등록/수정 완료</b>를 눌러야 실제로 저장됩니다.</div>` +
+                html +
+                `</div>` +
+                `<div style="padding:14px 18px; border-top:1px solid var(--border);">` +
+                `<button type="button" onclick="closeDisplayTabSetting()" style="width:100%; height:46px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:15px; font-weight:800; cursor:pointer;">확인</button>` +
+                `</div></div>`;
+            document.body.appendChild(modal);
+            // .summary-modal-overlay는 opacity:0으로 시작하고 .active가 붙어야 보인다 (다른 모달과 동일)
+            requestAnimationFrame(() => modal.classList.add('active'));
+        }
+
+        function pickDisplayTab(key) {
+            uploadDisplayTab = key || '';
+            updateDisplayTabUI();
+            openDisplayTabSetting(); // 선택 표시 갱신
+        }
+
+        function closeDisplayTabSetting() {
+            const m = document.getElementById('display-tab-modal');
+            if (m) m.remove();
+        }
+
         let uploadEditIsSada = false; // [신규] 수정 시 '사다드림' 체크 상태를 기억해 폼에 반영
         let uploadSelectedDate = new Date().toISOString().split('T')[0];
         let uploadManageDeliveryType = "today";
@@ -9327,13 +9449,20 @@
             if (m) return `20${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
             return '';
         }
+        // [신규] 사다드림 상품인지. 상품등록의 사다드림 체크(isSada)를 먼저 보고,
+        //  값이 없는 예전 상품만 예전처럼 이름·분류로 판단한다. (주문서와 같은 기준)
+        function isSadaListProduct(prod) {
+            if (!prod) return false;
+            if (prod.isSada === true || prod.isSada === 'true') return true;
+            if (prod.isSada === false || prod.isSada === 'false') return false;
+            return String(prod.name || '').includes('사다드림') || String(prod.matchKey || '').trim() === '사다드림';
+        }
+
         function isReserveListProduct(prod) {
             if (!prod) return false;
-            const name = String(prod.name || '');
             const mk = String(prod.matchKey || '').trim();
-            const isSada = name.includes('사다드림') || mk === '사다드림';
             const isDate = /^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(mk);
-            return isSada || isDate; // 예약구매 목록엔 사다드림 + 공동구매(날짜)만
+            return isSadaListProduct(prod) || isDate; // 예약구매 목록엔 사다드림 + 공동구매(날짜)만
         }
         function getReserveGroupDate(prod) {
             if (!prod) return '';
@@ -9408,6 +9537,8 @@
                 const _now = new Date();
                 const _todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
                 const cats = []; // [변경] 전체·이전 버튼 제거 — 날짜 토글로 대체(아무것도 선택 안 하면 전체)
+                // [신규] 사다드림만 모아 보는 탭. 날짜가 여러 개로 흩어져 있어 한 번에 보기 어려웠다.
+                cats.push(['_사다드림', '사다드림']);
                 dates.filter(d => d >= _todayStr).forEach(d => cats.push([d, fmtMD(d)])); // 오늘 이후(포함) 날짜별 개별 탭
                 container.innerHTML = cats.map(([key, label]) => {
                     const isToday = (key === _todayStr); // [신규] 오늘 날짜 테두리
@@ -10424,6 +10555,7 @@
                     const _n = new Date();
                     const _t = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`;
                     const gd = getReserveGroupDate(prod);
+                    if (uploadManageTab === '_사다드림') return isSadaListProduct(prod); // [신규] 사다드림만 모아보기
                     if (uploadManageTab === '_upcoming') return gd && gd >= _t; // 오늘 포함 이후 날짜 상품 전부
                     if (uploadManageTab === '_이전') return gd && gd < _t;       // 오늘 이전 날짜 상품 모아보기
                     return gd === uploadManageTab;
@@ -10913,8 +11045,11 @@
                 return;
             }
 
+            // [수정] 사다드림 여부를 이름 말머리뿐 아니라 별도 값(isSada)으로도 저장한다.
+            //  주문서가 이 값을 먼저 보므로, 상품명을 바꿔도 사다드림 판정이 흔들리지 않는다.
             const _sadaChkEl = document.getElementById('productIsSada');
-            if (uploadCurrentTab === 'reserve' && _sadaChkEl && _sadaChkEl.checked) {
+            const _isSadaChecked = (uploadCurrentTab === 'reserve' && !!_sadaChkEl && _sadaChkEl.checked);
+            if (_isSadaChecked) {
                 name = '[사다드림]' + name;
             }
 
@@ -10964,6 +11099,10 @@
                     showToday: showToday,
                     showReserve: showReserve,
                     showWeekly: showWeekly,
+                    // [신규] 주문서에서 이 상품이 들어갈 탭. 빈 값이면 기존 방식(이름·분류로 판단)을 그대로 쓴다.
+                    displayTab: uploadDisplayTab || "",
+                    // [신규] 사다드림 여부. 상품명 말머리 대신 이 값으로 판단한다.
+                    isSada: _isSadaChecked,
                     // [신규] 상세옵션 설정
                     useOptions: uploadUseOptions,
                     useChoiceOptions: uploadUseChoiceOptions,
@@ -11308,8 +11447,10 @@
             }
 
             uploadEditShelf = String(prod.shelf || ''); // [신규] 기존 선반위치를 폼에 반영 (selectMainTab에서 사용)
-            // [신규] 기존 [사다드림] 말머리 여부를 체크박스로 복원 (selectMainTab에서 사용)
-            uploadEditIsSada = /^\s*\[\s*사다드림\s*\]/.test(String(prod.name || ''));
+            // [수정] 사다드림 여부 복원 — 저장된 isSada 값이 있으면 그것을 쓰고,
+            //  없는 예전 상품만 이름 말머리로 판단한다.
+            uploadEditIsSada = (prod.isSada === true || prod.isSada === 'true')
+                || (prod.isSada === undefined && /^\s*\[\s*사다드림\s*\]/.test(String(prod.name || '')));
             selectMainTab(tabType);
 
             // 말머리는 체크박스가 담당하므로 입력칸에는 순수 상품명만 보여준다
@@ -11334,6 +11475,10 @@
             isShowReserve = (prod.showReserve !== false);
             isShowWeekly = (prod.showWeekly === true);
             updateExposureButtonsUI();
+
+            // [신규] 분류탭 복원 (저장된 적 없는 기존 상품은 '없음')
+            uploadDisplayTab = prod.displayTab || "";
+            updateDisplayTabUI();
 
             // [신규] 저장된 상세옵션 복원 (useOptions 필드가 없는 기존 상품은 켜짐으로 간주)
             uploadUseOptions = (prod.useOptions !== false && prod.useOptions !== 'false');
@@ -11398,6 +11543,8 @@
 
             uploadEditShelf = ''; // [신규] 선반위치 기억값 초기화
             uploadEditIsSada = false; // [신규] 사다드림 체크 기억값 초기화
+            uploadDisplayTab = ''; // [신규] 분류탭 초기화 (새 상품은 '없음'으로 시작)
+            updateDisplayTabUI();
             selectMainTab('fruit');
 
             uploadSelectedFiles = [];
