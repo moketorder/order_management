@@ -1240,6 +1240,25 @@
                 background: none !important;
                 border-top: none !important;
             }
+
+            /* [수정] 옵션 줄은 화면에서 주황 알약 모양(배경·테두리)인데,
+               영수증 프린터에서는 그 배경이 시커먼 칸으로 찍혀 읽기 어려웠다.
+               인쇄할 때는 배경·테두리를 없애고, 글자 속성은 상품명과 똑같이 물려받게 한다. */
+            .print-option,
+            .order-option-text,
+            .print-card .print-option,
+            .print-card .order-option-text {
+                background: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                color: inherit !important;
+                font-size: inherit !important;
+                font-weight: inherit !important;
+                line-height: inherit !important;
+                display: block !important;
+                padding: 1px 0 0 6px !important;
+                margin: 0 !important;
+            }
         }
 
         /* 오늘 주문현황 모달 스타일 */
@@ -2729,7 +2748,7 @@
                 <!-- [신규] 전체 데이터(보관함) 갱신 — 과거 자료는 마지막 갱신 데이터 기준으로 표시 -->
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:nowrap; margin-bottom:10px;">
                     <div id="sales-archive-status" style="font-size:11px; color:var(--text-sub); font-weight:700; min-width:0; flex:1 1 auto;"></div>
-                    <button type="button" onclick="refreshSalesArchive()" title="전체 데이터 갱신" style="flex-shrink:0; padding:6px 10px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:8px; font-size:14px; font-weight:800; cursor:pointer; white-space:nowrap; line-height:1;">🔄</button>
+                    <button type="button" onclick="refreshSalesArchive(true)" title="전체 데이터 갱신" style="flex-shrink:0; padding:6px 10px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:8px; font-size:14px; font-weight:800; cursor:pointer; white-space:nowrap; line-height:1;">🔄</button>
                 </div>
                 <!-- 컨트롤 패널: 집계기준 / 배송유형 / 기간 — 주문 내역 날짜필터 박스와 동일 디자인 -->
                 <div style="background:white; border:1px solid var(--border); border-radius:var(--radius-main); box-shadow:var(--shadow); padding:10px 8px; margin-bottom:14px;">
@@ -3103,14 +3122,27 @@
             _ordersRef.on('child_removed', (snap) => { delete ordersByPhone[snap.key]; _applyOrdersDelta(); }, _ordersErr);
 
             // 안전장치: orders가 비어 child_added가 한 번도 오지 않아도 로더/초기 렌더가 멈추지 않게 처리
+            // [버그수정] 예전에는 3초가 지나면 그때까지 도착한 것만으로 무조건 다시 그렸다.
+            //  초기 수신은 전화번호 단위로 나눠 오는데, 망이 느려 3초를 넘기면 캐시로 그려둔 전체 목록이
+            //  '반쪽 데이터'로 교체돼 목록이 비어 보였다. (새로고침하면 캐시가 먼저 그려져 멀쩡해 보임)
+            //  받은 게 캐시보다 적으면 그리지 않고 캐시 화면을 유지한다. 나머지가 도착하면 위 디바운스가 그린다.
             setTimeout(() => {
-                if (!isRealtimeFirstLoadDone) {
+                if (isRealtimeFirstLoadDone) return;
+
+                let arrivedCount = 0;
+                Object.values(ordersByPhone).forEach(v => { arrivedCount += Object.keys(v || {}).length; });
+                const cachedCount = (rawOrders || []).length;
+
+                if (cachedCount === 0 || arrivedCount >= cachedCount) {
                     isRealtimeFirstLoadDone = true;
                     processOrdersSnapshot(ordersByPhone);
-                    hideLoader();
-                    if (syncTextEl) syncTextEl.innerText = "실시간 연동중";
-                    if (syncDotEl) syncDotEl.style.backgroundColor = "var(--primary)";
+                } else {
+                    console.log(`초기 수신 지연: 도착 ${arrivedCount}건 < 캐시 ${cachedCount}건 → 캐시 화면 유지`);
                 }
+
+                hideLoader();
+                if (syncTextEl) syncTextEl.innerText = "실시간 연동중";
+                if (syncDotEl) syncDotEl.style.backgroundColor = "var(--primary)";
             }, 3000);
 
             rtdb.ref('customer_memos').on('value', (snapshot) => {
@@ -4304,8 +4336,8 @@
         // [변경] 보관함을 공유 로컬 캐시에서 우선 사용(다운로드 X). 캐시 없을 때만 다운로드(폴백).
         async function loadArchiveOrdersIfNeeded() {
             if (isArchiveLoaded) return;
-            hydrateArchiveFromCache();      // 공유 캐시 사용
-            if (isArchiveLoaded) return;    // 캐시로 해결되면 끝(네트워크 X)
+            await hydrateArchiveFromCache();  // 공유 캐시 사용 (IndexedDB라 비동기)
+            if (isArchiveLoaded) return;      // 캐시로 해결되면 끝(네트워크 X)
             showLoader("📁 과거 보관함 데이터를 불러오는 중...");
             try { await refreshSalesArchive(); } // 캐시 없으면 다운로드 + 공유 캐시 저장
             catch (e) { console.error("아카이브 로드 실패:", e); }
@@ -4365,6 +4397,8 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(deletePatch)
                     });
+
+                    await gTouchArchiveMark(); // 보관함이 바뀌었음을 표식에 남긴다 (아래 설명 참고)
 
                     const archSet = new Set(archivableOrders.map(it => (it.phone || "") + "_" + it.orderKey));
                     rawOrders = rawOrders.filter(o => !archSet.has((o.phone || "") + "_" + o.orderKey));
@@ -4444,6 +4478,7 @@
                 });
 
                 await Promise.all(promises);
+                await gTouchArchiveMark(); // 보관함이 바뀌었으니 표식 갱신
                 showToast(`🎉 최근 주문 ${toRestore.length}건을 성공적으로 복구했습니다.`);
                 isArchiveLoaded = false; // 캐시 플래그 초기화
                 await fetchOrders(true);
@@ -4504,6 +4539,7 @@
                 });
 
                 await Promise.all(promises);
+                await gTouchArchiveMark(); // 보관함이 바뀌었으니 표식 갱신
                 showToast(`🎉 30일 이상 지난 주문 ${archivableOrders.length}건을 보관함으로 이동했습니다!`);
                 const archSet = new Set(archivableOrders.map(it => (it.phone || "") + "_" + it.orderKey));
                 rawOrders = rawOrders.filter(o => !archSet.has((o.phone || "") + "_" + o.orderKey));
@@ -5416,14 +5452,145 @@
             return;
         }
 
-        // [수정] 배달비 자동 제거 로직을 없앴다.
-        //  예전에는 총액이 15,000원을 넘으면 여기서 배달비 기록을 통째로 DELETE 했다.
-        //  그러면 "배달비를 받았다가 안 받기로 했다"는 흔적이 사라지고, 주문서 쪽에서 쓰는
-        //  '배달비 차감' 방식과도 규칙이 어긋난다.
-        //  배달비를 붙이고 빼는 판단은 주문서(주문·취소)에서 한 곳으로 처리하고,
-        //  여기서는 상쇄하고 남은 최종 배달비만 카드 맨 아래에 보여준다.
+        // [신규] 그 고객·그 날짜의 배달비를 다시 맞춘다. (주문서의 주문·취소 때와 똑같은 규칙)
+        //  예전에는 여기서 총액이 15,000원을 넘으면 배달비 기록을 통째로 DELETE 했고,
+        //  반대로 금액이 줄어 배달비를 받아야 하는 경우는 아무 처리도 없었다.
+        //  게다가 사장님이 주문 카드를 취소하면 그 카드에 딸린 배달비 줄만 같이 취소돼서,
+        //  다른 주문이 남아 있어도 배달비가 사라지거나 반대로 남아 있는 일이 생겼다.
+        //
+        //  남은 상품 금액을 보고 '있어야 할 배달비'와 '지금 붙어 있는 배달비'를 비교해,
+        //  모자라면 배달비를, 넘치면 배달비 차감을 새 줄로 기록한다. 기존 기록은 고치지 않는다.
         async function checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, pickupDate) {
-            return;
+            const cleanPhone = String(phone || "").replace(/\D/g, "");
+            const pDate = String(pickupDate || "").trim();
+            if (!cleanPhone || !pDate) return;
+
+            const isCanceled = (o) => (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+            const isDone = (o) => {
+                const rec = String(o.received || ""), del = String(o.delivered || "");
+                return o.received === true || rec === "픽업완료" || rec === "취소완료"
+                    || o.delivered === true || del === "배달완료";
+            };
+            const amountOf = (o) => Math.abs(parseInt(String(o.total || 0).replace(/,/g, "")) || 0);
+
+            // 그 날짜에 살아 있는 '배달' 주문만 본다 (픽업은 배달비와 무관)
+            const live = (rawOrders || []).filter(o =>
+                String(o.phone || "").replace(/\D/g, "") === cleanPhone &&
+                String(o.pickupDate || "").trim() === pDate &&
+                String(o.shippingMethod || "").includes("배달") &&
+                !isCanceled(o) && !isDone(o)
+            );
+            if (live.length === 0) return;
+
+            const feeRows = live.filter(o => gFeeRowName(o) === "배달비");
+            const refundRows = live.filter(o => gFeeRowName(o) === FEE_REFUND_NAME);
+            const productRows = live.filter(o => !gIsFeeRow(o));
+
+            // 상품이 하나도 안 남았으면 배달비·차감도 같이 취소한다
+            if (productRows.length === 0) {
+                for (const o of feeRows.concat(refundRows)) {
+                    try {
+                        const res = await fetch(`${FIREBASE_DB_URL}orders/${cleanPhone}/${o.orderKey}.json`, {
+                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ canceled: true, received: "취소완료" })
+                        });
+                        if (res.ok) { o.canceled = true; o.received = "취소완료"; }
+                    } catch (e) { console.error("잔여 배달비 취소 실패:", e); }
+                }
+                renderFilteredOrders();
+                return;
+            }
+
+            // 무료배달 기준 금액 — 사다드림 금액은 빼고 센다 (주문서와 같은 규칙)
+            const base = productRows.reduce((a, o) => a + (isSadaOrderRow(o) ? 0 : amountOf(o)), 0);
+            const current = feeRows.reduce((a, o) => a + amountOf(o), 0)
+                          - refundRows.reduce((a, o) => a + amountOf(o), 0);
+            const needed = (base >= 15000) ? 0 : await gGetDeliveryFee();
+            const diff = needed - current;
+            if (diff === 0) return;
+
+            const baseOrder = productRows[0];
+            const ok = await gAppendFeeRowAdmin(cleanPhone, baseOrder, pDate, Math.abs(diff), diff < 0);
+            if (ok) {
+                showToast(diff > 0
+                    ? `배달비 ${Math.abs(diff).toLocaleString()}원이 추가되었습니다.`
+                    : `배달비 ${Math.abs(diff).toLocaleString()}원을 빼드렸습니다.`);
+                renderFilteredOrders();
+            }
+        }
+
+        // 주문 기록이 사다드림인지 (저장된 isSada 우선, 없으면 예전 주문이라 이름으로 판단)
+        function isSadaOrderRow(o) {
+            if (!o) return false;
+            if (o.isSada === true || o.isSada === 'true') return true;
+            if (o.isSada === false || o.isSada === 'false') return false;
+            return String(o.item || "").includes("[사다드림]");
+        }
+
+        let _cachedDeliveryFee = 0;
+        async function gGetDeliveryFee() {
+            if (_cachedDeliveryFee > 0) return _cachedDeliveryFee;
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}delivery_fee.json?t=` + Date.now());
+                if (res.ok) {
+                    const v = parseInt(await res.json());
+                    if (v > 0) _cachedDeliveryFee = v;
+                }
+            } catch (e) { console.warn("배달비 금액 조회 실패:", e); }
+            return _cachedDeliveryFee || 3000;
+        }
+
+        // 배달비/배달비 차감 줄을 새로 하나 기록한다 (기존 기록은 건드리지 않는다)
+        async function gAppendFeeRowAdmin(cleanPhone, baseOrder, pDate, amount, isRefund) {
+            const amt = Math.abs(parseInt(amount) || 0);
+            if (amt <= 0) return false;
+
+            const rowName = isRefund ? FEE_REFUND_NAME : "배달비";
+            const signed = isRefund ? -amt : amt;
+            const tempTimestamp = Date.now();
+            const formattedTimestamp = formatTimestampToFullString(tempTimestamp);
+            const orderKey = fSafeKey(formattedTimestamp) + "_" + fSafeKey(rowName);
+
+            const payload = {
+                header: 'order',
+                name: baseOrder.name,
+                phone: baseOrder.phone,
+                address: baseOrder.address || "",
+                addressDetail: baseOrder.addressDetail || "",
+                entrance: baseOrder.entrance || "",
+                shippingMethod: baseOrder.shippingMethod,
+                cashReceipt: baseOrder.cashReceipt || "미발행",
+                kakaoName: baseOrder.kakaoName || "",
+                kakaoRealName: baseOrder.kakaoRealName || "",
+                timestamp: formattedTimestamp,
+                item: rowName,
+                qty: 1,
+                price: signed,
+                total: signed,
+                pickupDate: pDate,
+                matchKey: pDate,
+                received: false,
+                delivered: false,
+                canceled: false,
+                isSada: false,
+                rawTimestamp: tempTimestamp
+            };
+
+            for (let a = 1; a <= 5; a++) {
+                try {
+                    const res = await fetch(`${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                    });
+                    if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                    rawOrders.push(Object.assign({ orderKey: orderKey }, payload));
+                    return true;
+                } catch (e) {
+                    console.warn(`${rowName} 기록 재시도 ${a}/5:`, e.message);
+                    await new Promise(r => setTimeout(r, 400 * a));
+                }
+            }
+            console.error(`${rowName} 기록 최종 실패`);
+            return false;
         }
 
         function escapeArg(str) {
@@ -7057,7 +7224,7 @@
 
                         printHtml += `
                             <tr style="border-bottom:none;">
-                                <td style="padding:4px 0;">${it.item}${statusBadge}${gOptionLines(it.optionText, { style: 'font-size:11px; color:#555; padding-left:6px;' })}</td>
+                                <td style="padding:4px 0;">${it.item}${statusBadge}${gOptionLines(it.optionText, { cls: 'print-option' })}</td>
                                 <td class="text-right" style="padding:4px 0;">${it.qty}</td>
                                 <td class="text-right" style="padding:4px 0;">${(parseInt(String(it.total || 0).replace(/,/g, "")) || 0).toLocaleString()}원</td>
                             </tr>
@@ -8791,12 +8958,69 @@
             return arr;
         }
 
+        // [신규] 보관함 원본(1.8MB)은 IndexedDB에 담는다.
+        //  localStorage는 한도가 5MB라 다른 캐시와 같이 쓰면 금세 넘치고, 넘치면 저장이 조용히 실패해
+        //  앱을 열 때마다 1.8MB를 다시 내려받게 된다. IndexedDB는 한도가 훨씬 커서 그 반복이 없어진다.
+        const IDB_NAME = 'moket_cache';
+        const IDB_STORE = 'kv';
+
+        function idbOpen(){
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(IDB_NAME, 1);
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function idbGet(key){
+            try {
+                const db = await idbOpen();
+                return await new Promise((resolve, reject) => {
+                    const tx = db.transaction(IDB_STORE, 'readonly');
+                    const r = tx.objectStore(IDB_STORE).get(key);
+                    r.onsuccess = () => resolve(r.result);
+                    r.onerror = () => reject(r.error);
+                });
+            } catch (e) { console.warn('IndexedDB 읽기 실패:', e); return null; }
+        }
+
+        async function idbSet(key, value){
+            try {
+                const db = await idbOpen();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(IDB_STORE, 'readwrite');
+                    tx.objectStore(IDB_STORE).put(value, key);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                });
+                return true;
+            } catch (e) { console.warn('IndexedDB 저장 실패:', e); return false; }
+        }
+
         // 공유 캐시(원본)에서 두 탭 모두 하이드레이트 (네트워크 X)
-        function hydrateArchiveFromCache(){
+        async function hydrateArchiveFromCache(){
             // 구버전 중복 캐시 정리(용량 회수)
             try { localStorage.removeItem('moket_sales_archive_cache'); localStorage.removeItem('moket_sales_archive_cache_time'); } catch(e){}
-            let raw = null;
-            try { const s = localStorage.getItem(ARCHIVE_RAW_KEY); if (s) raw = JSON.parse(s); } catch(e){}
+
+            let raw = await idbGet(ARCHIVE_RAW_KEY);
+
+            // 예전에 localStorage에 담아 둔 것이 있으면 옮겨 오고 그쪽은 비운다 (용량 회수)
+            if (!raw){
+                try {
+                    const s = localStorage.getItem(ARCHIVE_RAW_KEY);
+                    if (s){
+                        raw = JSON.parse(s);
+                        await idbSet(ARCHIVE_RAW_KEY, raw);
+                        localStorage.removeItem(ARCHIVE_RAW_KEY);
+                        console.log('보관함 캐시를 IndexedDB로 옮기고 localStorage에서 지웠습니다.');
+                    }
+                } catch(e){ console.warn('보관함 캐시 이전 실패:', e); }
+            }
+
             if (raw){
                 try { salesArchiveOrders = salesFlattenArchive(raw); salesArchiveLoaded = salesArchiveOrders.length > 0; } catch(e){ salesArchiveOrders = []; salesArchiveLoaded = false; }
                 try { archivedOrdersCache = flattenArchiveForOrders(raw); isArchiveLoaded = true; mergeArchiveIntoRawOrders(); } catch(e){}
@@ -8806,7 +9030,7 @@
             updateSalesArchiveStatus();
         }
         // 하위호환: 판매관리 초기화에서 부르던 이름 유지
-        function loadSalesArchiveFromCache(){ hydrateArchiveFromCache(); }
+        function loadSalesArchiveFromCache(){ return hydrateArchiveFromCache(); }
 
         // 캐시 총 용량(대략) 계산 — 5MB(localStorage 한도) 참고용
         function getLocalStorageUsageMB(){
@@ -8831,17 +9055,69 @@
             }
         }
 
+        // [신규] 보관함이 바뀐 시각을 적어 두는 작은 표식.
+        //  Firebase는 '안 바뀌었으면 안 보냄'(304)을 지원하지 않아서(Cache-Control: no-cache, ETag 없음)
+        //  같은 자료를 매번 1.8MB씩 다시 받아야 했다. 그래서 표식을 우리가 직접 둔다.
+        //  앱은 이 몇 바이트만 먼저 읽어 내가 가진 것과 같으면 본문을 아예 요청하지 않는다.
+        const ARCHIVE_MARK_KEY = 'moket_archive_mark';   // 내가 가진 자료의 표식 (로컬)
+
+        async function gTouchArchiveMark(){
+            const mark = Date.now();
+            try {
+                await fetch(`${FIREBASE_DB_URL}orders_archive_updated.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mark)
+                });
+                try { localStorage.setItem(ARCHIVE_MARK_KEY, String(mark)); } catch(e){}
+            } catch (e) { console.warn('보관함 표식 갱신 실패:', e); }
+            return mark;
+        }
+
+        async function gFetchArchiveMark(){
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}orders_archive_updated.json`);
+                if (!res.ok) return null;
+                const v = await res.json();
+                return (v === null || v === undefined) ? null : String(v);
+            } catch (e) { return null; }
+        }
+
         // [신규] 전체 데이터(보관함) 갱신 — 다운로드 + 공유 캐시 저장 + 두 탭 반영
-        async function refreshSalesArchive(){
+        //  force=true (🔄 버튼)면 표식과 무관하게 새로 받는다.
+        async function refreshSalesArchive(force = false){
+            // 표식이 같으면 1.8MB를 받지 않고 가진 것으로 끝낸다
+            if (!force) {
+                const serverMark = await gFetchArchiveMark();
+                let localMark = null;
+                try { localMark = localStorage.getItem(ARCHIVE_MARK_KEY); } catch(e){}
+                if (serverMark && localMark && serverMark === localMark) {
+                    const cached = await idbGet(ARCHIVE_RAW_KEY);
+                    if (cached) {
+                        await hydrateArchiveFromCache();
+                        console.log('보관함 표식이 같아 다운로드를 건너뜁니다.');
+                        return;
+                    }
+                }
+            }
+
             if (typeof showToast === 'function') showToast('전체 데이터 갱신 중...');
             try {
                 const res = await fetch(`${FIREBASE_DB_URL}orders_archive.json?t=${Date.now()}`);
                 if (!res.ok) throw new Error('서버 응답 ' + res.status);
                 const raw = await res.json();
-                try {
-                    localStorage.setItem(ARCHIVE_RAW_KEY, JSON.stringify(raw || {}));
-                    localStorage.setItem(ARCHIVE_TIME_KEY, String(Date.now()));
-                } catch(e){ console.warn('보관함 캐시 저장 실패(용량 초과 가능):', e); if (typeof showToast === 'function') showToast('⚠️ 저장용량 초과로 캐시 저장 실패'); }
+                // [수정] 보관함 원본은 IndexedDB에 담는다. localStorage(5MB)에 넣다가 실패하면
+                //  다음에 또 1.8MB를 내려받게 되므로, 저장 성공 여부를 확인하고 실패하면 알린다.
+                const saved = await idbSet(ARCHIVE_RAW_KEY, raw || {});
+                if (saved) {
+                    try { localStorage.setItem(ARCHIVE_TIME_KEY, String(Date.now())); } catch(e){}
+                    try { localStorage.removeItem(ARCHIVE_RAW_KEY); } catch(e){} // 예전 자리 비우기
+                    // 지금 받은 자료가 서버의 어느 시점인지 표식을 맞춰 둔다 (없으면 하나 만들어 둔다)
+                    const mark = await gFetchArchiveMark();
+                    if (mark) { try { localStorage.setItem(ARCHIVE_MARK_KEY, mark); } catch(e){} }
+                    else { await gTouchArchiveMark(); }
+                } else {
+                    console.warn('보관함 캐시 저장 실패');
+                    if (typeof showToast === 'function') showToast('⚠️ 과거 자료 저장에 실패했습니다');
+                }
                 salesArchiveOrders = salesFlattenArchive(raw); salesArchiveLoaded = salesArchiveOrders.length > 0;
                 archivedOrdersCache = flattenArchiveForOrders(raw); isArchiveLoaded = true; mergeArchiveIntoRawOrders();
                 updateSalesArchiveStatus();
