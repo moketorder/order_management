@@ -2637,10 +2637,14 @@
         .sales-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
         .orders-sub-btn { color:var(--text-sub); }
         .orders-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+        /* [신규] 자료 정리 하위탭(판매 통계 / 아파트 관리) — 위 탭들과 같은 선택 표시 */
+        .data-sub-btn { color:var(--text-sub); }
+        .data-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
         /* [신규] 각 메인탭의 보조 세그먼트 버튼 박스 크기 통일 (당일/예약/상시·발주등록/목록·발주관리/판매현황·상품등록 대분류) */
         [data-manage-delivery-type],
         .purchase-sub-btn,
         .sales-sub-btn,
+        .data-sub-btn,
         #tab-admin-product-upload .segment-control [data-tab] {
             height: 36px !important;
             padding: 0 4px !important;
@@ -8226,6 +8230,7 @@
         }
 
         let uploadEditIsSada = false; // [신규] 수정 시 '사다드림' 체크 상태를 기억해 폼에 반영
+        let uploadEditIsRecommend = false; // [신규] 수정 시 '오늘의추천'(과채류) 체크 상태를 기억해 폼에 반영
         let uploadSelectedDate = new Date().toISOString().split('T')[0];
         let uploadManageDeliveryType = "today";
         let uploadManageTab = "today-fruit";
@@ -8807,11 +8812,34 @@
         let salesUpcomingCats = new Set(); // 발주 카테고리 필터: 비어있으면 '전체', 값이 있으면 그 카테고리만
 
         // 상품 카테고리 분류: 'fruit'(과일/야채/채소) | 'group'(공동구매=날짜) | 'sada'(사다드림) | 'other'(그외=상시판매 등)
-        function salesProductCategory(prod, orderItemName){
+        // [신규] 지난 과일 주문을 이름으로 알아보기 위한 낱말.
+        //  과일은 분류(matchKey)로 판단하는데, 상품이 목록에서 내려가면 그 값을 알 수 없어
+        //  '[오늘의추천]…복숭아' 같은 지난 주문이 전부 상시판매로 잡히고 있었다.
+        //  실제 과일 상품 이름에서 뽑은 낱말이며, 가공식품(주스·요거트·스틱 등)은 제외어로 걸러낸다.
+        const SALES_FRUIT_WORDS = ['복숭아','백도','황도','천중도','마도카','대옥계','그레이트','단호장',
+            '자두','거봉','샤인머스켓','샤인','포도','사과','아오리','홍로','감귤','수박','참외',
+            '블루베리','방울토마토','대추방울','딸기','멜론','망고','체리','키위','브릭스'];
+        const SALES_NOT_FRUIT_WORDS = ['주스','음료','요거트','스틱','칩','스낵','잼','절임',
+            '빵','케이크','아이스','우유','커리','피자','샌드','과자'];
+
+        function salesLooksLikeFruit(name){
+            // 말머리([오늘의추천] 등)는 떼고 본다
+            const bare = String(name || '').replace(/\[[^\]]*\]/g, ' ');
+            if (SALES_NOT_FRUIT_WORDS.some(w => bare.includes(w))) return false;
+            return SALES_FRUIT_WORDS.some(w => bare.includes(w));
+        }
+
+        //  orderCategory: 주문에 적어 둔 분류(fruit/sada/group/other). 주문서가 저장한 값이라 가장 정확하다.
+        function salesProductCategory(prod, orderItemName, orderCategory){
+            const oc = String(orderCategory || '').trim();
+            if (oc === 'fruit' || oc === 'sada' || oc === 'group' || oc === 'other') return oc;
+
             const mk = String(prod ? (prod.matchKey || '') : '').trim();
             const nm = String((prod && prod.name) || orderItemName || '');
             if (nm.includes('사다드림') || mk === '사다드림') return 'sada';
             if (/과일|야채|채소/.test(mk) || /\[과일\]|\[야채\]|\[채소\]/.test(nm)) return 'fruit';
+            // 상품이 목록에서 내려가 분류를 모를 때만 이름으로 한 번 더 본다
+            if (!mk && salesLooksLikeFruit(nm)) return 'fruit';
             if (/^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(mk)) return 'group'; // 공동구매: matchKey가 날짜
             return 'other';
         }
@@ -9271,7 +9299,7 @@
                     if (_inScope) todayAfterMap.set(key, (todayAfterMap.get(key) || 0) + (parseInt(o.qty || 0) || 0));
                 }
                 // 카드 집계: 카테고리 + 날짜범위 필터
-                if (salesUpcomingCats.size > 0 && !salesUpcomingCats.has(salesProductCategory(prod, o.item))) return; // 카테고리 필터(비어있으면 전체)
+                if (salesUpcomingCats.size > 0 && !salesUpcomingCats.has(salesProductCategory(prod, o.item, o.category))) return; // 카테고리 필터(비어있으면 전체)
                 const info = getOrderDateInfo(o);
                 if (!info.dateStr || info.dateStr === '기타') return;
                 const p = info.dateStr.split('-');
@@ -9532,7 +9560,7 @@
                 if (!itemMap.has(nm)) itemMap.set(nm, { qty: 0, amount: 0 });
                 const im = itemMap.get(nm); im.qty += q; im.amount += amt;
                 // [신규] 카테고리별 판매액 누적 (과일 / 공동구매(+사다드림) / 상시판매)
-                const _cat = salesProductCategory(_prodByName[nm], nm);
+                const _cat = salesProductCategory(_prodByName[nm], nm, o.category);
                 if (_cat === 'fruit') catAmt.fruit += amt;
                 else if (_cat === 'sada') catAmt.sada += amt;
                 else if (_cat === 'group') catAmt.group += amt;
@@ -10073,7 +10101,7 @@
                 if (salesMethodFilter === 'delivery' && !isDel) return;
                 if (salesMethodFilter === 'pickup' && isDel) return;
                 const nm = String(o.item || '상품명 없음');
-                const c = salesProductCategory(prodByName[nm], nm);
+                const c = salesProductCategory(prodByName[nm], nm, o.category);
                 const bucket = (c === 'fruit') ? 'fruit' : (c === 'sada') ? 'sada' : (c === 'group') ? 'group' : 'other';
                 if (bucket !== cat) return;
                 if (!items.has(nm)) items.set(nm, { cnt: 0, amount: 0 });
@@ -10108,7 +10136,7 @@
                 if (!cust.has(key)) cust.set(key, { name: String(o.name || '무명'), phone: phone, sadaCnt: 0, sadaAmt: 0, etcCnt: 0, etcAmt: 0 });
                 const c = cust.get(key);
                 const amt = parseInt(o.total || 0) || 0;
-                if (salesProductCategory(prodByName[nm], nm) === 'sada'){ c.sadaCnt += 1; c.sadaAmt += amt; }
+                if (salesProductCategory(prodByName[nm], nm, o.category) === 'sada'){ c.sadaCnt += 1; c.sadaAmt += amt; }
                 else { c.etcCnt += 1; c.etcAmt += amt; }
             });
             const only = [], mixed = [];
@@ -10315,7 +10343,7 @@
             } else if (type === 'inventory') {
                 uploadManageTab = 'inv-all';
             } else {
-                uploadManageTab = 'all'; // [변경] 공동구매 기본: 아무 날짜도 선택 안 함 = 전체
+                uploadManageTab = gDefaultReserveTab(); // [변경] 공동구매 기본: 오늘 날짜 탭
             }
             
             // 다른 카테고리로 이동 시 선택 상태를 기억하도록 초기화 로직 제거
@@ -10325,6 +10353,21 @@
             buildManageCategoryTabs();
             buildSubTabs();
             renderProductsList();
+        }
+
+        // [신규] 공동구매 탭을 열었을 때 기본으로 고를 날짜.
+        //  오늘 날짜 탭이 있으면 그걸 고르고, 오늘 들어갈 상품이 없으면 전체로 둔다.
+        //  (없는 날짜를 고르면 목록이 비어 보여서 오히려 불편하다)
+        function gDefaultReserveTab() {
+            try {
+                const n = new Date();
+                const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+                const hasToday = (uploadProducts || []).some(p =>
+                    isReserveListProduct(p) && getReserveGroupDate(p) === today);
+                return hasToday ? today : 'all';
+            } catch (e) {
+                return 'all';
+            }
         }
 
         // [신규] 예약구매(사다드림+공동구매) 날짜 분류용 헬퍼들
@@ -10628,7 +10671,8 @@
                 const sadaLabel = document.createElement('label');
                 sadaLabel.className = 'checkbox-container';
                 // 버튼 크기로 고정 (남는 폭은 날짜칸이 채움)
-                sadaLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; height:45px; padding:0 14px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; flex:0 0 auto; box-sizing:border-box;';
+                // [수정] 아래 '분류탭' 버튼(116px)과 오른쪽 끝이 맞도록 같은 폭으로 고정
+                sadaLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:6px; height:45px; width:116px; padding:0; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; flex:0 0 auto; box-sizing:border-box;';
                 const sadaChk = document.createElement('input');
                 sadaChk.type = 'checkbox';
                 sadaChk.id = 'productIsSada';
@@ -10686,18 +10730,53 @@
                 populateShelfOptions(uploadIsEditMode ? (uploadEditShelf || '') : '');
             }
             else if (tab === 'fruit') {
-                document.getElementById('categoryLabel').innerText = "과채류 분류 선택";
+                document.getElementById('categoryLabel').innerText = "과채류 분류 선택  ·  오늘의추천 여부";
+                // [신규] 왼쪽=분류, 오른쪽=오늘의추천 체크 (공동구매 탭의 사다드림 버튼과 같은 모양)
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; gap:8px; align-items:stretch;';
+
                 const select = document.createElement('select');
                 select.id = 'categoryValue';
                 select.className = 'form-control';
+                select.style.flex = '1 1 auto';
+                select.style.minWidth = '0';
                 fruitCategories.forEach(cat => {
                     const opt = document.createElement('option');
                     opt.value = cat.key;
                     opt.innerText = cat.label;
                     select.appendChild(opt);
                 });
-                container.appendChild(select);
-            } 
+
+                // 체크 시 상품명 앞에 [오늘의추천] 말머리를 자동으로 붙여 저장한다.
+                //  네이티브 체크박스는 전역 CSS로 숨겨져 있어, input 바로 뒤에 .custom-checkbox 스팬을 둬야 표시된다.
+                const recLabel = document.createElement('label');
+                recLabel.className = 'checkbox-container';
+                // [수정] 아래 '분류탭' 버튼(116px)과 오른쪽 끝이 맞도록 같은 폭으로 고정
+                recLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:6px; height:45px; width:116px; padding:0; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; flex:0 0 auto; box-sizing:border-box;';
+                const recChk = document.createElement('input');
+                recChk.type = 'checkbox';
+                recChk.id = 'productIsRecommend';
+                recChk.checked = !!(uploadIsEditMode && uploadEditIsRecommend);
+                const recBox = document.createElement('span');
+                recBox.className = 'custom-checkbox';
+                const recTxt = document.createElement('span');
+                recTxt.innerText = '오늘의추천';
+                const paintRec = () => {
+                    const on = recChk.checked;
+                    recLabel.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
+                    recLabel.style.background = on ? 'var(--primary-light)' : '#ffffff';
+                    recLabel.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
+                };
+                recChk.onchange = paintRec;
+                paintRec();
+                recLabel.appendChild(recChk);
+                recLabel.appendChild(recBox);
+                recLabel.appendChild(recTxt);
+
+                row.appendChild(select);
+                row.appendChild(recLabel);
+                container.appendChild(row);
+            }
             else if (tab === 'costco') {
                 document.getElementById('categoryLabel').innerText = "코스트코 소분류 선택";
                 const select = document.createElement('select');
@@ -11944,6 +12023,13 @@
                 name = '[사다드림]' + name;
             }
 
+            // [신규] 과채류의 '오늘의추천'도 같은 방식 — 말머리와 값(isRecommend)을 함께 저장한다.
+            const _recChkEl = document.getElementById('productIsRecommend');
+            const _isRecommendChecked = (uploadCurrentTab === 'fruit' && !!_recChkEl && _recChkEl.checked);
+            if (_isRecommendChecked) {
+                name = '[오늘의추천]' + name;
+            }
+
             try {
                 // 1. 모든 신규 사진 업로드 처리 (item.id = Cloudinary CDN URL). GAS 대신 Cloudinary 직접 업로드로 속도 개선.
                 for (let i = 0; i < uploadSelectedFiles.length; i++) {
@@ -11994,6 +12080,8 @@
                     displayTab: uploadDisplayTab || "",
                     // [신규] 사다드림 여부. 상품명 말머리 대신 이 값으로 판단한다.
                     isSada: _isSadaChecked,
+                    // [신규] 오늘의추천 여부 (과채류)
+                    isRecommend: _isRecommendChecked,
                     // [신규] 상세옵션 설정
                     useOptions: uploadUseOptions,
                     useChoiceOptions: uploadUseChoiceOptions,
@@ -12342,6 +12430,9 @@
             //  없는 예전 상품만 이름 말머리로 판단한다.
             uploadEditIsSada = (prod.isSada === true || prod.isSada === 'true')
                 || (prod.isSada === undefined && /^\s*\[\s*사다드림\s*\]/.test(String(prod.name || '')));
+            // [신규] 오늘의추천 여부 복원 (같은 방식)
+            uploadEditIsRecommend = (prod.isRecommend === true || prod.isRecommend === 'true')
+                || (prod.isRecommend === undefined && /^\s*\[\s*오늘의추천\s*\]/.test(String(prod.name || '')));
             selectMainTab(tabType);
 
             // 말머리는 체크박스가 담당하므로 입력칸에는 순수 상품명만 보여준다
@@ -12434,6 +12525,7 @@
 
             uploadEditShelf = ''; // [신규] 선반위치 기억값 초기화
             uploadEditIsSada = false; // [신규] 사다드림 체크 기억값 초기화
+            uploadEditIsRecommend = false; // [신규] 오늘의추천 체크 기억값 초기화
             uploadDisplayTab = ''; // [신규] 분류탭 초기화 (새 상품은 '없음'으로 시작)
             updateDisplayTabUI();
             selectMainTab('fruit');
