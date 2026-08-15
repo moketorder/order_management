@@ -2236,20 +2236,17 @@
                                 </div>
                             </div>
 
-                            <!-- 노출 설정 (분류탭 설정과 함께 '어디에 보일지'를 정하는 항목이라 붙여 둔다) -->
-                            <div class="form-group">
-                                <label>노출 설정</label>
-                                <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
-                                    <button type="button" id="btnShowToday" class="exposure-toggle-btn active green" onclick="toggleExposure('Today')" style="flex: 1; min-width: 100px;">당일구매 노출</button>
-                                    <button type="button" id="btnShowReserve" class="exposure-toggle-btn active" onclick="toggleExposure('Reserve')" style="flex: 1; min-width: 100px;">예약구매 노출</button>
-                                    <button type="button" id="btnShowWeekly" class="exposure-toggle-btn" onclick="toggleExposure('Weekly')" style="flex: 1.5; min-width: 180px;">매주 노출 (자동 연장)</button>
-                                </div>
-                            </div>
-
                             <!-- 상품명 -->
+                            <!-- [수정] '당일구매 노출 / 예약구매 노출'은 없앴다.
+                                 노출·숨김은 상품목록에서 상품을 골라 👁️노출 / 🙈숨김으로 하는 편이 헷갈리지 않는다.
+                                 남은 '매주 노출(자동 연장)'만 상품명 옆으로 옮겼다. -->
                             <div class="form-group">
                                 <label>상품명</label>
-                                <input type="text" id="productName" class="form-control" placeholder="예: 무농약 프리미엄 딸기 1kg" required>
+                                <div style="display: flex; flex-wrap: nowrap; gap: 6px; align-items: stretch;">
+                                    <input type="text" id="productName" class="form-control" placeholder="예: 무농약 프리미엄 딸기 1kg" required style="flex: 1 1 auto; width: auto; min-width: 0;">
+                                    <!-- [수정] 분류탭·상세옵션 버튼과 같은 폭(price-option-btn, 116px)으로 맞춘다 -->
+                                    <button type="button" id="btnShowWeekly" class="price-option-btn" onclick="toggleExposure('Weekly')" title="매주 노출 (자동 연장)">🔁 매주 노출</button>
+                                </div>
                             </div>
 
                             <!-- 가격 -->
@@ -2357,6 +2354,7 @@
                         <button type="button" onclick="document.getElementById('product-csv-file').click()" style="flex:1; padding:9px 6px; border:1.5px solid #059669; background:#ecfdf5; color:#059669; border-radius:var(--radius-sm); font-size:12.5px; font-weight:800; cursor:pointer;">📥 CSV 업로드</button>
                         <input type="file" id="product-csv-file" accept=".csv,text/csv" style="display:none;" onchange="importProductsFromCSV(this)">
                     </div>
+
 
                     <div class="card" style="padding: 10px;">
                         <div id="products-list-container">
@@ -2690,13 +2688,22 @@
                 <div class="card" style="padding: 12px;">
                     <div class="card-title" style="margin:0 0 4px; font-size:14px;">🏢 아파트 자료</div>
                     <div style="font-size:11.5px; color:var(--text-sub); font-weight:700; line-height:1.6; margin-bottom:12px; word-break:keep-all;">
-                        배달 주소에서 아파트를 알아보는 기준입니다. 지번이 있으면 지번을 먼저 보고, 없으면 이름(키워드)을 긴 것부터 맞춰 봅니다.
+                        배달 주소에서 아파트를 알아보는 기준입니다. <b>① 도로명주소</b>를 먼저 보고, 없으면 <b>② 지번</b>, 그다음 <b>③ 이름(키워드)</b>을 긴 것부터, 마지막으로 <b>④ 내가 묶은 구역</b> 순으로 맞춰 봅니다.
                         별칭은 주문 검색창에서 그 단어로 찾을 수 있게 해 줍니다.
                     </div>
                     <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
                         <input type="text" id="apart-test-input" placeholder="🔍 주소를 넣어 어떻게 인식되는지 확인" oninput="renderApartmentTest()" style="flex:1 1 0; min-width:0; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; box-sizing:border-box;">
                     </div>
                     <div id="apart-test-result" style="margin-bottom:14px;"></div>
+
+                    <!-- [신규] 기간을 정해서 그 기간의 주문만 세어 본다 (주문일 기준) -->
+                    <div style="display:flex; gap:4px; flex-wrap:nowrap; overflow-x:auto; align-items:center; margin-bottom:8px;" id="apart-period-tabs"></div>
+                    <div id="apart-custom-range" style="display:none; gap:6px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
+                        <input type="date" id="apart-from" class="form-control" style="width:auto; height:36px;" onchange="setApartPeriod('custom')">
+                        <span style="font-size:12px;">~</span>
+                        <input type="date" id="apart-to" class="form-control" style="width:auto; height:36px;" onchange="setApartPeriod('custom')">
+                    </div>
+
                     <div id="apart-summary" style="margin-bottom:14px;"></div>
                     <div class="card-title" style="margin:0 0 6px; font-size:13px;">📋 기본 아파트 표 <span style="font-size:11px; font-weight:700; color:var(--text-sub);">· 주문 많은 순</span></div>
                     <div id="apart-table-wrap" style="overflow-x:auto; margin-bottom:18px;"></div>
@@ -2729,9 +2736,10 @@
                     </div>
                     <div id="sales-upcat-tabs" style="display:flex; gap:4px; flex-wrap:nowrap; align-items:center; margin-bottom:9px;">
                         <button type="button" data-sales-upcat="fruit" onclick="setSalesUpcomingCat('fruit')" class="sales-toggle-btn up-cat-fruit" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">과일</button>
+                        <!-- [수정] 과일 · 공동구매 · 사다드림 · 상시판매 순으로 정렬 -->
                         <button type="button" data-sales-upcat="group" onclick="setSalesUpcomingCat('group')" class="sales-toggle-btn up-cat-group" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">공동구매</button>
-                        <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn up-cat-other" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">상시판매</button>
                         <button type="button" data-sales-upcat="sada" onclick="setSalesUpcomingCat('sada')" class="sales-toggle-btn up-cat-sada" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">사다드림</button>
+                        <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn up-cat-other" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">상시판매</button>
                     </div>
                     <div id="sales-upcoming-summary" style="display:flex; gap:8px; flex-wrap:nowrap;"></div>
                 </div>
@@ -2754,6 +2762,9 @@
                     <div id="sales-archive-status" style="font-size:11px; color:var(--text-sub); font-weight:700; min-width:0; flex:1 1 auto;"></div>
                     <button type="button" onclick="refreshSalesArchive(true)" title="전체 데이터 갱신" style="flex-shrink:0; padding:6px 10px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:8px; font-size:14px; font-weight:800; cursor:pointer; white-space:nowrap; line-height:1;">🔄</button>
                 </div>
+
+                <!-- [수정] 리포트 내보내기는 자주 쓰는 기능이라 기간 고르기보다 위로 올렸다 -->
+                <button type="button" onclick="exportSalesCSV()" style="width:100%; padding:9px; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:var(--radius-sm); font-size:13px; font-weight:800; cursor:pointer; margin-bottom:12px;">📤 판매 리포트 CSV 내보내기</button>
                 <!-- 컨트롤 패널: 집계기준 / 배송유형 / 기간 — 주문 내역 날짜필터 박스와 동일 디자인 -->
                 <div style="background:white; border:1px solid var(--border); border-radius:var(--radius-main); box-shadow:var(--shadow); padding:10px 8px; margin-bottom:14px;">
                     <div id="sales-period-row1" style="display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; align-items:center; margin-bottom:8px;"></div>
@@ -2769,11 +2780,11 @@
 
                 <div id="sales-paid-summary" style="margin-bottom:14px;"></div>
 
-                <button type="button" onclick="exportSalesCSV()" style="width:100%; padding:9px; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:var(--radius-sm); font-size:13px; font-weight:800; cursor:pointer; margin-bottom:16px;">📤 판매 리포트 CSV 내보내기</button>
-
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 0 8px 0; flex-wrap:wrap;">
                     <div class="card-title" id="sales-trend-title" style="margin:0; font-size:14px;">📈 매출 추이</div>
                 </div>
+                <!-- [신규] 그래프를 어떤 단위로 볼지 직접 고른다 (자동 = 고른 기간에 맞춰 알아서) -->
+                <div id="trend-unit-tabs" style="display:flex; gap:4px; margin-bottom:8px; flex-wrap:nowrap; overflow-x:auto;"></div>
                 <div id="sales-daily-trend" style="margin-bottom:16px;"></div>
 
                 <div style="display:flex; gap:5px; margin:6px 0 8px 0; flex-wrap:nowrap; overflow-x:auto;">
@@ -3523,7 +3534,9 @@
             { name: "아데나",      roads: [], lots: [], keywords: ["아데나"], aliases: ["아데나"] },
             { name: "호반",        roads: [], lots: [], keywords: ["호반"], aliases: ["호반"] },
             { name: "동원",        roads: [], lots: [], keywords: ["동원"], aliases: ["동원"] },
-            { name: "스타힐스",    roads: [], lots: [], keywords: ["스타힐스"], aliases: ["스타힐스"] },
+            // [수정] 미사강변대로240 = 미사강변도시8단지(스타힐스). 주소에 '스타힐스'가 안 적혀 들어와
+            //  이름조각으로는 못 찾던 곳이라, 도로명주소와 단지 이름을 넣어 확실히 잡히게 했다.
+            { name: "스타힐스",    roads: ["미사강변대로240"], lots: [], keywords: ["미사강변도시8단지", "스타힐스"], aliases: ["스타힐스", "미사강변스타힐스", "미사강변도시8단지", "8단지"] },
             // 위에서 못 찾았을 때만 걸리도록 짧은 단어는 맨 뒤에 둔다.
             // [수정] 그냥 '푸르지오'는 2차(미사강변한강로 60)와 다른 1차를 가리킨다. 1차로 부른다.
             { name: "푸르지오1차", roads: ["미사강변대로165"], lots: [], keywords: ["미사강변1차푸르지오", "푸르지오1차", "1차푸르지오", "미사강변푸르지오", "푸르지오"], aliases: ["푸르지오1차", "푸르지오", "미사강변1차푸르지오", "미사강변푸르지오", "1차"] },
@@ -3593,6 +3606,62 @@
             return APARTMENT_NICK;
         }
 
+        // [신규] 사장님이 화면에서 직접 등록한 아파트. Firebase(apartment_extra)에 저장한다.
+        //  위 APARTMENT_DATA는 코드에 박혀 있어 손댈 수 없으므로, 새 아파트는 여기에 쌓고 함께 본다.
+        //  { key: { name, roads:[], lots:[], keywords:[], aliases:[] } }
+        let APARTMENT_EXTRA = [];
+
+        async function loadApartmentExtra() {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}apartment_extra.json`);
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                const data = await res.json();
+                APARTMENT_EXTRA = Object.entries(data || {}).map(([key, v]) => ({
+                    key: key,
+                    name: String((v && v.name) || '').trim(),
+                    roads: (v && v.roads) || [],
+                    lots: (v && v.lots) || [],
+                    keywords: (v && v.keywords) || [],
+                    aliases: (v && v.aliases) || [],
+                    __extra: true
+                })).filter(a => a.name);
+            } catch (e) {
+                console.warn("등록 아파트 불러오기 실패:", e);
+            }
+            return APARTMENT_EXTRA;
+        }
+
+        // 기본표 + 직접 등록한 아파트를 합친 목록 (직접 등록한 것을 먼저 본다)
+        function gAptList() {
+            return APARTMENT_EXTRA.concat(APARTMENT_DATA);
+        }
+
+        // [신규] 사장님이 직접 넣는 검색 별칭. Firebase(apartment_alias)에 아파트명을 키로 저장한다.
+        //  기본표(APARTMENT_DATA)의 aliases는 코드에 박혀 있어 손댈 수 없으므로, 여기에 더해서 쓴다.
+        //  { 아파트명: [별칭, ...] }
+        let APARTMENT_ALIAS = {};
+
+        async function loadApartmentAlias() {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}apartment_alias.json`);
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                const data = await res.json();
+                APARTMENT_ALIAS = {};
+                Object.entries(data || {}).forEach(([k, v]) => {
+                    const name = String((v && v.name) || k).trim();
+                    const raw = (v && v.aliases) || v || [];
+                    const list = Array.isArray(raw)
+                        ? raw
+                        : String(raw).split(/[,\s]+/);
+                    const clean = [...new Set(list.map(x => String(x).trim()).filter(Boolean))];
+                    if (name && clean.length) APARTMENT_ALIAS[name] = clean;
+                });
+            } catch (e) {
+                console.warn("아파트 별칭 불러오기 실패:", e);
+            }
+            return APARTMENT_ALIAS;
+        }
+
         // 주소 하나가 어느 구역에 속하는지. 긴 주소조각부터 맞춰 본다.
         function gFindCustomZone(normAddr) {
             let best = null, bestLen = 0;
@@ -3604,8 +3673,9 @@
             return best;
         }
 
-        // 주소에 해당하는 아파트 한 곳을 찾는다. 지번이 있으면 지번이 우선,
-        // 없으면 키워드를 긴 것부터 맞춰 본다. (짧은 '자이'가 '리버뷰자이'를 가로채지 않게)
+        // 주소에 해당하는 아파트 한 곳을 찾는다. 도로명주소가 1순위이고,
+        // 없으면 지번 → 키워드(긴 것부터) → 내가 묶은 구역 순으로 본다.
+        // (키워드를 긴 것부터 보는 이유: 짧은 '자이'가 '리버뷰자이'를 가로채지 않게)
         function gFindApartment(address) {
             const addr = gNormAddr(address);
             if (!addr) return null;
@@ -3615,21 +3685,22 @@
             //  구역을 먼저 보면 '미사'처럼 짧은 조각 하나가 다른 아파트까지 전부 삼켜 버린다.
 
             // [수정] 도로명주소가 기준. 이게 맞으면 더 볼 것도 없다.
+            //  (기본표 + 사장님이 직접 등록한 아파트를 함께 본다)
             const road = gRoadKey(address);
             if (road) {
-                for (const apt of APARTMENT_DATA) {
+                for (const apt of gAptList()) {
                     if ((apt.roads || []).includes(road)) return apt;
                 }
             }
 
             // 도로명주소가 없거나 표에 없으면 지번으로 채워 본다.
-            for (const apt of APARTMENT_DATA) {
-                if (apt.lots.some(lot => addr.includes(lot))) return apt;
+            for (const apt of gAptList()) {
+                if ((apt.lots || []).some(lot => addr.includes(lot))) return apt;
             }
 
             let best = null, bestLen = 0;
-            APARTMENT_DATA.forEach(apt => {
-                apt.keywords.forEach(kw => {
+            gAptList().forEach(apt => {
+                (apt.keywords || []).forEach(kw => {
                     if (kw.length > bestLen && addr.includes(kw)) { best = apt; bestLen = kw.length; }
                 });
             });
@@ -3647,7 +3718,9 @@
             const apt = gFindApartment(address);
             if (!apt) return [];
             const nick = APARTMENT_NICK[apt.name];
-            return [...new Set([apt.name].concat(apt.aliases).concat(nick ? [nick] : []))];
+            // [수정] 사장님이 직접 넣은 별칭(apartment_alias)도 함께 검색에 쓴다
+            const mine = APARTMENT_ALIAS[apt.name] || [];
+            return [...new Set([apt.name].concat(apt.aliases).concat(mine).concat(nick ? [nick] : []))];
         }
 
         // 3. 필터링 및 렌더링
@@ -6899,6 +6972,44 @@
             const ageGroup = pickAttr('ageGroup');
             const genderIcon = gender==='여성'?'👩':(gender==='남성'?'👨':'👤');
 
+            // [신규] 고객 주소 — 가장 최근 주문에 적힌 값을 쓴다 (이사·주소 수정이 바로 반영되도록).
+            //  배달 주문에만 주소가 있으므로, 픽업만 하는 손님은 이 줄이 아예 안 나온다.
+            const _recentFirst = [...all].sort((a, b) => {
+                const da = validDate(a), db = validDate(b);
+                return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
+            });
+            const _pickRecent = (field) => {
+                const hit = _recentFirst.find(o => String(o[field] || '').trim());
+                return hit ? String(hit[field]).trim() : '';
+            };
+            const custAddr = _pickRecent('address');
+            const custAddrDetail = _pickRecent('addressDetail');
+
+            // [신규] 카카오 이름(실명)과 연락처 — 아이디만으로는 누군지 알기 어려워 바로 아래에 함께 보여준다.
+            const custKakaoName = _pickRecent('kakaoName');
+            const custKakaoReal = _pickRecent('kakaoRealName');
+            const kakaoLabel = custKakaoName
+                ? (custKakaoReal && custKakaoReal !== custKakaoName ? `${custKakaoName} (${custKakaoReal})` : custKakaoName)
+                : (custKakaoReal || '');
+            const phoneLabel = cleanPhone
+                ? (cleanPhone.length === 11
+                    ? `${cleanPhone.slice(0, 3)}-${cleanPhone.slice(3, 7)}-${cleanPhone.slice(7)}`
+                    : (cleanPhone.length === 10 ? `${cleanPhone.slice(0, 3)}-${cleanPhone.slice(3, 6)}-${cleanPhone.slice(6)}` : cleanPhone))
+                : '';
+            const idSubHtml = (kakaoLabel || phoneLabel) ? `
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin-top:4px; font-size:12px; font-weight:700; color:#334155;">
+                    ${kakaoLabel ? `<span>💬 ${kakaoLabel}</span>` : ''}
+                    ${phoneLabel ? `<a href="tel:${cleanPhone}" style="color:#334155; text-decoration:none;">📱 ${phoneLabel}</a>` : ''}
+                </div>` : '';
+
+            // [수정] 주소는 이름(아이디) 바로 아래, 등급(재구매 등) 줄 위에 넣는다.
+            //  상세주소는 아랫줄로 내리고, 공동현관 비밀번호·복사 버튼은 넣지 않는다.
+            const addrHtml = (custAddr || custAddrDetail) ? `
+                <div style="display:flex; align-items:flex-start; gap:5px; margin-top:5px; font-size:11.5px; font-weight:700; color:#334155; line-height:1.5; word-break:break-all;">
+                    <span style="flex:0 0 auto;">🏡</span>
+                    <span style="flex:1; min-width:0;">${custAddr}${custAddrDetail ? `<br>${custAddrDetail}` : ''}</span>
+                </div>` : '';
+
             const topHtml = topItems.length ? topItems.map(([nm,v],i)=>`
                 <div style="display:flex; justify-content:space-between; gap:8px; padding:4px 0; border-top:1px dashed #f1f5f9; font-size:12px;">
                     <span style="color:var(--text-main); word-break:break-all;"><b style="color:${i<3?'#d97706':'#94a3b8'};">${i+1}</b> ${nm}</span>
@@ -6924,6 +7035,8 @@
                                 ${cleanPhone ? `<a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:2px 8px; border-radius:6px;">📞 전화</a>
                                 <button type="button" onclick="copyTextAndSms(decodeURIComponent('${encodeURIComponent('[모켓] '+(name||'')+'님, 안녕하세요! 😊')}'), '${cleanPhone}', '고객 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:2px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>` : ''}
                             </div>
+                            ${idSubHtml}
+                            ${addrHtml}
                             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:5px 8px; margin-top:6px;">
                                 <span style="font-size:12px; font-weight:800; color:${gradeColor};">${grade}</span>
                                 ${gender ? `<span style="font-size:12px; font-weight:700; color:#334155;">${genderIcon} ${gender}</span>` : ''}
@@ -7406,29 +7519,14 @@
         let uploadProducts = [];
 
         // 노출 설정 버튼 상태
-        let isShowToday = true;
-        let isShowReserve = true;
+        // [수정] 당일/예약 노출 버튼은 없앴다. 노출·숨김은 상품목록의 👁️노출 / 🙈숨김으로 한다.
+        //  다만 상품을 수정할 때 지금 노출 상태가 바뀌면 안 되므로, 값은 그대로 들고 있다가 다시 저장한다.
+        let keepShowToday = true;
+        let keepShowReserve = true;
         let isShowWeekly = false;
 
         function updateExposureButtonsUI() {
-            const btnToday = document.getElementById('btnShowToday');
-            const btnReserve = document.getElementById('btnShowReserve');
             const btnWeekly = document.getElementById('btnShowWeekly');
-            
-            if (btnToday) {
-                if (isShowToday) {
-                    btnToday.classList.add('active', 'green');
-                } else {
-                    btnToday.classList.remove('active', 'green');
-                }
-            }
-            if (btnReserve) {
-                if (isShowReserve) {
-                    btnReserve.classList.add('active');
-                } else {
-                    btnReserve.classList.remove('active');
-                }
-            }
             if (btnWeekly) {
                 if (isShowWeekly) {
                     btnWeekly.classList.add('active', 'purple');
@@ -7439,11 +7537,7 @@
         }
 
         function toggleExposure(type) {
-            if (type === 'Today') {
-                isShowToday = !isShowToday;
-            } else if (type === 'Reserve') {
-                isShowReserve = !isShowReserve;
-            } else if (type === 'Weekly') {
+            if (type === 'Weekly') {
                 isShowWeekly = !isShowWeekly;
             }
             updateExposureButtonsUI();
@@ -8247,6 +8341,23 @@
         //  값(key)은 주문서의 currentMainTab 값과 같게 맞춰, 나중에 연결할 때 변환이 필요 없게 했다.
         let uploadDisplayTab = '';
 
+        // ===== [신규] 상시판매 음식 종류 분류 =====
+        //  key/label은 주문서ver2의 ONSITE_CATS와 똑같아야 한다 (주문서가 이 값으로 탭을 만든다).
+        //  분류는 상품마다 '분류탭 설정'에서 직접 고른다.
+        const ONSITE_CATS = [
+            { key: 'onsite-fruit', label: '🍎 과일' },
+            { key: 'onsite-soup', label: '🍲 국·탕·찌개' },
+            { key: 'onsite-meat', label: '🍖 고기·반찬' },
+            { key: 'onsite-noodle', label: '🍜 면류' },
+            { key: 'onsite-bunsik', label: '🌭 분식·야식' },
+            { key: 'onsite-western', label: '🍕 간편식' },
+            { key: 'onsite-bakery', label: '🥐 빵·유제품' },
+            { key: 'onsite-snack', label: '🍪 스낵·과자' },
+            { key: 'onsite-drink', label: '🥤 음료' },
+            { key: 'onsite-grocery', label: '🧂 식재료·양념' },
+            { key: 'onsite-living', label: '🧴 생활용품' }
+        ];
+
         const DISPLAY_TAB_GROUPS = [
             {
                 group: '당일구매',
@@ -8256,12 +8367,11 @@
                 ]
             },
             {
+                // [수정] 보관방법(냉동·냉장·상온) 대신 음식 종류로 나눈다.
+                //  손님은 '무엇을 먹을지'로 찾지 '어디에 보관하는지'로 찾지 않기 때문.
+                //  보관방법은 분류(matchKey)와 선반으로 그대로 관리한다.
                 group: '상시판매',
-                items: [
-                    { key: 'onsite-frozen', label: '냉동', desc: '' },
-                    { key: 'onsite-refrigerated', label: '냉장', desc: '' },
-                    { key: 'onsite-room', label: '상온', desc: '' }
-                ]
+                items: ONSITE_CATS.map(c => ({ key: c.key, label: c.label, desc: '' }))
             },
             {
                 group: '예약구매',
@@ -8454,9 +8564,84 @@
             return gRoadKey(address);
         }
 
+        // ===== [신규] 아파트 자료 기간 고르기 (주문일 기준) =====
+        //  판매통계처럼 기간을 정해서 그 기간의 배달 주문만 세어 본다.
+        let _apartRange = 'm1';    // all | m1 | m3 | m6 | y1 | custom  (기본: 최근 1개월)
+
+        const APART_RANGES = [['all', '전체'], ['m1', '1개월'], ['m3', '3개월'], ['m6', '6개월'], ['y1', '1년'], ['custom', '직접']];
+
+        function setApartPeriod(key) {
+            _apartRange = key;
+            const box = document.getElementById('apart-custom-range');
+            if (box) box.style.display = (key === 'custom') ? 'flex' : 'none';
+            renderApartmentAdmin();
+        }
+
+        function buildApartPeriodTabs() {
+            const box = document.getElementById('apart-period-tabs');
+            if (!box) return;
+            box.innerHTML = APART_RANGES.map(([k, label]) => {
+                const on = (_apartRange === k);
+                return `<button type="button" onclick="setApartPeriod('${k}')" style="flex:1 1 0; min-width:0; padding:8px 4px; border:1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}; background:${on ? 'var(--primary-light)' : '#fff'}; color:${on ? 'var(--primary)' : 'var(--text-sub)'}; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">${label}</button>`;
+            }).join('');
+            const cbox = document.getElementById('apart-custom-range');
+            if (cbox) cbox.style.display = (_apartRange === 'custom') ? 'flex' : 'none';
+        }
+
+        // 고른 기간의 시작·끝 (없으면 null = 제한 없음)
+        function gApartRangeBounds() {
+            if (_apartRange === 'all') return { from: null, to: null, label: '전체 기간' };
+            if (_apartRange === 'custom') {
+                const f = document.getElementById('apart-from')?.value;
+                const t = document.getElementById('apart-to')?.value;
+                const from = f ? new Date(f + 'T00:00:00') : null;
+                const to = t ? new Date(t + 'T23:59:59') : null;
+                return { from, to, label: `${f || '처음'} ~ ${t || '지금'}` };
+            }
+            const months = { m1: 1, m3: 3, m6: 6, y1: 12 }[_apartRange] || 0;
+            const from = new Date();
+            from.setMonth(from.getMonth() - months);
+            from.setHours(0, 0, 0, 0);
+            return { from, to: null, label: `최근 ${_apartRange === 'y1' ? '1년' : months + '개월'}` };
+        }
+
+        // [신규] 판매통계와 같은 기준 — 같은 사람이 같은 날 시킨 것은 한 건으로 센다.
+        //  (상품 줄 수로 세면 한 번에 여러 개 담은 주문이 여러 건으로 부풀려진다)
+        function gOrderDayKey(o) {
+            const d = parseTimestampToDate(o.timestamp);
+            const ds = (d && !isNaN(d.getTime()))
+                ? `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+                : '날짜모름';
+            return `${String(o.phone || '').replace(/\D/g, '')}|${ds}`;
+        }
+
+        // 이 주문이 고른 기간 안에 드는지 (주문일시 기준)
+        function gApartInRange(o, bounds) {
+            if (!bounds || (!bounds.from && !bounds.to)) return true;
+            const d = parseTimestampToDate(o.timestamp);
+            if (!d || isNaN(d.getTime())) return false;
+            if (bounds.from && d < bounds.from) return false;
+            if (bounds.to && d > bounds.to) return false;
+            return true;
+        }
+
         async function renderApartmentAdmin() {
-            await Promise.all([loadApartmentCustom(), loadApartmentNick()]);
+            await Promise.all([loadApartmentCustom(), loadApartmentNick(), loadApartmentAlias(), loadApartmentExtra()]);
             renderApartmentTest();
+            buildApartPeriodTabs();
+
+            const _bounds = gApartRangeBounds();
+
+            // [수정] '건수'는 상품 줄 수라 한 번 주문에 여러 개를 담으면 부풀려진다.
+            //  같은 사람이 같은 날 시킨 것은 한 번으로 세고(주문 일수), 금액도 함께 모은다.
+            const stats = {};   // 이름 → { days: Set('전화|날짜'), amount }
+            const bump = (name, o) => {
+                if (!stats[name]) stats[name] = { days: new Set(), amount: 0 };
+                stats[name].days.add(gOrderDayKey(o));
+                stats[name].amount += parseInt(o.total || 0) || 0;
+            };
+            const dayCount = (name) => (stats[name] ? stats[name].days.size : 0);
+            const amtOf = (name) => (stats[name] ? stats[name].amount : 0);
 
             // 지금 들어와 있는 배달 주문을 아파트별로 세어 본다 (취소 건 제외)
             const counts = {};
@@ -8465,11 +8650,13 @@
             (rawOrders || []).forEach(o => {
                 const isCanceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
                 if (isCanceled) return;
+                if (!gApartInRange(o, _bounds)) return;
                 const full = `${o.address || ''} ${o.addressDetail || ''}`.trim();
                 if (!full) return;
                 const apt = gFindApartment(full);
                 if (apt) {
                     counts[apt.name] = (counts[apt.name] || 0) + 1;
+                    bump(apt.name, o);
                     const road = gExtractRoad(o.address || full);
                     if (road) {
                         if (!roadHits[apt.name]) roadHits[apt.name] = {};
@@ -8479,22 +8666,28 @@
                     // 이름을 지정할 때 쓰려고 원본 주소(동·호수 뺀 것)를 그대로 들고 있는다
                     const raw = String(o.address || full).trim();
                     const key = gNormAddr(raw);
-                    if (!unmatched[key]) unmatched[key] = { display: formatShortAddress(raw) || raw, raw: raw, count: 0 };
+                    if (!unmatched[key]) unmatched[key] = { display: formatShortAddress(raw) || raw, raw: raw, count: 0, days: new Set() };
                     unmatched[key].count++;
+                    unmatched[key].days.add(gOrderDayKey(o));
                 }
             });
 
-            const totalMatched = Object.values(counts).reduce((a, b) => a + b, 0);
-            const unmatchedKeys = Object.keys(unmatched).sort((a, b) => unmatched[b].count - unmatched[a].count);
-            const totalUnmatched = unmatchedKeys.reduce((a, k) => a + unmatched[k].count, 0);
+            // 아파트·구역 전체의 주문 일수·금액 (같은 사람이 같은 날 시킨 건 한 건)
+            const allDays = new Set();
+            let totalAmount = 0;
+            Object.values(stats).forEach(s => { s.days.forEach(k => allDays.add(k)); totalAmount += s.amount; });
+            const totalMatched = allDays.size;
+            const unmatchedKeys = Object.keys(unmatched).sort((a, b) => unmatched[b].days.size - unmatched[a].days.size);
+            const totalUnmatched = new Set(unmatchedKeys.flatMap(k => [...unmatched[k].days])).size;
 
             const cell = (v, extra) => `<td style="padding:7px 8px; border-bottom:1px solid #f1f5f9; ${extra || ''}">${v}</td>`;
             const chip = (t, color, bg) => `<span style="display:inline-block; margin:1px 3px 1px 0; padding:1px 6px; border-radius:5px; font-size:11px; font-weight:700; color:${color}; background:${bg};">${t}</span>`;
 
             document.getElementById('apart-summary').innerHTML = `
-                <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
-                    ${[['등록된 아파트', APARTMENT_DATA.length + '곳', '#0284c7', '#f0f9ff'],
+                <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px;">
+                    ${[['등록된 아파트', gAptList().length + '곳', '#0284c7', '#f0f9ff'],
                        ['인식된 주문', totalMatched.toLocaleString() + '건', '#166534', '#f0fdf4'],
+                       ['주문 금액', totalAmount.toLocaleString() + '원', '#c2410c', '#fff7ed'],
                        ['못 찾은 주문', totalUnmatched.toLocaleString() + '건', totalUnmatched > 0 ? '#9a3412' : '#64748b', totalUnmatched > 0 ? '#fff7ed' : '#f8fafc']]
                       .map(([label, val, color, bg]) => `
                         <div style="background:${bg}; border-radius:10px; padding:9px 10px; text-align:center;">
@@ -8504,76 +8697,98 @@
                 </div>`;
 
             // 내가 묶은 구역 목록 (이름 바꾸기 · 주소 빼기 · 구역 지우기)
+            const line = (label, html) => html
+                ? `<div style="display:flex; gap:6px; align-items:flex-start; margin-top:5px;">
+                       <span style="flex:0 0 52px; font-size:10.5px; font-weight:800; color:#94a3b8; padding-top:2px;">${label}</span>
+                       <span style="flex:1; min-width:0; display:flex; flex-wrap:wrap; gap:3px;">${html}</span>
+                   </div>`
+                : '';
+
+            // [수정] 내가 묶은 구역도 위 아파트 카드와 같은 모양으로 보여준다.
+            //  (주문 건수 · 눌러서 동·호수별 보기 · 명칭 · 검색 별칭까지 아파트와 똑같이 쓸 수 있다)
             document.getElementById('apart-custom-list').innerHTML = APARTMENT_CUSTOM.length === 0
                 ? `<div style="font-size:12px; font-weight:700; color:var(--text-sub); background:#f8fafc; border-radius:8px; padding:10px 12px; line-height:1.6; word-break:keep-all;">
                        묶어 놓은 구역이 아직 없습니다. 아래 '등록 안 된 주소'에서 <b>구역에 넣기</b>를 눌러 보세요.<br>
                        빌라처럼 주소가 제각각이어도 한 이름으로 묶을 수 있습니다.
                    </div>`
-                : APARTMENT_CUSTOM.map(g => {
-                    const n = counts[g.name] || 0;
-                    return `<div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:9px 10px; margin-bottom:6px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <div style="flex:1; min-width:0; font-size:13px; font-weight:900; color:#5b21b6; word-break:keep-all;">
-                                ${g.name}
-                                <span style="font-size:11px; font-weight:700; color:#7c3aed;">주소 ${g.matches.length}개 · ${n}건</span>
-                            </div>
-                            <button type="button" onclick="openApartmentGroupRename('${escapeArg(g.key)}', '${escapeArg(g.name)}')" style="flex-shrink:0; padding:5px 9px; border:1.5px solid #7c3aed; background:#fff; color:#7c3aed; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">이름</button>
-                            <button type="button" onclick="deleteApartmentName('${escapeArg(g.key)}', '${escapeArg(g.name)}')" style="flex-shrink:0; padding:5px 9px; border:1.5px solid #ef4444; background:#fff; color:#ef4444; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">삭제</button>
+                : APARTMENT_CUSTOM.slice().sort((a, b) => dayCount(b.name) - dayCount(a.name)).map(g => {
+                    const n = dayCount(g.name);
+                    const amt = amtOf(g.name);
+                    const nick = APARTMENT_NICK[g.name] || "";
+                    const mine = APARTMENT_ALIAS[g.name] || [];
+
+                    const nickChip = nick
+                        ? `<span onclick="openApartmentNickTool('${escapeArg(g.name)}')" style="cursor:pointer; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:800; color:#b45309; background:#fffbeb; border:1px solid #fde68a;">${nick}</span>`
+                        : `<span onclick="openApartmentNickTool('${escapeArg(g.name)}')" title="눌러서 명칭 넣기" style="cursor:pointer; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:800; color:#c4b5fd; background:#fff; border:1px dashed #ddd6fe;">＋명칭</span>`;
+
+                    return `<div style="background:#faf9ff; border:1px solid #ddd6fe; border-radius:10px; padding:10px 11px; margin-bottom:7px;">
+                        <div onclick="showZoneAddresses('${escapeArg(g.name)}')" title="주소별 주문 보기" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:pointer;">
+                            <b style="font-size:13.5px; color:#5b21b6;">${g.name}</b>
+                            ${nickChip}
+                            ${n > 0 ? `<span style="font-size:10px; font-weight:800; color:#7c3aed;">▶ 주소별</span>` : ''}
+                            <span style="margin-left:auto; font-size:11.5px; font-weight:800; color:${n > 0 ? '#166534' : '#cbd5e1'}; white-space:nowrap;">주문 ${n}건${amt ? ` · ${amt.toLocaleString()}원` : ''}</span>
                         </div>
-                        <div style="display:flex; flex-direction:column; gap:3px; margin-top:7px;">
-                            ${g.matches.map(m => `
-                                <div style="display:flex; align-items:center; gap:6px; background:#fff; border-radius:6px; padding:5px 8px;">
-                                    <span style="flex:1; min-width:0; font-size:11px; font-weight:600; color:#6d28d9; word-break:break-all;">${m}</span>
-                                    <span onclick="removeApartmentMatch('${escapeArg(g.key)}', '${escapeArg(m)}')" title="이 주소를 구역에서 빼기" style="flex-shrink:0; font-size:15px; font-weight:800; color:#c4b5fd; cursor:pointer; line-height:1; padding:0 2px;">&times;</span>
-                                </div>`).join('')}
+                        ${line('주소', g.matches.map(m => `<span style="display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:5px; font-size:11px; font-weight:700; color:#6d28d9; background:#fff; border:1px solid #ede9fe; word-break:break-all;">${m}<span onclick="event.stopPropagation(); removeApartmentMatch('${escapeArg(g.key)}', '${escapeArg(m)}')" title="이 주소를 구역에서 빼기" style="flex-shrink:0; font-size:13px; font-weight:800; color:#c4b5fd; cursor:pointer; line-height:1;">&times;</span></span>`).join(''))}
+                        ${line('검색별칭',
+                            chip(g.name, '#7c3aed', '#f5f3ff') +
+                            mine.map(k => `<span onclick="openApartmentAliasTool('${escapeArg(g.name)}')" style="cursor:pointer; display:inline-block; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:800; color:#be123c; background:#fff1f2; border:1px solid #fecdd3;">${k}</span>`).join('') +
+                            `<span onclick="openApartmentAliasTool('${escapeArg(g.name)}')" title="검색 별칭 넣기" style="cursor:pointer; display:inline-block; padding:2px 8px; border-radius:5px; font-size:11px; font-weight:800; color:var(--primary); background:#fff; border:1px dashed var(--primary);">＋ 별칭</span>`
+                        )}
+                        <div style="display:flex; gap:6px; margin-top:8px;">
+                            <button type="button" onclick="openApartmentGroupRename('${escapeArg(g.key)}', '${escapeArg(g.name)}')" style="flex:1; padding:6px 9px; border:1.5px solid #7c3aed; background:#fff; color:#7c3aed; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">이름 바꾸기</button>
+                            <button type="button" onclick="deleteApartmentName('${escapeArg(g.key)}', '${escapeArg(g.name)}')" style="flex:0 0 78px; padding:6px 9px; border:1.5px solid #ef4444; background:#fff; color:#ef4444; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">삭제</button>
                         </div>
                     </div>`;
                 }).join('');
 
             // 주문이 많은 곳부터 (같으면 이름순)
-            const sortedApts = APARTMENT_DATA.slice().sort((a, b) => {
-                const d = (counts[b.name] || 0) - (counts[a.name] || 0);
+            const sortedApts = gAptList().slice().sort((a, b) => {
+                const d = dayCount(b.name) - dayCount(a.name);
                 return d !== 0 ? d : a.name.localeCompare(b.name);
             });
 
-            const rows = sortedApts.map(apt => {
-                const n = counts[apt.name] || 0;
+            // [수정] 가로로 긴 7칸 표는 휴대폰에서 옆으로 밀어야 보였다.
+            //  한 아파트를 한 장의 카드로 세워 접어서, 좁은 화면에서도 한눈에 읽히게 바꾼다.
+            // [수정] 주문이 한 건도 없는 아파트는 접어 둔다 (아래 '주문 없는 곳도 보기'로 펼침).
+            const shownApts = sortedApts.filter(apt => dayCount(apt.name) > 0 || _apartShowEmpty);
+            const hiddenCount = sortedApts.length - sortedApts.filter(apt => dayCount(apt.name) > 0).length;
+
+            const cards = shownApts.map(apt => {
+                const n = dayCount(apt.name);
+                const amt = amtOf(apt.name);
                 const nick = APARTMENT_NICK[apt.name] || "";
+                const mine = APARTMENT_ALIAS[apt.name] || [];
                 // 실제 주문에서 많이 나온 도로명 순서대로 (최대 2개)
                 const roads = Object.entries(roadHits[apt.name] || {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
 
-                // 명칭은 눌러서 바로 고칠 수 있게 칸 전체를 클릭 대상으로 둔다.
-                // 따로 정하지 않았으면 빈칸으로 둔다. (인쇄에는 아파트명이 그대로 나간다)
-                const nickCell = nick
-                    ? `<span onclick="openApartmentNickTool('${escapeArg(apt.name)}')" style="cursor:pointer; display:inline-block; padding:2px 7px; border-radius:5px; font-size:11.5px; font-weight:800; color:#b45309; background:#fffbeb; border:1px solid #fde68a;">${nick}</span>`
-                    : `<span onclick="openApartmentNickTool('${escapeArg(apt.name)}')" title="눌러서 명칭 넣기" style="cursor:pointer; display:inline-block; min-width:52px; height:20px; border-radius:5px; border:1px dashed #edf2f7;"></span>`;
+                const nickChip = nick
+                    ? `<span onclick="openApartmentNickTool('${escapeArg(apt.name)}')" style="cursor:pointer; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:800; color:#b45309; background:#fffbeb; border:1px solid #fde68a;">${nick}</span>`
+                    : `<span onclick="openApartmentNickTool('${escapeArg(apt.name)}')" title="눌러서 명칭 넣기" style="cursor:pointer; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:800; color:#cbd5e1; background:#fff; border:1px dashed #e2e8f0;">＋명칭</span>`;
 
-                return `<tr>
-                    ${cell(`<b>${apt.name}</b>`, 'white-space:nowrap;')}
-                    ${cell(nickCell, 'white-space:nowrap;')}
-                    ${cell(roads.length ? roads.map(([r]) => chip(r, '#0369a1', '#f0f9ff')).join('') : '<span style="color:#cbd5e1;">—</span>')}
-                    ${cell(apt.lots.length ? apt.lots.map(l => chip(l, '#0f766e', '#ecfeff')).join('') : '<span style="color:#cbd5e1;">—</span>')}
-                    ${cell(apt.keywords.map(k => chip(k, '#475569', '#f1f5f9')).join(''))}
-                    ${cell(apt.aliases.map(k => chip(k, '#7c3aed', '#f5f3ff')).join(''))}
-                    ${cell(n > 0 ? `<b style="color:#166534;">${n}</b>` : '<span style="color:#cbd5e1;">0</span>', 'text-align:right; white-space:nowrap;')}
-                </tr>`;
+                return `<div style="border:1px solid var(--border); border-radius:10px; padding:10px 11px; margin-bottom:7px; background:#fff;">
+                    <div onclick="showApartmentUnits('${escapeArg(apt.name)}')" title="동·호수별 주문 보기" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:pointer;">
+                        <b style="font-size:13.5px; color:var(--text-main);">${apt.name}</b>
+                        ${nickChip}
+                        ${n > 0 ? `<span style="font-size:10px; font-weight:800; color:var(--primary);">▶ 동·호수</span>` : ''}
+                        <span style="margin-left:auto; font-size:11.5px; font-weight:800; color:${n > 0 ? '#166534' : '#cbd5e1'}; white-space:nowrap;">주문 ${n}건${amt ? ` · ${amt.toLocaleString()}원` : ''}</span>
+                    </div>
+                    ${line('도로명', (roads.length ? roads.map(([r]) => chip(r, '#0369a1', '#f0f9ff')) : (apt.roads || []).map(r => chip(r, '#0369a1', '#f0f9ff'))).join(''))}
+                    ${line('지번', (apt.lots || []).map(l => chip(l, '#0f766e', '#ecfeff')).join(''))}
+                    ${line('인식어', (apt.keywords || []).map(k => chip(k, '#475569', '#f1f5f9')).join(''))}
+                    ${apt.__extra ? `<div style="margin-top:6px;"><span style="font-size:10px; font-weight:800; color:#0891b2; background:#ecfeff; padding:2px 7px; border-radius:5px;">직접 등록</span> <button type="button" onclick="deleteApartmentExtra('${escapeArg(apt.key)}', '${escapeArg(apt.name)}')" style="margin-left:4px; padding:3px 8px; border:1.5px solid #ef4444; background:#fff; color:#ef4444; border-radius:6px; font-size:10.5px; font-weight:800; cursor:pointer;">등록 지우기</button></div>` : ''}
+                    ${line('검색별칭',
+                        (apt.aliases || []).map(k => chip(k, '#7c3aed', '#f5f3ff')).join('') +
+                        mine.map(k => `<span onclick="openApartmentAliasTool('${escapeArg(apt.name)}')" style="cursor:pointer; display:inline-block; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:800; color:#be123c; background:#fff1f2; border:1px solid #fecdd3;">${k}</span>`).join('') +
+                        `<span onclick="openApartmentAliasTool('${escapeArg(apt.name)}')" title="검색 별칭 넣기" style="cursor:pointer; display:inline-block; padding:2px 8px; border-radius:5px; font-size:11px; font-weight:800; color:var(--primary); background:#fff; border:1px dashed var(--primary);">＋ 별칭</span>`
+                    )}
+                </div>`;
             }).join('');
 
-            document.getElementById('apart-table-wrap').innerHTML = `
-                <table style="width:100%; border-collapse:collapse; font-size:12px;">
-                    <thead>
-                        <tr style="background:#f8fafc;">
-                            <th style="padding:7px 8px; text-align:left; white-space:nowrap;">아파트명</th>
-                            <th style="padding:7px 8px; text-align:left; white-space:nowrap;">명칭</th>
-                            <th style="padding:7px 8px; text-align:left; white-space:nowrap;">도로명주소</th>
-                            <th style="padding:7px 8px; text-align:left;">지번</th>
-                            <th style="padding:7px 8px; text-align:left;">인식 키워드</th>
-                            <th style="padding:7px 8px; text-align:left;">검색 별칭</th>
-                            <th style="padding:7px 8px; text-align:right; white-space:nowrap;">주문</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>`;
+            document.getElementById('apart-table-wrap').innerHTML = cards + (hiddenCount > 0
+                ? `<button type="button" onclick="toggleApartEmpty()" style="width:100%; margin-top:2px; padding:9px; border:1.5px dashed var(--border); background:#fff; color:var(--text-sub); border-radius:9px; font-size:12px; font-weight:800; cursor:pointer;">
+                       ${_apartShowEmpty ? `주문 없는 곳 ${hiddenCount}곳 접기` : `주문 없는 곳 ${hiddenCount}곳 보기`}
+                   </button>`
+                : '');
 
             document.getElementById('apart-unmatched').innerHTML = unmatchedKeys.length === 0
                 ? `<div style="font-size:12px; font-weight:700; color:#166534; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px;">
@@ -8590,6 +8805,7 @@
                            <div style="display:flex; align-items:center; gap:8px; background:#f8fafc; border-radius:6px; padding:7px 9px; font-size:12px;">
                                <span style="font-weight:700; color:var(--text-main); flex:1; min-width:0; word-break:break-all;">${u.display}</span>
                                <span style="font-weight:800; color:#9a3412; white-space:nowrap;">${u.count}건</span>
+                               <button type="button" onclick="openApartmentRegisterTool('${escapeArg(u.raw)}')" style="flex-shrink:0; padding:5px 9px; border:1.5px solid #0891b2; background:#fff; color:#0891b2; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">🏢 아파트 등록</button>
                                <button type="button" onclick="openApartmentNameTool('${escapeArg(u.raw)}')" style="flex-shrink:0; padding:5px 9px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:7px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">구역에 넣기</button>
                            </div>`;
                        }).join('')}
@@ -8745,6 +8961,418 @@
                 showToast(`'${name}'에 넣었습니다.`);
             } catch (e) {
                 showToast("저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // [신규] 주소 상세에서 동·호수를 뽑는다. ('706동1704호', '가동 101호', '1704호' 등)
+        function gParseDongHo(text) {
+            const s = String(text || '').replace(/\s+/g, '');
+            let dong = (s.match(/([0-9]{1,4}|[가-힣]{1,3})동(?![로길])/) || [])[1] || '';
+            let ho = (s.match(/([0-9]{1,5})호/) || [])[1] || '';
+
+            // [신규] '109-2902'처럼 '동/호' 글자 없이 하이픈으로만 적는 손님이 많다.
+            //  앞자리를 동, 뒷자리를 호수로 읽는다. ('101-2103호'처럼 한쪽만 빠진 경우도 채워 준다)
+            if (!dong || !ho) {
+                // 사이 기호는 손님마다 제각각이다 (-, ., /, ~)
+                const m = s.match(/(\d{1,4})\s*[-–—~./]\s*(\d{2,5})/);
+                if (m) {
+                    if (!dong) dong = m[1];
+                    if (!ho) ho = m[2];
+                }
+            }
+            // '104동2504'처럼 '호' 글자를 안 쓴 경우
+            if (dong && !ho) {
+                const m2 = s.match(/동\s*(\d{2,5})/);
+                if (m2) ho = m2[1];
+            }
+            return { dong: dong ? dong + '동' : '', ho: ho ? ho + '호' : '' };
+        }
+
+        // [신규] 아파트 하나의 동·호수별 주문 건수. 카드에서 아파트 이름을 누르면 열린다.
+        //  단골이 어느 동에 몰려 있는지, 어느 집이 자주 시키는지 한눈에 보려는 용도.
+        function showApartmentUnits(aptName) {
+            // [수정] 건수(상품 줄 수) 대신 '주문 건수(같은 사람·같은 날은 하나)'와 금액으로 센다.
+            const dongMap = new Map();   // 동 → { days:Set, amount, hos: Map(호 → {days:Set, amount}) }
+            const totalDays = new Set();
+            let noDong = 0, totalAmount = 0;
+            const _bounds = gApartRangeBounds();   // 위에서 고른 기간을 그대로 따른다
+
+            (rawOrders || []).forEach(o => {
+                const isCanceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                if (isCanceled) return;
+                if (!gApartInRange(o, _bounds)) return;
+                const full = `${o.address || ''} ${o.addressDetail || ''}`.trim();
+                if (!full) return;
+                const apt = gFindApartment(full);
+                if (!apt || apt.name !== aptName) return;
+
+                const _k = gOrderDayKey(o);
+                const _amt = parseInt(o.total || 0) || 0;
+                totalDays.add(_k);
+                totalAmount += _amt;
+
+                // [주의] 상세주소만 본다. 도로명주소에는 '(선동, 미사강변센트리버)'처럼 법정동이 들어 있어
+                //  그것까지 보면 '선동'이 동 이름으로 잘못 잡힌다.
+                const { dong, ho } = gParseDongHo(o.addressDetail || '');
+                if (!dong && !ho) { noDong++; return; }
+                const dk = dong || '동 모름';
+                if (!dongMap.has(dk)) dongMap.set(dk, { days: new Set(), amount: 0, hos: new Map() });
+                const d = dongMap.get(dk);
+                d.days.add(_k);
+                d.amount += _amt;
+                const hk = ho || '호수 모름';
+                if (!d.hos.has(hk)) d.hos.set(hk, { days: new Set(), amount: 0 });
+                const h = d.hos.get(hk);
+                h.days.add(_k);
+                h.amount += _amt;
+            });
+
+            const total = totalDays.size;
+
+            // 주문 많은 동부터. 단 '동 모름'은 언제나 맨 뒤로 보낸다.
+            const dongs = [...dongMap.entries()].sort((a, b) => {
+                const au = a[0] === '동 모름', bu = b[0] === '동 모름';
+                if (au !== bu) return au ? 1 : -1;
+                return b[1].days.size - a[1].days.size;
+            });
+
+            const body = dongs.length === 0
+                ? `<div style="font-size:12.5px; font-weight:700; color:var(--text-sub); padding:12px 0;">동·호수가 적힌 주문이 없습니다.</div>`
+                : dongs.map(([dong, d]) => {
+                    // 호수도 주문 많은 순, '호수 모름'은 맨 뒤로
+                    const hos = [...d.hos.entries()].sort((a, b) => {
+                        const au = a[0] === '호수 모름', bu = b[0] === '호수 모름';
+                        if (au !== bu) return au ? 1 : -1;
+                        return b[1].days.size - a[1].days.size;
+                    });
+
+                    // [신규] 호수 끝자리로 라인을 나눈다 (1704호 → 04 → 4호 라인).
+                    //  같은 계단(현관)을 쓰는 집끼리 묶여 배달 동선을 잡기 쉽다.
+                    const groups = new Map([['1·2호 라인', []], ['3·4호 라인', []], ['그 외 라인', []]]);
+                    hos.forEach(([ho, v]) => {
+                        const n = String(ho).replace(/\D/g, '');
+                        const line = n ? (parseInt(n.slice(-2), 10) || parseInt(n.slice(-1), 10) || 0) : 0;
+                        const g = (line === 1 || line === 2) ? '1·2호 라인'
+                            : (line === 3 || line === 4) ? '3·4호 라인'
+                            : '그 외 라인';
+                        groups.get(g).push([ho, v]);
+                    });
+
+                    const lineBlocks = [...groups.entries()].filter(([, list]) => list.length > 0).map(([label, list]) => {
+                        const cnt = list.reduce((a, x) => a + x[1].days.size, 0);
+                        const amt = list.reduce((a, x) => a + x[1].amount, 0);
+                        const color = label === '1·2호 라인' ? '#0369a1' : (label === '3·4호 라인' ? '#7c3aed' : '#64748b');
+                        const bg = label === '1·2호 라인' ? '#f0f9ff' : (label === '3·4호 라인' ? '#f5f3ff' : '#f8fafc');
+                        return `<div style="margin-top:6px;">
+                            <div style="display:flex; align-items:center; gap:5px; margin-bottom:4px;">
+                                <span style="font-size:10.5px; font-weight:800; color:${color}; background:${bg}; padding:2px 7px; border-radius:5px;">${label}</span>
+                                <span style="font-size:10.5px; font-weight:700; color:var(--text-sub);">${list.length}집 · ${cnt}건 · ${amt.toLocaleString()}원</span>
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                                ${list.map(([ho, v]) => {
+                                    const c = v.days.size;
+                                    return `<span title="${v.amount.toLocaleString()}원" style="display:inline-flex; align-items:center; gap:3px; padding:3px 7px; border-radius:6px; font-size:11.5px; font-weight:700; color:#334155; background:#f1f5f9;">${ho}<b style="color:${c >= 5 ? '#c2410c' : '#64748b'};">${c}</b></span>`;
+                                }).join('')}
+                            </div>
+                        </div>`;
+                    }).join('');
+
+                    return `<div style="border:1px solid var(--border); border-radius:10px; padding:9px 10px; margin-bottom:6px;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <b style="font-size:13px; color:var(--text-main);">${dong}</b>
+                            <span style="margin-left:auto; font-size:11.5px; font-weight:800; color:#166534;">${hos.length}집 · ${d.days.size}건 · ${d.amount.toLocaleString()}원</span>
+                        </div>
+                        ${lineBlocks}
+                    </div>`;
+                }).join('');
+
+            closeApartmentNameTool();
+            const modal = document.createElement('div');
+            modal.id = 'apart-name-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10050';
+            modal.innerHTML =
+                `<div class="summary-modal-content" style="max-width:420px; width:92%; max-height:86vh; padding:0; overflow:hidden; display:flex; flex-direction:column;">` +
+                `<div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:8px;">` +
+                `<div style="min-width:0;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">🏢 ${aptName} 동·호수별 주문</div>` +
+                `<div style="font-size:11.5px; font-weight:700; color:var(--text-sub); margin-top:3px;">${_bounds.label} · 모두 ${total}건 · ${totalAmount.toLocaleString()}원 · ${dongs.length}개 동</div>` +
+                `</div>` +
+                `<span onclick="closeApartmentNameTool()" style="flex:0 0 auto; font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="flex:1; overflow-y:auto; padding:12px 16px;">${body}</div>` +
+                `<div style="padding:12px 16px; border-top:1px solid var(--border);">` +
+                `<button type="button" onclick="closeApartmentNameTool()" style="width:100%; height:44px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">닫기</button>` +
+                `</div></div>`;
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => modal.classList.add('active'));
+        }
+
+        // [신규] 내가 묶은 구역은 동·호수 대신 '주소별'로 묶어 본다.
+        //  빌라·다세대라 동·호수가 없는 곳이 많고, 어느 주소에서 주문이 나오는지가 더 궁금하기 때문.
+        function showZoneAddresses(zoneName) {
+            const _bounds = gApartRangeBounds();
+            const addrMap = new Map();   // 주소 → { days:Set, amount, details: Map(상세 → {days:Set, amount}) }
+            const totalDays = new Set();
+            let totalAmount = 0;
+
+            (rawOrders || []).forEach(o => {
+                const isCanceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                if (isCanceled) return;
+                if (!gApartInRange(o, _bounds)) return;
+                const full = `${o.address || ''} ${o.addressDetail || ''}`.trim();
+                if (!full) return;
+                const apt = gFindApartment(full);
+                if (!apt || apt.name !== zoneName) return;
+
+                const _k = gOrderDayKey(o);
+                const _amt = parseInt(o.total || 0) || 0;
+                totalDays.add(_k);
+                totalAmount += _amt;
+
+                const key = String(o.address || full).trim() || '(주소 없음)';
+                if (!addrMap.has(key)) addrMap.set(key, { days: new Set(), amount: 0, details: new Map() });
+                const a = addrMap.get(key);
+                a.days.add(_k);
+                a.amount += _amt;
+                const det = String(o.addressDetail || '').trim() || '상세주소 없음';
+                if (!a.details.has(det)) a.details.set(det, { days: new Set(), amount: 0 });
+                const dv = a.details.get(det);
+                dv.days.add(_k);
+                dv.amount += _amt;
+            });
+
+            const total = totalDays.size;
+            const addrs = [...addrMap.entries()].sort((a, b) => b[1].days.size - a[1].days.size);
+
+            const body = addrs.length === 0
+                ? `<div style="font-size:12.5px; font-weight:700; color:var(--text-sub); padding:12px 0;">이 기간에 주문이 없습니다.</div>`
+                : addrs.map(([addr, a]) => {
+                    const dets = [...a.details.entries()].sort((x, y) => y[1].days.size - x[1].days.size);
+                    return `<div style="border:1px solid var(--border); border-radius:10px; padding:9px 10px; margin-bottom:6px;">
+                        <div style="display:flex; align-items:flex-start; gap:6px;">
+                            <b style="flex:1; min-width:0; font-size:12.5px; color:var(--text-main); word-break:break-all;">${addr}</b>
+                            <span style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:#166534; text-align:right;">${a.days.size}건<br>${a.amount.toLocaleString()}원</span>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+                            ${dets.map(([d, v]) => {
+                                const c = v.days.size;
+                                return `<span title="${v.amount.toLocaleString()}원" style="display:inline-flex; align-items:center; gap:3px; padding:3px 7px; border-radius:6px; font-size:11.5px; font-weight:700; color:#334155; background:#f1f5f9;">${d}<b style="color:${c >= 5 ? '#c2410c' : '#64748b'};">${c}</b></span>`;
+                            }).join('')}
+                        </div>
+                    </div>`;
+                }).join('');
+
+            closeApartmentNameTool();
+            const modal = document.createElement('div');
+            modal.id = 'apart-name-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10050';
+            modal.innerHTML =
+                `<div class="summary-modal-content" style="max-width:420px; width:92%; max-height:86vh; padding:0; overflow:hidden; display:flex; flex-direction:column;">` +
+                `<div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:8px;">` +
+                `<div style="min-width:0;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">📍 ${zoneName} 주소별 주문</div>` +
+                `<div style="font-size:11.5px; font-weight:700; color:var(--text-sub); margin-top:3px;">${_bounds.label} · 모두 ${total}건 · ${totalAmount.toLocaleString()}원 · 주소 ${addrs.length}곳</div>` +
+                `</div>` +
+                `<span onclick="closeApartmentNameTool()" style="flex:0 0 auto; font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="flex:1; overflow-y:auto; padding:12px 16px;">${body}</div>` +
+                `<div style="padding:12px 16px; border-top:1px solid var(--border);">` +
+                `<button type="button" onclick="closeApartmentNameTool()" style="width:100%; height:44px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">닫기</button>` +
+                `</div></div>`;
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => modal.classList.add('active'));
+        }
+
+        // [신규] 주문 없는 아파트 접기/펼치기
+        let _apartShowEmpty = false;
+        function toggleApartEmpty() {
+            _apartShowEmpty = !_apartShowEmpty;
+            renderApartmentAdmin();
+        }
+
+        // [신규] 검색 별칭 넣기. 여기에 넣은 단어로 주문 검색창에서 그 아파트 주문을 찾을 수 있다.
+        // ===== [신규] 새 아파트 등록 =====
+        //  '등록 안 된 주소'에서 누르면, 그 주문에 실제로 찍힌 도로명주소를 그대로 가져와 채운다.
+        //  (인터넷에서 찾은 주소는 틀릴 수 있지만, 실제 배달 주소는 틀릴 일이 없다)
+        function openApartmentRegisterTool(rawAddress) {
+            closeApartmentNameTool();
+            const road = gRoadKey(rawAddress);
+            const paren = (String(rawAddress).match(/\(([^)]*)\)/) || [])[1] || '';
+            // 괄호 안 '법정동, 단지명'에서 단지명만 뽑아 이름 후보로 쓴다
+            const guess = paren.includes(',') ? paren.split(',').slice(1).join(',').trim() : '';
+
+            const modal = document.createElement('div');
+            modal.id = 'apart-name-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10050';
+            modal.innerHTML =
+                `<div class="summary-modal-content" style="max-width:420px; width:92%; padding:0; overflow:hidden;">` +
+                `<div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">🏢 아파트 등록</div>` +
+                `<span onclick="closeApartmentNameTool()" style="font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="padding:14px 18px;">` +
+                `<div style="font-size:11.5px; font-weight:700; color:var(--text-sub); background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:9px 11px; margin-bottom:12px; line-height:1.6; word-break:break-all;">` +
+                `주문에 찍힌 주소<br><b style="color:var(--text-main);">${rawAddress}</b></div>` +
+                `<div style="font-size:11px; font-weight:800; color:#94a3b8; margin-bottom:4px;">도로명주소 (이걸로 알아봅니다)</div>` +
+                `<input type="text" id="apart-reg-road" value="${String(road).replace(/"/g, '&quot;')}" placeholder="예: 미사강변대로240" style="width:100%; box-sizing:border-box; padding:9px 10px; margin-bottom:10px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; font-weight:800; background:#f8fafc;">` +
+                `<div style="font-size:11px; font-weight:800; color:#94a3b8; margin-bottom:4px;">아파트 이름 (화면·인쇄에 나올 짧은 이름)</div>` +
+                `<input type="text" id="apart-reg-name" value="${String(guess).replace(/"/g, '&quot;')}" placeholder="예: 스타힐스" style="width:100%; box-sizing:border-box; padding:10px; border:1.5px solid var(--border); border-radius:8px; font-size:15px; font-weight:800;">` +
+                `<div style="font-size:11.5px; font-weight:600; color:var(--text-sub); margin-top:8px; line-height:1.6; word-break:keep-all;">` +
+                `저장하면 이 도로명으로 들어오는 주문이 모두 이 아파트로 잡힙니다. 별칭·명칭은 저장 뒤 카드에서 넣으시면 됩니다.` +
+                `</div></div>` +
+                `<div style="padding:14px 18px; border-top:1px solid var(--border); display:flex; gap:8px;">` +
+                `<button type="button" onclick="closeApartmentNameTool()" style="flex:1; height:44px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">취소</button>` +
+                `<button type="button" onclick="saveApartmentExtra()" style="flex:1.4; height:44px; border:none; background:#0891b2; color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">등록</button>` +
+                `</div></div>`;
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => modal.classList.add('active'));
+            setTimeout(() => document.getElementById('apart-reg-name')?.focus(), 100);
+        }
+
+        async function saveApartmentExtra() {
+            const road = String(document.getElementById('apart-reg-road')?.value || '').replace(/\s+/g, '');
+            const name = String(document.getElementById('apart-reg-name')?.value || '').trim();
+            if (!name) { showToast("아파트 이름을 입력해 주세요."); return; }
+            if (!road) { showToast("도로명주소가 비어 있습니다."); return; }
+
+            // 이미 같은 도로명이 등록돼 있으면 막는다 (엉뚱한 아파트로 합쳐지는 사고 방지)
+            const dup = gAptList().find(a => (a.roads || []).includes(road));
+            if (dup) { showToast(`이 도로명은 이미 '${dup.name}'에 등록돼 있습니다.`); return; }
+
+            const key = fSafeKey(road);
+            showLoader("아파트 등록 중...");
+            try {
+                let ok = false, lastErr = null;
+                for (let a = 1; a <= 5 && !ok; a++) {
+                    try {
+                        const res = await fetch(`${FIREBASE_DB_URL}apartment_extra/${key}.json`, {
+                            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: name, roads: [road], lots: [], keywords: [name], aliases: [name], updatedAt: Date.now() })
+                        });
+                        if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                        ok = true;
+                    } catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 400 * a)); }
+                }
+                if (!ok) throw lastErr || new Error("저장 실패");
+                closeApartmentNameTool();
+                await renderApartmentAdmin();
+                if (typeof renderFilteredOrders === 'function') renderFilteredOrders();
+                showToast(`'${name}' 아파트로 등록했습니다.`);
+            } catch (e) {
+                console.error("아파트 등록 실패:", e);
+                showToast("등록에 실패했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // 직접 등록한 아파트 지우기 (기본표 아파트는 못 지운다)
+        async function deleteApartmentExtra(key, name) {
+            if (!await uiConfirm(`'${name}' 아파트 등록을 지울까요?\n\n지우면 이 주소는 다시 '등록 안 된 주소'로 돌아갑니다.`, '삭제')) return;
+            showLoader("삭제 중...");
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}apartment_extra/${key}.json`, { method: 'DELETE' });
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                await renderApartmentAdmin();
+                showToast(`'${name}' 등록을 지웠습니다.`);
+            } catch (e) {
+                showToast("삭제에 실패했습니다.");
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // [수정] 예전에는 기존 별칭이 채워진 칸을 통째로 고쳐 쓰는 방식이라,
+        //  새 단어만 적으면 원래 있던 별칭이 사라졌다. 이제 '하나씩 더하고 하나씩 빼는' 방식이다.
+        function openApartmentAliasTool(aptName) {
+            closeApartmentNameTool();
+            const mine = APARTMENT_ALIAS[aptName] || [];
+            const basic = (APARTMENT_DATA.find(a => a.name === aptName) || {}).aliases || [];
+
+            const chips = mine.length
+                ? mine.map(k => `<span style="display:inline-flex; align-items:center; gap:5px; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:800; color:#be123c; background:#fff1f2; border:1px solid #fecdd3;">${k}` +
+                    `<span onclick="removeApartmentAlias('${escapeArg(aptName)}', '${escapeArg(k)}')" title="이 별칭 빼기" style="cursor:pointer; font-size:14px; color:#fda4af; line-height:1;">&times;</span></span>`).join('')
+                : `<span style="font-size:12px; font-weight:700; color:var(--text-sub);">아직 없습니다.</span>`;
+
+            const modal = document.createElement('div');
+            modal.id = 'apart-name-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10050';
+            modal.innerHTML =
+                `<div class="summary-modal-content" style="max-width:400px; width:92%; padding:0; overflow:hidden;">` +
+                `<div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">${aptName} 검색 별칭</div>` +
+                `<span onclick="closeApartmentNameTool()" style="font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="padding:14px 18px;">` +
+                `<div style="font-size:11px; font-weight:800; color:#94a3b8; margin-bottom:5px;">지금 넣어둔 별칭</div>` +
+                `<div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:12px;">${chips}</div>` +
+                `<div style="display:flex; gap:6px;">` +
+                `<input type="text" id="apart-alias-value" placeholder="새 별칭 (예: 1단지)" onkeydown="if(event.key==='Enter'){event.preventDefault(); addApartmentAlias('${escapeArg(aptName)}');}" style="flex:1; min-width:0; box-sizing:border-box; padding:10px; border:1.5px solid var(--border); border-radius:8px; font-size:15px; font-weight:800;">` +
+                `<button type="button" onclick="addApartmentAlias('${escapeArg(aptName)}')" style="flex:0 0 auto; padding:0 16px; border:none; background:var(--primary); color:#fff; border-radius:8px; font-size:14px; font-weight:800; cursor:pointer;">추가</button>` +
+                `</div>` +
+                `<div style="font-size:11.5px; font-weight:600; color:var(--text-sub); margin-top:8px; line-height:1.6; word-break:keep-all;">` +
+                `넣은 단어로 주문 검색창에서 이 아파트 주문을 찾을 수 있습니다. 쉼표로 여러 개를 한 번에 넣어도 됩니다.<br>` +
+                (basic.length ? `기본으로 이미 되는 말: <b>${basic.join(', ')}</b>` : '') +
+                `</div></div>` +
+                `<div style="padding:14px 18px; border-top:1px solid var(--border);">` +
+                `<button type="button" onclick="closeApartmentNameTool()" style="width:100%; height:44px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">닫기</button>` +
+                `</div></div>`;
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => modal.classList.add('active'));
+            setTimeout(() => document.getElementById('apart-alias-value')?.focus(), 100);
+        }
+
+        // 새 별칭을 기존 목록에 더한다 (기존 것은 그대로 둔다)
+        async function addApartmentAlias(aptName) {
+            const raw = String(document.getElementById('apart-alias-value')?.value || "");
+            const add = raw.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+            if (add.length === 0) { showToast("넣을 별칭을 입력해 주세요."); return; }
+            const list = [...new Set((APARTMENT_ALIAS[aptName] || []).concat(add))];
+            await saveApartmentAlias(aptName, list);
+        }
+
+        // 별칭 하나만 뺀다
+        async function removeApartmentAlias(aptName, alias) {
+            const list = (APARTMENT_ALIAS[aptName] || []).filter(x => x !== alias);
+            await saveApartmentAlias(aptName, list);
+        }
+
+        async function saveApartmentAlias(aptName, list) {
+            list = [...new Set((list || []).map(s => String(s).trim()).filter(Boolean))];
+            const key = fSafeKey(aptName);
+            showLoader("별칭 저장 중...");
+            try {
+                // Firebase 쓰기는 성공을 확인하고, 실패하면 다시 시도한다
+                let ok = false, lastErr = null;
+                for (let a = 1; a <= 5 && !ok; a++) {
+                    try {
+                        const res = list.length
+                            ? await fetch(`${FIREBASE_DB_URL}apartment_alias/${key}.json`, {
+                                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name: aptName, aliases: list, updatedAt: Date.now() })
+                              })
+                            : await fetch(`${FIREBASE_DB_URL}apartment_alias/${key}.json`, { method: 'DELETE' });
+                        if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                        ok = true;
+                    } catch (e) {
+                        lastErr = e;
+                        await new Promise(r => setTimeout(r, 400 * a));
+                    }
+                }
+                if (!ok) throw lastErr || new Error("저장 실패");
+                if (list.length) APARTMENT_ALIAS[aptName] = list; else delete APARTMENT_ALIAS[aptName];
+                await renderApartmentAdmin();
+                openApartmentAliasTool(aptName);   // 목록을 갱신해 다시 열어 준다 (계속 더 넣을 수 있게)
+                showToast(list.length ? `별칭 ${list.length}개 저장` : "별칭을 모두 지웠습니다.");
+            } catch (e) {
+                console.error("별칭 저장 실패:", e);
+                showToast("저장에 실패했습니다.");
             } finally {
                 hideLoader();
             }
@@ -9345,7 +9973,9 @@
                     const mk = String(p.matchKey||''); const nm = String(p.name||'');
                     const isFruit = /과일|야채|채소|기타/.test(mk) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]/.test(nm);
                     const isShown = (p.showToday === true || p.showToday === 'true');
-                    if (isFruit && isShown) targets.push(key);
+                    // [신규] 상시판매 분류탭으로 옮긴 과일은 당일 마감과 무관하므로 자동 숨김 대상에서 뺀다
+                    const isOnsiteAssigned = String(p.displayTab||'').startsWith('onsite-');
+                    if (isFruit && isShown && !isOnsiteAssigned) targets.push(key);
                 }
                 if (targets.length){
                     await Promise.all(targets.map(key => fetch(`${FIREBASE_DB_URL}published_products/${key}.json`, {
@@ -9601,7 +10231,29 @@
                     </div>
                 </div>`;
             };
-            list.innerHTML = filteredRows.map(cardHTML).join('');
+            // [신규] 과일 · 공동구매 · 사다드림 · 상시판매 순으로 묶어서 보여준다.
+            //  발주하러 갈 때 같은 종류끼리 모여 있어야 챙기기 쉽다. (묶음 안 순서는 위 정렬 버튼 그대로)
+            const UPCAT_ORDER = [
+                ['fruit', '🍎 과일', '#dc2626', '#fef2f2'],
+                ['group', '🗓️ 공동구매', '#2563eb', '#eff6ff'],
+                ['sada', '🛵 사다드림', '#0891b2', '#ecfeff'],
+                ['other', '🏪 상시판매', '#c2410c', '#fff7ed']
+            ];
+            const catOf = (r) => salesProductCategory(r.prod, r.name, (r.prod && r.prod.category) || '');
+            const grouped = new Map(UPCAT_ORDER.map(([k]) => [k, []]));
+            filteredRows.forEach(r => {
+                const c = catOf(r);
+                (grouped.get(c) || grouped.get('other')).push(r);
+            });
+            list.innerHTML = UPCAT_ORDER.filter(([k]) => grouped.get(k).length > 0).map(([k, label, color, bg]) => {
+                const rows = grouped.get(k);
+                const q = rows.reduce((a, r) => a + r.qty, 0);
+                const amt = rows.reduce((a, r) => a + r.amount, 0);
+                return `<div style="display:flex; align-items:center; gap:6px; margin:10px 0 6px;">
+                        <span style="font-size:11.5px; font-weight:900; color:${color}; background:${bg}; padding:3px 9px; border-radius:6px;">${label}</span>
+                        <span style="font-size:11px; font-weight:700; color:var(--text-sub);">${rows.length}종 · ${q}개 · ${amt.toLocaleString()}원</span>
+                    </div>` + rows.map(cardHTML).join('');
+            }).join('');
             if (sumBox) sumBox.innerHTML =
                 salesStatChip('상품 종류', filteredRows.length + '종') +
                 salesStatChip('재고 부족', shortageCount + '종', shortageCount > 0 ? '#dc2626' : null) +
@@ -9963,6 +10615,129 @@
             renderSalesDailyTrend(_salesDayCache || new Map());
         }
 
+        // [신규] 그래프 단위 버튼 (자동 · 시간 · 일 · 주 · 월 · 년)
+        //  '자동'은 고른 기간에 맞춘 기본 모습이고, 나머지는 그 단위로 강제로 쪼개 본다.
+        const TREND_UNITS = [[null, '자동'], ['hour', '시간'], ['day', '일'], ['week', '주'], ['month', '월'], ['year', '년']];
+
+        function buildTrendUnitTabs() {
+            const box = document.getElementById('trend-unit-tabs');
+            if (!box) return;
+            box.innerHTML = TREND_UNITS.map(([u, label]) => {
+                const on = (salesTrendUnitOverride === u) || (u === null && !salesTrendUnitOverride);
+                return `<button type="button" onclick="setSalesTrendUnit(${u === null ? 'null' : `'${u}'`})" style="flex:1 1 0; min-width:0; padding:6px 4px; border:1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}; background:${on ? 'var(--primary-light)' : '#fff'}; color:${on ? 'var(--primary)' : 'var(--text-sub)'}; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer; white-space:nowrap;">${label}</button>`;
+            }).join('');
+        }
+
+        // [신규] 고른 단위로 기간을 쪼개 막대 그래프를 그린다 (기간 전체를 그 단위로 나눔)
+        function renderTrendByUnit(dayMap, unit) {
+            const box = document.getElementById('sales-daily-trend');
+            const titleEl = document.getElementById('sales-trend-title');
+            const _pad = n => String(n).padStart(2, '0');
+            const nameMap = { hour: '시간대별', day: '일자별', week: '주별', month: '월별', year: '연도별' };
+            if (titleEl) titleEl.innerText = `📈 ${nameMap[unit] || ''} 매출 추이`;
+
+            // 시간대는 날짜별 합계로는 만들 수 없어 주문에서 직접 센다
+            if (unit === 'hour') {
+                const { from, to } = getSalesPeriodRange();
+                const bands = [];
+                for (let b = 0; b < 6; b++) bands.push({ s: b * 4, e: b * 4 + 4, amount: 0 });
+                getSalesSourceOrders().forEach(o => {
+                    if (isSalesCanceled(o)) return;
+                    const d = salesOrderDate(o);
+                    if (!d || isNaN(d.getTime()) || d.getFullYear() < 2000) return;
+                    if (from && d < from) return;
+                    if (to && d > to) return;
+                    const t = parseTimestampToDate(o.timestamp);
+                    const h = (t && !isNaN(t.getTime())) ? t.getHours() : 0;
+                    bands[Math.min(5, Math.floor(h / 4))].amount += parseInt(o.total || 0) || 0;
+                });
+                const hmax = Math.max.apply(null, bands.map(b => b.amount).concat([1]));
+                box.innerHTML = `<div style="display:flex; flex-direction:column; gap:5px; height:196px;">` + bands.map(v => {
+                    const pct = Math.round(v.amount / hmax * 100);
+                    const label = `${_pad(v.s)}-${_pad(v.e)}시`;
+                    return `<div onclick="showHourBandDetail(${v.s},${v.e},'${escapeArg(label)}')" style="display:flex; align-items:center; gap:8px; flex:1 1 0; min-height:0; cursor:pointer;" title="클릭 시 판매 상품 내역">
+                        <div style="width:64px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${label}</div>
+                        <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:100%;">
+                            <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
+                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}원</span><span style="color:#64748b; font-size:10px;">▶</span></div>
+                        </div>
+                    </div>`;
+                }).join('') + `</div>`;
+                return;
+            }
+
+            // [수정] '주'는 경계 주도 월~일 7일을 통째로 채운다.
+            //  고른 기간(예: 8월) 밖의 날짜(7/27~7/31)는 dayMap에 없으므로 주문에서 직접 가져온다.
+            let srcMap = dayMap;
+            if (unit === 'week') {
+                const pr = getSalesPeriodRange() || {};
+                if (pr.from && pr.to) {
+                    const wFrom = new Date(pr.from);
+                    wFrom.setDate(wFrom.getDate() - ((wFrom.getDay() + 6) % 7));
+                    wFrom.setHours(0, 0, 0, 0);
+                    const wTo = new Date(pr.to);
+                    wTo.setDate(wTo.getDate() + (6 - ((wTo.getDay() + 6) % 7)));
+                    wTo.setHours(23, 59, 59, 999);
+                    srcMap = gSalesDayAmounts(wFrom, wTo);
+                }
+            }
+
+            const buckets = new Map();
+            srcMap.forEach((amt, ds) => {
+                const p = ds.split('-');
+                const y = +p[0], m = +p[1], dd = +p[2];
+                let key, label, startISO = ds, endISO = ds;
+                if (unit === 'week') {
+                    const dt = new Date(y, m - 1, dd);
+                    // 주는 무조건 월요일~일요일 7일 통째 (달 경계에서 자르지 않는다)
+                    const mon = new Date(dt); mon.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+                    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                    key = `${mon.getFullYear()}-${_pad(mon.getMonth() + 1)}-${_pad(mon.getDate())}`;
+                    label = `${mon.getMonth() + 1}/${mon.getDate()}~${sun.getMonth() + 1}/${sun.getDate()}`;
+                    startISO = key;
+                    endISO = `${sun.getFullYear()}-${_pad(sun.getMonth() + 1)}-${_pad(sun.getDate())}`;
+                } else if (unit === 'month') {
+                    key = `${p[0]}-${p[1]}`;
+                    label = `${p[0].slice(2)}/${m}월`;
+                    startISO = `${p[0]}-${p[1]}-01`;
+                    endISO = `${p[0]}-${p[1]}-${_pad(new Date(y, m, 0).getDate())}`;
+                } else if (unit === 'year') {
+                    key = `${p[0]}`;
+                    label = `${p[0]}년`;
+                    startISO = `${p[0]}-01-01`;
+                    endISO = `${p[0]}-12-31`;
+                } else { // day
+                    key = ds;
+                    label = `${m}/${dd}`;
+                }
+                if (!buckets.has(key)) buckets.set(key, { label, amount: 0, startISO, endISO });
+                buckets.get(key).amount += amt;
+            });
+
+            // 너무 길어지지 않게 최근 구간만 (일=31, 주=16, 월=24, 년=10)
+            const cap = { day: 31, week: 16, month: 24, year: 10 }[unit] || 31;
+            const list = [...buckets.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).slice(-cap).map(x => x[1]);
+
+            if (list.length === 0) {
+                box.innerHTML = `<div style="font-size:12px; font-weight:700; color:var(--text-sub); padding:20px 0; text-align:center;">이 기간에 매출이 없습니다.</div>`;
+                return;
+            }
+
+            const max = Math.max.apply(null, list.map(v => v.amount).concat([1]));
+            const lblW = (unit === 'week') ? 86 : (unit === 'month') ? 58 : (unit === 'year') ? 52 : 44;
+            const rowH = Math.max(16, Math.min(28, Math.floor(300 / list.length)));
+            box.innerHTML = `<div style="display:flex; flex-direction:column; gap:4px;">` + list.map(v => {
+                const pct = Math.round(v.amount / max * 100);
+                return `<div onclick="showTrendDetail('${v.startISO}','${v.endISO}','${escapeArg(v.label)}')" style="display:flex; align-items:center; gap:8px; height:${rowH}px; cursor:pointer;" title="클릭 시 판매 상품 내역">
+                    <div style="width:${lblW}px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${v.label}</div>
+                    <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:100%;">
+                        <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
+                        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}원</span><span style="color:#64748b; font-size:10px;">▶</span></div>
+                    </div>
+                </div>`;
+            }).join('') + `</div>`;
+        }
+
         // [신규] 일/주/월/분기/년 기간에서 고정 개수의 추이 버킷 생성(빈 구간도 0으로 채워 줄 수 고정)
         function salesFixedTrendBuckets(unit, count){
             const _pad = n => String(n).padStart(2,'0');
@@ -9984,6 +10759,28 @@
             }
             return out;
         }
+        // [신규] 주어진 기간의 '날짜별 매출' 표를 주문에서 직접 만든다.
+        //  판매현황 집계와 같은 조건(취소 제외, 배달완료·픽업만, 수령방법 필터)을 쓴다.
+        //  달 경계를 넘는 주처럼 선택 기간 밖의 날짜가 필요할 때 쓴다.
+        function gSalesDayAmounts(fromDate, toDate) {
+            const map = new Map();
+            getSalesSourceOrders().forEach(o => {
+                if (isSalesCanceled(o)) return;
+                const st = String(o.status || '');
+                if (st !== '배달완료' && st !== '픽업') return;
+                const d = salesOrderDate(o);
+                if (!d || isNaN(d.getTime()) || d.getFullYear() < 2000) return;
+                if (fromDate && d < fromDate) return;
+                if (toDate && d > toDate) return;
+                const isDelivery = isSalesDelivery(o);
+                if (salesMethodFilter === 'delivery' && !isDelivery) return;
+                if (salesMethodFilter === 'pickup' && isDelivery) return;
+                const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                map.set(ds, (map.get(ds) || 0) + (parseInt(o.total || 0) || 0));
+            });
+            return map;
+        }
+
         // [신규] 날짜문자열(YYYY-MM-DD)을 단위별 버킷 키로 변환
         function salesTrendKeyForDate(ds, unit){
             const p=ds.split('-'); const y=+p[0], m=+p[1], d=+p[2]; const _pad=n=>String(n).padStart(2,'0');
@@ -10007,14 +10804,35 @@
                 return { buckets: out, keyOf: ds => ds };
             }
             if (salesUnit === 'month'){
-                // 그 달의 주차(월~일, 달 경계 클램프)
-                const y=from.getFullYear(), m=from.getMonth();
-                const firstDow=(new Date(y,m,1).getDay()+6)%7;
-                const lastDay=new Date(y,m+1,0).getDate();
-                const numWeeks=Math.ceil((lastDay+firstDow)/7);
-                for (let wk=1; wk<=numWeeks; wk++){ const sd=Math.max(1,(wk-1)*7-firstDow+1); const ed=Math.min(lastDay,wk*7-firstDow); out.push({ key:`W${wk}`, label:`${wk}주(${m+1}/${sd}~${m+1}/${ed})`, startISO:`${y}-${_pad(m+1)}-${_pad(sd)}`, endISO:`${y}-${_pad(m+1)}-${_pad(ed)}`, amount:0 }); }
-                const keyOf = ds => { const dd=+ds.split('-')[2]; return `W${Math.ceil((dd+firstDow)/7)}`; };
-                return { buckets: out, keyOf };
+                // [수정] 주는 무조건 월요일~일요일 7일 통째로 잡는다.
+                //  그 달 1일이 낀 주(전달로 걸쳐 있어도)부터, 말일이 낀 주(다음 달로 넘어가도)까지.
+                //  라벨에 적힌 날짜 그대로 계산하므로 '적힌 기간 ≠ 숫자'가 되는 일이 없다.
+                const y = from.getFullYear(), m = from.getMonth();
+                const first = new Date(y, m, 1);
+                const lastDay = new Date(y, m + 1, 0);
+                const weeks = [];   // [월요일, 일요일]
+                const firstMon = new Date(first);
+                firstMon.setDate(first.getDate() - ((first.getDay() + 6) % 7));
+                for (let cur = new Date(firstMon); cur <= lastDay; cur.setDate(cur.getDate() + 7)) {
+                    const end = new Date(cur); end.setDate(cur.getDate() + 6);
+                    weeks.push([new Date(cur), end]);
+                }
+                weeks.forEach(([s, e], i) => {
+                    out.push({
+                        key: `W${i + 1}`,
+                        label: `${i + 1}주(${s.getMonth() + 1}/${s.getDate()}~${e.getMonth() + 1}/${e.getDate()})`,
+                        startISO: iso(s), endISO: iso(e), amount: 0
+                    });
+                });
+                const keyOf = ds => {
+                    const p = ds.split('-');
+                    const dt = new Date(+p[0], +p[1] - 1, +p[2]);
+                    const i = weeks.findIndex(([s, e]) => dt >= s && dt <= e);
+                    return i >= 0 ? `W${i + 1}` : '';
+                };
+                // 마지막 주가 다음 달로 넘어간 만큼도 라벨에 적힌 대로 채워 넣는다
+                const _lastEnd = new Date(weeks[weeks.length - 1][1]); _lastEnd.setHours(23, 59, 59, 999);
+                return { buckets: out, keyOf, wideFrom: weeks[0][0], wideTo: _lastEnd };
             }
             if (salesUnit === 'quarter'){
                 // 그 분기의 3개월
@@ -10036,6 +10854,14 @@
             const box = document.getElementById('sales-daily-trend');
             const titleEl = document.getElementById('sales-trend-title');
             if (!box) return;
+
+            // [신규] 그래프 단위를 직접 고른 경우, 고른 기간을 그 단위로 쪼개 그린다
+            buildTrendUnitTabs();
+            if (salesTrendUnitOverride) {
+                renderTrendByUnit(dayMap, salesTrendUnitOverride);
+                return;
+            }
+
             // [신규] 일: 시간대별(4시간 6구간, 24시간제) — 00시부터 오름차순(00-04시가 맨 위 → 20-24시), 전체 높이 고정, 막대 클릭 시 주문내역
             if (salesUnit === 'today' || salesUnit === 'day'){
                 if (titleEl) titleEl.innerText = '📈 시간대별 매출 추이';
@@ -10064,9 +10890,12 @@
             if (salesUnit === 'week' || salesUnit === 'month' || salesUnit === 'quarter' || salesUnit === 'year'){
                 const _tmap = { week:'일별', month:'주별', quarter:'월별', year:'분기별' };
                 if (titleEl) titleEl.innerText = `📈 ${_tmap[salesUnit]} 매출 추이`;
-                const { buckets, keyOf } = salesSubTrendBuckets();
+                const { buckets, keyOf, wideFrom, wideTo } = salesSubTrendBuckets();
                 const bmap = new Map(buckets.map(b => [b.key, b]));
-                dayMap.forEach((amt, ds) => { const k = keyOf(ds); if (bmap.has(k)) bmap.get(k).amount += amt; });
+                // [수정] 기간 밖으로 걸친 주(전달 끝·다음달 초)는 dayMap에 없으므로 주문에서 직접 채운다.
+                //  그래야 막대에 적힌 날짜 범위와 금액이 정확히 맞는다.
+                const srcMap = (wideFrom && wideTo) ? gSalesDayAmounts(wideFrom, wideTo) : dayMap;
+                srcMap.forEach((amt, ds) => { const k = keyOf(ds); if (bmap.has(k)) bmap.get(k).amount += amt; });
                 // 전부 오름차순(생성 순서 그대로): 주=월→일, 월=1주→막주, 분기=첫달→끝달, 년=1분기→4분기
                 const max = Math.max.apply(null, buckets.map(b => b.amount).concat([1]));
                 const lblW = (salesUnit === 'week') ? 66 : (salesUnit === 'month') ? 104 : (salesUnit === 'year') ? 92 : 44;
@@ -10611,11 +11440,15 @@
                 uploadManageTab = 'today-fruit';
             } else if (uploadManageDeliveryType === 'inventory') {
                 // [신규] 상시판매 — 상단 그룹(전체·선반·냉장·냉동·기타). 하위 선반은 서브탭에서.
-                const shelves = [['inv-all', '전체']].concat(
-                    Object.entries(INV_GROUPS).map(([key, g]) => [key, g.label])
-                );
+                // [수정] 과일도 선반·냉장·냉동·기타와 같은 줄의 분류 하나로 둔다 (전체 · 과일 · 선반 · 냉장 · 냉동 · 기타).
+                const shelves = [['inv-all', '전체'], [INV_FRUIT_TAB, '과일']]
+                    .concat(Object.entries(INV_GROUPS).map(([key, g]) => [key, g.label]));
+                // 개수만큼 칸을 나눠 한 줄에 다 들어가게 한다 (5칸 고정이면 6개째가 아래로 내려간다).
+                //  .five-cols 규칙이 repeat(5,1fr)을 !important로 걸어 두어 여기서도 !important가 필요하다.
+                container.style.setProperty('grid-template-columns', `repeat(${shelves.length}, minmax(0, 1fr))`, 'important');
+                container.style.rowGap = '0';
                 container.innerHTML = shelves.map(([key, label]) =>
-                    `<div class="segment-btn ${uploadManageTab === key ? 'active' : ''}" data-manage-tab="${key}" onclick="selectManageTab('${key}')" style="flex:0 0 auto; min-width:52px; text-align:center; padding:10px 12px; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px; white-space:nowrap;">${label}</div>`
+                    `<div class="segment-btn ${uploadManageTab === key ? 'active' : ''}" data-manage-tab="${key}" onclick="selectManageTab('${key}')" style="min-width:0; text-align:center; padding:10px 4px; font-size:11px; font-weight:800; cursor:pointer; border-radius:10px; white-space:nowrap;">${label}</div>`
                 ).join('');
             } else {
                 // [수정] 예약구매: 전체 + 날짜별 (사다드림·공동구매를 모두 날짜로 분류)
@@ -10764,7 +11597,14 @@
             'inv-grp-other':   { label: '기타', shelves: [['other', '기타'], ['', '미지정']] }
         };
 
-        const onsiteCategories = ["냉동", "냉장", "상온"];
+        // [신규] 상시판매 목록의 '과일' 탭. 주문서 '상시판매 › 🍎 과일'에 넣은 상품만 모아 본다.
+        //  (당일판매 과일과 섞이지 않게, 사장님이 분류탭으로 직접 지정한 것만 들어온다)
+        //  선반 개념이 없어 INV_GROUPS에는 넣지 않고 따로 처리한다(하위 선반 서브탭 없음).
+        const INV_FRUIT_TAB = 'inv-grp-fruit';
+
+        // [수정] 상시판매 보관/분류에 '과일'을 추가. 과일은 선반에 두지 않으므로 선반위치는 '미지정'만 쓴다.
+        //  (과일을 맨 앞에 두면 새 상품 기본값이 과일이 되어 버려서, 기존처럼 냉동이 기본이 되도록 뒤에 붙였다)
+        const onsiteCategories = ["냉동", "냉장", "상온", "과일"];
         const fruitCategories = [
             { key: "과일", label: "과일" },
             { key: "야채", label: "야채" },
@@ -10772,9 +11612,12 @@
         ];
         const costcoCategories = ["코스트코 냉동", "코스트코 냉장", "코스트코 상온"];
         // [신규] 상품 등록/수정 폼의 선반위치(장소) 옵션 — 재고관리 탭의 선반 분류와 동일
-        const SHELF_OPTS_FORM = [['', '📦 미지정'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']];
+        const SHELF_OPTS_FORM = [['', '📦 미지정'], ['fruit', '🍎 과일'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']];
         // [신규] 상시판매 보관분류별 선반 옵션 (냉동→냉동4~7, 냉장→냉장1~2, 상온→선반1~3, 공통: 미지정·기타)
         const SHELF_GROUPS = {
+            // [수정] 과일도 실제로는 어느 자리에나 둘 수 있어(과일매대·냉장·상온 선반 등) 선반을 막지 않는다.
+            //  '과일' 자리를 맨 앞에 두되 나머지 선반도 그대로 고를 수 있게 한다.
+            '과일': [['fruit', '🍎 과일'], ['', '📦 미지정'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']],
             '냉동': [['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['', '📦 미지정'], ['other', '🧺 기타']],
             '냉장': [['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['', '📦 미지정'], ['other', '🧺 기타']],
             '상온': [['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['', '📦 미지정'], ['other', '🧺 기타']]
@@ -10869,7 +11712,7 @@
                 onsiteCategories.forEach(cat => {
                     const opt = document.createElement('option');
                     opt.value = cat;
-                    opt.innerText = (cat === "냉동" ? "🧊냉동" : cat === "냉장" ? "❄️냉장" : cat === "상온" ? "🌡️상온" : cat);
+                    opt.innerText = (cat === "냉동" ? "🧊냉동" : cat === "냉장" ? "❄️냉장" : cat === "상온" ? "🌡️상온" : cat === "과일" ? "🍎과일" : cat);
                     select.appendChild(opt);
                 });
 
@@ -10879,7 +11722,15 @@
                 shelfSelect.style.flex = '1';
                 shelfSelect.style.minWidth = '0';
                 // [신규] 보관분류 바뀌면 선반 옵션도 관련된 것만 갱신
-                select.onchange = () => populateShelfOptions();
+                select.onchange = () => {
+                    populateShelfOptions();
+                    // [신규] 상시판매에서 '과일'을 고르면 주문서 분류탭도 '상시판매 › 과일'로 맞춰 준다.
+                    //  (안 그러면 분류가 과일이라 당일판매 과일 쪽에 섞여 버린다. 이미 다른 탭을 골라 뒀으면 건드리지 않는다)
+                    if (select.value === '과일' && !uploadDisplayTab) {
+                        uploadDisplayTab = 'onsite-fruit';
+                        updateDisplayTabUI();
+                    }
+                };
 
                 row.appendChild(select);
                 row.appendChild(shelfSelect);
@@ -11653,6 +12504,9 @@
                 // [수정] 당일구매는 과일(야채/채소 포함)만 표시 — 세부 카테고리 없음
                 filteredProducts = filteredProducts.filter(({ prod }) => {
                     if (prod.name === "배달비") return false;
+                    // [신규] 상시판매 분류로 넘긴 과일은 여기서 뺀다.
+                    //  같은 과일이 당일구매·상시판매 양쪽에 겹쳐 보이면 어느 쪽을 고쳐야 할지 헷갈린다.
+                    if (String(prod.displayTab || '').startsWith('onsite-')) return false;
                     const mKey = String(prod.matchKey || "").trim();
                     const isFruit = /과일|야채|채소/.test(mKey) || /\[과일\]|\[야채\]|\[채소\]/.test(prod.name);
                     return isFruit;
@@ -11661,10 +12515,15 @@
                 // [신규] 재고관리 — 냉동/냉장/상온 보관 상품만 대상. '전체'는 그 전부, 특정 선반은 shelf가 일치하는 상품.
                 filteredProducts = filteredProducts.filter(({ prod }) => {
                     if (prod.name === "배달비") return false;
+                    // [수정] '과일' 탭은 '상시판매 › 과일'로 직접 지정한 상품만 본다.
+                    //  당일판매용 과일 전체(80여 개)를 여기 끌어오면 상시판매 목록이 뒤덮인다.
+                    if (uploadManageTab === INV_FRUIT_TAB) return String(prod.displayTab || '') === 'onsite-fruit';
                     const mk = String(prod.matchKey || "").trim();
                     const st = String(prod.storage || "").trim();
                     const isStorage = /냉동|냉장|상온|실온/.test(mk) || /냉동|냉장|상온|실온/.test(st);
-                    if (!isStorage) return false; // 공동구매 날짜/과일/코스트코 등은 제외
+                    // [신규] 보관분류가 '과일'이어도 상시판매 분류탭으로 지정했으면 상시판매 상품으로 본다
+                    const isOnsiteAssigned = String(prod.displayTab || '').startsWith('onsite-');
+                    if (!isStorage && !isOnsiteAssigned) return false; // 공동구매 날짜/과일/코스트코 등은 제외
                     if (uploadManageTab === 'inv-all') return true;
                     const prodShelf = String(prod.shelf || "");
                     const grp = INV_GROUPS[uploadManageTab];
@@ -11783,13 +12642,9 @@
                         const soA = isProductSoldOut(a.prod), soB = isProductSoldOut(b.prod);
                         if (soA !== soB) return soA ? 1 : -1;
                     }
-                    const isVisibleA = uploadManageDeliveryType === 'today'
-                        ? (a.prod.showToday !== undefined ? (a.prod.showToday === true || a.prod.showToday === 'true') : (a.prod.show !== false && a.prod.show !== 'false'))
-                        : (a.prod.showReserve !== undefined ? (a.prod.showReserve === true || a.prod.showReserve === 'true') : (a.prod.show !== false && a.prod.show !== 'false'));
-                        
-                    const isVisibleB = uploadManageDeliveryType === 'today'
-                        ? (b.prod.showToday !== undefined ? (b.prod.showToday === true || b.prod.showToday === 'true') : (b.prod.show !== false && b.prod.show !== 'false'))
-                        : (b.prod.showReserve !== undefined ? (b.prod.showReserve === true || b.prod.showReserve === 'true') : (b.prod.show !== false && b.prod.show !== 'false'));
+                    // [수정] 정렬 기준도 화면 표시와 같은 판단을 쓴다 (탭마다 달라지지 않게)
+                    const isVisibleA = gIsProductShown(a.prod);
+                    const isVisibleB = gIsProductShown(b.prod);
 
                     if (isVisibleA && !isVisibleB) return -1;
                     if (!isVisibleA && isVisibleB) return 1;
@@ -11801,13 +12656,8 @@
                     const item = document.createElement('div');
                     item.className = 'product-item';
                     
-                    // 배송 유형(당일배송/예약배송)별 탭 노출 여부 판정
-                    let isVisible = true;
-                    if (uploadManageDeliveryType === 'today') {
-                        isVisible = prod.showToday !== undefined ? (prod.showToday === true || prod.showToday === 'true') : (prod.show !== false && prod.show !== 'false');
-                    } else {
-                        isVisible = prod.showReserve !== undefined ? (prod.showReserve === true || prod.showReserve === 'true') : (prod.show !== false && prod.show !== 'false');
-                    }
+                    // [수정] 노출 여부는 탭과 상관없이 하나로 본다 (아래 gIsProductShown 설명 참고)
+                    const isVisible = gIsProductShown(prod);
 
                     if (!isVisible) {
                         item.style.opacity = '0.6';
@@ -11844,7 +12694,7 @@
                     // [신규] 재고관리 모드: 선반 지정 드롭다운
                     let actionsHtml;
                     if (uploadManageDeliveryType === 'inventory') {
-                        const shelfOpts = [['', '미지정'], ['shelf-1', '선반1'], ['shelf-2', '선반2'], ['shelf-3', '선반3'], ['fridge-1', '냉장1'], ['fridge-2', '냉장2'], ['freezer-4', '냉동4'], ['freezer-5', '냉동5'], ['freezer-6', '냉동6'], ['freezer-7', '냉동7'], ['other', '기타']];
+                        const shelfOpts = [['', '미지정'], ['fruit', '과일'], ['shelf-1', '선반1'], ['shelf-2', '선반2'], ['shelf-3', '선반3'], ['fridge-1', '냉장1'], ['fridge-2', '냉장2'], ['freezer-4', '냉동4'], ['freezer-5', '냉동5'], ['freezer-6', '냉동6'], ['freezer-7', '냉동7'], ['other', '기타']];
                         const cur = String(prod.shelf || '');
                         // 현재 실재고(또는 무제한)를 입력칸 기본값으로
                         let stockInputVal = '무제한';
@@ -11966,30 +12816,38 @@
             }
         }
 
+        // [신규] 이 상품이 손님에게 보이는 상태인지 (탭과 상관없이 하나로 판단).
+        //  값은 예전 구조(showToday/showReserve) 그대로 쓰되, 상품이 실제로 노출되는 자리를 기준으로 본다.
+        //  · 과일·야채류 → 당일판매 탭에서만 팔리므로 showToday가 기준 (15시 자동 숨김도 이 값을 끈다)
+        //  · 그 밖의 상품 → 상시판매·예약판매 탭에서 팔리므로 showReserve가 기준
+        function gIsProductShown(prod) {
+            if (!prod) return false;
+            const mk = String(prod.matchKey || '');
+            const nm = String(prod.name || '');
+            const isFruit = /과일|야채|채소|기타/.test(mk) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]/.test(nm);
+            const v = isFruit ? prod.showToday : prod.showReserve;
+            if (v === undefined || v === null) return (prod.show !== false && prod.show !== 'false');
+            return (v === true || v === 'true');
+        }
+
         async function handleBatchVisibility(visible) {
             if (uploadSelectedProductIndices.size === 0) return;
             
             showLoader("💾 노출 상태 일괄 업데이트 중...");
             try {
+                // [수정] 노출·숨김을 하나로 통일했다.
+                //  예전에는 보고 있는 탭에 따라 당일(showToday) 또는 예약(showReserve) 한쪽만 꺼져서,
+                //  같은 상품이 어떤 탭에서는 '숨김', 다른 탭에서는 '노출중'으로 보였다.
+                //  이제 한 번 누르면 두 값이 함께 바뀐다. (값 자체는 기존 구조를 그대로 쓴다)
                 let updatedList = [...uploadProducts];
                 uploadSelectedProductIndices.forEach(idx => {
-                    if (uploadManageDeliveryType === 'today') {
-                        updatedList[idx] = {
-                            ...updatedList[idx],
-                            showToday: visible,
-                            updatedAt: Date.now()
-                        };
-                    } else {
-                        updatedList[idx] = {
-                            ...updatedList[idx],
-                            showReserve: visible,
-                            updatedAt: Date.now()
-                        };
-                    }
-                    // 하위 호환성을 위해 hide 값도 동기화 (둘 다 숨겨지면 hide: true, 둘 중 하나라도 노출되면 hide: false)
-                    const isTodayShow = updatedList[idx].showToday !== false;
-                    const isReserveShow = updatedList[idx].showReserve !== false;
-                    updatedList[idx].hide = (!isTodayShow && !isReserveShow);
+                    updatedList[idx] = {
+                        ...updatedList[idx],
+                        showToday: visible,
+                        showReserve: visible,
+                        hide: !visible,
+                        updatedAt: Date.now()
+                    };
                 });
 
                 const writeRes = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
@@ -12015,10 +12873,39 @@
         }
 
         // [신규] 선택 상품 일괄 삭제
+        // [신규] 브라우저 기본 confirm 대신 쓰는 확인창.
+        //  브라우저에서 '이 페이지의 추가 대화상자 차단'이 한 번 켜지면 confirm()이 조용히 false로 돌아와서
+        //  삭제 버튼을 눌러도 아무 반응이 없는 것처럼 보인다. 화면 안에서 직접 물어보면 그런 일이 없다.
+        function uiConfirm(message, okText) {
+            return new Promise(resolve => {
+                const old = document.getElementById('ui-confirm-modal');
+                if (old) old.remove();
+                const m = document.createElement('div');
+                m.id = 'ui-confirm-modal';
+                m.className = 'summary-modal-overlay';
+                m.style.zIndex = '10090';
+                m.innerHTML =
+                    `<div class="summary-modal-content" style="max-width:380px; width:92%;">` +
+                    `<div style="padding:18px 20px; font-size:14px; font-weight:700; color:var(--text-main); line-height:1.6; white-space:pre-line; text-align:left;">${message}</div>` +
+                    `<div style="display:flex; gap:8px; padding:0 18px 18px;">` +
+                    `<button type="button" id="ui-confirm-no" style="flex:1; height:46px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">취소</button>` +
+                    `<button type="button" id="ui-confirm-yes" style="flex:1; height:46px; border:none; background:#dc2626; color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">${okText || '확인'}</button>` +
+                    `</div></div>`;
+                document.body.appendChild(m);
+                requestAnimationFrame(() => m.classList.add('active'));
+                const done = (v) => { m.remove(); resolve(v); };
+                m.querySelector('#ui-confirm-yes').onclick = () => done(true);
+                m.querySelector('#ui-confirm-no').onclick = () => done(false);
+                m.onclick = (e) => { if (e.target === m) done(false); };
+            });
+        }
+
         async function handleBatchDelete() {
             if (uploadSelectedProductIndices.size === 0) return;
             const count = uploadSelectedProductIndices.size;
-            if (!confirm(`선택한 ${count}개 상품을 삭제하시겠습니까?\n삭제된 상품은 되돌릴 수 없습니다.`)) return;
+            const _names = [...uploadSelectedProductIndices].map(i => (uploadProducts[i] || {}).name).filter(Boolean);
+            const _list = _names.slice(0, 5).map(n => `· ${n}`).join('\n') + (_names.length > 5 ? `\n… 외 ${_names.length - 5}개` : '');
+            if (!await uiConfirm(`선택한 ${count}개 상품을 삭제할까요?\n\n${_list}\n\n삭제하면 되돌릴 수 없습니다.`, '삭제')) return;
 
             showLoader(`🗑️ 상품 ${count}개 삭제 중...`);
             try {
@@ -12217,8 +13104,9 @@
 
                 showLoader("💾 Firebase 주문서 데이터베이스 반영 중...");
 
-                const showToday = isShowToday;
-                const showReserve = isShowReserve;
+                // [수정] 노출값은 폼에서 손대지 않는다. 수정 전 값을 그대로 다시 저장한다 (새 상품은 노출).
+                const showToday = keepShowToday;
+                const showReserve = keepShowReserve;
                 const showWeekly = isShowWeekly;
 
                 const productObj = {
@@ -12259,6 +13147,49 @@
                 // [신규] 상시판매 상품은 폼의 선반위치(장소)도 함께 저장 → 재고관리 탭 선반 분류와 연동
                 const shelfEl = document.getElementById('productShelf');
                 if (shelfEl) productObj.shelf = shelfEl.value;
+
+                // ===== [신규] 같은 이름의 상품은 만들지 못하게 막는다 =====
+                //  상품명이 사실상 상품을 구분하는 열쇠다(재고 조정키·주문 기록·주문서 중복차단이 전부 이름 기준).
+                //  이름이 겹치면 주문서에서 한쪽이 통째로 안 보이고 재고·주문 집계도 엉킨다.
+                {
+                    const _norm = s => String(s || '').replace(/\s+/g, '');
+                    // 수정 중인 자기 자신은 검사에서 뺀다 (이름을 그대로 두고 다른 값만 고치는 경우)
+                    let _selfIdx = -1;
+                    if (uploadIsEditMode && !forceDup) {
+                        if (uploadEditProductRef) {
+                            _selfIdx = uploadProducts.findIndex(p => p
+                                && p.name === uploadEditProductRef.name
+                                && String(p.matchKey || '') === uploadEditProductRef.matchKey
+                                && String(p.date || '') === uploadEditProductRef.date);
+                        }
+                        if (_selfIdx < 0 && uploadEditProductKey !== null && uploadEditProductKey < uploadProducts.length) {
+                            _selfIdx = uploadEditProductKey;
+                        }
+                    }
+                    let _dupIdx = uploadProducts.findIndex((p, i) => p && i !== _selfIdx && _norm(p.name) === _norm(name));
+
+                    // [신규] '복제하기'는 원래 같은 이름으로 하나 더 만드는 기능이라, 막는 대신 이름 뒤에 (2), (3)…을 붙여 준다.
+                    if (_dupIdx > -1 && forceDup) {
+                        const _base = name.replace(/\s*\(\d+\)\s*$/, '');
+                        for (let n = 2; n < 100; n++) {
+                            const _try = `${_base} (${n})`;
+                            if (!uploadProducts.some(p => p && _norm(p.name) === _norm(_try))) { name = _try; break; }
+                        }
+                        productObj.name = name;
+                        const _nameEl = document.getElementById('productName');
+                        if (_nameEl) _nameEl.value = name;
+                        showToast(`같은 이름이 있어 '${name}'으로 복제합니다.`);
+                        _dupIdx = -1;
+                    }
+
+                    if (_dupIdx > -1) {
+                        const d = uploadProducts[_dupIdx];
+                        hideLoader();
+                        alert(`같은 이름의 상품이 이미 있습니다.\n\n· ${d.name}\n· 분류: ${d.matchKey || '-'} / 재고: ${(d.stock === '' || d.stock === undefined || d.stock === null) ? '무제한' : d.stock}\n\n상품명이 상품을 구분하는 열쇠라서, 이름이 같으면 주문서에서 한쪽이 안 보이고 재고도 엉킵니다.\n이름을 다르게 지어 주세요. (예: 뒤에 '(상시)' 붙이기)`);
+                        showToast("같은 이름의 상품이 이미 있습니다.");
+                        return;
+                    }
+                }
 
                 let updatedProducts = [...uploadProducts];
                 let isStockChanged = false;
@@ -12611,8 +13542,8 @@
             stockInput.value = isUnlimited ? '9999' : realStock;
             stockInput.disabled = isUnlimited;
 
-            isShowToday = (prod.showToday !== false);
-            isShowReserve = (prod.showReserve !== false);
+            keepShowToday = (prod.showToday !== false);
+            keepShowReserve = (prod.showReserve !== false);
             isShowWeekly = (prod.showWeekly === true);
             updateExposureButtonsUI();
 
@@ -12692,8 +13623,8 @@
             uploadThumbnailIndex = -1;
             renderSelectedFilesList();
 
-            isShowToday = true;
-            isShowReserve = true;
+            keepShowToday = true;
+            keepShowReserve = true;
             isShowWeekly = false;
             updateExposureButtonsUI();
 
@@ -12927,7 +13858,7 @@
         window.onload = function() {
             _relocatePurchaseAgg();          // [신규] 발주집계를 주문관리 하위로 이동 (판매관리에 안 보이게)
             // [신규] 사장님이 묶은 구역·명칭을 먼저 읽어 둔다 (카드·인쇄 표시와 검색에 바로 반영)
-            Promise.all([loadApartmentCustom(), loadApartmentNick()]).then(() => {
+            Promise.all([loadApartmentCustom(), loadApartmentNick(), loadApartmentAlias(), loadApartmentExtra()]).then(() => {
                 if (APARTMENT_CUSTOM.length > 0 && typeof renderFilteredOrders === 'function') renderFilteredOrders();
             });
             // 캐시가 있으면 즉시 화면에 먼저 그려주고, 실시간 리스너로 최신 데이터를 이어받음
