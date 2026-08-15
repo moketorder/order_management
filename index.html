@@ -5528,8 +5528,24 @@
         //
         //  남은 상품 금액을 보고 '있어야 할 배달비'와 '지금 붙어 있는 배달비'를 비교해,
         //  모자라면 배달비를, 넘치면 배달비 차감을 새 줄로 기록한다. 기존 기록은 고치지 않는다.
+        // [신규] 어떤 번호로 부르든 그 손님의 '대표키'(주문이 실제로 담긴 서랍 이름)를 돌려준다.
+        //  주문서가 카카오 번호를 대표키로 쓰기 시작하면서, 손님이 적은 연락처(phone)와
+        //  서랍 이름이 다른 경우가 생겼다. 연락처로 경로를 만들면 없는 서랍에 유령이 생긴다.
+        //  rawOrders 에는 읽어올 때 채워 둔 firebasePhoneKey 가 있으므로 그걸 찾아 쓴다.
+        function gCustomerKey(phoneOrKey) {
+            const raw = String(phoneOrKey || "").replace(/\D/g, "");
+            if (!raw) return "";
+            const hit = (rawOrders || []).find(o =>
+                String(o.firebasePhoneKey || "").replace(/\D/g, "") === raw
+                || String(o.phone || "").replace(/\D/g, "") === raw
+            );
+            const key = hit ? String(hit.firebasePhoneKey || "").replace(/\D/g, "") : "";
+            return key || raw; // 못 찾으면 넘어온 값 그대로 (예전 동작)
+        }
+
         async function checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, pickupDate) {
-            const cleanPhone = String(phone || "").replace(/\D/g, "");
+            // [수정] 쓰기 경로는 대표키로. 연락처로 만들면 없는 서랍에 유령 주문이 생긴다.
+            const cleanPhone = gCustomerKey(phone);
             const pDate = String(pickupDate || "").trim();
             if (!cleanPhone || !pDate) return;
 
@@ -5542,8 +5558,9 @@
             const amountOf = (o) => Math.abs(parseInt(String(o.total || 0).replace(/,/g, "")) || 0);
 
             // 그 날짜에 살아 있는 '배달' 주문만 본다 (픽업은 배달비와 무관)
+            // [수정] 손님을 가리는 기준도 대표키로 맞춘다. (연락처로 고르면 위 경로와 어긋난다)
             const live = (rawOrders || []).filter(o =>
-                String(o.phone || "").replace(/\D/g, "") === cleanPhone &&
+                String(o.firebasePhoneKey || o.phone || "").replace(/\D/g, "") === cleanPhone &&
                 String(o.pickupDate || "").trim() === pDate &&
                 String(o.shippingMethod || "").includes("배달") &&
                 !isCanceled(o) && !isDone(o)
@@ -5612,6 +5629,12 @@
         async function gAppendFeeRowAdmin(cleanPhone, baseOrder, pDate, amount, isRefund) {
             const amt = Math.abs(parseInt(amount) || 0);
             if (amt <= 0) return false;
+
+            // [수정] 어디서 부르든 대표키 자리에 쓰도록 한 번 더 맞춘다.
+            //  기준이 되는 주문이 있으면 그 주문이 담긴 서랍이 가장 확실하다.
+            cleanPhone = String((baseOrder && baseOrder.firebasePhoneKey) || "").replace(/\D/g, "")
+                      || gCustomerKey(cleanPhone);
+            if (!cleanPhone) return false;
 
             const rowName = isRefund ? FEE_REFUND_NAME : "배달비";
             const signed = isRefund ? -amt : amt;
@@ -13115,7 +13138,9 @@
             if (!photoData) {
                 showLoader("📸 배달 사진 로딩 중...");
                 try {
-                    const cleanPhone = String(phone).replace(/\D/g, "");
+                    // [수정] 사진은 저장할 때 대표키(서랍 이름)로 넣는다. 찾을 때도 같은 값으로 찾아야 한다.
+                    //  연락처로 찾으면 두 값이 다른 손님의 사진을 못 본다.
+                    const cleanPhone = gCustomerKey(phone);
                     const res = await fetch(`${FIREBASE_DB_URL}delivery_photos/${cleanPhone}/${orderKey}.json`);
                     if (res.ok) {
                         const data = await res.json();
