@@ -11314,6 +11314,21 @@
             return String(prod.name || '').includes('사다드림') || String(prod.matchKey || '').trim() === '사다드림';
         }
 
+        // [신규] 오늘의추천 상품인지. 상품명에는 말머리를 넣지 않으므로 isRecommend 값이 기준이고,
+        //  값이 없는 예전 상품만 이름 말머리로 판단한다. (주문서의 gIsRecommendProduct와 같은 기준)
+        function isRecommendListProduct(prod) {
+            if (!prod) return false;
+            if (prod.isRecommend === true || prod.isRecommend === 'true') return true;
+            if (prod.isRecommend === false || prod.isRecommend === 'false') return false;
+            return /^\s*\[\s*오늘의추천\s*\]/.test(String(prod.name || ''));
+        }
+
+        // [신규] 목록에 보여줄 상품명 — 이름에 박혀 있던 [오늘의추천] 말머리는 떼어낸다.
+        //  말머리는 위 판정값으로 따로 그리므로, 안 떼면 예전 상품에서 두 번 나온다.
+        function listDisplayName(prod) {
+            return String((prod && prod.name) || '').replace(/^(?:\s*\[\s*오늘의추천\s*\]\s*)+/, '');
+        }
+
         function isReserveListProduct(prod) {
             if (!prod) return false;
             const mk = String(prod.matchKey || '').trim();
@@ -12672,7 +12687,7 @@
                         ${hasImage ? `<img src="${imgUrl}" class="product-img">` : `<div class="product-img" style="display:flex; align-items:center; justify-content:center; font-size:16px;">📦</div>`}
                         <div class="product-info" onclick="toggleSelectProduct(${index})" style="cursor: pointer; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
                             <div class="product-name" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-all; line-height: 1.3; font-weight: 700;">
-                                ${prod.name}
+                                ${isRecommendListProduct(prod) ? `<span style="color:#ff6d00; font-weight:800;">[오늘의추천]</span> ` : ``}${listDisplayName(prod)}
                             </div>
                             <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                 <span>${parseInt(prod.price).toLocaleString()}원</span>
@@ -12989,6 +13004,9 @@
             // [신규] 공동구매 탭의 '사다드림' 체크 → 상품명 앞에 [사다드림] 말머리 자동 부여.
             //  기존 말머리는 항상 떼어낸 뒤 다시 붙여, 중복 표기·체크 해제 시 잔존을 방지한다.
             name = name.replace(/^\s*\[\s*사다드림\s*\]\s*/, '').trim();
+            // [수정] '오늘의추천'도 같은 규칙 — 입력칸에 남아 있던 말머리는 몇 개가 붙어 있든 모두 떼어낸다.
+            //  (예전엔 떼지 않고 붙이기만 해서, 수정할 때마다 [오늘의추천]이 계속 늘어났다)
+            name = name.replace(/^(?:\s*\[\s*오늘의추천\s*\]\s*)+/, '').trim();
 
             if (!name) {
                 showToast("상품명을 입력해주세요.");
@@ -13003,12 +13021,12 @@
                 name = '[사다드림]' + name;
             }
 
-            // [신규] 과채류의 '오늘의추천'도 같은 방식 — 말머리와 값(isRecommend)을 함께 저장한다.
+            // [수정] 과채류의 '오늘의추천'은 상품명에 말머리를 붙이지 않는다.
+            //  값(isRecommend)만 저장하고, 주문서가 그 값을 보고 [오늘의추천] 표시를 직접 그린다.
+            //  (예전에는 이름에 붙여 저장해서, 이름을 고칠 때마다 말머리가 겹쳐 쌓였다)
+            //  위에서 이름의 [오늘의추천] 말머리를 이미 떼어냈으므로, 예전 상품도 한 번 저장하면 이름이 깨끗해진다.
             const _recChkEl = document.getElementById('productIsRecommend');
             const _isRecommendChecked = (uploadCurrentTab === 'fruit' && !!_recChkEl && _recChkEl.checked);
-            if (_isRecommendChecked) {
-                name = '[오늘의추천]' + name;
-            }
 
             try {
                 // 1. 모든 신규 사진 업로드 처리 (item.id = Cloudinary CDN URL). GAS 대신 Cloudinary 직접 업로드로 속도 개선.
@@ -13460,7 +13478,10 @@
             selectMainTab(tabType);
 
             // 말머리는 체크박스가 담당하므로 입력칸에는 순수 상품명만 보여준다
-            document.getElementById('productName').value = String(prod.name || "").replace(/^\s*\[\s*사다드림\s*\]\s*/, '');
+            //  [수정] '오늘의추천'도 함께 떼어낸다. 이미 [오늘의추천]이 여러 번 붙은 상품도 한 번에 정리된다.
+            document.getElementById('productName').value = String(prod.name || "")
+                .replace(/^\s*\[\s*사다드림\s*\]\s*/, '')
+                .replace(/^(?:\s*\[\s*오늘의추천\s*\]\s*)+/, '');
             // 이전 상품에서 잠겨 있었을 수 있으므로 가격칸을 먼저 깨끗한 숫자칸으로 되돌린 뒤 값을 넣는다
             resetPriceField();
             document.getElementById('productPrice').value = prod.price || 0;
