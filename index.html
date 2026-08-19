@@ -2245,7 +2245,18 @@
                                 <div style="display: flex; flex-wrap: nowrap; gap: 6px; align-items: stretch;">
                                     <input type="text" id="productName" class="form-control" placeholder="예: 무농약 프리미엄 딸기 1kg" required style="flex: 1 1 auto; width: auto; min-width: 0;">
                                     <!-- [수정] 분류탭·상세옵션 버튼과 같은 폭(price-option-btn, 116px)으로 맞춘다 -->
+                                    <!-- [신규] 손님 화면에 보일지 여부. 예전에는 상품목록에서만 바꿀 수 있었는데,
+                                         등록·수정하면서 바로 정하는 편이 편해서 폼에도 넣었다. -->
+                                    <button type="button" id="btnShowVisible" class="price-option-btn" onclick="toggleExposure('Visible')" title="손님 화면 노출 / 숨김">👁️ 노출</button>
                                     <button type="button" id="btnShowWeekly" class="price-option-btn" onclick="toggleExposure('Weekly')" title="매주 노출 (자동 연장)">🔁 매주 노출</button>
+                                </div>
+
+                                <!-- [신규] 식별번호 — 발주와 이어 주는 번호. 상품등록에 꼭 필요한 값은 아니라
+                                     발주가 있는 상품에만 붙는다. 손으로 못 고치게 읽기전용으로 둔다. -->
+                                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+                                    <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
+                                    <input type="text" id="productCodeField" class="form-control" placeholder="없음" readonly tabindex="-1" style="flex:0 0 110px; height:36px; padding:7px 10px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:13px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
+                                    <span id="product-code-hint" style="font-size:12px; font-weight:700; color:#64748b; flex:1 1 200px; min-width:0;">발주를 넣으면 자동으로 생깁니다.</span>
                                 </div>
                             </div>
 
@@ -2344,7 +2355,7 @@
                     
                     <!-- 상품 검색창 -->
                     <div class="search-box-container" style="margin-bottom: 12px; position: relative;">
-                        <input type="text" id="product-search-input" placeholder="🔍 상품명을 입력하여 검색..." oninput="onProductSearchInput(this.value)" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; box-sizing: border-box; outline: none; transition: var(--transition);">
+                        <input type="text" id="product-search-input" placeholder="🔍 상품명 또는 식별번호(P0013)로 검색..." oninput="onProductSearchInput(this.value)" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; box-sizing: border-box; outline: none; transition: var(--transition);">
                         <button type="button" onclick="clearProductSearch(); renderProductsList();" id="btn-clear-product-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 18px; color: var(--text-sub); cursor: pointer; line-height: 1;">&times;</button>
                     </div>
 
@@ -2478,9 +2489,10 @@
                 
                 <!-- 하위 카테고리 탭 (발주 등록 / 발주 목록) -->
                 <div class="sub-tabs-container no-print" style="margin-bottom: 3px; padding: 0;">
-                    <div class="segment-control two-cols" style="display: grid; grid-template-columns: 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
+                    <div class="segment-control two-cols" style="display: grid; grid-template-columns: 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
                         <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
+                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-link" onclick="switchPurchaseSubTab('link')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🔗 코드 연결</div>
                     </div>
                 </div>
 
@@ -2497,61 +2509,91 @@
                         <form id="purchase-order-form" onsubmit="savePurchaseOrder(event)">
                             <input type="hidden" id="purchase-editing-id" value="">
                             
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                            <!-- [수정] 예전에는 auto-fit(최소 160px)이라 화면이 넓으면 167px짜리 칸 5개가 생기고,
+                                 정작 가장 중요한 상품명이 그 사이에 끼어 눌려 있었다. 식별번호 줄 때문에
+                                 그 칸만 키가 커져 줄이 들쭉날쭉했다. 12칸 기준으로 자리를 못박는다. -->
+                            <div class="po-form-grid">
                                 <!-- 발주일 -->
-                                <div>
+                                <div class="po-f-date">
                                     <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">📅 발주일자</label>
                                     <input type="date" id="purchase-date" class="form-control" required style="width: 100%; height: 43px; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box; background: #ffffff; -webkit-appearance: none; appearance: none;">
                                 </div>
 
                                 <!-- 업체명 (드롭다운/자동완성 datalist) -->
-                                <div>
+                                <div class="po-f-sup">
                                     <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">🏢 업체명</label>
                                     <input type="text" id="purchase-supplier" list="purchase-suppliers-datalist" class="form-control" placeholder="예: 농협 청과" style="width: 100%; height: 43px; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box; background: #ffffff;">
                                     <datalist id="purchase-suppliers-datalist"></datalist>
                                 </div>
 
                                 <!-- 발주 상품명 (등록 상품 자동완성 datalist 연동) -->
-                                <div style="grid-column: span 2;">
-                                    <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">📦 발주 상품명 (등록 상품 선택 가능)</label>
-                                    <input type="text" id="purchase-item-name" list="uploaded-products-datalist" class="form-control" placeholder="예: [과일] 나주 배 5kg (클릭 시 등록된 상품 목록 선택)" required oninput="onPurchaseItemNameChange(); calcPurchaseTotal();" onchange="onPurchaseItemNameChange()" style="width: 100%; height: 43px; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box; background: #ffffff;">
-                                    <datalist id="uploaded-products-datalist"></datalist>
+                                <div class="po-f-name">
+                                    <label style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">
+                                        <span>📦 발주 상품명</span>
+                                        <!-- [신규] 등록 상품을 검색해서 고르는 창. 고르면 상품명·판매가·식별번호가 한 번에 채워진다. -->
+                                        <button type="button" onclick="openProductPicker()" style="padding:4px 10px; background:#eff6ff; color:#2563eb; border:1.5px solid #bfdbfe; border-radius:7px; font-size:12px; font-weight:800; cursor:pointer;">🔍 상품 찾기</button>
+                                    </label>
+                                    <!-- [수정] 브라우저 기본 자동완성 목록(datalist)을 뗐다. 글씨를 칠 때마다 목록이 떠서
+                                         거슬리고, 무엇이 왜 뜨는지도 알기 어려웠다. 상품은 '🔍 상품 찾기'로 고른다.
+                                         autocomplete="off"로 브라우저가 기억한 입력값도 안 뜨게 한다. -->
+                                    <input type="text" id="purchase-item-name" class="form-control" autocomplete="off" placeholder="예: [과일] 나주 배 5kg (또는 위 '상품 찾기'로 선택)" required oninput="onPurchaseItemNameChange(); calcPurchaseTotal();" onchange="onPurchaseItemNameChange()" style="width: 100%; height: 43px; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box; background: #ffffff;">
+
+                                    <!-- [신규] 식별번호 — 이름이 달라도 이 번호가 같으면 같은 상품으로 본다.
+                                         등록 상품을 고르면 그 상품의 번호가 자동으로 들어오고,
+                                         번호를 직접 적으면 이름과 상관없이 그 상품의 발주로 잡힌다. -->
+                                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+                                        <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
+                                        <!-- [수정] 손으로 못 고치게 읽기전용. 잘못 적으면 엉뚱한 상품에 묶여 버린다.
+                                             '🔍 상품 찾기'로 고르면 채워지고, 비어 있으면 저장할 때 자동으로 붙는다. -->
+                                        <input type="text" id="purchase-product-code" class="form-control" placeholder="자동" readonly tabindex="-1" style="flex:0 0 110px; height:36px; padding:7px 10px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:13px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
+                                        <span id="purchase-code-hint" style="font-size:12px; font-weight:700; color:#64748b; flex:1 1 180px; min-width:0;">‘🔍 상품 찾기’로 고르면 자동으로 채워집니다.</span>
+                                    </div>
                                 </div>
 
                                 <!-- 발주 수량 (박스/팩) -->
-                                <div>
+                                <div class="po-f-q">
                                     <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">📦 발주 수량 (박스/팩)</label>
                                     <input type="number" id="purchase-qty" class="form-control" placeholder="예: 10" min="1" required oninput="calcPurchaseTotal()" style="width: 100%; height: 43px; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box; background: #ffffff;">
                                 </div>
 
                                 <!-- 한 박스에 몇 개 -->
-                                <div>
+                                <div class="po-f-q">
                                     <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">🔢 한 박스에 몇 개</label>
                                     <input type="number" id="purchase-items-per-box" class="form-control" placeholder="예: 20" min="1" value="1" required oninput="calcPurchaseTotal()" style="width: 100%; height: 43px; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box; background: #ffffff;">
                                 </div>
 
                                 <!-- 낱개 가격 (단가 원) -->
-                                <div>
+                                <div class="po-f-q">
                                     <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">💵 낱개 단가 (원)</label>
                                     <input type="number" id="purchase-unit-price" class="form-control" placeholder="예: 3000" min="0" required oninput="calcPurchaseTotal()" style="width: 100%; height: 43px; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box; background: #ffffff;">
                                 </div>
 
-                                <!-- 현재 판매가 (원) -->
-                                <div>
-                                    <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">🏷️ 현재 판매가 (원)</label>
+                                <!-- 판매 예정가 (원) -->
+                                <div class="po-f-q">
+                                    <label style="display: block; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">🏷️ 판매 예정가 (원)</label>
                                     <input type="number" id="purchase-sale-price" class="form-control" placeholder="예: 4000" min="0" oninput="calcPurchaseTotal()" style="width: 100%; height: 43px; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box; background: #ffffff;">
                                 </div>
                             </div>
 
                             <!-- 계산된 정보 영역 -->
-                            <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 16px; font-size: 14px; font-weight: 800; color: #334155;">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1;">
-                                    <div>총 낱개수량: <span id="purchase-calc-total-units" style="color: var(--blue);">0개</span></div>
-                                    <div>총 발주금액: <span id="purchase-calc-total-price" style="color: var(--amber);">0원</span></div>
+                            <!-- [수정] 좌우 끝으로 벌어져 있어 값이 어디에 붙는지 눈이 따라가기 힘들었다.
+                                 네 값을 같은 크기 칸에 나란히 놓고 이름 아래에 숫자를 둔다. -->
+                            <div class="po-calc-box">
+                                <div class="po-calc-cell">
+                                    <div class="po-calc-label">총 낱개수량</div>
+                                    <div class="po-calc-val" id="purchase-calc-total-units" style="color: var(--blue);">0개</div>
                                 </div>
-                                <div style="display: flex; gap: 15px; font-size: 13px;">
-                                    <div style="color: #16a34a;">20% 마진 권장가: <span id="purchase-calc-margin-20">0원</span></div>
-                                    <div style="color: #2563eb;">30% 마진 권장가: <span id="purchase-calc-margin-30">0원</span></div>
+                                <div class="po-calc-cell">
+                                    <div class="po-calc-label">총 발주금액</div>
+                                    <div class="po-calc-val" id="purchase-calc-total-price" style="color: var(--amber);">0원</div>
+                                </div>
+                                <div class="po-calc-cell" style="background:#f0fdf4; border-color:#bbf7d0;">
+                                    <div class="po-calc-label" style="color:#15803d;">20% 마진 권장가</div>
+                                    <div class="po-calc-val" id="purchase-calc-margin-20" style="color:#15803d;">0원</div>
+                                </div>
+                                <div class="po-calc-cell" style="background:#eff6ff; border-color:#bfdbfe;">
+                                    <div class="po-calc-label" style="color:#1d4ed8;">30% 마진 권장가</div>
+                                    <div class="po-calc-val" id="purchase-calc-margin-30" style="color:#1d4ed8;">0원</div>
                                 </div>
                             </div>
 
@@ -2559,6 +2601,9 @@
                             <div style="display: flex; gap: 8px; justify-content: flex-end;">
                                 <button type="button" id="btn-purchase-cancel" onclick="resetPurchaseOrderForm()" class="btn-common btn-secondary" style="display: none; padding: 10px 20px; font-size: 14px;">취소</button>
                                 <button type="submit" id="btn-purchase-submit" class="btn-common" style="padding: 10px 24px; font-size: 14px; background: #10b981; color: white; border: none; border-radius: var(--radius-sub); font-weight: 800; cursor: pointer;">💾 발주 내역 저장</button>
+                                <!-- [신규] 저장하고 바로 상품등록까지 이어서 하는 버튼.
+                                     예전에는 저장 후 '상품등록 할래요?' 창을 띄웠는데, 매번 묻는 것이 성가셔서 버튼으로 바꿨다. -->
+                                <button type="submit" id="btn-purchase-submit-product" onclick="purchaseSaveThenProduct()" class="btn-common" style="padding: 10px 20px; font-size: 14px; background: #fff; color: #2563eb; border: 1.5px solid #bfdbfe; border-radius: var(--radius-sub); font-weight: 800; cursor: pointer;">💾 저장 후 상품등록</button>
                             </div>
                         </form>
                     </div>
@@ -2568,12 +2613,39 @@
                 <div id="purchase-section-list" class="purchase-sub-section">
                     <!-- 검색 및 필터 바 -->
                     <div class="card" style="background: #ffffff; border-radius: 16px; padding: 16px; box-shadow: var(--shadow); margin-bottom: 16px; border: 1px solid var(--border);">
+                        <!-- [신규] 기간별 조회 — 발주일자 기준. 검색어 없이 기간만으로도 조회된다. -->
+                        <div class="purchase-date-row">
+                            <span class="purchase-date-label">📅 기간</span>
+                            <!-- [수정] 시작일~종료일을 한 덩어리로 묶는다. 안 묶으면 좁은 화면에서
+                                 '~'만 첫 줄에 남고 종료일이 혼자 다음 줄로 떨어져 보기 흉했다. -->
+                            <div class="purchase-date-pair">
+                                <input type="date" id="purchaseStartDate" onchange="onPurchaseDateInputChange()" class="form-control purchase-date-filter">
+                                <span style="font-size: 12px; font-weight: 800; color: #94a3b8; flex: 0 0 auto;">~</span>
+                                <input type="date" id="purchaseEndDate" onchange="onPurchaseDateInputChange()" class="form-control purchase-date-filter">
+                            </div>
+                        </div>
+
+                        <!-- 자주 쓰는 기간 한 번에 잡기 -->
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px;">
+                            <button type="button" class="purchase-range-btn" onclick="setPurchaseDateRange('today')">오늘</button>
+                            <button type="button" class="purchase-range-btn" onclick="setPurchaseDateRange('7d')">최근 7일</button>
+                            <button type="button" class="purchase-range-btn" onclick="setPurchaseDateRange('30d')">최근 30일</button>
+                            <button type="button" class="purchase-range-btn" onclick="setPurchaseDateRange('month')">이번 달</button>
+                            <button type="button" class="purchase-range-btn" onclick="setPurchaseDateRange('lastmonth')">지난 달</button>
+                            <button type="button" class="purchase-range-btn" onclick="setPurchaseDateRange('all')">전체</button>
+                            <button type="button" class="purchase-range-btn" onclick="setPurchaseDateRange('clear')" style="color: #dc2626; border-color: #fecaca;">기간 해제</button>
+                            <button type="button" class="purchase-range-btn" onclick="refreshPurchaseArchiveManual()" title="저장함(10일 지난 발주)을 서버에서 새로 받습니다" style="color: #4338ca; border-color: #c7d2fe;">🔄 저장함 갱신</button>
+                        </div>
+
                         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
                             <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 1; min-width: 200px;">
                                 <input type="text" id="purchaseSearchInput" onkeyup="renderPurchaseOrdersList()" class="form-control" placeholder="🔍 상품명/업체명/날짜로 검색" style="width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; border: 1.5px solid #cbd5e1;">
                             </div>
                             <span id="purchase-total-count-badge" style="background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 800;">총 0건</span>
                         </div>
+
+                        <!-- [신규] '이 상품 발주목록'으로 좁혀 볼 때 뜨는 띠 -->
+                        <div id="purchase-code-filter-chip" style="display:none; margin-top:10px; padding:9px 11px; background:#f8fafc; border:1.5px solid #c7d2fe; border-radius:10px; align-items:center; gap:7px; flex-wrap:wrap;"></div>
                     </div>
 
                     <!-- 데스크톱 테이블 뷰 -->
@@ -2581,18 +2653,16 @@
                         <table style="width: 100%; border-collapse: collapse; text-align: left;">
                             <thead>
                                 <tr style="border-bottom: 2px solid #e2e8f0; font-size: 12px; font-weight: 800; color: #475569; background: #f8fafc;">
-                                    <th style="padding: 12px; white-space: nowrap;">발주일자</th>
-                                    <th style="padding: 12px; white-space: nowrap;">업체명</th>
-                                    <th style="padding: 12px; white-space: nowrap;">발주 상품명</th>
-                                    <th style="padding: 12px; text-align: right; white-space: nowrap;">발주수량</th>
-                                    <th style="padding: 12px; text-align: right; white-space: nowrap;">입수량</th>
-                                    <th style="padding: 12px; text-align: right; white-space: nowrap;">총 낱개수량</th>
-                                    <th style="padding: 12px; text-align: right; white-space: nowrap;">낱개단가</th>
-                                    <th style="padding: 12px; text-align: right; white-space: nowrap;">총 발주금액</th>
-                                    <th style="padding: 12px; text-align: right; white-space: nowrap; background: #f0fdf4; color: #166534;">20% 마진 권장</th>
-                                    <th style="padding: 12px; text-align: right; white-space: nowrap; background: #eff6ff; color: #1e40af;">30% 마진 권장</th>
-                                    <th style="padding: 12px; text-align: right; white-space: nowrap; background: #f0f9ff; color: #075985;">현재 판매가</th>
-                                    <th style="padding: 12px; text-align: center; white-space: nowrap;">관리</th>
+                                    <th class="po-date">발주일자</th>
+                                    <th class="po-name">발주 상품명</th>
+                                    <th class="po-code">식별번호</th>
+                                    <th class="po-supplier">업체명</th>
+                                    <th class="po-num po-qty">발주수량<br><span class="po-sub">입수량</span></th>
+                                    <th class="po-num po-units">총 낱개</th>
+                                    <th class="po-num po-unitprice">낱개단가</th>
+                                    <th class="po-num po-total">총 발주금액</th>
+                                    <th class="po-num po-margin">마진 권장가<br><span class="po-sub">20% / 30%</span></th>
+                                    <th class="po-num po-sale">판매 예정가</th>
                                 </tr>
                             </thead>
                             <tbody id="purchase-orders-tbody" style="font-size: 13px; font-weight: 700;">
@@ -2605,6 +2675,40 @@
                     <div id="purchase-orders-mobile-list" class="mobile-only-list" style="display: none;">
                         <!-- 동적 삽입 -->
                     </div>
+
+                    <!-- [신규] 발주 한 건을 고르면 아래에서 올라오는 버튼 줄 (상품관리의 선택 바와 같은 방식) -->
+                    <div class="batch-action-bar no-print" id="purchase-action-bar">
+                        <div class="batch-top-row">
+                            <div class="batch-selection-info">
+                                <span id="purchase-selection-text">발주 선택됨</span>
+                            </div>
+                        </div>
+                        <div class="batch-buttons" style="display: flex; gap: 5px; width: 100%; box-sizing: border-box; flex-wrap: wrap;">
+                            <button class="btn-batch" onclick="viewPurchasesOfSelected()" style="flex: 1 1 130px; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(79,70,229,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #4338ca; white-space: nowrap; overflow: hidden;">📋 주문전체보기</button>
+                            <button class="btn-batch" onclick="registerProductFromPurchase()" style="flex: 1 1 110px; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(16,185,129,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #10b981; white-space: nowrap; overflow: hidden;">📦 상품등록</button>
+                            <button class="btn-batch" onclick="editSelectedPurchase()" style="flex: 1 1 120px; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(59,130,246,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #2563eb; white-space: nowrap; overflow: hidden;">✏️ 수정</button>
+                            <button class="btn-batch" id="btn-purchase-del" onclick="askDeleteSelectedPurchase()" style="flex: 1 1 120px; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(220,38,38,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #dc2626; white-space: nowrap; overflow: hidden;">🗑️ 삭제</button>
+                            <button class="btn-batch" onclick="clearPurchaseSelection()" style="flex: 0 0 auto; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: var(--text-sub);">닫기</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- [신규] 하위 섹션 3: 코드 연결 — 이름이 비슷한 상품↔발주를 눌러서 같은 식별번호로 잇는다 -->
+                <div id="purchase-section-link" class="purchase-sub-section" style="display: none;">
+                    <div class="card" style="background:#ffffff; border-radius:16px; padding:16px; box-shadow:var(--shadow); margin-bottom:16px; border:1px solid var(--border);">
+                        <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:6px;">🔗 상품 ↔ 발주 식별번호 연결</div>
+                        <div style="font-size:12.5px; font-weight:700; color:#64748b; line-height:1.6;">
+                            이름이 <b>정확히 같은</b> 상품은 이미 자동으로 이어져 있습니다.<br>
+                            여기 나오는 건 <b>이름이 비슷하지만 똑같지는 않은</b> 것들이라, 같은 물건인지는 사장님만 아십니다.<br>
+                            맞으면 <b>연결</b>을 누르세요. 상품의 식별번호가 발주 번호로 바뀌어 하나로 묶입니다.
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:12px;">
+                            <button type="button" class="purchase-range-btn" onclick="renderCodeLinkCandidates()">🔄 후보 다시 찾기</button>
+                            <button type="button" id="btn-bulk-code-link" class="purchase-range-btn" onclick="askAllExactCodeLinks()" style="color:#166534; border-color:#bbf7d0;">✅ 일치율 100%만 한번에 연결</button>
+                            <span id="code-link-count-badge" style="background:#f1f5f9; color:#475569; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:800;">후보 0건</span>
+                        </div>
+                    </div>
+                    <div id="code-link-list"><!-- 동적 삽입 --></div>
                 </div>
 
             </div>
@@ -2615,6 +2719,115 @@
     <style>
         .sales-toggle-btn { padding:7px 12px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; }
         .sales-toggle-btn.active { border-color:var(--primary); background:var(--primary-light); color:var(--primary); }
+        /* [신규] 발주 등록 폼 — 12칸 기준으로 자리를 못박아 줄을 맞춘다.
+           상품명은 한 줄 전체(가장 중요하고 길다), 날짜·업체명은 반반,
+           숫자 네 칸(수량·입수량·단가·판매가)은 한 줄에 나란히. */
+        .po-form-grid {
+            display: grid; grid-template-columns: repeat(12, 1fr);
+            gap: 14px; margin-bottom: 16px; align-items: start;
+        }
+        /* 1줄: 발주일자(4) + 업체명(8) — 목록의 '발주일자 먼저' 순서와 맞춘다
+           2줄: 발주 상품명 + 식별번호 (한 줄 전체)
+           3줄: 숫자 네 칸 */
+        .po-form-grid .po-f-date { grid-column: span 4; }
+        .po-form-grid .po-f-sup  { grid-column: span 8; }
+        .po-form-grid .po-f-name { grid-column: span 12; }
+        .po-form-grid .po-f-q    { grid-column: span 3; }
+
+        /* 태블릿: 숫자 칸을 2개씩 두 줄로 */
+        @media (max-width: 900px) {
+            .po-form-grid .po-f-q { grid-column: span 6; }
+        }
+        /* 핸드폰: 전부 한 줄에 하나씩 */
+        @media (max-width: 560px) {
+            .po-form-grid { gap: 12px; }
+            .po-form-grid .po-f-date,
+            .po-form-grid .po-f-sup,
+            .po-form-grid .po-f-q { grid-column: span 12; }
+        }
+
+        /* 계산 결과 네 칸 */
+        .po-calc-box {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+            background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px;
+            padding: 12px; margin-bottom: 16px;
+        }
+        .po-calc-cell { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; min-width: 0; }
+        .po-calc-label { font-size: 11.5px; font-weight: 800; color: #64748b; margin-bottom: 4px; white-space: nowrap; }
+        .po-calc-val { font-size: 16px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        @media (max-width: 700px) {
+            .po-calc-box { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* [신규] 발주 목록 표 — 칸이 13개라 1396px가 나와 914px 화면을 482px 넘쳤다.
+           성격이 같은 칸을 위아래로 합치고(발주수량+입수량, 20%+30% 마진), 여백·글씨를 조여
+           가로 스크롤 없이 한 화면에 들어오게 한다. 숫자는 오른쪽 정렬로 자릿수를 맞춘다. */
+        #purchase-orders-tbody .po-row { border-bottom: 1px solid #f1f5f9; cursor: pointer; }
+        #purchase-orders-tbody .po-row:hover { background: #f8fafc; }
+        #purchase-orders-tbody .po-row.selected { background: #eef2ff; box-shadow: inset 3px 0 0 #4f46e5; }
+        #purchase-orders-tbody .po-row.selected td { color: #1e1b4b; }
+        #purchase-section-list table th,
+        #purchase-section-list table td { padding: 9px 7px; vertical-align: middle; }
+        #purchase-section-list table th { white-space: nowrap; line-height: 1.35; }
+
+        #purchase-section-list .po-sub { font-size: 10.5px; font-weight: 800; color: #94a3b8; }
+        #purchase-section-list .po-num { text-align: right; white-space: nowrap; }
+
+        #purchase-section-list .po-date { white-space: nowrap; font-size: 12px; font-weight: 700; color: #475569; }
+        #purchase-orders-tbody .po-arch { display: inline-block; margin-top: 2px; background: #f1f5f9; color: #64748b; padding: 1px 5px; border-radius: 5px; font-size: 10px; font-weight: 800; }
+        #purchase-section-list .po-code { white-space: nowrap; }
+        #purchase-orders-tbody .po-code-badge { background: #eef2ff; color: #4338ca; padding: 3px 7px; border-radius: 6px; font-size: 11.5px; font-weight: 800; }
+        #purchase-section-list .po-supplier { font-size: 12px; font-weight: 800; color: #334155; word-break: keep-all; }
+
+        /* 상품명만 줄바꿈을 허용한다. 이 칸이 nowrap이라 413px까지 늘어나 표를 밀어냈다. */
+        #purchase-section-list .po-name {
+            font-size: 12.5px; font-weight: 800; color: #1e293b;
+            white-space: normal; word-break: break-all; line-height: 1.35;
+            min-width: 150px; max-width: 260px;
+        }
+
+        #purchase-orders-tbody .po-qty { font-size: 12.5px; font-weight: 800; color: var(--blue); }
+        #purchase-orders-tbody .po-units { font-size: 12.5px; font-weight: 800; color: #166534; }
+        #purchase-orders-tbody .po-unitprice { font-size: 12px; font-weight: 700; color: #475569; }
+        #purchase-orders-tbody .po-total { font-size: 13px; font-weight: 900; color: #d97706; }
+        #purchase-section-list .po-margin { background: #f7fbf8; }
+        #purchase-orders-tbody .po-m20 { font-size: 12px; font-weight: 900; color: #15803d; }
+        #purchase-orders-tbody .po-m30 { font-size: 12px; font-weight: 900; color: #1d4ed8; }
+        #purchase-section-list .po-sale { background: #f0f9ff; font-size: 12.5px; font-weight: 900; color: #0284c7; }
+
+        #purchase-section-list .po-actions { text-align: center; white-space: nowrap; }
+        #purchase-orders-tbody .po-btn { padding: 3px 7px; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer; }
+        #purchase-orders-tbody .po-btn-edit { border: 1px solid #cbd5e1; background: #fff; color: #3b82f6; }
+        #purchase-orders-tbody .po-btn-del { border: 1px solid #fca5a5; background: #fef2f2; color: #ef4444; margin-left: 3px; }
+
+        /* [신규] 발주 목록 기간 조회 - 날짜 두 칸 */
+        .purchase-date-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+        .purchase-date-label { font-size: 12px; font-weight: 800; color: #475569; white-space: nowrap; }
+        /* 시작일~종료일은 한 덩어리로 움직인다 (좁아지면 통째로 다음 줄) */
+        .purchase-date-pair { display: flex; gap: 6px; align-items: center; flex: 1 1 250px; min-width: 0; }
+        .purchase-date-filter {
+            flex: 1 1 0; min-width: 0; box-sizing: border-box; padding: 7px 10px; height: 36px;
+            border-radius: 8px; font-size: 13px; font-weight: 700; border: 1.5px solid #cbd5e1;
+            background: #ffffff; -webkit-appearance: none; appearance: none;
+        }
+        /* 핸드폰에서는 '기간' 글자를 윗줄에 두고, 날짜 두 칸이 아랫줄을 나눠 쓰게 한다 */
+        @media (max-width: 560px) {
+            .purchase-date-label { flex: 1 1 100%; }
+        }
+        /* [신규] 매입·매출 페이지 기간 버튼 (발주 목록 버튼과 같은 모양) */
+        .profit-range-btn {
+            padding: 6px 11px; border: 1.5px solid #cbd5e1; background: #fff; color: #475569;
+            border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap;
+        }
+        .profit-range-btn:hover { background: #f8fafc; }
+
+        /* [신규] 발주 목록 기간 조회 - 자주 쓰는 기간 버튼 */
+        .purchase-range-btn {
+            padding: 6px 11px; border: 1.5px solid #cbd5e1; background: #fff; color: #475569;
+            border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap;
+        }
+        .purchase-range-btn:hover { background: #f8fafc; }
+        .purchase-range-btn.active { background: #10b981; border-color: #10b981; color: #fff; }
         /* 발주 관리 분류 카테고리 색상 (비활성=컬러 테두리 / 활성=컬러 채움) */
         .up-cat-fruit { border-color:#fca5a5; color:#dc2626; }
         .up-cat-fruit.active { background:#ef4444; border-color:#ef4444; color:#fff; }
@@ -2657,6 +2870,12 @@
         .admin-nav-tabs .admin-nav-btn[data-tab="thumbnail-generator"] { display: none !important; }
         /* 발주관리 하위탭(발주 목록/등록) 높이를 주문관리·상품관리 하위탭과 동일하게(36px/12px) 통일 */
         #tab-admin-purchase-history .segment-control.two-cols .purchase-sub-btn.segment-btn { height:36px !important; padding:10px 0 !important; font-size:12px !important; }
+        /* [신규] 발주관리 하위탭은 세 개(목록·등록·코드 연결)라 한 줄에 셋으로 놓는다.
+           위쪽 미디어쿼리가 .two-cols를 2칸으로 못박고 있어, 여기서 뒤에 한 번 더 덮어쓴다. */
+        #tab-admin-purchase-history .segment-control.two-cols { grid-template-columns: repeat(3, 1fr) !important; }
+        @media (max-width: 560px) {
+            #tab-admin-purchase-history .segment-control.two-cols .purchase-sub-btn.segment-btn { font-size:11px !important; padding:10px 1px !important; }
+        }
         #tab-admin-sales table th, #tab-admin-sales table td { border-bottom:1px solid #f1f5f9; }
         #order-status-tabs, #order-status-tabs2, #sales-uprange-tabs, #sales-upcat-tabs, #sales-period-row1, #sales-period-row2 { -webkit-overflow-scrolling: touch; }
         #order-status-tabs::-webkit-scrollbar, #order-status-tabs2::-webkit-scrollbar, #sales-uprange-tabs::-webkit-scrollbar, #sales-upcat-tabs::-webkit-scrollbar, #sales-period-row1::-webkit-scrollbar, #sales-period-row2::-webkit-scrollbar { display: none; }
@@ -2677,10 +2896,77 @@
     <div id="tab-admin-sales" class="admin-tab-content" style="display: none;">
         <div class="container" style="max-width: 900px; margin: 0 auto;">
 
-            <!-- [신규] 자료 정리 하위 탭: 판매 통계 / 아파트 관리 -->
-            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
+            <!-- [수정] 자료 정리 하위 탭: 판매 통계 / 매입·매출 / 아파트 관리 -->
+            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
                 <div class="segment-btn data-sub-btn active" id="btn-data-sub-sales" onclick="switchDataSubTab('sales')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📊 판매 통계</div>
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-profit" onclick="switchDataSubTab('profit')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📈 매입·매출</div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-apart" onclick="switchDataSubTab('apart')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🏢 아파트 관리</div>
+            </div>
+
+            <!-- [신규] 매입·매출 — 발주(매입)와 판매(매출)를 나란히 놓고 남는 돈을 본다 -->
+            <div id="data-sub-profit" style="display:none;">
+                <!-- 기간 고르기 -->
+                <div class="card" style="background:#fff; border-radius:16px; padding:16px; box-shadow:var(--shadow); border:1px solid var(--border); margin-bottom:14px;">
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                        <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap; margin-right:2px;">📅 기간</span>
+                        <button type="button" class="profit-range-btn" onclick="setProfitRange('3m')">최근 3개월</button>
+                        <button type="button" class="profit-range-btn" onclick="setProfitRange('6m')">최근 6개월</button>
+                        <button type="button" class="profit-range-btn" onclick="setProfitRange('12m')">최근 12개월</button>
+                        <button type="button" class="profit-range-btn" onclick="setProfitRange('year')">올해</button>
+                        <button type="button" class="profit-range-btn" onclick="setProfitRange('all')">전체</button>
+                        <button type="button" class="profit-range-btn" onclick="renderProfitReport()" style="margin-left:auto; color:#4338ca; border-color:#c7d2fe;">🔄 새로고침</button>
+                    </div>
+                    <div id="profit-range-label" style="margin-top:9px; font-size:12px; font-weight:800; color:#64748b;"></div>
+                </div>
+
+                <div id="profit-summary" class="po-calc-box" style="margin-bottom:6px;"></div>
+                <div id="profit-breakdown" style="font-size:11.5px; font-weight:800; color:#64748b; margin:0 2px 14px;"></div>
+
+
+                <div class="card" style="background:#fff; border-radius:16px; padding:14px; box-shadow:var(--shadow); border:1px solid var(--border); overflow-x:auto;">
+                    <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:10px;">📆 월별</div>
+                    <table style="width:100%; border-collapse:collapse; text-align:left;" id="profit-table">
+                        <thead>
+                            <tr style="border-bottom:2px solid #e2e8f0; font-size:12px; font-weight:800; color:#475569; background:#f8fafc;">
+                                <th style="padding:9px 7px; white-space:nowrap;">월</th>
+                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">💳 포스</th>
+                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">🏦 계좌이체</th>
+                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">매출 합계</th>
+                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">매입<br><span style="font-size:10.5px; color:#94a3b8;">발주금액</span></th>
+                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">남은 돈</th>
+                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">비율</th>
+                            </tr>
+                        </thead>
+                        <tbody id="profit-tbody" style="font-size:13px; font-weight:700;"></tbody>
+                    </table>
+                </div>
+                <!-- [신규] 주문서를 거치지 않은 매출(포스·계좌이체)을 날짜별로 직접 적는다 -->
+                <div class="card" style="background:#fff; border-radius:16px; padding:14px; box-shadow:var(--shadow); border:1px solid var(--border); margin-bottom:14px;">
+                    <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:4px;">✍️ 매출 직접 입력</div>
+                    <div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin-bottom:11px; line-height:1.6;">
+                        한 달 치 매출(매장 포스·계좌이체)을 월별로 적어 두면 위 통계에 함께 잡힙니다.
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(12,1fr); gap:8px; align-items:end;">
+                        <div style="grid-column:span 4;">
+                            <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; margin-bottom:5px;">📅 월</label>
+                            <input type="month" id="ms-month" class="form-control" style="width:100%; height:40px; padding:8px 10px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:700; box-sizing:border-box; background:#fff; -webkit-appearance:none; appearance:none;">
+                        </div>
+                        <div style="grid-column:span 4;">
+                            <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; margin-bottom:5px;">💳 포스</label>
+                            <input type="number" id="ms-pos" min="0" placeholder="0" class="form-control" style="width:100%; height:40px; padding:8px 10px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:700; box-sizing:border-box;">
+                        </div>
+                        <div style="grid-column:span 4;">
+                            <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; margin-bottom:5px;">🏦 계좌이체</label>
+                            <input type="number" id="ms-transfer" min="0" placeholder="0" class="form-control" style="width:100%; height:40px; padding:8px 10px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:700; box-sizing:border-box;">
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:7px; margin-top:10px; align-items:center; flex-wrap:wrap;">
+                        <button type="button" onclick="saveManualSale()" style="padding:9px 18px; background:#10b981; color:#fff; border:none; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">💾 저장</button>
+                        <span id="ms-hint" style="font-size:11.5px; font-weight:700; color:#94a3b8;">같은 달을 다시 저장하면 덮어씁니다.</span>
+                    </div>
+                    <div id="ms-list" style="margin-top:12px;"></div>
+                </div>
+
             </div>
 
             <!-- 아파트 관리 -->
@@ -7541,11 +7827,26 @@
                     btnWeekly.classList.remove('active', 'purple');
                 }
             }
+
+            // [신규] 노출/숨김 버튼 — 지금 어느 쪽인지 글자와 색으로 같이 보여 준다
+            const btnVis = document.getElementById('btnShowVisible');
+            if (btnVis) {
+                const on = (keepShowToday !== false) || (keepShowReserve !== false);
+                btnVis.innerText = on ? '👁️ 노출' : '🙈 숨김';
+                btnVis.classList.toggle('active', on);
+                btnVis.style.color = on ? '' : '#dc2626';
+                btnVis.style.borderColor = on ? '' : '#fca5a5';
+            }
         }
 
         function toggleExposure(type) {
             if (type === 'Weekly') {
                 isShowWeekly = !isShowWeekly;
+            } else if (type === 'Visible') {
+                // 당일·예약 노출을 함께 켜고 끈다 (손님 화면에 보이느냐 마느냐 한 가지로 다룬다)
+                const on = (keepShowToday !== false) || (keepShowReserve !== false);
+                keepShowToday = !on;
+                keepShowReserve = !on;
             }
             updateExposureButtonsUI();
         }
@@ -8370,7 +8671,7 @@
                 group: '당일구매',
                 items: [
                     { key: 'today-fruit', label: '과일 / 야채', desc: '당일 수령하는 과일·야채' },
-                    { key: 'today-reserve', label: '공동구매', desc: '오늘 날짜 공동구매 (해당 상품이 있을 때만 탭이 생김)' }
+                    { key: 'today-reserve', label: '오늘의 상품', desc: '오늘 날짜 공동구매 (해당 상품이 있을 때만 탭이 생김)' }
                 ]
             },
             {
@@ -8537,12 +8838,17 @@
 
         // ===== [신규] 자료 정리 — 하위 탭 (판매 통계 / 아파트 관리) =====
         function switchDataSubTab(which) {
-            const isApart = (which === 'apart');
-            document.getElementById('data-sub-sales').style.display = isApart ? 'none' : 'block';
-            document.getElementById('data-sub-apart').style.display = isApart ? 'block' : 'none';
-            document.getElementById('btn-data-sub-sales').classList.toggle('active', !isApart);
-            document.getElementById('btn-data-sub-apart').classList.toggle('active', isApart);
-            if (isApart) renderApartmentAdmin();
+            // [수정] '매입·매출'이 늘어 세 갈래가 됐다. 보일 것 하나만 켜고 나머지는 끈다.
+            const keys = ['sales', 'profit', 'apart'];
+            if (!keys.includes(which)) which = 'sales';
+            keys.forEach(k => {
+                const sec = document.getElementById('data-sub-' + k);
+                if (sec) sec.style.display = (k === which) ? 'block' : 'none';
+                const btn = document.getElementById('btn-data-sub-' + k);
+                if (btn) btn.classList.toggle('active', k === which);
+            });
+            if (which === 'apart') renderApartmentAdmin();
+            else if (which === 'profit') renderProfitReport();
         }
 
         // 주소 한 줄을 넣어 어떻게 인식되는지 바로 확인 (지번을 새로 알았을 때 확인용)
@@ -12270,6 +12576,7 @@
             
             uploadSelectedFiles.forEach((item, idx) => {
                 const row = document.createElement('div');
+                row.dataset.photoRow = String(idx);   // [신규] 끌어서 옮긴 뒤 원래 어느 사진이었는지 찾는 표식
                 row.style = "display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 8px; border: 1.5px solid var(--border); gap: 10px;";
                 
                 const isChecked = (idx === uploadThumbnailIndex);
@@ -12289,8 +12596,24 @@
                     ? `<img src="${imgSrc}" style="width: 36px; height: 36px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); flex-shrink: 0;" onerror="this.onerror=null; this.style.display='none';">` 
                     : `<div style="width: 36px; height: 36px; background: #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">🖼️</div>`;
 
+                // [신규] 손님 화면에 실제로 보일 순서. 대표 섬네일이 1번이고 나머지는 이 목록 순서대로다.
+                //  (저장할 때 finalImages를 만드는 규칙과 똑같이 계산해, 보이는 번호와 저장 결과가 어긋나지 않게 한다)
+                const hasThumb = (uploadThumbnailIndex >= 0 && uploadThumbnailIndex < uploadSelectedFiles.length);
+                let orderNo;
+                if (isChecked) orderNo = 1;
+                else {
+                    let n = hasThumb ? 1 : 0;
+                    for (let i = 0; i < idx; i++) { if (!(hasThumb && i === uploadThumbnailIndex)) n++; }
+                    orderNo = n + 1;
+                }
+
                 row.innerHTML = `
                     <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
+                        <!-- [신규] 이 손잡이를 잡고 끌면 순서가 바뀐다 (마우스·손가락 모두) -->
+                        <span onpointerdown="photoDragStart(event)" onpointermove="photoDragMove(event)" onpointerup="photoDragEnd(event)" onpointercancel="photoDragEnd(event)"
+                            title="끌어서 순서 바꾸기"
+                            style="flex-shrink:0; padding:2px 5px; color:#94a3b8; font-size:15px; font-weight:900; line-height:1; cursor:grab; touch-action:none; user-select:none;">⠿</span>
+                        <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:${isChecked ? 'var(--primary)' : '#cbd5e1'}; color:#fff; font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center;">${orderNo}</span>
                         <input type="radio" name="thumbnailSelect" id="thumb_${idx}" ${isChecked ? 'checked' : ''} onchange="setThumbnail(${idx})" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--primary); flex-shrink: 0;">
                         ${imgTag}
                         <span style="font-size: 13px; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; flex: 1;" onclick="setThumbnail(${idx})">
@@ -12298,10 +12621,90 @@
                         </span>
                         ${isChecked ? '<span style="color: var(--primary); font-size: 11px; font-weight: 800; background: var(--primary-light); padding: 2px 6px; border-radius: 4px; flex-shrink: 0;">대표 섬네일</span>' : ''}
                     </div>
-                    <button type="button" onclick="removeSelectedFile(${idx})" style="background: none; border: none; color: var(--red); font-size: 18px; font-weight: bold; cursor: pointer; padding: 0 4px; line-height: 1;">&times;</button>
+                    <div style="display:flex; align-items:center; gap:3px; flex-shrink:0;">
+                        <!-- [신규] 사진 순서 바꾸기 -->
+                        <button type="button" onclick="moveSelectedFile(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="위로"
+                            style="width:26px; height:26px; padding:0; border:1.5px solid var(--border); background:#fff; border-radius:6px; font-size:12px; font-weight:800; cursor:${idx === 0 ? 'default' : 'pointer'}; opacity:${idx === 0 ? '0.35' : '1'}; color:#475569;">▲</button>
+                        <button type="button" onclick="moveSelectedFile(${idx}, 1)" ${idx === uploadSelectedFiles.length - 1 ? 'disabled' : ''} title="아래로"
+                            style="width:26px; height:26px; padding:0; border:1.5px solid var(--border); background:#fff; border-radius:6px; font-size:12px; font-weight:800; cursor:${idx === uploadSelectedFiles.length - 1 ? 'default' : 'pointer'}; opacity:${idx === uploadSelectedFiles.length - 1 ? '0.35' : '1'}; color:#475569;">▼</button>
+                        <button type="button" onclick="removeSelectedFile(${idx})" style="background: none; border: none; color: var(--red); font-size: 18px; font-weight: bold; cursor: pointer; padding: 0 4px; line-height: 1;">&times;</button>
+                    </div>
                 `;
                 list.appendChild(row);
             });
+        }
+
+        /* [신규] 사진 끌어서 순서 바꾸기.
+           HTML5 draggable은 손가락(터치)에서 동작하지 않아, 마우스·터치를 함께 다루는
+           포인터 이벤트로 직접 만들었다. 끄는 동안에는 목록을 다시 그리지 않고 DOM 줄만 옮기고,
+           손을 뗄 때 화면에 놓인 순서대로 배열을 다시 만든다. (다시 그리면 잡고 있던 손잡이가 사라진다) */
+        let photoDrag = null;
+
+        function photoDragStart(ev) {
+            const handle = ev.currentTarget;
+            const row = handle.closest('[data-photo-row]');
+            const list = document.getElementById('selectedFilesList');
+            if (!row || !list) return;
+            ev.preventDefault();
+            try { handle.setPointerCapture(ev.pointerId); } catch (e) {}
+            photoDrag = { pointerId: ev.pointerId, handle, row, list };
+            row.style.opacity = '0.65';
+            row.style.borderColor = 'var(--primary)';
+            row.style.boxShadow = '0 6px 18px rgba(0,0,0,0.15)';
+            handle.style.cursor = 'grabbing';
+        }
+
+        function photoDragMove(ev) {
+            if (!photoDrag || ev.pointerId !== photoDrag.pointerId) return;
+            ev.preventDefault();
+            const { row, list } = photoDrag;
+            const y = ev.clientY;
+
+            for (const other of list.querySelectorAll('[data-photo-row]')) {
+                if (other === row) continue;
+                const r = other.getBoundingClientRect();
+                const mid = r.top + r.height / 2;
+                const rowIsAfter = !!(other.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING);
+                if (y < mid && rowIsAfter) { list.insertBefore(row, other); break; }
+                if (y > mid && !rowIsAfter) { list.insertBefore(row, other.nextSibling); break; }
+            }
+        }
+
+        function photoDragEnd(ev) {
+            if (!photoDrag) return;
+            const { row, list, handle, pointerId } = photoDrag;
+            try { handle.releasePointerCapture(pointerId); } catch (e) {}
+            row.style.opacity = '';
+            row.style.borderColor = '';
+            row.style.boxShadow = '';
+            handle.style.cursor = 'grab';
+            photoDrag = null;
+
+            // 화면에 놓인 순서대로 배열을 다시 만든다. 대표 섬네일은 그 사진을 따라간다.
+            const order = [...list.querySelectorAll('[data-photo-row]')].map(r => parseInt(r.dataset.photoRow, 10));
+            const thumbItem = (uploadThumbnailIndex >= 0 && uploadThumbnailIndex < uploadSelectedFiles.length)
+                ? uploadSelectedFiles[uploadThumbnailIndex] : null;
+
+            uploadSelectedFiles = order.map(i => uploadSelectedFiles[i]).filter(Boolean);
+            if (thumbItem) uploadThumbnailIndex = uploadSelectedFiles.indexOf(thumbItem);
+            renderSelectedFilesList();
+        }
+
+        // [신규] 사진 순서를 한 칸씩 옮긴다.
+        //  대표 섬네일로 골라 둔 사진은 자리가 바뀌어도 계속 대표로 남아야 하므로,
+        //  인덱스가 아니라 '그 사진 자체'를 기억했다가 옮긴 뒤 위치를 다시 찾는다.
+        function moveSelectedFile(idx, dir) {
+            const to = idx + dir;
+            if (to < 0 || to >= uploadSelectedFiles.length) return;
+
+            const thumbItem = (uploadThumbnailIndex >= 0 && uploadThumbnailIndex < uploadSelectedFiles.length)
+                ? uploadSelectedFiles[uploadThumbnailIndex] : null;
+
+            const [moved] = uploadSelectedFiles.splice(idx, 1);
+            uploadSelectedFiles.splice(to, 0, moved);
+
+            if (thumbItem) uploadThumbnailIndex = uploadSelectedFiles.indexOf(thumbItem);
+            renderSelectedFilesList();
         }
 
         function setThumbnail(index) {
@@ -12433,6 +12836,10 @@
 
                 // [신규] 저장해 둔 기본 대행료 불러오기 (신규 등록 폼에 미리 채움)
                 loadDefaultProductSettings().catch(e => console.error("기본 설정 로드 실패:", e));
+
+                // [신규] 식별번호가 없는 상품에 번호를 채운다. 발주에 같은 이름이 있으면 그 번호로 이어 붙는다.
+                ensureProductCodes().then(n => { if (n > 0) renderProductsList(); })
+                    .catch(e => console.error("식별번호 부여 실패:", e));
             } catch (e) {
                 console.error("데이터 로드 실패:", e);
                 showToast("데이터 로드에 실패했습니다.");
@@ -12503,8 +12910,10 @@
             const hasKeyword = (typeof productSearchKeyword !== 'undefined' && productSearchKeyword && productSearchKeyword.trim() !== "");
             if (hasKeyword) {
                 const keyword = productSearchKeyword.trim().toLowerCase();
-                filteredProducts = filteredProducts.filter(({ prod }) => 
-                    String(prod.name || "").toLowerCase().includes(keyword)
+                // [신규] 식별번호(P0013)로도 찾을 수 있게 한다. 발주 화면과 같은 기준.
+                filteredProducts = filteredProducts.filter(({ prod }) =>
+                    String(prod.name || "").toLowerCase().includes(keyword) ||
+                    String(prod.productCode || "").toLowerCase().includes(keyword)
                 );
             }
 
@@ -12690,6 +13099,7 @@
                                 ${isRecommendListProduct(prod) ? `<span style="color:#ff6d00; font-weight:800;">[오늘의추천]</span> ` : ``}${listDisplayName(prod)}
                             </div>
                             <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                ${prod.productCode ? `<span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${prod.productCode}</span>` : ``}
                                 <span>${parseInt(prod.price).toLocaleString()}원</span>
                                 ${stockText ? `<span style="color: var(--text-sub);">|</span><span>${stockText}</span>` : ``}
                                 ${statusBadge}
@@ -13062,8 +13472,26 @@
                 const showReserve = keepShowReserve;
                 const showWeekly = isShowWeekly;
 
+                // [수정] 식별번호는 발주가 있는 상품에만 붙는다. 상품등록에 꼭 필요한 값이 아니다.
+                //  · 수정 중이면 붙어 있던 번호를 그대로 둔다 (상품명을 바꿔도 번호는 유지)
+                //  · 새 상품은 발주에 같은 이름이 있을 때만 그 번호를 물려받고, 없으면 번호 없이 등록한다
+                //    (그 상품을 처음 발주하는 순간 번호가 생긴다)
+                const _existingProd = (uploadIsEditMode && uploadEditProductKey !== null) ? uploadProducts[uploadEditProductKey] : null;
+                let _productCode = (_existingProd && /^P\d+$/.test(String(_existingProd.productCode || "").trim()))
+                    ? String(_existingProd.productCode).trim()
+                    : "";
+                // 발주 목록에서 '상품등록'으로 넘어온 경우엔 그 발주의 번호를 그대로 쓴다 (이름이 달라도 연결 유지)
+                if (!_productCode && pendingProductCodeFromPurchase) _productCode = pendingProductCodeFromPurchase;
+                if (!_productCode) {
+                    const _key = fNormItemName(name);
+                    const _hit = purchaseOrders.concat(purchaseArchive)
+                        .find(po => fNormItemName(po.itemName) === _key && /^P\d+$/.test(String(po.productCode || '').trim()));
+                    if (_hit) _productCode = String(_hit.productCode).trim();
+                }
+
                 const productObj = {
                     name: name,
+                    productCode: _productCode,
                     price: price,
                     stock: stock,
                     desc: desc,
@@ -13477,6 +13905,8 @@
                 || (prod.isRecommend === undefined && /^\s*\[\s*오늘의추천\s*\]/.test(String(prod.name || '')));
             selectMainTab(tabType);
 
+            paintProductCodeField(prod);   // [신규] 식별번호 칸 채우기
+
             // 말머리는 체크박스가 담당하므로 입력칸에는 순수 상품명만 보여준다
             //  [수정] '오늘의추천'도 함께 떼어낸다. 이미 [오늘의추천]이 여러 번 붙은 상품도 한 번에 정리된다.
             document.getElementById('productName').value = String(prod.name || "")
@@ -13567,6 +13997,8 @@
             document.getElementById('productForm').reset();
             document.getElementById('unlimitedStock').checked = false;
             document.getElementById('productStock').disabled = false;
+            pendingProductCodeFromPurchase = '';   // 발주에서 물려받던 번호도 함께 푼다
+            paintProductCodeField(null);   // [신규] 새 상품이므로 식별번호 칸을 비운다
 
             uploadEditShelf = ''; // [신규] 선반위치 기억값 초기화
             uploadEditIsSada = false; // [신규] 사다드림 체크 기억값 초기화
@@ -14079,27 +14511,20 @@
                 document.getElementById('purchase-date').value = todayStr;
                 
                 loadPurchaseOrders();
-            } else {
-                buildPurchaseDatalists();
             }
+            // [수정] 상품 목록이 없으면 받아 온 뒤 자동완성을 채운다.
+            //  상품관리 탭을 안 들르고 발주관리로 바로 오면 uploadProducts가 비어 있어서
+            //  '등록 상품 선택'도, 식별번호 자동채움도 되지 않았다.
+            ensureProductsLoaded().then(() => buildPurchaseDatalists())
+                .catch(e => console.error('상품 목록 준비 실패:', e));
         }
 
         function buildPurchaseDatalists() {
             // 상품 자동완성 데이터리스트 연동
+            // [수정] 상품 자동완성 목록은 없앴다 ('🔍 상품 찾기' 창으로 고른다).
+            //  예전에 만들어 둔 datalist가 남아 있으면 비워 둔다.
             const dl = document.getElementById('uploaded-products-datalist');
-            if (dl) {
-                dl.innerHTML = '';
-                // uploadProducts는 주문관리.html의 기존 업로드 상품 전역 배열입니다.
-                if (window.uploadProducts && Array.isArray(window.uploadProducts)) {
-                    window.uploadProducts.forEach(prod => {
-                        if (prod && prod.name) {
-                            const opt = document.createElement('option');
-                            opt.value = prod.name;
-                            dl.appendChild(opt);
-                        }
-                    });
-                }
-            }
+            if (dl) dl.innerHTML = '';
             
             // 업체명 데이터리스트 연동
             const sDl = document.getElementById('purchase-suppliers-datalist');
@@ -14138,25 +14563,410 @@
             
             const registerSec = document.getElementById('purchase-section-register');
             const listSec = document.getElementById('purchase-section-list');
-            
+            const linkSec = document.getElementById('purchase-section-link');
+
             if (registerSec) registerSec.style.display = subTabName === 'register' ? 'block' : 'none';
             if (listSec) listSec.style.display = subTabName === 'list' ? 'block' : 'none';
-            
+            if (linkSec) linkSec.style.display = subTabName === 'link' ? 'block' : 'none';
+
             if (subTabName === 'list') {
                 renderPurchaseOrdersList();
+            } else if (subTabName === 'link') {
+                renderCodeLinkCandidates();
             }
+        }
+
+        /* ---------------- [신규] 상품 ↔ 발주 식별번호 연결 후보 ---------------- */
+
+        // 이름 비교용으로 더 바짝 줄인 형태 (공백·기호·따옴표까지 뗀다)
+        function fTightName(s) {
+            return String(s || '').toLowerCase().replace(/[\s!~\-_,.·()\[\]{}'"+*]/g, '');
+        }
+
+        let codeLinkCandidates = [];
+
+        // [신규] 상품 목록이 아직 없으면 여기서 직접 받아 온다.
+        //  상품관리 탭을 한 번도 안 들르고 발주관리로 바로 오면 uploadProducts가 비어 있어,
+        //  연결 후보가 0건으로 나오고 버튼도 안 생겼다. (그래서 '눌러도 안 된다'처럼 보였다)
+        async function ensureProductsLoaded() {
+            if (Array.isArray(uploadProducts) && uploadProducts.length > 0) return true;
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
+                if (!res.ok) throw new Error('상품 목록 로드 실패 ' + res.status);
+                const data = await res.json();
+                uploadProducts = Array.isArray(data) ? data.filter(p => p !== null) : Object.values(data || {});
+                return uploadProducts.length > 0;
+            } catch (e) {
+                console.error('상품 목록 로드 실패:', e);
+                return false;
+            }
+        }
+
+        // 상품과 발주를 견줘, 번호가 서로 다른데 이름이 비슷한 짝을 찾는다.
+        function findCodeLinkCandidates() {
+            const allPO = purchaseOrders.concat(purchaseArchive);
+            if (!Array.isArray(uploadProducts) || uploadProducts.length === 0 || allPO.length === 0) return [];
+
+            // 발주는 같은 번호가 여러 건이므로 번호별로 한 줄만 대표로 쓴다 (가장 최근 발주)
+            const poByCode = new Map();
+            allPO.forEach(po => {
+                const c = String(po.productCode || '').trim();
+                if (!/^P\d+$/.test(c)) return;
+                const prev = poByCode.get(c);
+                if (!prev || String(po.date || '') > String(prev.date || '')) poByCode.set(c, po);
+            });
+
+            const poList = [...poByCode.values()].map(po => ({ po, t: fTightName(po.itemName) })).filter(x => x.t.length > 3);
+            const usedByProduct = new Set(uploadProducts.map(p => String((p && p.productCode) || '').trim()));
+
+            const out = [];
+            uploadProducts.forEach((prod, idx) => {
+                if (!prod || !prod.name) return;
+                const myCode = String(prod.productCode || '').trim();
+                // 이미 발주와 같은 번호를 쓰고 있으면(=정확일치로 이어진 상품) 건드릴 것이 없다
+                if (poByCode.has(myCode)) return;
+
+                const t = fTightName(prod.name);
+                if (t.length <= 3) return;
+
+                // 한쪽이 다른 쪽을 품고 있으면 후보. 겹치는 글자가 길수록 확실한 짝으로 본다.
+                const hits = poList
+                    .filter(x => x.t.includes(t) || t.includes(x.t))
+                    .map(x => ({ po: x.po, score: Math.min(x.t.length, t.length) / Math.max(x.t.length, t.length) }))
+                    .sort((a, b) => b.score - a.score);
+
+                if (hits.length === 0) return;
+                out.push({ idx, prod, myCode, hits: hits.slice(0, 3) });
+            });
+
+            out.sort((a, b) => b.hits[0].score - a.hits[0].score);
+            return out;
+        }
+
+        async function renderCodeLinkCandidates() {
+            const box = document.getElementById('code-link-list');
+            const badge = document.getElementById('code-link-count-badge');
+            if (!box) return;
+
+            box.innerHTML = `<div style="text-align:center; padding:30px; color:#64748b; font-size:13px; font-weight:700;">후보를 찾는 중…</div>`;
+            await ensureProductsLoaded();          // 상품 목록이 없으면 여기서 받아 온다
+            await loadPurchaseArchiveIfNeeded();   // 옛 발주까지 봐야 짝이 제대로 나온다
+
+            // 상품이나 발주 중 한쪽이라도 못 받았으면 '후보 없음'이 아니라 그 사실을 알려 준다
+            if (!Array.isArray(uploadProducts) || uploadProducts.length === 0) {
+                if (badge) badge.innerText = `후보 0건`;
+                box.innerHTML = `<div class="card" style="background:#fff; border-radius:16px; padding:40px 20px; text-align:center; border:1px solid var(--border);">
+                    <div style="font-size:15px; font-weight:800; color:#b45309; margin-bottom:6px;">⚠️ 상품 목록을 불러오지 못했습니다.</div>
+                    <div style="font-size:13px; color:#94a3b8;">인터넷 상태를 확인하고 <b>🔄 후보 다시 찾기</b>를 눌러 주세요.</div>
+                </div>`;
+                return;
+            }
+
+            codeLinkCandidates = findCodeLinkCandidates();
+            resetBulkLinkButton();   // 다시 그릴 때 '한 번 더 누르기' 상태가 남지 않게 되돌린다
+            if (badge) badge.innerText = `후보 ${codeLinkCandidates.length}건`;
+
+            if (codeLinkCandidates.length === 0) {
+                box.innerHTML = `<div class="card" style="background:#fff; border-radius:16px; padding:40px 20px; text-align:center; border:1px solid var(--border);">
+                    <div style="font-size:15px; font-weight:800; color:#334155; margin-bottom:6px;">✅ 이어 줄 후보가 없습니다.</div>
+                    <div style="font-size:13px; color:#94a3b8;">이름이 비슷한 상품·발주 짝을 찾지 못했습니다.</div>
+                </div>`;
+                return;
+            }
+
+            box.innerHTML = codeLinkCandidates.map((c, i) => {
+                const best = c.hits[0];
+                const pct = Math.round(best.score * 100);
+                const others = c.hits.slice(1);
+                return `
+                <div class="card" style="background:#fff; border-radius:14px; padding:14px; margin-bottom:10px; border:1px solid var(--border); box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+                        <span style="font-size:11px; font-weight:800; color:#64748b;">이름 일치율 약 ${pct}%</span>
+                        <span id="code-link-act-${i}"><button type="button" onclick="askCodeLink(${i}, 0)" style="padding:7px 16px; background:#10b981; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">연결</button></span>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr; gap:8px;">
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+                            <div style="font-size:11px; font-weight:800; color:#64748b; margin-bottom:4px;">📦 상품관리</div>
+                            <div style="font-size:13.5px; font-weight:800; color:#0f172a; word-break:keep-all; line-height:1.4;">${c.prod.name}</div>
+                            <div style="margin-top:5px;"><span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${c.myCode || '-'}</span></div>
+                        </div>
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+                            <div style="font-size:11px; font-weight:800; color:#64748b; margin-bottom:4px;">🚚 발주목록 · 최근 ${best.po.date || '-'}</div>
+                            <div style="font-size:13.5px; font-weight:800; color:#0f172a; word-break:keep-all; line-height:1.4;">${best.po.itemName}</div>
+                            <div style="margin-top:5px;"><span style="background:#dcfce7; color:#166534; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${best.po.productCode}</span></div>
+                        </div>
+                    </div>
+                    ${others.length ? `<div style="margin-top:9px; padding-top:9px; border-top:1px dashed #e2e8f0;">
+                        <div style="font-size:11px; font-weight:800; color:#94a3b8; margin-bottom:5px;">다른 후보</div>
+                        ${others.map((h, j) => `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;">
+                            <span style="font-size:12px; font-weight:700; color:#475569; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${h.po.itemName} <b style="color:#166534;">${h.po.productCode}</b></span>
+                            <button type="button" onclick="askCodeLink(${i}, ${j + 1})" style="flex:0 0 auto; padding:4px 10px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">이걸로</button>
+                        </div>`).join('')}
+                    </div>` : ``}
+                </div>`;
+            }).join('');
+        }
+
+        // [신규] 이름이 사실상 똑같은(일치율 100%) 후보만 한 번에 잇는다.
+        //  대괄호 말머리·중복 공백·이모지 때문에 정확일치에서 빠진 것들이라 오연결 걱정이 없다.
+        //  이 버튼도 confirm() 대신 '한 번 더 누르기'로 확인을 받는다 (위 askCodeLink와 같은 이유)
+        let bulkLinkArmed = false;
+        function askAllExactCodeLinks() {
+            const btn = document.getElementById('btn-bulk-code-link');
+            const targets = codeLinkCandidates.filter(c => c.hits[0].score >= 1);
+            if (targets.length === 0) { showToast("일치율 100%인 후보가 없습니다."); return; }
+            if (bulkLinkArmed) { applyAllExactCodeLinks(); return; }
+
+            bulkLinkArmed = true;
+            if (btn) {
+                btn.innerText = `한 번 더 누르면 ${targets.length}건 연결`;
+                btn.style.background = '#10b981';
+                btn.style.borderColor = '#10b981';
+                btn.style.color = '#fff';
+            }
+            // 8초 안에 다시 누르지 않으면 원래대로 되돌린다 (실수로 눌린 채 방치되지 않게)
+            setTimeout(() => { if (bulkLinkArmed) resetBulkLinkButton(); }, 8000);
+        }
+
+        function resetBulkLinkButton() {
+            bulkLinkArmed = false;
+            const btn = document.getElementById('btn-bulk-code-link');
+            if (btn) {
+                btn.innerText = '✅ 일치율 100%만 한번에 연결';
+                btn.style.background = '#fff';
+                btn.style.borderColor = '#bbf7d0';
+                btn.style.color = '#166534';
+            }
+        }
+
+        async function applyAllExactCodeLinks() {
+            resetBulkLinkButton();
+            const targets = codeLinkCandidates.filter(c => c.hits[0].score >= 1);
+            if (targets.length === 0) { showToast("일치율 100%인 후보가 없습니다."); return; }
+
+            showLoader(`식별번호 연결 중... (${targets.length}건)`);
+            try {
+                const patch = {};
+                targets.forEach(c => {
+                    const code = String(c.hits[0].po.productCode || '').trim();
+                    if (/^P\d+$/.test(code)) patch[`${c.idx}/productCode`] = code;
+                });
+                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
+                });
+                if (!res.ok) throw new Error('저장 실패 ' + res.status);
+                targets.forEach(c => {
+                    const code = String(c.hits[0].po.productCode || '').trim();
+                    if (uploadProducts[c.idx] && /^P\d+$/.test(code)) uploadProducts[c.idx].productCode = code;
+                });
+                showToast(`${Object.keys(patch).length}건 연결 완료`);
+                await renderCodeLinkCandidates();
+                if (typeof renderProductsList === 'function') renderProductsList();
+            } catch (e) {
+                console.error(e);
+                showToast("일괄 연결 실패: " + e.message);
+            } finally { hideLoader(); }
+        }
+
+        // [수정] 확인을 브라우저의 confirm() 창으로 받지 않는다.
+        //  이 화면은 대화상자를 자주 띄우는데, 크롬이 '이 페이지가 추가 대화상자를 표시하지 않도록' 차단하면
+        //  confirm()이 곧바로 false를 돌려준다. 그러면 눌러도 아무 일이 없어 '버튼이 안 눌린다'가 된다.
+        //  그래서 버튼 자리에서 한 번 더 누르는 방식으로 바꿨다.
+        function askCodeLink(candIdx, hitIdx) {
+            const c = codeLinkCandidates[candIdx];
+            const slot = document.getElementById(`code-link-act-${candIdx}`);
+            if (!c || !slot) return;
+            const hit = c.hits[hitIdx];
+            if (!hit) return;
+
+            slot.innerHTML =
+                `<span style="font-size:11.5px; font-weight:800; color:#b45309; margin-right:6px;">${hit.po.productCode} 로 이을까요?</span>` +
+                `<button type="button" onclick="applyCodeLink(${candIdx}, ${hitIdx})" style="padding:7px 14px; background:#10b981; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">확인</button>` +
+                `<button type="button" onclick="cancelCodeLink(${candIdx})" style="margin-left:5px; padding:7px 12px; background:#fff; color:#64748b; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">취소</button>`;
+        }
+
+        function cancelCodeLink(candIdx) {
+            const slot = document.getElementById(`code-link-act-${candIdx}`);
+            if (!slot) return;
+            slot.innerHTML = `<button type="button" onclick="askCodeLink(${candIdx}, 0)" style="padding:7px 16px; background:#10b981; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">연결</button>`;
+        }
+
+        // 고른 짝으로 상품의 식별번호를 발주 번호에 맞춘다.
+        async function applyCodeLink(candIdx, hitIdx) {
+            const c = codeLinkCandidates[candIdx];
+            if (!c) return;
+            const hit = c.hits[hitIdx];
+            if (!hit) return;
+            const newCode = String(hit.po.productCode || '').trim();
+            if (!/^P\d+$/.test(newCode)) { showToast("발주 쪽 식별번호가 올바르지 않습니다."); return; }
+
+            showLoader("식별번호 연결 중...");
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [`${c.idx}/productCode`]: newCode })
+                });
+                if (!res.ok) throw new Error('저장 실패 ' + res.status);
+                if (uploadProducts[c.idx]) uploadProducts[c.idx].productCode = newCode;
+                showToast(`연결 완료 — ${newCode}`);
+                await renderCodeLinkCandidates();
+                if (typeof renderProductsList === 'function') renderProductsList();
+            } catch (e) {
+                console.error(e);
+                showToast("연결 실패: " + e.message);
+            } finally { hideLoader(); }
         }
 
         function onPurchaseItemNameChange() {
             const val = document.getElementById('purchase-item-name').value.trim();
-            if (window.uploadProducts && Array.isArray(window.uploadProducts)) {
-                const prod = window.uploadProducts.find(p => p.name === val);
+            // [버그수정] window.uploadProducts는 undefined다 (let 선언이라 window에 안 붙는다).
+            //  그래서 판매가 자동입력도 여태 동작한 적이 없었다.
+            if (Array.isArray(uploadProducts)) {
+                const prod = uploadProducts.find(p => p && p.name === val);
                 if (prod) {
                     const price = parseInt(String(prod.price || "").replace(/\D/g, "")) || 0;
                     document.getElementById('purchase-sale-price').value = price;
+                    // [신규] 고른 상품의 식별번호를 그대로 가져온다. 이름을 바꿔 적어도 이 번호로 묶인다.
+                    const codeEl = document.getElementById('purchase-product-code');
+                    if (codeEl && /^P\d+$/.test(String(prod.productCode || '').trim())) {
+                        codeEl.value = String(prod.productCode).trim();
+                    }
                 }
             }
+            onPurchaseCodeChange();
             calcPurchaseTotal();
+        }
+
+        /* ---------------- [신규] 발주 등록 - 상품 찾기 창 ----------------
+           브라우저 기본 자동완성(datalist)은 무엇이 뜨는지·왜 뜨는지 알기 어려워서,
+           직접 검색해 고르는 창을 따로 뒀다. 고르면 상품명·판매가·식별번호가 한 번에 채워진다. */
+
+        async function openProductPicker() {
+            const modal = document.getElementById('product-picker-modal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+
+            const search = document.getElementById('product-picker-search');
+            // 상품명 칸에 이미 적어 둔 글자가 있으면 그것으로 먼저 찾아 준다
+            const typed = String(document.getElementById('purchase-item-name')?.value || '').trim();
+            search.value = typed;
+
+            document.getElementById('product-picker-list').innerHTML =
+                `<div style="text-align:center; padding:30px; color:#64748b; font-size:13px; font-weight:700;">상품을 불러오는 중…</div>`;
+            await ensureProductsLoaded();
+            await loadPurchaseArchiveIfNeeded();   // 상품별 최근 발주를 같이 보여 주기 위해
+            renderProductPicker();
+            try { search.focus(); search.select(); } catch (e) {}
+        }
+
+        function closeProductPicker() {
+            const modal = document.getElementById('product-picker-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function renderProductPicker() {
+            const box = document.getElementById('product-picker-list');
+            const cnt = document.getElementById('product-picker-count');
+            if (!box) return;
+
+            const q = String(document.getElementById('product-picker-search')?.value || '').trim().toLowerCase();
+            const list = (Array.isArray(uploadProducts) ? uploadProducts : []).filter(p => p && p.name);
+
+            // 상품명 또는 식별번호로 찾는다 (둘 다 부분일치)
+            const hit = q === '' ? list : list.filter(p =>
+                String(p.name).toLowerCase().includes(q) ||
+                String(p.productCode || '').toLowerCase().includes(q)
+            );
+
+            // 그 상품 코드로 잡힌 발주가 몇 건 있는지 미리 세어 둔다
+            const poCount = {};
+            purchaseOrders.concat(purchaseArchive).forEach(po => {
+                const c = String(po.productCode || '').trim();
+                if (c) poCount[c] = (poCount[c] || 0) + 1;
+            });
+
+            if (cnt) cnt.innerText = q === '' ? `전체 ${hit.length}개` : `${hit.length}개 찾음`;
+
+            if (hit.length === 0) {
+                box.innerHTML = `<div style="text-align:center; padding:36px 20px; color:#94a3b8; font-size:13px; font-weight:700;">
+                    찾는 상품이 없습니다.<br><span style="font-size:12px;">목록에 없는 물건이면 창을 닫고 상품명을 직접 적으세요. 식별번호는 저장할 때 새로 붙습니다.</span>
+                </div>`;
+                return;
+            }
+
+            box.innerHTML = hit.slice(0, 300).map(p => {
+                const code = String(p.productCode || '').trim();
+                const n = poCount[code] || 0;
+                const price = parseInt(String(p.price || '').replace(/\D/g, '')) || 0;
+                return `<div onclick="pickProductForPurchase('${escapeArg(p.name)}')"
+                    style="padding:11px 12px; border:1px solid #e2e8f0; border-radius:11px; margin-bottom:7px; cursor:pointer; background:#fff;"
+                    onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:4px;">
+                        <span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${code || '번호없음'}</span>
+                        <span style="font-size:11px; font-weight:800; color:${n > 0 ? '#166534' : '#94a3b8'};">${n > 0 ? `🚚 발주 ${n}건` : '발주 이력 없음'}</span>
+                        <span style="font-size:11px; font-weight:800; color:#94a3b8;">${p.matchKey || ''}</span>
+                    </div>
+                    <div style="font-size:13.5px; font-weight:800; color:#0f172a; word-break:keep-all; line-height:1.4;">${p.name}</div>
+                    <div style="font-size:12px; font-weight:800; color:#64748b; margin-top:3px;">판매가 ${price.toLocaleString()}원</div>
+                </div>`;
+            }).join('') + (hit.length > 300 ? `<div style="text-align:center; padding:10px; font-size:12px; font-weight:800; color:#94a3b8;">300개까지만 보여 줍니다. 검색어를 더 넣어 주세요.</div>` : ``);
+        }
+
+        // 목록에서 고른 상품을 발주 등록 폼에 채운다.
+        function pickProductForPurchase(name) {
+            const prod = (Array.isArray(uploadProducts) ? uploadProducts : []).find(p => p && p.name === name);
+            if (!prod) { showToast("상품을 찾지 못했습니다."); return; }
+
+            document.getElementById('purchase-item-name').value = prod.name;
+            const price = parseInt(String(prod.price || '').replace(/\D/g, '')) || 0;
+            document.getElementById('purchase-sale-price').value = price;
+            const codeEl = document.getElementById('purchase-product-code');
+            if (codeEl) codeEl.value = /^P\d+$/.test(String(prod.productCode || '').trim()) ? String(prod.productCode).trim() : '';
+
+            onPurchaseCodeChange();
+            calcPurchaseTotal();
+            closeProductPicker();
+            showToast(`${prod.productCode || ''} ${prod.name}`.trim());
+        }
+
+        // [신규] 식별번호 칸이 바뀔 때 — 그 번호가 어느 상품/발주 것인지 바로 알려 준다.
+        //  이름이 달라도 번호가 같으면 같은 상품이므로, 무엇에 붙는지 눈으로 확인시켜 준다.
+        function onPurchaseCodeChange() {
+            const codeEl = document.getElementById('purchase-product-code');
+            const hint = document.getElementById('purchase-code-hint');
+            if (!codeEl || !hint) return;
+
+            const code = String(codeEl.value || '').trim().toUpperCase();
+            if (code && codeEl.value !== code) codeEl.value = code;
+
+            if (!code) {
+                hint.innerHTML = `‘🔍 상품 찾기’로 고르면 자동으로 채워집니다. <span style="color:#94a3b8;">비워두면 저장할 때 상품명으로 번호가 붙습니다.</span>`;
+                hint.style.color = '#64748b';
+                return;
+            }
+            if (!/^P\d+$/.test(code)) {
+                hint.innerText = '⚠️ 식별번호 형식이 올바르지 않습니다. 상품 찾기로 다시 골라 주세요.';
+                hint.style.color = '#dc2626';
+                return;
+            }
+
+            const prod = (Array.isArray(uploadProducts) ? uploadProducts : []).find(p => p && String(p.productCode || '').trim() === code);
+            const pos = purchaseOrders.concat(purchaseArchive).filter(p => String(p.productCode || '').trim() === code);
+
+            if (!prod && pos.length === 0) {
+                hint.innerText = `🆕 처음 쓰는 번호입니다.`;
+                hint.style.color = '#475569';
+                return;
+            }
+            const bits = [];
+            if (prod) bits.push(`📦 상품 「${prod.name}」`);
+            if (pos.length > 0) {
+                // 발주일자가 'X' 같은 옛 자료가 섞여 있어, 날짜 형식인 것만 보고 '최근'을 정한다
+                const days = pos.map(p => String(p.date || '')).filter(fIsPurchaseDate).sort();
+                bits.push(`🚚 발주 ${pos.length}건${days.length ? ` (최근 ${days[days.length - 1]})` : ''}`);
+            }
+            hint.innerHTML = `✅ ${bits.join(' · ')} 와 같은 상품으로 묶입니다.`;
+            hint.style.color = '#166534';
         }
 
         function calcPurchaseTotal() {
@@ -14188,11 +14998,320 @@
                         purchaseOrders.push({ id, ...data[id] });
                     }
                 }
-                purchaseOrders.sort((a, b) => b.date.localeCompare(a.date));
+                // [버그수정] date가 없는 건이 섞이면 localeCompare에서 터진다. 문자열로 감싸 안전하게 비교한다.
+                purchaseOrders.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
                 buildPurchaseDatalists();
                 renderPurchaseOrdersList();
+                // [신규] 10일 지난 발주를 저장함으로 옮긴다 (하루 한 번). 식별번호도 이때 함께 채운다.
+                autoArchiveOldPurchaseSilent();
             } catch (e) {
                 console.error("loadPurchaseOrders error:", e);
+            }
+        }
+
+        /* =========================================================================
+           [신규] 발주 식별번호 + 저장함(purchase_orders_archive)
+           - 주문(orders → orders_archive)과 같은 방식이다.
+             · 평소에는 최근 10일치(purchase_orders)만 받는다
+             · 10일 지난 건은 저장함으로 옮기고, 저장함은 필요할 때만 따로 받는다
+             · 저장함 원본은 IndexedDB 공유 캐시에 담아 두고, 서버 표식이 같으면 아예 안 받는다
+           - 식별번호(productCode)는 상품 하나마다 P0001 형태로 붙인다.
+             상품명이 같으면 같은 번호를 쓰고, 나중에 상품관리와 이 번호로 연동한다.
+           ========================================================================= */
+
+        const PURCHASE_ARCHIVE_RAW_KEY = 'moket_purchase_archive_raw';   // IndexedDB: 저장함 원본
+        const PURCHASE_ARCHIVE_MARK_KEY = 'moket_purchase_archive_mark'; // localStorage: 내가 가진 자료의 표식
+        const PURCHASE_ARCHIVE_RUN_KEY = 'moket_purchase_archive_run_day'; // localStorage: 오늘 이관 돌았는지
+        const PURCHASE_ARCHIVE_DAYS = 10;                                 // 며칠 지난 것을 옮길지
+
+        let purchaseArchive = [];          // 저장함 발주 (평탄화)
+        let isPurchaseArchiveLoaded = false;
+
+        // 상품명을 식별번호의 열쇠로 쓸 수 있게 다듬는다 (앞뒤 공백·연속 공백·대소문자 무시)
+        function fNormItemName(s) {
+            return String(s || "").trim().replace(/\s+/g, ' ').toLowerCase();
+        }
+
+        function fIsPurchaseDate(s) {
+            return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
+        }
+
+        // 오늘 0시에서 10일 전 (이 날보다 이른 발주는 저장함으로 간다)
+        function fPurchaseCutoffStr() {
+            const t = new Date();
+            t.setHours(0, 0, 0, 0);
+            return fPurchaseDateStr(new Date(t.getTime() - PURCHASE_ARCHIVE_DAYS * 24 * 60 * 60 * 1000));
+        }
+
+        // 지금까지 쓰인 식별번호를 모아 { 상품명 → 번호 } 맵과 다음 번호를 만든다.
+        //  이미 번호가 붙은 건이 있으면 그 번호를 그대로 쓰고, 없는 상품만 새 번호를 받는다.
+        //  [수정] 발주뿐 아니라 등록 상품(uploadProducts)까지 함께 훑는다.
+        //   두 곳이 같은 번호판을 쓰게 해야 '같은 물건 = 같은 번호'가 되고, 번호가 겹치지도 않는다.
+        function buildPurchaseCodeMap() {
+            const map = new Map();
+            let maxNum = 0;
+            const scan = (row, nameField) => {
+                const code = String((row && row.productCode) || "").trim();
+                if (!/^P\d+$/.test(code)) return;
+                maxNum = Math.max(maxNum, parseInt(code.slice(1), 10) || 0);
+                const key = fNormItemName(row[nameField]);
+                if (key && !map.has(key)) map.set(key, code);
+            };
+            purchaseOrders.forEach(po => scan(po, 'itemName'));
+            purchaseArchive.forEach(po => scan(po, 'itemName'));
+            if (Array.isArray(uploadProducts)) uploadProducts.forEach(p => scan(p, 'name'));
+            return { map, maxNum };
+        }
+
+        // [수정] 식별번호는 '발주가 있는 상품'에만 붙인다.
+        //  상품등록에 번호가 꼭 필요한 것은 아니라서, 발주 이력이 없는 상품에는 번호를 만들지 않는다.
+        //  (예전에는 모든 상품에 번호를 새로 만들어, 쓰지도 않는 번호가 246개 생겼다)
+        //  발주에 같은 이름이 이미 있을 때만 그 번호를 물려받는다 = 연결.
+        async function ensureProductCodes(silent = true) {
+            try {
+                await ensureProductsLoaded();
+                if (!Array.isArray(uploadProducts) || uploadProducts.length === 0) return 0;
+                await loadPurchaseArchiveIfNeeded();   // 저장함까지 봐야 옛 발주와도 이어진다
+
+                // 발주에서 쓰이는 번호만 모은다 (상품 쪽 번호는 새 번호를 만드는 데 쓰지 않는다)
+                const poByName = new Map();
+                purchaseOrders.concat(purchaseArchive).forEach(po => {
+                    const code = String(po.productCode || '').trim();
+                    if (!/^P\d+$/.test(code)) return;
+                    const key = fNormItemName(po.itemName);
+                    if (key && !poByName.has(key)) poByName.set(key, code);
+                });
+
+                const patch = {};
+                let linked = 0;
+
+                uploadProducts.forEach((prod, idx) => {
+                    if (!prod || !prod.name) return;
+                    if (/^P\d+$/.test(String(prod.productCode || "").trim())) return; // 이미 있음
+
+                    const code = poByName.get(fNormItemName(prod.name));
+                    if (!code) return;   // 발주에 없는 상품이면 번호를 붙이지 않는다
+
+                    prod.productCode = code;
+                    patch[`${idx}/productCode`] = code;
+                    linked++;
+                });
+
+                const created = 0;
+                if (Object.keys(patch).length === 0) return 0;
+
+                // published_products는 배열이라 인덱스를 키로 PATCH한다 (다른 값은 건드리지 않는다)
+                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
+                });
+                if (!res.ok) throw new Error('상품 식별번호 저장 실패 ' + res.status);
+
+                console.log(`[상품 식별번호] 발주와 연결 ${linked}건, 새 번호 ${created}건`);
+                if (!silent) showToast(`식별번호 부여 완료 — 발주 연결 ${linked}건, 신규 ${created}건`);
+                return linked + created;
+            } catch (e) {
+                console.error('상품 식별번호 부여 실패:', e);
+                if (!silent) showToast('식별번호 부여 실패: ' + e.message);
+                return 0;
+            }
+        }
+
+        // 상품명에 맞는 식별번호를 돌려준다. 없으면 새로 만들어 맵에 등록한다.
+        function fTakePurchaseCode(state, itemName) {
+            const key = fNormItemName(itemName);
+            if (!key) return "";
+            if (state.map.has(key)) return state.map.get(key);
+            state.maxNum += 1;
+            const code = 'P' + String(state.maxNum).padStart(4, '0');
+            state.map.set(key, code);
+            return code;
+        }
+
+        // 저장함이 바뀐 시각을 서버에 적어 둔다 (주문 보관함의 표식과 같은 방식)
+        async function gTouchPurchaseArchiveMark() {
+            const mark = Date.now();
+            try {
+                await fetch(`${FIREBASE_DB_URL}purchase_orders_archive_updated.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mark)
+                });
+                try { localStorage.setItem(PURCHASE_ARCHIVE_MARK_KEY, String(mark)); } catch (e) {}
+            } catch (e) { console.warn('발주 저장함 표식 갱신 실패:', e); }
+            return mark;
+        }
+
+        async function gFetchPurchaseArchiveMark() {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}purchase_orders_archive_updated.json`);
+                if (!res.ok) return null;
+                const v = await res.json();
+                return (v === null || v === undefined) ? null : String(v);
+            } catch (e) { return null; }
+        }
+
+        function flattenPurchaseArchive(raw) {
+            const arr = [];
+            if (raw) {
+                for (const id in raw) {
+                    if (raw[id]) arr.push({ id, ...raw[id], isArchived: true });
+                }
+            }
+            arr.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+            return arr;
+        }
+
+        // 공유 캐시(IndexedDB)에서 저장함을 꺼내 온다. 네트워크를 쓰지 않는다.
+        async function hydratePurchaseArchiveFromCache() {
+            const raw = await idbGet(PURCHASE_ARCHIVE_RAW_KEY);
+            if (raw) {
+                try {
+                    purchaseArchive = flattenPurchaseArchive(raw);
+                    isPurchaseArchiveLoaded = true;
+                } catch (e) { purchaseArchive = []; isPurchaseArchiveLoaded = false; }
+            }
+            return isPurchaseArchiveLoaded;
+        }
+
+        // 저장함 내려받기 + 캐시 저장. 서버 표식이 내 것과 같으면 받지 않는다.
+        async function refreshPurchaseArchive(force = false) {
+            if (!force) {
+                const serverMark = await gFetchPurchaseArchiveMark();
+                let localMark = null;
+                try { localMark = localStorage.getItem(PURCHASE_ARCHIVE_MARK_KEY); } catch (e) {}
+                if (serverMark && localMark && serverMark === localMark) {
+                    const cached = await idbGet(PURCHASE_ARCHIVE_RAW_KEY);
+                    if (cached) {
+                        await hydratePurchaseArchiveFromCache();
+                        console.log('발주 저장함 표식이 같아 다운로드를 건너뜁니다.');
+                        return;
+                    }
+                }
+            }
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}purchase_orders_archive.json?t=${Date.now()}`);
+                if (!res.ok) throw new Error('서버 응답 ' + res.status);
+                const raw = await res.json();
+                const saved = await idbSet(PURCHASE_ARCHIVE_RAW_KEY, raw || {});
+                if (saved) {
+                    const mark = await gFetchPurchaseArchiveMark();
+                    if (mark) { try { localStorage.setItem(PURCHASE_ARCHIVE_MARK_KEY, mark); } catch (e) {} }
+                    else { await gTouchPurchaseArchiveMark(); }
+                } else {
+                    console.warn('발주 저장함 캐시 저장 실패');
+                }
+                purchaseArchive = flattenPurchaseArchive(raw);
+                isPurchaseArchiveLoaded = true;
+            } catch (e) {
+                console.error('발주 저장함 로드 실패:', e);
+            }
+        }
+
+        // 저장함이 필요할 때만 준비한다 (캐시 우선, 없을 때만 다운로드)
+        async function loadPurchaseArchiveIfNeeded() {
+            if (isPurchaseArchiveLoaded) return;
+            await hydratePurchaseArchiveFromCache();
+            if (isPurchaseArchiveLoaded) return;
+            showLoader("📁 발주 저장함을 불러오는 중...");
+            try { await refreshPurchaseArchive(); }
+            finally { hideLoader(); }
+        }
+
+        // 🔄 버튼 — 저장함을 강제로 새로 받는다
+        async function refreshPurchaseArchiveManual() {
+            showLoader("📁 발주 저장함 갱신 중...");
+            try {
+                await refreshPurchaseArchive(true);
+                showToast(`저장함 ${purchaseArchive.length}건을 새로 받았습니다.`);
+                renderPurchaseOrdersList();
+            } finally { hideLoader(); }
+        }
+
+        // [신규] 10일 지난 발주를 저장함으로 옮기고, 식별번호가 없는 건에는 번호를 채운다.
+        //  하루 한 번만 돈다. 여러 번 돌아도 결과가 같도록(멱등) 만들어, 중간에 실패해도 다음에 이어서 된다.
+        async function autoArchiveOldPurchaseSilent(force = false) {
+            try {
+                const todayKey = fPurchaseDateStr(new Date());
+                if (!force) {
+                    let ran = null;
+                    try { ran = localStorage.getItem(PURCHASE_ARCHIVE_RUN_KEY); } catch (e) {}
+                    if (ran === todayKey) return;
+                }
+                if (!Array.isArray(purchaseOrders) || purchaseOrders.length === 0) return;
+
+                const markRan = () => { try { localStorage.setItem(PURCHASE_ARCHIVE_RUN_KEY, todayKey); } catch (e) {} };
+
+                // 번호가 이미 붙은 것을 알아야 이어서 매길 수 있으므로 저장함을 먼저 준비한다
+                await loadPurchaseArchiveIfNeeded();
+
+                const cutoff = fPurchaseCutoffStr();
+                const state = buildPurchaseCodeMap();
+
+                const codePatch = {};      // 최근 자료에 채워 넣을 식별번호
+                const archivePatch = {};   // 저장함으로 옮길 건
+                const deletePatch = {};    // 원본에서 지울 건
+                const moved = [];
+
+                purchaseOrders.forEach(po => {
+                    if (!po || !po.id) return;
+
+                    // 식별번호가 없는 건에만 상품명 기준으로 새로 부여한다 (이미 있으면 그대로 둔다)
+                    const hadCode = /^P\d+$/.test(String(po.productCode || "").trim());
+                    let code = hadCode ? String(po.productCode).trim() : fTakePurchaseCode(state, po.itemName);
+                    if (!hadCode && code) po.productCode = code;
+
+                    // 발주일자가 날짜 형식이 아니거나(예전 'X' 자료) 10일보다 이르면 저장함으로
+                    const d = String(po.date || "");
+                    const isOld = !fIsPurchaseDate(d) || d < cutoff;
+
+                    if (isOld) {
+                        const { id, isArchived, ...rest } = po;
+                        archivePatch[id] = rest;   // 옮기는 건은 부여한 번호까지 통째로 저장함에 들어간다
+                        deletePatch[id] = null;
+                        moved.push(po);
+                    } else if (!hadCode && code) {
+                        codePatch[`${po.id}/productCode`] = code; // 남는 건은 번호만 채워 넣는다
+                    }
+                });
+
+                if (moved.length === 0 && Object.keys(codePatch).length === 0) { markRan(); return; }
+
+                // 1) 저장함에 먼저 넣는다 (여기서 실패하면 원본은 그대로라 자료가 사라지지 않는다)
+                if (Object.keys(archivePatch).length > 0) {
+                    const resA = await fetch(`${FIREBASE_DB_URL}purchase_orders_archive.json`, {
+                        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(archivePatch)
+                    });
+                    if (!resA.ok) throw new Error('저장함 쓰기 실패 ' + resA.status);
+                }
+
+                // 2) 원본에서 옮긴 건을 지우고, 남은 건에는 식별번호를 채운다
+                const mainPatch = { ...codePatch, ...deletePatch };
+                if (Object.keys(mainPatch).length > 0) {
+                    const resB = await fetch(`${FIREBASE_DB_URL}purchase_orders.json`, {
+                        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mainPatch)
+                    });
+                    if (!resB.ok) throw new Error('원본 정리 실패 ' + resB.status);
+                }
+
+                // 3) 화면과 캐시를 맞춘다
+                if (moved.length > 0) {
+                    const movedIds = new Set(moved.map(p => p.id));
+                    purchaseOrders = purchaseOrders.filter(p => !movedIds.has(p.id));
+                    purchaseArchive = purchaseArchive.concat(moved.map(p => ({ ...p, isArchived: true })));
+                    purchaseArchive.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+                    // 저장함 캐시도 갱신해 두면 다음에 다시 받지 않는다
+                    try {
+                        const rawCache = (await idbGet(PURCHASE_ARCHIVE_RAW_KEY)) || {};
+                        moved.forEach(p => { const { id, isArchived, ...rest } = p; rawCache[id] = rest; });
+                        await idbSet(PURCHASE_ARCHIVE_RAW_KEY, rawCache);
+                    } catch (e) { console.warn('발주 저장함 캐시 갱신 실패:', e); }
+                    await gTouchPurchaseArchiveMark();
+                }
+
+                markRan();
+                buildPurchaseDatalists();
+                renderPurchaseOrdersList();
+                console.log(`[발주 자동 저장함] ${moved.length}건 이관, 식별번호 ${Object.keys(codePatch).length}건 반영`);
+            } catch (e) {
+                console.error('발주 저장함 이관 실패:', e);
             }
         }
 
@@ -14208,6 +15327,23 @@
             const unitPrice = parseInt(document.getElementById('purchase-unit-price').value) || 0;
             const salePrice = parseInt(document.getElementById('purchase-sale-price').value) || 0;
             
+            // [신규] 식별번호 결정 순서
+            //  ① 폼의 식별번호 칸에 적힌 값 — 이름이 달라도 이 번호가 같으면 같은 상품으로 묶인다 (사장님이 고른 값이 최우선)
+            //  ② 수정 중이면 그 건에 붙어 있던 번호 (상품명을 고쳐도 번호는 안 흔들린다)
+            //  ③ 둘 다 없으면 상품명으로 찾거나 새로 만든다
+            const _typedCode = String(document.getElementById('purchase-product-code')?.value || "").trim().toUpperCase();
+            if (_typedCode && !/^P\d+$/.test(_typedCode)) {
+                showToast("식별번호는 P0001 형식으로 적어 주세요.");
+                return;
+            }
+            const _editingPo = editingId ? purchaseOrders.find(p => p.id === editingId) : null;
+            const _codeState = buildPurchaseCodeMap();
+            const productCode = _typedCode
+                ? _typedCode
+                : ((_editingPo && /^P\d+$/.test(String(_editingPo.productCode || "").trim()))
+                    ? String(_editingPo.productCode).trim()
+                    : fTakePurchaseCode(_codeState, itemName));
+
             const payload = {
                 date,
                 supplier,
@@ -14217,12 +15353,18 @@
                 totalUnits: qty * itemsPerBox,
                 unitPrice,
                 totalPrice: qty * itemsPerBox * unitPrice,
-                salePrice
+                salePrice,
+                productCode
             };
             
             showLoader("발주 내역 저장 중...");
             try {
-                const url = editingId ? `${FIREBASE_DB_URL}purchase_orders/${editingId}.json` : `${FIREBASE_DB_URL}purchase_orders.json`;
+                // [수정] 수정 중인 건이 저장함에 있으면 저장함 쪽에 써야 한다.
+                //  예전에는 무조건 purchase_orders에 PUT해서, 저장함 건을 고치면
+                //  저장함 원본은 그대로인 채 현재 목록에 사본이 하나 더 생겼다.
+                const _found = editingId ? findPurchaseById(editingId) : null;
+                const _node = _found ? _found.node : 'purchase_orders';
+                const url = editingId ? `${FIREBASE_DB_URL}${_node}/${editingId}.json` : `${FIREBASE_DB_URL}purchase_orders.json`;
                 const method = editingId ? 'PUT' : 'POST';
                 
                 const res = await fetch(url, {
@@ -14233,10 +15375,39 @@
                 
                 if (!res.ok) throw new Error("Firebase 발주 내역 저장 실패");
                 
+                // 저장함을 고쳤으면 표식과 캐시도 새로 맞춰 준다 (다른 기기가 옛 자료를 계속 쓰지 않도록)
+                if (editingId && _node === 'purchase_orders_archive') {
+                    await gTouchPurchaseArchiveMark();
+                    await refreshPurchaseArchive(true);
+                }
+
+                // [신규] 상품관리에서 넘어온 발주라면, 방금 정해진 번호를 그 상품에도 붙여 준다.
+                //  이래야 다음부터 그 상품과 발주가 번호로 이어진다.
+                if (pendingProductCodeLink !== null) {
+                    const _pi = pendingProductCodeLink;
+                    pendingProductCodeLink = null;
+                    const _p = uploadProducts[_pi];
+                    if (_p && !/^P\d+$/.test(String(_p.productCode || '').trim()) && /^P\d+$/.test(productCode)) {
+                        try {
+                            await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ [`${_pi}/productCode`]: productCode })
+                            });
+                            _p.productCode = productCode;
+                        } catch (e) { console.warn('상품에 식별번호 연결 실패:', e); }
+                    }
+                }
+
                 showToast(editingId ? "발주 내역이 수정되었습니다." : "발주 내역이 저장되었습니다.");
                 resetPurchaseOrderForm();
                 await loadPurchaseOrders();
                 switchPurchaseSubTab('list');
+
+                // [신규] '💾 저장 후 상품등록'으로 저장했으면 이어서 상품등록 폼으로 넘어간다.
+                if (goProductAfterPurchaseSave) {
+                    goProductAfterPurchaseSave = false;
+                    goProductRegisterFrom({ ...payload, productCode });
+                }
             } catch (e) {
                 console.error(e);
                 showToast("저장 실패: " + e.toString());
@@ -14260,11 +15431,24 @@
             return ''; // 파싱 불가(잘못 입력된 값) → 빈 값
         }
 
+        // [신규] 발주 한 건을 id로 찾는다. 저장함으로 옮겨진 건도 함께 뒤져서
+        //  어느 서랍(purchase_orders / purchase_orders_archive)에 있는지 같이 알려 준다.
+        function findPurchaseById(id) {
+            const cur = purchaseOrders.find(it => it.id === id);
+            if (cur) return { item: cur, node: 'purchase_orders' };
+            const arc = purchaseArchive.find(it => it.id === id);
+            if (arc) return { item: arc, node: 'purchase_orders_archive' };
+            return null;
+        }
+
         function editPurchaseOrder(id) {
-            const item = purchaseOrders.find(it => it.id === id);
-            if (!item) return;
+            // [수정] 예전에는 현재 목록만 뒤져서, 저장함으로 옮겨진 발주는 수정 버튼을 눌러도 아무 일이 없었다.
+            const found = findPurchaseById(id);
+            if (!found) { showToast("발주 내역을 찾지 못했습니다."); return; }
+            const item = found.item;
 
             document.getElementById('purchase-editing-id').value = id;
+            { const el = document.getElementById('purchase-product-code'); if (el) el.value = item.productCode || ""; }
             document.getElementById('purchase-date').value = poDateToISO(item.date);
             document.getElementById('purchase-supplier').value = item.supplier || "";
             document.getElementById('purchase-item-name').value = item.itemName || "";
@@ -14279,6 +15463,7 @@
             document.getElementById('btn-purchase-submit').innerText = "💾 수정 완료";
             
             switchPurchaseSubTab('register');
+            onPurchaseCodeChange();
             calcPurchaseTotal();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -14292,7 +15477,9 @@
             const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
             document.getElementById('purchase-date').value = todayStr;
             document.getElementById('purchase-items-per-box').value = "1";
-            
+            { const el = document.getElementById('purchase-product-code'); if (el) el.value = ""; }
+            onPurchaseCodeChange();
+
             document.getElementById('purchase-form-title').innerText = "🚚 발주 내역 등록";
             document.getElementById('purchase-edit-mode-badge').style.display = "none";
             document.getElementById('btn-purchase-cancel').style.display = "none";
@@ -14301,14 +15488,24 @@
             calcPurchaseTotal();
         }
 
-        async function deletePurchaseOrder(id) {
-            if (!confirm("정말로 이 발주 내역을 삭제하시겠습니까?")) return;
+        async function deletePurchaseOrder(id, skipConfirm = false) {
+            // [수정] 아래 버튼 줄에서 이미 두 번 눌러 확인했으면 다시 묻지 않는다.
+            //  (confirm 창은 브라우저가 차단하면 그대로 false가 되어 삭제가 먹통이 된다)
+            if (!skipConfirm && !confirm("정말로 이 발주 내역을 삭제하시겠습니까?")) return;
             showLoader("발주 내역 삭제 중...");
             try {
-                const res = await fetch(`${FIREBASE_DB_URL}purchase_orders/${id}.json`, {
+                // [수정] 저장함에 있는 건은 저장함에서 지워야 한다.
+                //  예전에는 무조건 purchase_orders를 지워서, 저장함 건은 삭제해도 그대로 남아 있었다.
+                const found = findPurchaseById(id);
+                const node = found ? found.node : 'purchase_orders';
+                const res = await fetch(`${FIREBASE_DB_URL}${node}/${id}.json`, {
                     method: 'DELETE'
                 });
                 if (!res.ok) throw new Error("삭제 실패");
+                if (node === 'purchase_orders_archive') {
+                    await gTouchPurchaseArchiveMark();
+                    await refreshPurchaseArchive(true);
+                }
                 showToast("발주 내역이 삭제되었습니다.");
                 await loadPurchaseOrders();
             } catch (e) {
@@ -14319,45 +15516,533 @@
             }
         }
 
+        /* ===================== [신규] 매입·매출 =====================
+           · 매출 = 사장님이 직접 적는 포스 + 계좌이체. (주문서 안의 주문 자료는 쓰지 않는다)
+             주문서를 거친 것도 결국 포스·계좌로 들어오므로, 한 곳에서만 세야 이중으로 잡히지 않는다.
+           · 매입 = 발주의 총 발주금액. 발주일자 기준.
+           월별로 묶어 나란히 보여 주고, 남은 돈(매출-매입)과 그 비율을 낸다.
+           ============================================================ */
+        let profitRangeKind = '6m';
+        let manualSales = {};            // { 'YYYY-MM-DD': { pos, transfer } }
+        let manualSalesLoaded = false;
+
+        async function loadManualSales(force = false) {
+            if (manualSalesLoaded && !force) return;
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}manual_sales.json?t=${Date.now()}`);
+                if (!res.ok) throw new Error('불러오기 실패 ' + res.status);
+                manualSales = (await res.json()) || {};
+                manualSalesLoaded = true;
+            } catch (e) {
+                console.error('매출 직접입력 로드 실패:', e);
+                manualSales = manualSales || {};
+            }
+        }
+
+        // 월 키(YYYY-MM)인지. 예전에 날짜(YYYY-MM-DD)로 적어 둔 것이 있으면 그 달로 합쳐 센다.
+        function fIsMonthKey(s) { return /^\d{4}-\d{2}$/.test(String(s || '')); }
+        function fToMonthKey(s) {
+            const v = String(s || '');
+            if (fIsMonthKey(v)) return v;
+            if (fIsPurchaseDate(v)) return v.slice(0, 7);
+            return '';
+        }
+
+        async function saveManualSale() {
+            const month = String(document.getElementById('ms-month')?.value || '').trim();
+            const pos = parseInt(document.getElementById('ms-pos')?.value || 0) || 0;
+            const transfer = parseInt(document.getElementById('ms-transfer')?.value || 0) || 0;
+
+            if (!fIsMonthKey(month)) { showToast("월을 골라 주세요."); return; }
+            if (pos <= 0 && transfer <= 0) { showToast("포스나 계좌이체 금액을 넣어 주세요."); return; }
+
+            showLoader("매출 저장 중...");
+            try {
+                const body = { pos, transfer, updatedAt: Date.now() };
+                const res = await fetch(`${FIREBASE_DB_URL}manual_sales/${month}.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                });
+                if (!res.ok) throw new Error('저장 실패 ' + res.status);
+                manualSales[month] = body;
+                document.getElementById('ms-pos').value = '';
+                document.getElementById('ms-transfer').value = '';
+                showToast(`${month} 매출 ${(pos + transfer).toLocaleString()}원 저장`);
+                renderProfitReport();
+            } catch (e) {
+                console.error(e);
+                showToast("저장 실패: " + e.message);
+            } finally { hideLoader(); }
+        }
+
+        // 지운다. 한 번 더 눌러 확인받는다 (confirm 창은 차단될 수 있어 쓰지 않는다)
+        let msDelArmed = '';
+        function askDeleteManualSale(date) {
+            if (msDelArmed !== date) {
+                msDelArmed = date;
+                renderManualSalesList();
+                setTimeout(() => { if (msDelArmed === date) { msDelArmed = ''; renderManualSalesList(); } }, 6000);
+                return;
+            }
+            msDelArmed = '';
+            deleteManualSale(date);
+        }
+
+        async function deleteManualSale(date) {
+            showLoader("삭제 중...");
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}manual_sales/${date}.json`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('삭제 실패 ' + res.status);
+                delete manualSales[date];
+                showToast(`${date} 매출을 지웠습니다.`);
+                renderProfitReport();
+            } catch (e) {
+                console.error(e);
+                showToast("삭제 실패: " + e.message);
+            } finally { hideLoader(); }
+        }
+
+        // 폼에 그 달 값을 올려 고쳐 넣게 한다
+        function editManualSale(key) {
+            const v = manualSales[key] || {};
+            const d = document.getElementById('ms-month'); if (d) d.value = fToMonthKey(key);
+            const p = document.getElementById('ms-pos'); if (p) p.value = parseInt(v.pos || 0) || '';
+            const t = document.getElementById('ms-transfer'); if (t) t.value = parseInt(v.transfer || 0) || '';
+            const h = document.getElementById('ms-hint');
+            if (h) { h.innerText = `${key} 값을 불러왔습니다. 고쳐서 저장하면 덮어씁니다.`; h.style.color = '#166534'; }
+            try { d.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+        }
+
+        // 최근 입력한 것부터 보여 준다
+        function renderManualSalesList() {
+            const box = document.getElementById('ms-list');
+            if (!box) return;
+            const dates = Object.keys(manualSales || {}).filter(k => !!fToMonthKey(k)).sort((a, b) => b.localeCompare(a));
+            if (dates.length === 0) {
+                box.innerHTML = `<div style="padding:14px; text-align:center; font-size:12px; font-weight:700; color:#cbd5e1;">아직 적어 둔 매출이 없습니다.</div>`;
+                return;
+            }
+            box.innerHTML =
+                `<div style="font-size:11.5px; font-weight:800; color:#64748b; margin-bottom:6px;">최근 입력 ${dates.length}건</div>` +
+                dates.slice(0, 12).map(d => {
+                    const v = manualSales[d] || {};
+                    const pos = parseInt(v.pos || 0) || 0, tr = parseInt(v.transfer || 0) || 0;
+                    const armed = (msDelArmed === d);
+                    return `<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:9px; margin-bottom:6px; flex-wrap:wrap;">
+                        <span style="font-size:12.5px; font-weight:800; color:#334155; white-space:nowrap;">${d}</span>
+                        <span style="font-size:12px; font-weight:800; color:#0284c7; white-space:nowrap;">💳 ${pos.toLocaleString()}</span>
+                        <span style="font-size:12px; font-weight:800; color:#7c3aed; white-space:nowrap;">🏦 ${tr.toLocaleString()}</span>
+                        <span style="font-size:12.5px; font-weight:900; color:#0f172a; white-space:nowrap;">= ${(pos + tr).toLocaleString()}원</span>
+                        <span style="margin-left:auto; display:flex; gap:5px; flex-shrink:0;">
+                            <button type="button" onclick="editManualSale('${d}')" style="padding:4px 9px; border:1px solid #cbd5e1; background:#fff; color:#2563eb; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">수정</button>
+                            <button type="button" onclick="askDeleteManualSale('${d}')" style="padding:4px 9px; border:1px solid ${armed ? '#dc2626' : '#fca5a5'}; background:${armed ? '#dc2626' : '#fef2f2'}; color:${armed ? '#fff' : '#ef4444'}; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${armed ? '한 번 더' : '삭제'}</button>
+                        </span>
+                    </div>`;
+                }).join('') +
+                (dates.length > 12 ? `<div style="font-size:11px; font-weight:700; color:#94a3b8; text-align:center; padding:4px;">최근 12건만 보여 줍니다</div>` : '');
+        }
+
+        function setProfitRange(kind) {
+            profitRangeKind = kind;
+            renderProfitReport();
+        }
+
+        function fProfitMonthKey(d) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        // 고른 기간의 시작 달(YYYY-MM). 'all'이면 자료에 있는 가장 이른 달.
+        function getProfitFromMonth(allMonths) {
+            const now = new Date();
+            if (profitRangeKind === 'year') return `${now.getFullYear()}-01`;
+            if (profitRangeKind === 'all') return allMonths.length ? allMonths[0] : fProfitMonthKey(now);
+            const n = profitRangeKind === '3m' ? 2 : profitRangeKind === '12m' ? 11 : 5;  // 이번 달 포함
+            const from = new Date(now.getFullYear(), now.getMonth() - n, 1);
+            return fProfitMonthKey(from);
+        }
+
+        async function renderProfitReport() {
+            const tbody = document.getElementById('profit-tbody');
+            const sumBox = document.getElementById('profit-summary');
+            if (!tbody || !sumBox) return;
+
+            tbody.innerHTML = `<tr><td colspan="7" style="padding:30px; text-align:center; color:#64748b; font-weight:700;">불러오는 중…</td></tr>`;
+
+            // [매입] 덩치가 큰 저장함(661건)은 IndexedDB 캐시에서만 읽는다. 서버 표식이 같으면 아예 안 받는다.
+            //  최근 10일치는 몇 KB밖에 안 되므로 캐시 없이 그냥 받아 쓴다.
+            await loadPurchaseArchiveIfNeeded();
+            if (!Array.isArray(purchaseOrders) || purchaseOrders.length === 0) {
+                try { await loadPurchaseOrders(); } catch (e) { console.warn('최근 발주 로드 실패:', e); }
+            }
+
+            // [매출] 사장님이 적은 포스·계좌이체만 센다 (주문서 안의 주문 자료는 쓰지 않는다)
+            await loadManualSales();
+            renderManualSalesList();
+
+            // [신규] 입력칸의 월은 비어 있으면 이번 달로 채워 둔다 (대개 이번 달을 적으므로)
+            {
+                const mEl = document.getElementById('ms-month');
+                if (mEl && !mEl.value) mEl.value = fProfitMonthKey(new Date());
+            }
+
+            const posByMonth = new Map(), trByMonth = new Map();
+            Object.keys(manualSales || {}).forEach(d => {
+                const k = fToMonthKey(d);   // 월(YYYY-MM). 예전에 날짜로 적어 둔 것도 그 달로 합친다.
+                if (!k) return;
+                const v = manualSales[d] || {};
+                posByMonth.set(k, (posByMonth.get(k) || 0) + (parseInt(v.pos || 0) || 0));
+                trByMonth.set(k, (trByMonth.get(k) || 0) + (parseInt(v.transfer || 0) || 0));
+            });
+            const saleByMonth = new Map();
+            [...new Set([...posByMonth.keys(), ...trByMonth.keys()])].forEach(k => {
+                saleByMonth.set(k, (posByMonth.get(k) || 0) + (trByMonth.get(k) || 0));
+            });
+
+            // ── 매입: 발주금액, 발주일자 기준 (날짜가 'X' 같은 옛 자료는 달을 알 수 없어 뺀다)
+            const buyByMonth = new Map();
+            let buySkipped = 0;
+            purchaseOrders.concat(purchaseArchive).forEach(po => {
+                const ds = String(po.date || '');
+                if (!fIsPurchaseDate(ds)) { buySkipped++; return; }
+                const k = ds.slice(0, 7);
+                buyByMonth.set(k, (buyByMonth.get(k) || 0) + (parseInt(po.totalPrice || 0) || 0));
+            });
+
+            const allMonths = [...new Set([...saleByMonth.keys(), ...buyByMonth.keys()])].sort();
+            const fromM = getProfitFromMonth(allMonths);
+            const months = allMonths.filter(m => m >= fromM).sort((a, b) => b.localeCompare(a)); // 최근 달 먼저
+
+            const label = document.getElementById('profit-range-label');
+            if (label) {
+                const kindLabel = { '3m': '최근 3개월', '6m': '최근 6개월', '12m': '최근 12개월', year: '올해', all: '전체' }[profitRangeKind] || '';
+                label.innerText = months.length
+                    ? `${kindLabel} · ${months[months.length - 1]} ~ ${months[0]} (${months.length}개월)`
+                    : `${kindLabel} · 자료 없음`;
+            }
+
+            let tSale = 0, tBuy = 0;
+            months.forEach(m => { tSale += (saleByMonth.get(m) || 0); tBuy += (buyByMonth.get(m) || 0); });
+            const tLeft = tSale - tBuy;
+            const tRate = tSale > 0 ? (tLeft / tSale * 100) : 0;
+
+            let tPos = 0, tTr = 0;
+            months.forEach(m => { tPos += (posByMonth.get(m) || 0); tTr += (trByMonth.get(m) || 0); });
+
+            sumBox.innerHTML = [
+                { l: '매출 (포스+계좌)', v: tSale.toLocaleString() + '원', c: '#0284c7' },
+                { l: '매입 (발주금액)', v: tBuy.toLocaleString() + '원', c: '#d97706' },
+                { l: '남은 돈', v: tLeft.toLocaleString() + '원', c: tLeft >= 0 ? '#15803d' : '#dc2626' },
+                { l: '매출 대비 비율', v: (tSale > 0 ? tRate.toFixed(1) + '%' : '-'), c: tLeft >= 0 ? '#15803d' : '#dc2626' }
+            ].map(x => `<div class="po-calc-cell"><div class="po-calc-label">${x.l}</div><div class="po-calc-val" style="color:${x.c};">${x.v}</div></div>`).join('');
+
+            const bd = document.getElementById('profit-breakdown');
+            if (bd) bd.innerHTML = `💳 포스 <b style="color:#0284c7;">${tPos.toLocaleString()}원</b> &nbsp;·&nbsp; 🏦 계좌이체 <b style="color:#7c3aed;">${tTr.toLocaleString()}원</b>`;
+
+            if (months.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="padding:30px; text-align:center; color:#94a3b8; font-weight:700;">이 기간에 자료가 없습니다.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = months.map(m => {
+                const p = posByMonth.get(m) || 0;
+                const t = trByMonth.get(m) || 0;
+                const s = saleByMonth.get(m) || 0;
+                const b = buyByMonth.get(m) || 0;
+                const left = s - b;
+                const rate = s > 0 ? (left / s * 100) : 0;
+                return `
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="padding:9px 7px; font-weight:800; color:#334155; white-space:nowrap;">${m.replace('-', '년 ')}월</td>
+                    <td style="padding:9px 7px; text-align:right; font-weight:700; color:#0284c7; white-space:nowrap;">${p.toLocaleString()}</td>
+                    <td style="padding:9px 7px; text-align:right; font-weight:700; color:#7c3aed; white-space:nowrap;">${t.toLocaleString()}</td>
+                    <td style="padding:9px 7px; text-align:right; font-weight:900; color:#0f172a; white-space:nowrap;">${s.toLocaleString()}</td>
+                    <td style="padding:9px 7px; text-align:right; font-weight:800; color:#d97706; white-space:nowrap;">${b.toLocaleString()}</td>
+                    <td style="padding:9px 7px; text-align:right; font-weight:900; color:${left >= 0 ? '#15803d' : '#dc2626'}; white-space:nowrap;">${left.toLocaleString()}</td>
+                    <td style="padding:9px 7px; text-align:right; font-weight:800; color:${left >= 0 ? '#15803d' : '#dc2626'}; white-space:nowrap;">${s > 0 ? rate.toFixed(1) + '%' : '-'}</td>
+                </tr>`;
+            }).join('');
+
+        }
+
+        // [신규] 발주 목록 기간 조회 — 지금 눌러 둔 빠른 기간 버튼(표시용). 날짜칸을 직접 고치면 해제된다.
+        let purchaseRangeKind = '';
+
+        /* ---------------- [신규] 발주 한 건 고르기 + 아래 버튼 줄 ----------------
+           표의 '관리' 칸(수정·삭제 버튼)을 없애고, 상품관리처럼 줄을 눌러 고르면
+           화면 아래에서 버튼 줄이 올라오게 한다. 칸이 하나 줄어 표도 넉넉해진다. */
+        let selectedPurchaseId = null;
+        let purchaseDelArmed = false;   // 삭제는 한 번 더 눌러 확인 (confirm 창은 차단될 수 있어 쓰지 않는다)
+        let purchaseCodeFilter = '';    // [신규] 특정 상품(식별번호)의 발주만 모아 보기
+
+        // [신규] 고른 발주와 같은 상품(같은 식별번호)의 발주를 전부 모아 본다.
+        //  기간·검색어는 풀어서, 그 상품의 발주 이력을 처음부터 끝까지 보여 준다.
+        async function viewPurchasesOfSelected() {
+            if (!selectedPurchaseId) return;
+            const found = findPurchaseById(selectedPurchaseId);
+            if (!found) return;
+            const code = String(found.item.productCode || '').trim();
+            if (!/^P\d+$/.test(code)) { showToast("이 발주에는 식별번호가 없습니다."); return; }
+
+            clearPurchaseSelection();
+            purchaseCodeFilter = code;
+
+            // 옛 발주까지 봐야 이력 전체가 나온다
+            await loadPurchaseArchiveIfNeeded();
+
+            // 기간·검색어는 푼다 (그 상품 것만 전부 보여 주는 게 목적)
+            const s = document.getElementById('purchaseStartDate'); if (s) s.value = '';
+            const e = document.getElementById('purchaseEndDate');   if (e) e.value = '';
+            const q = document.getElementById('purchaseSearchInput'); if (q) q.value = '';
+            purchaseRangeKind = '';
+            paintPurchaseRangeButtons();
+
+            renderPurchaseOrdersList();
+            try { document.getElementById('purchase-section-list').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (err) {}
+        }
+
+        function clearPurchaseCodeFilter() {
+            purchaseCodeFilter = '';
+            renderPurchaseOrdersList();
+        }
+
+        // 지금 어떤 상품만 보고 있는지 알려 주는 띠 (해제 버튼 포함)
+        function renderPurchaseCodeFilterChip() {
+            const box = document.getElementById('purchase-code-filter-chip');
+            if (!box) return;
+            if (!purchaseCodeFilter) { box.style.display = 'none'; box.innerHTML = ''; return; }
+            box.style.display = 'flex';
+
+            const all = purchaseOrders.concat(purchaseArchive).filter(p => String(p.productCode || '').trim() === purchaseCodeFilter);
+            const name = all.length ? (all[0].itemName || '') : '';
+            box.innerHTML =
+                `<span style="background:#eef2ff; color:#4338ca; padding:3px 8px; border-radius:6px; font-size:12px; font-weight:800;">${purchaseCodeFilter}</span>` +
+                `<span style="font-size:12.5px; font-weight:800; color:#334155; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>` +
+                `<span style="font-size:12px; font-weight:800; color:#64748b; white-space:nowrap;">의 발주만 보는 중</span>` +
+                `<button type="button" onclick="clearPurchaseCodeFilter()" style="margin-left:auto; flex:0 0 auto; padding:4px 10px; background:#fff; border:1.5px solid #cbd5e1; border-radius:7px; font-size:12px; font-weight:800; color:#475569; cursor:pointer;">✕ 전체 보기</button>`;
+        }
+
+        function selectPurchaseRow(id) {
+            selectedPurchaseId = (selectedPurchaseId === id) ? null : id;  // 같은 줄을 다시 누르면 해제
+            purchaseDelArmed = false;
+            updatePurchaseActionBar();
+            renderPurchaseOrdersList();
+        }
+
+        function clearPurchaseSelection() {
+            selectedPurchaseId = null;
+            purchaseDelArmed = false;
+            updatePurchaseActionBar();
+            renderPurchaseOrdersList();
+        }
+
+        function updatePurchaseActionBar() {
+            const bar = document.getElementById('purchase-action-bar');
+            const txt = document.getElementById('purchase-selection-text');
+            const delBtn = document.getElementById('btn-purchase-del');
+            if (!bar) return;
+
+            if (delBtn) delBtn.innerText = purchaseDelArmed ? '⚠️ 한 번 더 누르면 삭제' : '🗑️ 삭제';
+
+            if (!selectedPurchaseId) { bar.classList.remove('show'); return; }
+            const found = findPurchaseById(selectedPurchaseId);
+            if (!found) { selectedPurchaseId = null; bar.classList.remove('show'); return; }
+
+            const po = found.item;
+            if (txt) txt.innerText = `${po.productCode || ''} ${po.itemName || ''} · ${po.date || ''}`.trim();
+            bar.classList.add('show');
+        }
+
+        function editSelectedPurchase() {
+            if (!selectedPurchaseId) return;
+            const id = selectedPurchaseId;
+            clearPurchaseSelection();
+            editPurchaseOrder(id);
+        }
+
+        // 삭제는 두 번 눌러야 지워진다 (실수 방지 + confirm 창 차단 대비)
+        function askDeleteSelectedPurchase() {
+            if (!selectedPurchaseId) return;
+            if (!purchaseDelArmed) {
+                purchaseDelArmed = true;
+                updatePurchaseActionBar();
+                setTimeout(() => { if (purchaseDelArmed) { purchaseDelArmed = false; updatePurchaseActionBar(); } }, 6000);
+                return;
+            }
+            const id = selectedPurchaseId;
+            purchaseDelArmed = false;
+            selectedPurchaseId = null;
+            updatePurchaseActionBar();
+            deletePurchaseOrder(id, true);   // 이미 확인했으므로 다시 묻지 않는다
+        }
+
+        // [신규] 고른 발주로 상품등록 폼을 채워 준다 (발주 → 상품 방향. 반대 방향은 quickRegisterPurchase)
+        function registerProductFromPurchase() {
+            if (!selectedPurchaseId) return;
+            const found = findPurchaseById(selectedPurchaseId);
+            if (!found) { showToast("발주 내역을 찾지 못했습니다."); return; }
+            const po = found.item;
+
+            clearPurchaseSelection();
+            // [버그수정] 'products'는 바깥 껍데기라 등록 폼이 안 열렸다. 실제 등록 페이지는 'product-upload'.
+            switchAdminTab('product-upload');
+            exitEditMode();               // 새 상품 등록 상태로 되돌린다
+
+            // [신규] 이 발주의 식별번호를 그대로 물려준다.
+            //  상품명을 손님용으로 고쳐 적어도 발주와의 연결이 끊기지 않는다.
+            pendingProductCodeFromPurchase = /^P\d+$/.test(String(po.productCode || '').trim())
+                ? String(po.productCode).trim() : '';
+            paintProductCodeField(pendingProductCodeFromPurchase ? { productCode: pendingProductCodeFromPurchase } : null);
+
+            const nameEl = document.getElementById('productName');
+            const priceEl = document.getElementById('productPrice');
+            if (nameEl) nameEl.value = String(po.itemName || '');
+            // 판매 예정가가 적혀 있으면 그대로, 없으면 30% 마진 권장가를 넣어 준다
+            const uPrice = parseInt(po.unitPrice || 0) || 0;
+            const sPrice = parseInt(po.salePrice || 0) || 0;
+            if (priceEl) priceEl.value = sPrice > 0 ? sPrice : (uPrice > 0 ? Math.round(uPrice / 0.7) : '');
+
+            try { nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+            showToast(`${po.productCode || ''} 발주로 상품등록을 시작합니다`.trim());
+        }
+
+        // 날짜를 발주일자와 같은 YYYY-MM-DD 문자열로 만든다 (toISOString은 UTC라 하루 밀릴 수 있어 쓰지 않는다)
+        function fPurchaseDateStr(dt) {
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const d = String(dt.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        // [신규] 자주 쓰는 기간을 한 번에 잡아 준다.
+        async function setPurchaseDateRange(kind) {
+            // '전체'는 저장함에 있는 옛 발주까지 봐야 시작일을 제대로 잡을 수 있다
+            if (kind === 'all') await loadPurchaseArchiveIfNeeded();
+            const startEl = document.getElementById('purchaseStartDate');
+            const endEl = document.getElementById('purchaseEndDate');
+            if (!startEl || !endEl) return;
+
+            const now = new Date();
+            let start = '', end = '';
+
+            if (kind === 'today') {
+                start = end = fPurchaseDateStr(now);
+            } else if (kind === '7d' || kind === '30d') {
+                const days = (kind === '7d') ? 6 : 29; // 오늘 포함해서 7일/30일
+                const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
+                start = fPurchaseDateStr(from);
+                end = fPurchaseDateStr(now);
+            } else if (kind === 'month') {
+                start = fPurchaseDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+                end = fPurchaseDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0)); // 말일
+            } else if (kind === 'lastmonth') {
+                start = fPurchaseDateStr(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+                end = fPurchaseDateStr(new Date(now.getFullYear(), now.getMonth(), 0));
+            } else if (kind === 'all') {
+                // 등록된 발주 중 가장 이른 날 ~ 가장 늦은 날. (앞으로 잡아 둔 발주일도 빠지지 않게 한다)
+                //  발주일자 칸에 날짜가 아닌 값이 들어간 예전 자료가 있어, YYYY-MM-DD 형식만 골라 쓴다.
+                const dates = purchaseOrders.concat(purchaseArchive)
+                    .map(po => String(po.date || ''))
+                    .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s))
+                    .sort();
+                if (dates.length === 0) { showToast("등록된 발주 내역이 없습니다."); return; }
+                start = dates[0];
+                end = dates[dates.length - 1];
+            } // 'clear'는 둘 다 빈 값
+
+            startEl.value = start;
+            endEl.value = end;
+            purchaseRangeKind = (kind === 'clear') ? '' : kind;
+            paintPurchaseRangeButtons();
+            renderPurchaseOrdersList();
+        }
+
+        // 눌러 둔 기간 버튼에 색을 넣어 지금 무슨 기간을 보고 있는지 알려 준다.
+        function paintPurchaseRangeButtons() {
+            document.querySelectorAll('.purchase-range-btn').forEach(btn => {
+                const k = (btn.getAttribute('onclick') || '').match(/setPurchaseDateRange\('([^']+)'\)/);
+                const on = !!(k && k[1] === purchaseRangeKind);
+                btn.classList.toggle('active', on);
+            });
+        }
+
+        // 날짜칸을 직접 고치면 빠른 기간 버튼 표시를 풀고 다시 그린다.
+        function onPurchaseDateInputChange() {
+            purchaseRangeKind = '';
+            paintPurchaseRangeButtons();
+            renderPurchaseOrdersList();
+        }
+
         function renderPurchaseOrdersList() {
             const tbody = document.getElementById('purchase-orders-tbody');
             const mobileContainer = document.getElementById('purchase-orders-mobile-list');
             if (!tbody) return;
-            
+
             const search = (document.getElementById('purchaseSearchInput')?.value || "").toLowerCase().trim();
-            
-            if (search === "") {
+            // [신규] 발주일자 기간. 한쪽만 넣어도 된다 (시작일만 = 그날 이후 전부).
+            const startDate = (document.getElementById('purchaseStartDate')?.value || "").trim();
+            const endDate = (document.getElementById('purchaseEndDate')?.value || "").trim();
+            const hasRange = !!(startDate || endDate);
+            renderPurchaseCodeFilterChip();
+
+            // [수정] 예전에는 검색어가 없으면 무조건 안내문만 띄웠다. 이제 기간만 잡아도 조회된다.
+            //  '이 상품 발주목록'으로 들어온 경우엔 조건이 따로 있으므로 안내문을 건너뛴다.
+            if (search === "" && !hasRange && !purchaseCodeFilter) {
                 const countBadge = document.getElementById('purchase-total-count-badge');
                 if (countBadge) countBadge.innerText = `총 ${purchaseOrders.length}건 보관 중`;
-                
+
                 const promptHtml = `
                     <div style="text-align: center; padding: 50px 20px;">
                         <div style="font-size: 28px; margin-bottom: 10px;">🔍</div>
-                        <div style="font-size: 15px; font-weight: 800; color: #334155; margin-bottom: 6px;">검색어를 입력해 주세요.</div>
-                        <div style="font-size: 13px; color: #64748b;">상단의 <b>검색창</b>에 상품명, 업체명, 또는 날짜를 입력하시면 즉시 검색됩니다.</div>
+                        <div style="font-size: 15px; font-weight: 800; color: #334155; margin-bottom: 6px;">기간을 고르거나 검색어를 입력해 주세요.</div>
+                        <div style="font-size: 13px; color: #64748b;">위의 <b>기간</b> 버튼(오늘·최근 7일·이번 달 등)을 누르거나, <b>검색창</b>에 상품명·업체명·날짜를 입력하시면 바로 조회됩니다.</div>
                     </div>`;
-                tbody.innerHTML = `<tr><td colspan="12">${promptHtml}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10">${promptHtml}</td></tr>`;
                 if (mobileContainer) mobileContainer.innerHTML = promptHtml;
                 return;
             }
-            
-            let filtered = purchaseOrders.filter(po => {
+
+            // [신규] 평소에는 최근 10일치만 갖고 있다. 그보다 이전을 보려 하거나 검색을 하면 저장함까지 합쳐서 본다.
+            //  저장함은 캐시에서 꺼내므로 대개 네트워크를 쓰지 않고, 없을 때만 한 번 받아 온다.
+            const _cutoff = fPurchaseCutoffStr();
+            const needArchive = (search !== "") || !!purchaseCodeFilter || (hasRange && (!startDate || startDate < _cutoff));
+            if (needArchive && !isPurchaseArchiveLoaded) {
+                // 아직 없으면 받아 온 뒤 다시 그린다 (지금 화면은 최근 자료만으로 먼저 보여 준다)
+                loadPurchaseArchiveIfNeeded().then(() => renderPurchaseOrdersList());
+            }
+            const source = (needArchive && isPurchaseArchiveLoaded)
+                ? purchaseOrders.concat(purchaseArchive)
+                : purchaseOrders;
+
+            let filtered = source.filter(po => {
+                // [신규] '이 상품 발주목록'으로 좁혀 보는 중이면 그 식별번호만 남긴다
+                if (purchaseCodeFilter && String(po.productCode || '').trim() !== purchaseCodeFilter) return false;
+
+                // 기간 먼저 거른다. 발주일자가 없거나 날짜 형식이 아닌 건('X' 등)은 기간을 잡으면 빠진다.
+                //  (문자열 비교라 'X' 같은 값은 어떤 날짜보다 크게 잡혀서, 막지 않으면 전부 딸려 들어온다)
+                const d = String(po.date || "");
+                if (hasRange && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+                if (startDate && d < startDate) return false;
+                if (endDate && d > endDate) return false;
+
+                if (search === "") return true; // 기간만으로 조회하는 경우
                 const nameMatch = (po.itemName || "").toLowerCase().includes(search);
-                const dateMatch = (po.date || "").includes(search);
+                const dateMatch = d.includes(search);
                 const supplierMatch = (po.supplier || "").toLowerCase().includes(search);
                 return nameMatch || dateMatch || supplierMatch;
             });
-            
+
+            // [신규] 건수와 함께 그 기간의 총 발주금액도 보여 준다 (기간별로 얼마 썼는지 바로 보이게)
+            const sumTotal = filtered.reduce((a, po) => a + (parseInt(po.totalPrice || 0) || 0), 0);
             const countBadge = document.getElementById('purchase-total-count-badge');
-            if (countBadge) countBadge.innerText = `총 ${filtered.length}건`;
-            
+            if (countBadge) countBadge.innerText = `총 ${filtered.length}건 · ${sumTotal.toLocaleString()}원`;
+
             if (filtered.length === 0) {
+                const rangeLabel = hasRange ? `${startDate || '처음'} ~ ${endDate || '끝'}` : '';
                 const emptyHtml = `
                     <div style="text-align: center; padding: 40px 20px;">
-                        <div style="font-size: 15px; font-weight: 800; color: #64748b; margin-bottom: 8px;">🚚 등록된 발주 내역이 없습니다.</div>
-                        <div style="font-size: 13px; color: #94a3b8;">'발주 등록' 탭에서 신규 발주 내역을 등록해 주세요.</div>
+                        <div style="font-size: 15px; font-weight: 800; color: #64748b; margin-bottom: 8px;">🚚 조건에 맞는 발주 내역이 없습니다.</div>
+                        <div style="font-size: 13px; color: #94a3b8;">${hasRange ? `조회 기간: <b>${rangeLabel}</b><br>기간을 넓히거나 '기간 해제'를 눌러 보세요.` : `'발주 등록' 탭에서 신규 발주 내역을 등록해 주세요.`}</div>
                     </div>`;
-                tbody.innerHTML = `<tr><td colspan="12">${emptyHtml}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10">${emptyHtml}</td></tr>`;
                 if (mobileContainer) mobileContainer.innerHTML = emptyHtml;
                 return;
             }
@@ -14373,40 +16058,35 @@
                 const mRate = sPrice > 0 ? ((sPrice - uPrice) / sPrice) * 100 : 0;
                 
                 tableHtml += `
-                    <tr style="border-bottom: 1px solid #f1f5f9;">
-                        <td style="padding: 12px; font-weight: 700; color: #475569; font-size: 13px; white-space: nowrap;">${po.date || '-'}</td>
-                        <td style="padding: 12px; font-weight: 800; color: #334155; font-size: 13px; white-space: nowrap;">${po.supplier || '-'}</td>
-                        <td style="padding: 12px; font-weight: 800; color: #1e293b; font-size: 14px; white-space: nowrap;">${po.itemName || '-'}</td>
-                        <td style="padding: 12px; font-weight: 800; color: var(--blue); font-size: 14px; text-align: right;">${parseInt(po.qty || 0).toLocaleString()}박스</td>
-                        <td style="padding: 12px; font-weight: 700; color: #64748b; font-size: 13px; text-align: right;">${parseInt(po.itemsPerBox || 1).toLocaleString()}개입</td>
-                        <td style="padding: 12px; font-weight: 800; color: #166534; font-size: 14px; text-align: right;">${parseInt(po.totalUnits || 0).toLocaleString()}개</td>
-                        <td style="padding: 12px; font-weight: 700; color: #475569; font-size: 13px; text-align: right;">${uPrice.toLocaleString()}원</td>
-                        <td style="padding: 12px; font-weight: 900; color: #d97706; font-size: 14px; text-align: right;">${parseInt(po.totalPrice || 0).toLocaleString()}원</td>
-                        <td style="padding: 12px; font-weight: 900; color: #15803d; font-size: 14px; text-align: right; background: #f0fdf4;">${m20 > 0 ? m20.toLocaleString() + '원' : '-'}</td>
-                        <td style="padding: 12px; font-weight: 900; color: #1d4ed8; font-size: 14px; text-align: right; background: #eff6ff;">${m30 > 0 ? m30.toLocaleString() + '원' : '-'}</td>
-                        <td style="padding: 12px; font-weight: 900; color: #0284c7; font-size: 14px; text-align: right; background: #f0f9ff;">
-                            ${sPrice > 0 ? `${sPrice.toLocaleString()}원<br><span style="font-size: 11px; font-weight: 800; color: #0369a1;">(마진 ${mRate.toFixed(1)}%)</span>` : '-'}
+                    <tr class="po-row${selectedPurchaseId === po.id ? ' selected' : ''}" onclick="selectPurchaseRow('${po.id}')">
+                        <td class="po-date">${po.date || '-'}${po.isArchived ? `<br><span class="po-arch">저장함</span>` : ``}</td>
+                        <td class="po-name">${po.itemName || '-'}</td>
+                        <td class="po-code"><span class="po-code-badge">${po.productCode || '-'}</span></td>
+                        <td class="po-supplier">${po.supplier || '-'}</td>
+                        <td class="po-num po-qty">${parseInt(po.qty || 0).toLocaleString()}박스<br><span class="po-sub">${parseInt(po.itemsPerBox || 1).toLocaleString()}개입</span></td>
+                        <td class="po-num po-units">${parseInt(po.totalUnits || 0).toLocaleString()}개</td>
+                        <td class="po-num po-unitprice">${uPrice.toLocaleString()}원</td>
+                        <td class="po-num po-total">${parseInt(po.totalPrice || 0).toLocaleString()}원</td>
+                        <td class="po-num po-margin">
+                            ${m20 > 0 ? `<span class="po-m20">${m20.toLocaleString()}</span>` : '-'}<br>
+                            ${m30 > 0 ? `<span class="po-m30">${m30.toLocaleString()}</span>` : '-'}
                         </td>
-                        <td style="padding: 12px; text-align: center;">
-                            <div style="display: flex; gap: 4px; justify-content: center;">
-                                <button type="button" onclick="editPurchaseOrder('${po.id}')" style="padding: 4px 8px; border: 1px solid #cbd5e1; background: white; color: #3b82f6; border-radius: 6px; font-size: 12px; font-weight: 800; cursor: pointer;">수정</button>
-                                <button type="button" onclick="deletePurchaseOrder('${po.id}')" style="padding: 4px 8px; border: 1px solid #fca5a5; background: #fef2f2; color: #ef4444; border-radius: 6px; font-size: 12px; font-weight: 800; cursor: pointer;">삭제</button>
-                            </div>
+                        <td class="po-num po-sale">
+                            ${sPrice > 0 ? `${sPrice.toLocaleString()}원<br><span class="po-sub">마진 ${mRate.toFixed(1)}%</span>` : '-'}
                         </td>
                     </tr>
                 `;
                 
                 mobileHtml += `
-                    <div style="background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+                    <div onclick="selectPurchaseRow('${po.id}')" style="background: ${selectedPurchaseId === po.id ? '#eef2ff' : '#ffffff'}; border: 1.5px solid ${selectedPurchaseId === po.id ? '#818cf8' : '#e2e8f0'}; border-radius: 14px; padding: 14px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); cursor: pointer;">
                         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 10px;">
                             <div style="font-size: 12px; font-weight: 800; color: #64748b; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                                 <span>📅 ${po.date || "-"}</span>
+                                <span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-weight:800;">${po.productCode || '-'}</span>
+                                ${po.isArchived ? `<span style="background:#f1f5f9; color:#64748b; padding:2px 7px; border-radius:6px; font-weight:800;">저장함</span>` : ''}
                                 ${po.supplier ? `<span style="background: #f1f5f9; padding: 2px 7px; border-radius: 6px; color: #334155; font-weight: 800;">🏢 ${po.supplier}</span>` : ''}
                             </div>
-                            <div style="display: flex; gap: 6px;">
-                                <button type="button" onclick="editPurchaseOrder('${po.id}')" style="padding: 4px 10px; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">수정</button>
-                                <button type="button" onclick="deletePurchaseOrder('${po.id}')" style="padding: 4px 10px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">삭제</button>
-                            </div>
+                            <span style="font-size:11px; font-weight:800; color:${selectedPurchaseId === po.id ? '#4338ca' : '#cbd5e1'}; white-space:nowrap;">${selectedPurchaseId === po.id ? '선택됨' : '눌러서 선택'}</span>
                         </div>
                         <div style="font-size: 15px; font-weight: 900; color: #0f172a; margin-bottom: 10px; word-break: keep-all;">
                             📦 ${po.itemName || "-"}
@@ -14427,7 +16107,7 @@
                                 <span>${m30 > 0 ? m30.toLocaleString() + '원' : '-'}</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; background: #f0f9ff; padding: 6px 10px; border-radius: 8px; color: #0369a1; border: 1px solid #bae6fd;">
-                                <span>🏷️ 현재 판매가 (마진율)</span>
+                                <span>🏷️ 판매 예정가 (마진율)</span>
                                 <span>${sPrice > 0 ? `${sPrice.toLocaleString()}원 (${mRate.toFixed(1)}%)` : '-'}</span>
                             </div>
                         </div>
@@ -14440,19 +16120,74 @@
         }
 
         // 상품 목록에서 발주 바로가기 등록 함수
-        function quickRegisterPurchase(index) {
+        // [신규] 발주 목록에서 '상품등록'으로 넘어올 때 물려받은 식별번호. 저장하면 이 번호로 상품이 등록된다.
+        let pendingProductCodeFromPurchase = '';
+
+        // [신규] 상품등록 폼의 식별번호 칸을 채운다. 그 번호로 잡힌 발주가 몇 건인지도 알려 준다.
+        function paintProductCodeField(prod) {
+            const el = document.getElementById('productCodeField');
+            const hint = document.getElementById('product-code-hint');
+            if (!el || !hint) return;
+
+            const code = String((prod && prod.productCode) || '').trim();
+            el.value = /^P\d+$/.test(code) ? code : '';
+
+            if (!/^P\d+$/.test(code)) {
+                hint.innerHTML = `아직 없습니다. <span style="color:#94a3b8;">이 상품을 발주에 넣으면 그때 자동으로 붙습니다.</span>`;
+                hint.style.color = '#64748b';
+                return;
+            }
+            const pos = purchaseOrders.concat(purchaseArchive).filter(p => String(p.productCode || '').trim() === code);
+            const days = pos.map(p => String(p.date || '')).filter(fIsPurchaseDate).sort();
+            hint.innerHTML = pos.length
+                ? `✅ 발주 ${pos.length}건과 이어져 있습니다${days.length ? ` (최근 ${days[days.length - 1]})` : ''}.`
+                : `발주 기록은 아직 없습니다.`;
+            hint.style.color = pos.length ? '#166534' : '#64748b';
+        }
+
+        // [신규] 상품관리에서 '발주'로 넘어온 상품. 발주가 저장되면 그때 생긴 번호를 이 상품에도 붙여 준다.
+        //  (상품에는 번호를 미리 만들어 두지 않으므로, 처음 발주하는 이 순간이 번호가 생기는 시점이다)
+        let pendingProductCodeLink = null;
+
+        async function quickRegisterPurchase(index) {
             const prod = uploadProducts[index];
             if (!prod) return;
-            
+            pendingProductCodeLink = index;
+
+            // 지난 발주를 찾으려면 저장함까지 있어야 한다 (평소엔 최근 10일치만 갖고 있다)
+            showLoader("발주 이력을 확인하는 중...");
+            try { await loadPurchaseArchiveIfNeeded(); } finally { hideLoader(); }
+
             // 1. 발주 등록 폼 초기화
             resetPurchaseOrderForm();
-            
-            // 2. 발주 상품명 및 현재 판매가 자동 연동
-            document.getElementById('purchase-item-name').value = prod.name || "";
-            
+
+            // 2. [수정] 식별번호로 연동한다. 상품명을 그대로 베끼지 않는다.
+            //  같은 번호로 이미 발주한 적이 있으면 그때 쓰던 발주 상품명·업체명·입수량·단가를 불러온다.
+            //  (상품명은 손님에게 보이는 이름, 발주 상품명은 거래처에서 부르는 이름이라 대개 다르다)
+            const code = String(prod.productCode || '').trim();
+            const codeEl = document.getElementById('purchase-product-code');
+            if (codeEl) codeEl.value = /^P\d+$/.test(code) ? code : '';
+
+            // 그 번호로 잡힌 지난 발주 중 가장 최근 것
+            const past = purchaseOrders.concat(purchaseArchive)
+                .filter(po => String(po.productCode || '').trim() === code && fIsPurchaseDate(po.date))
+                .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+
+            if (past) {
+                document.getElementById('purchase-item-name').value = past.itemName || prod.name || "";
+                document.getElementById('purchase-supplier').value = past.supplier || "";
+                document.getElementById('purchase-items-per-box').value = parseInt(past.itemsPerBox || 1) || 1;
+                document.getElementById('purchase-unit-price').value = parseInt(past.unitPrice || 0) || 0;
+                showToast(`지난 발주(${past.date}) 내용을 불러왔습니다`);
+            } else {
+                // 발주한 적이 없는 상품이면 상품명으로 시작한다 (거래처 표기는 사장님이 고쳐 쓰면 된다)
+                document.getElementById('purchase-item-name').value = prod.name || "";
+            }
+
             const price = parseInt(String(prod.price || "").replace(/\D/g, "")) || 0;
             document.getElementById('purchase-sale-price').value = price;
-            
+            onPurchaseCodeChange();
+
             // 3. 발주 일자를 오늘 날짜로 기본 세팅
             const today = new Date();
             const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -14487,16 +16222,161 @@
             }
             
             const firstIndex = Array.from(uploadSelectedProductIndices)[0];
-            quickRegisterPurchase(firstIndex);
-            
+
             // 선택 해제 및 툴바 숨김
             uploadSelectedProductIndices.clear();
             updateBatchBar();
             renderProductsList();
+
+            // [수정] 바로 발주 등록으로 넘어가지 않고, 무엇을 할지 먼저 고르게 한다.
+            openPurchaseChoice(firstIndex);
+        }
+
+        /* -------- [신규] 발주 저장 → 이어서 상품등록 --------
+           예전에는 저장 후 '상품등록 할래요?' 창을 띄웠는데, 매번 묻는 것이 성가셔서
+           '💾 저장 후 상품등록' 버튼으로 바꿨다. 누른 버튼에 따라 저장 뒤 갈 곳이 정해진다. */
+        let goProductAfterPurchaseSave = false;
+
+        function purchaseSaveThenProduct() {
+            goProductAfterPurchaseSave = true;   // 폼 제출은 그대로 진행된다 (type=submit)
+        }
+
+        // 발주 한 건을 받아 상품등록 폼을 채우고 그 화면으로 넘어간다.
+        function goProductRegisterFrom(po) {
+            if (!po) return;
+            switchAdminTab('product-upload');
+            exitEditMode();
+
+            pendingProductCodeFromPurchase = /^P\d+$/.test(String(po.productCode || '').trim())
+                ? String(po.productCode).trim() : '';
+            paintProductCodeField(pendingProductCodeFromPurchase ? { productCode: pendingProductCodeFromPurchase } : null);
+
+            const nameEl = document.getElementById('productName');
+            const priceEl = document.getElementById('productPrice');
+            if (nameEl) nameEl.value = String(po.itemName || '');
+            const uPrice = parseInt(po.unitPrice || 0) || 0;
+            const sPrice = parseInt(po.salePrice || 0) || 0;
+            if (priceEl) priceEl.value = sPrice > 0 ? sPrice : (uPrice > 0 ? Math.round(uPrice / 0.7) : '');
+
+            try { nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+        }
+
+        /* -------- [신규] 상품관리 '발주' → 등록할지 목록을 볼지 고르는 창 -------- */
+        let purchaseChoiceIndex = null;
+
+        async function openPurchaseChoice(index) {
+            const prod = uploadProducts[index];
+            if (!prod) return;
+            purchaseChoiceIndex = index;
+
+            const modal = document.getElementById('purchase-choice-modal');
+            const nameEl = document.getElementById('purchase-choice-product');
+            const cntEl = document.getElementById('purchase-choice-count');
+            const histBtn = document.getElementById('btn-choice-history');
+            if (!modal) return;
+
+            if (nameEl) nameEl.innerText = prod.name || '';
+            if (cntEl) cntEl.innerText = '발주 이력을 확인하는 중…';
+            modal.style.display = 'flex';
+
+            await loadPurchaseArchiveIfNeeded();   // 옛 발주까지 세야 정확하다
+
+            const code = String(prod.productCode || '').trim();
+            const pos = /^P\d+$/.test(code)
+                ? purchaseOrders.concat(purchaseArchive).filter(p => String(p.productCode || '').trim() === code)
+                : [];
+            const days = pos.map(p => String(p.date || '')).filter(fIsPurchaseDate).sort();
+
+            if (cntEl) {
+                cntEl.innerText = pos.length
+                    ? `${code} · 발주 ${pos.length}건${days.length ? ` (최근 ${days[days.length - 1]})` : ''}`
+                    : '아직 발주한 적이 없는 상품입니다';
+            }
+            // 이력이 없으면 목록 보기는 눌러도 볼 게 없으므로 흐리게 둔다
+            if (histBtn) {
+                histBtn.disabled = pos.length === 0;
+                histBtn.style.opacity = pos.length === 0 ? '0.45' : '1';
+                histBtn.style.cursor = pos.length === 0 ? 'default' : 'pointer';
+            }
+        }
+
+        function closePurchaseChoice() {
+            const modal = document.getElementById('purchase-choice-modal');
+            if (modal) modal.style.display = 'none';
+            purchaseChoiceIndex = null;
+        }
+
+        function choosePurchaseRegister() {
+            const idx = purchaseChoiceIndex;
+            closePurchaseChoice();
+            if (idx === null) return;
+            quickRegisterPurchase(idx);
+        }
+
+        async function choosePurchaseHistory() {
+            const idx = purchaseChoiceIndex;
+            if (idx === null) return;
+            const prod = uploadProducts[idx];
+            const code = String((prod && prod.productCode) || '').trim();
+            closePurchaseChoice();
+            if (!/^P\d+$/.test(code)) { showToast("아직 발주한 적이 없는 상품입니다."); return; }
+
+            await loadPurchaseArchiveIfNeeded();
+            purchaseCodeFilter = code;
+
+            switchAdminTab('purchase-history');
+            switchPurchaseSubTab('list');
+
+            // 기간·검색어는 풀고 그 상품 것만 전부 보여 준다
+            const s = document.getElementById('purchaseStartDate'); if (s) s.value = '';
+            const e = document.getElementById('purchaseEndDate');   if (e) e.value = '';
+            const q = document.getElementById('purchaseSearchInput'); if (q) q.value = '';
+            purchaseRangeKind = '';
+            paintPurchaseRangeButtons();
+            renderPurchaseOrdersList();
         }
     </script>
 
     <!-- 배달 사진 모달 -->
+    <!-- [신규] 상품관리에서 '발주'를 눌렀을 때 무엇을 할지 고르는 창 -->
+    <div id="purchase-choice-modal" class="no-print" style="display:none; position:fixed; z-index:10001; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;" onclick="if(event.target===this) closePurchaseChoice()">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:420px; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
+            <div style="padding:14px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+                <div style="min-width:0;">
+                    <div style="font-size:15px; font-weight:900; color:#0f172a;">🚚 발주</div>
+                    <div id="purchase-choice-product" style="font-size:12.5px; font-weight:700; color:#64748b; margin-top:3px; word-break:keep-all;"></div>
+                </div>
+                <span onclick="closePurchaseChoice()" style="font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+            </div>
+            <div style="padding:14px 16px; display:flex; flex-direction:column; gap:9px;">
+                <button type="button" onclick="choosePurchaseRegister()" style="width:100%; padding:14px; background:#10b981; color:#fff; border:none; border-radius:11px; font-size:14px; font-weight:800; cursor:pointer; text-align:left;">
+                    ✏️ 발주 등록하기
+                    <div style="font-size:11.5px; font-weight:700; opacity:0.9; margin-top:3px;">지난 발주가 있으면 업체명·단가를 불러옵니다</div>
+                </button>
+                <button type="button" id="btn-choice-history" onclick="choosePurchaseHistory()" style="width:100%; padding:14px; background:#fff; color:#4338ca; border:1.5px solid #c7d2fe; border-radius:11px; font-size:14px; font-weight:800; cursor:pointer; text-align:left;">
+                    📋 발주목록 보기
+                    <div id="purchase-choice-count" style="font-size:11.5px; font-weight:700; color:#64748b; margin-top:3px;"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [신규] 발주 등록 - 상품 찾기 창 -->
+    <div id="product-picker-modal" class="no-print" style="display:none; position:fixed; z-index:10001; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;" onclick="if(event.target===this) closeProductPicker()">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:560px; max-height:82vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
+            <div style="padding:14px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="font-size:15px; font-weight:900; color:#0f172a;">🔍 상품 찾기</div>
+                <span onclick="closeProductPicker()" style="font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+            </div>
+            <div style="padding:12px 16px; border-bottom:1px solid #f1f5f9;">
+                <input type="text" id="product-picker-search" placeholder="상품명 또는 식별번호(P0013)로 검색" oninput="renderProductPicker()" autocomplete="off"
+                    style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:14px; font-weight:700;">
+                <div id="product-picker-count" style="margin-top:7px; font-size:12px; font-weight:800; color:#64748b;"></div>
+            </div>
+            <div id="product-picker-list" style="overflow-y:auto; padding:8px 10px; -webkit-overflow-scrolling:touch;"></div>
+        </div>
+    </div>
+
     <div id="photo-modal" class="modal no-print" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center;" onclick="closePhotoModal()">
         <div style="background-color: #fff; padding: 20px; border-radius: 16px; width: 100%; max-width: 450px; text-align: center; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.2); box-sizing: border-box;" onclick="event.stopPropagation()">
             <span onclick="closePhotoModal()" style="position: absolute; right: 16px; top: 10px; color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
