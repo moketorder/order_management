@@ -8779,6 +8779,7 @@
 
         let uploadEditIsSada = false; // [신규] 수정 시 '사다드림' 체크 상태를 기억해 폼에 반영
         let uploadEditIsRecommend = false; // [신규] 수정 시 '오늘의추천'(과채류) 체크 상태를 기억해 폼에 반영
+        let uploadIsFresh = false;         // [신규] 공동구매 칸의 '신선식품' 선택 상태 (사다드림과 하나만 켜진다)
         let uploadSelectedDate = new Date().toISOString().split('T')[0];
         let uploadManageDeliveryType = "today";
         let uploadManageTab = "today-fruit";
@@ -11915,7 +11916,7 @@
             container.innerHTML = '';
 
             if (tab === 'reserve') {
-                document.getElementById('categoryLabel').innerText = "공동구매 날짜 선택  ·  사다드림 여부";
+                document.getElementById('categoryLabel').innerText = "공동구매 날짜 선택  ·  종류(사다드림·신선식품)";
                 // [신규] 왼쪽=날짜(폭 축소), 오른쪽=사다드림 체크박스 배치
                 const row = document.createElement('div');
                 row.style.cssText = 'display:flex; gap:8px; align-items:stretch;';
@@ -11937,36 +11938,51 @@
                     uploadSelectedDate = input.value;
                 };
 
-                // [신규] 체크 시 상품명 앞에 [사다드림] 말머리를 자동으로 붙여 저장.
-                //  이 페이지는 네이티브 체크박스를 전역 CSS로 숨기므로(.custom-checkbox 스팬으로 표시),
-                //  기존 패턴대로 input 바로 뒤에 .custom-checkbox 스팬을 붙여야 체크 표시가 보인다.
-                const sadaLabel = document.createElement('label');
-                sadaLabel.className = 'checkbox-container';
-                // 버튼 크기로 고정 (남는 폭은 날짜칸이 채움)
-                // [수정] 아래 '분류탭' 버튼(116px)과 오른쪽 끝이 맞도록 같은 폭으로 고정
-                sadaLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:6px; height:45px; width:116px; padding:0; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; flex:0 0 auto; box-sizing:border-box;';
+                /* [수정] 사다드림 체크 하나였던 것을 '사다드림 / 신선식품' 토글로 바꾼다.
+                   셋 중 하나만 켜진다: 아무것도 아님 · 사다드림 · 신선식품.
+                   값은 productIsSada(체크박스)와 uploadIsFresh(변수)에 담아 저장한다.
+                   화면에는 체크박스를 안 보이고 버튼처럼만 쓴다. */
+                const segWrap = document.createElement('div');
+                segWrap.style.cssText = 'display:flex; flex:0 0 auto;';
+
+                // 저장 로직이 읽어 가는 체크박스는 그대로 두되 화면에서는 숨긴다
                 const sadaChk = document.createElement('input');
                 sadaChk.type = 'checkbox';
                 sadaChk.id = 'productIsSada';
+                sadaChk.style.display = 'none';
                 sadaChk.checked = !!(uploadIsEditMode && uploadEditIsSada);
-                const sadaBox = document.createElement('span');
-                sadaBox.className = 'custom-checkbox';
-                const sadaTxt = document.createElement('span');
-                sadaTxt.innerText = '사다드림';
-                const paintSada = () => {
-                    const on = sadaChk.checked;
-                    sadaLabel.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
-                    sadaLabel.style.background = on ? 'var(--primary-light)' : '#ffffff';
-                    sadaLabel.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
+                segWrap.appendChild(sadaChk);
+
+                // [수정] 사다드림·신선식품을 버튼 두 개로 두지 않고 고르는 칸 하나로 합친다.
+                //  셋 중 하나만 되는 값이라 고르는 칸이 뜻이 더 분명하고, 자리도 덜 차지한다.
+                const kindSel = document.createElement('select');
+                kindSel.id = 'productKindSelect';
+                kindSel.className = 'form-control';
+                kindSel.style.cssText = 'height:45px; width:116px; padding:0 8px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap; flex:0 0 auto; box-sizing:border-box;';
+                [['', '선택안함'], ['sada', '사다드림'], ['fresh', '신선식품']].forEach(([v, t]) => {
+                    const o = document.createElement('option');
+                    o.value = v; o.innerText = t;
+                    kindSel.appendChild(o);
+                });
+                kindSel.value = sadaChk.checked ? 'sada' : (uploadIsFresh ? 'fresh' : '');
+
+                const paintKind = () => {
+                    const on = kindSel.value !== '';
+                    kindSel.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
+                    kindSel.style.background = on ? 'var(--primary-light)' : '#ffffff';
+                    kindSel.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
                 };
-                sadaChk.onchange = paintSada;
-                paintSada();
-                sadaLabel.appendChild(sadaChk);
-                sadaLabel.appendChild(sadaBox);
-                sadaLabel.appendChild(sadaTxt);
+                kindSel.onchange = () => {
+                    sadaChk.checked = (kindSel.value === 'sada');
+                    uploadIsFresh = (kindSel.value === 'fresh');
+                    paintKind();
+                };
+                paintKind();
+
+                segWrap.appendChild(kindSel);
 
                 row.appendChild(input);
-                row.appendChild(sadaLabel);
+                row.appendChild(segWrap);
                 container.appendChild(row);
             }
             else if (tab === 'onsite') {
@@ -13459,6 +13475,10 @@
             const _recChkEl = document.getElementById('productIsRecommend');
             const _isRecommendChecked = (uploadCurrentTab === 'fruit' && !!_recChkEl && _recChkEl.checked);
 
+            // [신규] 공동구매 칸의 '신선식품' 선택. 지금은 값만 저장한다(주문서 동작은 아직 없음).
+            //  사다드림과 하나만 켜지므로, 사다드림이면 신선식품은 꺼진 것으로 본다.
+            const _isFresh = (uploadCurrentTab === 'reserve' && uploadIsFresh && !_isSadaChecked);
+
             try {
                 // 1. 모든 신규 사진 업로드 처리 (item.id = Cloudinary CDN URL). GAS 대신 Cloudinary 직접 업로드로 속도 개선.
                 for (let i = 0; i < uploadSelectedFiles.length; i++) {
@@ -13528,6 +13548,8 @@
                     displayTab: uploadDisplayTab || "",
                     // [신규] 사다드림 여부. 상품명 말머리 대신 이 값으로 판단한다.
                     isSada: _isSadaChecked,
+                    // [신규] 신선식품 여부 (공동구매 칸에서 고른 값). 지금은 저장만 한다.
+                    isFresh: _isFresh,
                     // [신규] 오늘의추천 여부 (과채류)
                     isRecommend: _isRecommendChecked,
                     // [신규] 상세옵션 설정
@@ -13921,6 +13943,8 @@
             //  없는 예전 상품만 이름 말머리로 판단한다.
             uploadEditIsSada = (prod.isSada === true || prod.isSada === 'true')
                 || (prod.isSada === undefined && /^\s*\[\s*사다드림\s*\]/.test(String(prod.name || '')));
+            // [신규] 신선식품 여부 복원 (사다드림이면 신선식품은 꺼진 것으로 본다)
+            uploadIsFresh = !uploadEditIsSada && (prod.isFresh === true || prod.isFresh === 'true');
             // [신규] 오늘의추천 여부 복원 (같은 방식)
             uploadEditIsRecommend = (prod.isRecommend === true || prod.isRecommend === 'true')
                 || (prod.isRecommend === undefined && /^\s*\[\s*오늘의추천\s*\]/.test(String(prod.name || '')));
@@ -14023,6 +14047,7 @@
 
             uploadEditShelf = ''; // [신규] 선반위치 기억값 초기화
             uploadEditIsSada = false; // [신규] 사다드림 체크 기억값 초기화
+            uploadIsFresh = false;    // [신규] 신선식품 선택도 함께 초기화
             uploadEditIsRecommend = false; // [신규] 오늘의추천 체크 기억값 초기화
             uploadDisplayTab = ''; // [신규] 분류탭 초기화 (새 상품은 '없음'으로 시작)
             updateDisplayTabUI();
