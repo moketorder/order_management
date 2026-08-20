@@ -2026,6 +2026,20 @@
             cursor: pointer;
             transition: var(--transition);
         }
+        /* [신규] 상품명 아랫줄의 노출·매주노출 버튼 — 둘이 반씩 나눠 갖는다.
+           .price-option-btn이 116px로 고정돼 있어 여기서만 풀어 준다. */
+        #tab-admin-products .name-btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        #tab-admin-products .name-btn-row .price-option-btn {
+            width: auto;
+            flex: 1 1 0;
+            min-width: 0;
+        }
+
         #tab-admin-products .price-option-btn:hover {
             border-color: #7c3aed;
             color: #7c3aed;
@@ -2242,9 +2256,10 @@
                                  남은 '매주 노출(자동 연장)'만 상품명 옆으로 옮겼다. -->
                             <div class="form-group">
                                 <label>상품명</label>
-                                <div style="display: flex; flex-wrap: nowrap; gap: 6px; align-items: stretch;">
-                                    <input type="text" id="productName" class="form-control" placeholder="예: 무농약 프리미엄 딸기 1kg" required style="flex: 1 1 auto; width: auto; min-width: 0;">
-                                    <!-- [수정] 분류탭·상세옵션 버튼과 같은 폭(price-option-btn, 116px)으로 맞춘다 -->
+                                <!-- [수정] 상품명 칸이 버튼 두 개에 밀려 모바일에서 너무 좁았다.
+                                     이름칸은 한 줄을 다 쓰고, 버튼 두 개는 아랫줄에 반반으로 놓는다. -->
+                                <input type="text" id="productName" class="form-control" placeholder="예: 무농약 프리미엄 딸기 1kg" required style="width: 100%; box-sizing: border-box;">
+                                <div class="name-btn-row">
                                     <!-- [신규] 손님 화면에 보일지 여부. 예전에는 상품목록에서만 바꿀 수 있었는데,
                                          등록·수정하면서 바로 정하는 편이 편해서 폼에도 넣었다. -->
                                     <button type="button" id="btnShowVisible" class="price-option-btn" onclick="toggleExposure('Visible')" title="손님 화면 노출 / 숨김">👁️ 노출</button>
@@ -13007,6 +13022,12 @@
 
                     if (isVisibleA && !isVisibleB) return -1;
                     if (!isVisibleA && isVisibleB) return 1;
+
+                    // [신규] 오늘의추천·사다드림으로 표시해 둔 상품을 그 다음으로 올린다.
+                    //  자주 손대는 상품이라 목록 위에 있어야 찾기 쉽다. (주문서 목록과 같은 기준)
+                    const flagA = isRecommendListProduct(a.prod) || isSadaListProduct(a.prod);
+                    const flagB = isRecommendListProduct(b.prod) || isSadaListProduct(b.prod);
+                    if (flagA !== flagB) return flagA ? -1 : 1;
 
                     return String(a.prod.name || "").localeCompare(String(b.prod.name || ""), 'ko');
                 });
