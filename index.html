@@ -3087,6 +3087,15 @@
                         <span style="font-size:12px;">~</span>
                         <input type="date" id="sales-custom-to" class="form-control" style="width:auto; height:36px;" onchange="onSalesCustomRangeChange()">
                     </div>
+
+                    <!-- [신규] 분류 골라 보기 — 고른 분류만 남겨 지표·매출 추이·순위를 다시 센다 -->
+                    <div style="display:flex; gap:4px; margin-top:8px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+                        <button type="button" data-sales-cat="all" onclick="setSalesCategory('all')" class="sales-toggle-btn active" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">전체</button>
+                        <button type="button" data-sales-cat="fruit" onclick="setSalesCategory('fruit')" class="sales-toggle-btn up-cat-fruit" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">과일</button>
+                        <button type="button" data-sales-cat="group" onclick="setSalesCategory('group')" class="sales-toggle-btn up-cat-group" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">공동구매</button>
+                        <button type="button" data-sales-cat="sada" onclick="setSalesCategory('sada')" class="sales-toggle-btn up-cat-sada" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">사다드림</button>
+                        <button type="button" data-sales-cat="other" onclick="setSalesCategory('other')" class="sales-toggle-btn up-cat-other" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">상시판매</button>
+                    </div>
                 </div>
 
                 <div id="sales-metrics" style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; margin-bottom:14px;"></div>
@@ -3095,6 +3104,11 @@
 
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 0 8px 0; flex-wrap:wrap;">
                     <div class="card-title" id="sales-trend-title" style="margin:0; font-size:14px;">📈 매출 추이</div>
+                    <!-- [신규] 그래프를 금액으로 볼지 건수로 볼지 (건수 = 상품 줄 하나가 1건) -->
+                    <div style="display:flex; gap:4px; flex-shrink:0;">
+                        <button type="button" data-sales-metric="amount" onclick="setSalesTrendMetric('amount')" class="sales-toggle-btn active" style="padding:5px 10px; font-size:11.5px;">금액</button>
+                        <button type="button" data-sales-metric="count" onclick="setSalesTrendMetric('count')" class="sales-toggle-btn" style="padding:5px 10px; font-size:11.5px;">건수</button>
+                    </div>
                 </div>
                 <!-- [신규] 그래프를 어떤 단위로 볼지 직접 고른다 (자동 = 고른 기간에 맞춰 알아서) -->
                 <div id="trend-unit-tabs" style="display:flex; gap:4px; margin-bottom:8px; flex-wrap:nowrap; overflow-x:auto;"></div>
@@ -7335,7 +7349,7 @@
             const topHtml = topItems.length ? topItems.map(([nm,v],i)=>`
                 <div style="display:flex; justify-content:space-between; gap:8px; padding:4px 0; border-top:1px dashed #f1f5f9; font-size:12px;">
                     <span style="color:var(--text-main); word-break:break-all;"><b style="color:${i<3?'#d97706':'#94a3b8'};">${i+1}</b> ${nm}</span>
-                    <span style="flex-shrink:0; color:var(--text-sub); white-space:nowrap;"><b style="color:#2563eb;">${v.qty}개</b> · ${v.amount.toLocaleString()}원</span>
+                    <span style="flex-shrink:0; color:var(--text-sub); white-space:nowrap;"><b style="color:#2563eb;">${v.qty}개</b> · ${v.amount.toLocaleString()}${salesMetricUnit()}</span>
                 </div>`).join('') : '<div style="color:var(--text-sub); font-size:12px; padding:4px 0;">완료 구매 내역 없음</div>';
 
             const recentHtml = recentDates.length ? recentDates.map(g=>`
@@ -9412,7 +9426,7 @@
                             <div style="display:flex; flex-wrap:wrap; gap:4px;">
                                 ${list.map(([ho, v]) => {
                                     const c = v.days.size;
-                                    return `<span title="${v.amount.toLocaleString()}원" style="display:inline-flex; align-items:center; gap:3px; padding:3px 7px; border-radius:6px; font-size:11.5px; font-weight:700; color:#334155; background:#f1f5f9;">${ho}<b style="color:${c >= 5 ? '#c2410c' : '#64748b'};">${c}</b></span>`;
+                                    return `<span title="${v.amount.toLocaleString()}${salesMetricUnit()}" style="display:inline-flex; align-items:center; gap:3px; padding:3px 7px; border-radius:6px; font-size:11.5px; font-weight:700; color:#334155; background:#f1f5f9;">${ho}<b style="color:${c >= 5 ? '#c2410c' : '#64748b'};">${c}</b></span>`;
                                 }).join('')}
                             </div>
                         </div>`;
@@ -9498,7 +9512,7 @@
                         <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
                             ${dets.map(([d, v]) => {
                                 const c = v.days.size;
-                                return `<span title="${v.amount.toLocaleString()}원" style="display:inline-flex; align-items:center; gap:3px; padding:3px 7px; border-radius:6px; font-size:11.5px; font-weight:700; color:#334155; background:#f1f5f9;">${d}<b style="color:${c >= 5 ? '#c2410c' : '#64748b'};">${c}</b></span>`;
+                                return `<span title="${v.amount.toLocaleString()}${salesMetricUnit()}" style="display:inline-flex; align-items:center; gap:3px; padding:3px 7px; border-radius:6px; font-size:11.5px; font-weight:700; color:#334155; background:#f1f5f9;">${d}<b style="color:${c >= 5 ? '#c2410c' : '#64748b'};">${c}</b></span>`;
                             }).join('')}
                         </div>
                     </div>`;
@@ -9817,6 +9831,58 @@
         // ===== [신규] 판매 관리 탭 =====
         let salesDateBasis = 'pickup'; // 'pickup'(픽업·배달일, 기본) | 'order'(주문일)
         let salesMethodFilter = 'all'; // 'all' | 'delivery'(배달) | 'pickup'(픽업)
+        /* [신규] 그래프에 무엇을 그릴지 — 'amount'(매출액) | 'count'(판매 건수)
+           '얼마 팔렸나'와 '몇 건 팔렸나'는 다른 이야기라 골라 볼 수 있게 한다.
+           여기서 건수는 주문한 수량대로 센다. 한 줄에서 2개를 시켰으면 2건이다.
+           (하루에 몇 명이 주문했나 하는 손님 수와는 다르다) */
+        let salesTrendMetric = 'amount';
+        const salesMetricUnit = () => (salesTrendMetric === 'count' ? '건' : '원');
+        const salesMetricName = () => (salesTrendMetric === 'count' ? '판매건수' : '매출');
+
+        function setSalesTrendMetric(m) {
+            salesTrendMetric = m;
+            document.querySelectorAll('[data-sales-metric]').forEach(b => b.classList.toggle('active', b.dataset.salesMetric === m));
+            renderSalesStatus();
+        }
+
+        // [신규] 분류 필터 — 'all' | 'fruit'(과일) | 'group'(공동구매) | 'sada'(사다드림) | 'other'(상시판매)
+        //  고른 분류만 남겨 지표·매출 추이·순위를 다시 센다.
+        let salesCategoryFilter = 'all';
+
+        // 주문 한 줄이 어느 분류에 드는지 (판매현황 집계와 같은 기준)
+        function salesOrderBucket(o) {
+            const nm = String(o.item || '상품명 없음');
+            const p = (typeof uploadProducts !== 'undefined' ? uploadProducts : []).find(x => x && x.name === nm);
+            const c = salesProductCategory(p, nm, o.category);
+            return (c === 'fruit') ? 'fruit' : (c === 'sada') ? 'sada' : (c === 'group') ? 'group' : 'other';
+        }
+
+        // 지금 고른 분류에 드는 주문인지
+        function salesPassCategory(o) {
+            if (salesCategoryFilter === 'all') return true;
+            return salesOrderBucket(o) === salesCategoryFilter;
+        }
+
+        function setSalesCategory(c) {
+            salesCategoryFilter = c;
+            document.querySelectorAll('[data-sales-cat]').forEach(b => b.classList.toggle('active', b.dataset.salesCat === c));
+            renderSalesStatus();
+        }
+
+        // [신규] 매출 추이 제목 옆에 지금 보고 있는 분류를 붙여 준다 (전체면 붙이지 않는다)
+        function applySalesCatChip() {
+            const titleEl = document.getElementById('sales-trend-title');
+            if (!titleEl) return;
+            const old = titleEl.querySelector('.sales-cat-chip');
+            if (old) old.remove();
+            const name = { fruit: '과일', group: '공동구매', sada: '사다드림', other: '상시판매' }[salesCategoryFilter];
+            if (!name) return;
+            const chip = document.createElement('span');
+            chip.className = 'sales-cat-chip';
+            chip.style.cssText = 'margin-left:6px; font-size:11px; font-weight:800; color:var(--primary); background:var(--primary-light); padding:2px 7px; border-radius:6px;';
+            chip.innerText = name;
+            titleEl.appendChild(chip);
+        }
         let salesArchiveOrders = [];   // [신규] 보관함(orders_archive) 과거 주문 (판매현황 전체기간 집계용)
         let salesArchiveLoaded = false;
         // [신규] 판매 기간 선택: 상단=단위(salesUnit), 하단=선택 인스턴스(salesUnitIdx, 0=가장 최근/오늘)
@@ -9956,12 +10022,27 @@
         // 배달 판별 — 주문현황(showTodaySummary)과 동일: shippingMethod가 '배달주문'이거나, '매장픽업'이 아니고 주소가 있으면 배달
         function isSalesDelivery(o){ return (o.shippingMethod === '배달주문' || (o.shippingMethod !== '매장픽업' && o.address && String(o.address).trim() !== '')); }
         // [신규] 순수 주문자 식별 키 — 전화번호 포맷(+82/82/10 등)을 010형으로 정규화해 같은 사람을 하나로. 전화 깨짐/없음이면 이름으로.
+        /* [신규] 전화번호 정규화. 보관함에 저장 과정에서 망가진 번호가 섞여 있어,
+           같은 사람이 두 명으로 갈라지고 매출도 두 번 잡히던 문제를 여기서 막는다.
+           실제 사례 - '+1+71461564'(0이 +로 바뀜), '04025587100'/'010842333899'(자릿수 오염).
+           멀쩡한 값은 1차에서 끝나므로 아래 복구는 실패했을 때만 돈다. */
+        function salesNormPhone(o){
+            const clean = (s) => {
+                let d = String(s || '').replace(/\D/g, '');
+                if (d.startsWith('82')) d = '0' + d.slice(2);                 // +82 / 82 국가코드 → 0
+                else if (d.length === 10 && d.startsWith('10')) d = '0' + d;  // 10XXXXXXXX → 010XXXXXXXX
+                return /^01[0-9]\d{7,8}$/.test(d) ? d : '';
+            };
+            const isObj = o && typeof o === 'object';
+            const raw = isObj ? String(o.phone || '') : String(o || '');
+            let k = clean(raw);
+            if (!k && raw.includes('+')) k = clean(raw.replace(/\+/g, '0')); // '0'이 '+'로 바뀐 기록
+            if (!k && isObj) k = clean(o.kakaoPhone);                        // 마지막 근거는 카카오 번호
+            return k;
+        }
+
         function salesPersonKey(o){
-            let d = String(o.phone || '').replace(/\D/g, '');
-            if (d.startsWith('82')) d = '0' + d.slice(2);                 // +82 / 82 국가코드 → 0
-            else if (d.length === 10 && d.startsWith('10')) d = '0' + d;  // 10XXXXXXXX → 010XXXXXXXX
-            if (/^01[0-9]\d{7,8}$/.test(d)) return d;                     // 유효 휴대폰만 전화 기준
-            return '명:' + String(o.name || '무명');                     // 그 외(깨진 값/없음)는 이름 기준
+            return salesNormPhone(o) || ('명:' + String(o.name || '무명'));  // 못 살리면 이름 기준
         }
 
         // [신규] 보관함(orders_archive)을 rawOrders와 동일한 형태로 평탄화 (status는 플래그로 계산)
@@ -10267,11 +10348,22 @@
         }
         // 판매관리 집계 소스 = 현재 주문(orders) + 보관함(orders_archive), 전화번호+주문키로 중복 제거(현재 주문 우선)
         function getSalesSourceOrders(){
-            const seen = new Set();
+            const seen = new Map();   // 키 → merged 인덱스
             const merged = [];
-            const keyOf = o => String(o.phone || '').replace(/\D/g, '') + '|' + String(o.orderKey || '');
-            (rawOrders || []).forEach(o => { seen.add(keyOf(o)); merged.push(o); });
-            (salesArchiveOrders || []).forEach(o => { const k = keyOf(o); if (!seen.has(k)) { seen.add(k); merged.push(o); } });
+            // 번호를 정규화해서 맞춰야 망가진 번호로 한 번 더 저장된 같은 주문이 중복 집계되지 않는다
+            const keyOf = o => (salesNormPhone(o) || String(o.phone || '').replace(/\D/g, '')) + '|' + String(o.orderKey || '');
+            // 번호가 망가진 쪽 사본은 category·isSada가 통째로 빠져 있어 분류가 틀어진다.
+            // 같은 주문이 둘이면 번호가 멀쩡하고 분류값이 살아 있는 쪽을 남긴다.
+            const rank = o => (salesNormPhone(o) === String(o.phone || '') ? 2 : 0) + (o.category ? 1 : 0);
+            const put = (o) => {
+                const k = keyOf(o);
+                if (!seen.has(k)) { seen.set(k, merged.length); merged.push(o); return; }
+                const i = seen.get(k);
+                if (rank(o) > rank(merged[i])) merged[i] = o;
+            };
+            // rawOrders에도 보관함이 합쳐져 들어오므로 여기서도 중복을 걸러야 한다
+            (rawOrders || []).forEach(put);
+            (salesArchiveOrders || []).forEach(put);
             return merged;
         }
         function salesTodayMidnight(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
@@ -10610,12 +10702,15 @@
                 const isDelivery = isSalesDelivery(o);
                 if (salesMethodFilter === 'delivery' && !isDelivery) return false;
                 if (salesMethodFilter === 'pickup' && isDelivery) return false;
+                if (!salesPassCategory(o)) return false;   // [신규] 분류 골라 보기
                 return true;
             });
             let totalAmount = 0, totalQty = 0, deliveredAmount = 0, pickupDoneAmount = 0, unpaidAmount = 0, deliveryQty = 0, pickupQty = 0;
             // [신규] 상품 카테고리(과일/공동구매/상시판매)별 판매액 — 상품명으로 상품 매칭해 분류
             const _prodByName = {}; (typeof uploadProducts !== 'undefined' ? uploadProducts : []).forEach(p => { if (p && p.name) _prodByName[p.name] = p; });
             const catAmt = { fruit: 0, group: 0, sada: 0, other: 0 };
+            const catCnt = { fruit: 0, group: 0, sada: 0, other: 0 };   // [신규] 카테고리별 건수
+            const catQty = { fruit: 0, group: 0, sada: 0, other: 0 };   // [신규] 카테고리별 수량
             // [수정] '건수'는 주문현황과 동일하게 고객(이름_전화번호) 단위로 집계 (주문시각이 달라도 같은 고객이면 1건)
             const custGroups = new Map(); // key: 사람_날짜 → 'delivery' | 'pickup' — 주문건수(고객×날짜)용
             const peopleSet = new Set();  // [신규] 순수 주문자 인원: 전화번호(숫자만) 기준 중복 제거
@@ -10649,19 +10744,22 @@
                 if (!itemMap.has(nm)) itemMap.set(nm, { qty: 0, amount: 0 });
                 const im = itemMap.get(nm); im.qty += q; im.amount += amt;
                 // [신규] 카테고리별 판매액 누적 (과일 / 공동구매(+사다드림) / 상시판매)
+                //  [추가] 금액뿐 아니라 건수·수량도 함께 센다 (아래 카테고리 표에서 쓴다)
                 const _cat = salesProductCategory(_prodByName[nm], nm, o.category);
-                if (_cat === 'fruit') catAmt.fruit += amt;
-                else if (_cat === 'sada') catAmt.sada += amt;
-                else if (_cat === 'group') catAmt.group += amt;
-                else catAmt.other += amt;
+                const _bk = (_cat === 'fruit') ? 'fruit' : (_cat === 'sada') ? 'sada' : (_cat === 'group') ? 'group' : 'other';
+                catAmt[_bk] += amt;
+                catCnt[_bk] += 1;
+                catQty[_bk] += q;
                 const dd = salesOrderDate(o);
                 if (dd && dd.getFullYear() >= 2000) { // 날짜 깨진 주문(1970 등)은 추이 그래프에서 제외
                     const ds = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
-                    dayMap.set(ds, (dayMap.get(ds) || 0) + amt);
+                    // [수정] 금액과 건수를 함께 쌓는다. 그래프에서 무엇을 볼지 골라 쓴다.
+                    //  건수는 주문한 수량대로 센다 (한 줄에서 2개 시켰으면 2건)
+                    dayMap.set(ds, (dayMap.get(ds) || 0) + (salesTrendMetric === 'count' ? q : amt));
                 }
                 // [신규] 시간대별(오늘) 매출: 주문시각의 시(hour) 기준 누적
                 const _ot = parseTimestampToDate(o.timestamp);
-                if (_ot && !isNaN(_ot.getTime()) && _ot.getFullYear() >= 2000) hourMap.set(_ot.getHours(), (hourMap.get(_ot.getHours()) || 0) + amt);
+                if (_ot && !isNaN(_ot.getTime()) && _ot.getFullYear() >= 2000) hourMap.set(_ot.getHours(), (hourMap.get(_ot.getHours()) || 0) + (salesTrendMetric === 'count' ? q : amt));
             });
 
             const metrics = document.getElementById('sales-metrics');
@@ -10718,6 +10816,7 @@
 
             _salesHourCache = hourMap;
             renderSalesDailyTrend(dayMap);
+            applySalesCatChip();   // [신규] 추이 제목을 다 쓴 뒤에 분류 표시를 붙인다 (먼저 붙이면 덮어써진다)
             _salesDayCache = dayMap;
         }
 
@@ -10730,6 +10829,506 @@
         function sortSalesCustRank(key){ toggleSalesSort(salesCustRankSort, key, key === 'name' ? 'asc' : 'desc'); renderSalesRanking(); }
 
         // [신규] 고객 통계 — 선택 기간·완료(배달·픽업) 기준. 성별/연령/신규재구매/등급/배달픽업/이탈. '미선택' 별도 표시.
+        /* ===== [신규] 고객 추이 (총고객·신규·재구매·이탈위험) =====
+           칩은 '지금 고른 기간' 한 덩어리만 보여 주는데, 늘고 있는지 줄고 있는지는 알 수 없다.
+           기간을 주/월/년으로 쪼개 각 구간의 사람 수를 선으로 잇는다.
+            · 총고객   = 그 구간에 산 사람 수 (중복 없이)
+            · 신규     = 그 구간이 첫 구매인 사람
+            · 재구매   = 그 전에도 산 적 있는 사람
+            · 이탈위험 = 그 구간 끝 시점에 마지막 구매가 30일 넘은 사람  */
+        let custTrendUnit = 'month';   // 'week' | 'month' | 'year'
+
+        function setCustTrendUnit(u){
+            custTrendUnit = u;
+            renderSalesRanking();      // 고객 통계 탭을 다시 그린다
+        }
+
+        function buildCustomerTrend(unit){
+            const src = getSalesSourceOrders();
+            const isDone = o => { const st=String(o.status||''); return st==='배달완료'||st==='픽업'; };
+            const _p2 = n => String(n).padStart(2,'0');
+
+            // 사람별 구매일 목록 (전체 이력)
+            const person = new Map();
+            src.forEach(o => {
+                if (isSalesCanceled(o) || !isDone(o)) return;
+                const d = salesOrderDate(o);
+                if (!d || isNaN(d.getTime()) || d.getFullYear() < 2000) return;
+                const del = isSalesDelivery(o);
+                if (salesMethodFilter==='delivery' && !del) return;
+                if (salesMethodFilter==='pickup' && del) return;
+                if (!salesPassCategory(o)) return;
+                const k = salesPersonKey(o);
+                if (!person.has(k)) person.set(k, []);
+                person.get(k).push(d.getTime());
+            });
+            person.forEach(list => list.sort((a,b)=>a-b));
+
+            // 구간 만들기 — 자료가 있는 첫 달부터 마지막 달까지
+            const allTimes = [];
+            person.forEach(list => { allTimes.push(list[0], list[list.length-1]); });
+            if (allTimes.length === 0) return [];
+            const minT = Math.min.apply(null, allTimes), maxT = Math.max.apply(null, allTimes);
+
+            const buckets = [];
+            const push = (start, end, label) => buckets.push({ label, start: start.getTime(), end: end.getTime() });
+            if (unit === 'year') {
+                for (let y = new Date(minT).getFullYear(); y <= new Date(maxT).getFullYear(); y++)
+                    push(new Date(y,0,1), new Date(y,11,31,23,59,59), `${y}년`);
+            } else if (unit === 'day') {
+                const s = new Date(minT); s.setHours(0,0,0,0);
+                for (let d = new Date(s); d.getTime() <= maxT; d.setDate(d.getDate()+1)) {
+                    const e = new Date(d); e.setHours(23,59,59,999);
+                    push(new Date(d), e, `${d.getMonth()+1}/${d.getDate()}`);
+                }
+            } else if (unit === 'week') {
+                const s = new Date(minT); s.setHours(0,0,0,0); s.setDate(s.getDate() - ((s.getDay()+6)%7));
+                for (let d = new Date(s); d.getTime() <= maxT; d.setDate(d.getDate()+7)) {
+                    const e = new Date(d); e.setDate(e.getDate()+6); e.setHours(23,59,59,999);
+                    push(new Date(d), e, `${d.getMonth()+1}/${d.getDate()}`);
+                }
+            } else {
+                const s = new Date(new Date(minT).getFullYear(), new Date(minT).getMonth(), 1);
+                for (let d = new Date(s); d.getTime() <= maxT; d.setMonth(d.getMonth()+1)) {
+                    const e = new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59);
+                    push(new Date(d), e, `${_p2(d.getMonth()+1)}월`);
+                }
+            }
+            // 너무 길면 최근 구간만 남긴다 (일 단위는 한 달치가 보이도록 조금 더 길게)
+            const _cap = (unit === 'day') ? 30 : 24;
+            if (buckets.length > _cap) buckets.splice(0, buckets.length - _cap);
+
+            const churnMs = 30*24*60*60*1000;
+            return buckets.map(b => {
+                let total=0, nw=0, re=0, churn=0;
+                person.forEach(list => {
+                    const inBucket = list.some(t => t >= b.start && t <= b.end);
+                    if (inBucket) {
+                        total++;
+                        if (list[0] >= b.start) nw++; else re++;
+                    }
+                    // 그 구간 끝 시점 기준 이탈위험 (그 전에 산 적이 있고, 30일 넘게 안 온 사람)
+                    const before = list.filter(t => t <= b.end);
+                    if (before.length && (b.end - before[before.length-1]) > churnMs) churn++;
+                });
+                return { label: b.label, total, nw, re, churn };
+            });
+        }
+
+        /* [수정] 선 네 개를 겹쳐 그렸더니 서로 가려 읽기 어려웠다.
+           · 신규 + 재구매를 쌓아 막대 하나로 만든다 → 막대 높이가 곧 '총고객'이라 선을 하나 줄일 수 있다
+           · 이탈위험만 성격이 달라(그 구간에 안 온 사람) 빨간 선으로 위에 얹는다
+           막대 위에 총고객 수를 숫자로 적어, 그래프를 못 읽어도 값은 보이게 한다. */
+        function customerTrendSvg(rows){
+            if (!rows.length) return `<div style="padding:14px; text-align:center; color:var(--text-sub); font-size:12px;">추이를 그릴 자료가 없습니다.</div>`;
+
+            const W = 640, H = 250, PL = 30, PR = 10, PT = 22, PB = 26;
+            const plotH = H - PT - PB;
+            const maxV = Math.max(1, ...rows.map(r => Math.max(r.total, r.churn)));
+            const n = rows.length;
+            const slot = (W - PL - PR) / n;
+            const bw = Math.max(6, Math.min(34, slot * 0.6));
+            const cx = i => PL + slot * i + slot / 2;
+            const y = v => PT + (1 - v / maxV) * plotH;
+
+            // 가로 눈금
+            const grid = [0, 0.5, 1].map(f => {
+                const v = Math.round(maxV * f), yy = y(v);
+                return `<line x1="${PL}" y1="${yy.toFixed(1)}" x2="${W-PR}" y2="${yy.toFixed(1)}" stroke="#eef2f6" stroke-width="1"/>`
+                     + `<text x="${PL-4}" y="${(yy+3).toFixed(1)}" text-anchor="end" font-size="9" fill="#b0bac5">${v}</text>`;
+            }).join('');
+
+            // 재구매(아래) + 신규(위) 쌓기
+            const bars = rows.map((r, i) => {
+                const x0 = (cx(i) - bw/2).toFixed(1);
+                const yRe = y(r.re), yTop = y(r.total);
+                const hRe = Math.max(0, y(0) - yRe), hNw = Math.max(0, yRe - yTop);
+                return `<g><title>${r.label} · 총 ${r.total}명 (신규 ${r.nw} / 재구매 ${r.re})</title>`
+                    + (hRe > 0 ? `<rect x="${x0}" y="${yRe.toFixed(1)}" width="${bw.toFixed(1)}" height="${hRe.toFixed(1)}" fill="#2563eb" rx="2"/>` : '')
+                    + (hNw > 0 ? `<rect x="${x0}" y="${yTop.toFixed(1)}" width="${bw.toFixed(1)}" height="${hNw.toFixed(1)}" fill="#34d399" rx="2"/>` : '')
+                    + `<text x="${cx(i).toFixed(1)}" y="${(yTop-5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="800" fill="#0f172a">${r.total}</text>`
+                    + `</g>`;
+            }).join('');
+
+            // 이탈위험만 선으로 얹는다 (신규·재구매는 막대에 이미 들어 있다)
+            const _line = (key, color, name) => {
+                const pts = rows.map((r,i) => `${cx(i).toFixed(1)},${y(r[key]).toFixed(1)}`).join(' ');
+                return `<polyline fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${pts}"/>`
+                    + rows.map((r,i)=>`<circle cx="${cx(i).toFixed(1)}" cy="${y(r[key]).toFixed(1)}" r="3" fill="#fff" stroke="${color}" stroke-width="2"><title>${r.label} ${name} ${r[key]}명</title></circle>`).join('');
+            };
+            const churnLine = _line('churn', '#dc2626', '이탈위험');
+
+            // 가로축 이름 (촘촘하면 건너뛴다)
+            const step = Math.ceil(n / 10);
+            const xlab = rows.map((r,i)=> (i % step === 0 || i === n-1)
+                ? `<text x="${cx(i).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="9" fill="#94a3b8">${r.label}</text>` : '').join('');
+
+            const legend = [
+                { c:'#34d399', t:'신규' },
+                { c:'#2563eb', t:'재구매' },
+                { c:'#dc2626', t:'이탈위험', line:true }
+            ].map(s => `<span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:800; color:#334155;">`
+                + `<span style="width:12px; height:${s.line?'3px':'10px'}; background:${s.c}; border-radius:${s.line?'2px':'3px'};"></span>${s.t}</span>`).join('');
+
+            return `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:250px; display:block;">${grid}${bars}${churnLine}${xlab}</svg>`
+                + `<div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:2px;">${legend}`
+                + `<span style="font-size:10.5px; font-weight:700; color:#94a3b8;">막대 높이 = 총고객</span></div>`;
+        }
+
+        /* [신규] 총고객·신규·재구매·이탈위험 칩을 누르면 누가 있는지 보여 준다.
+           숫자만 보고는 '누구를 챙겨야 하나'를 알 수 없어서, 이름·연락처·마지막 방문을 함께 낸다. */
+        function showCustomerListDetail(kind){
+            const { from, to } = getSalesPeriodRange();
+            const today = salesTodayMidnight();
+            const src = getSalesSourceOrders();
+            const isDone = o => { const st=String(o.status||''); return st==='배달완료'||st==='픽업'; };
+            const vDate = o => { const d=salesOrderDate(o); return (d && !isNaN(d.getTime()) && d.getFullYear()>=2000) ? d : null; };
+
+            // 사람별로 전체 이력과 기간 내 실적을 모은다
+            const all = new Map();
+            src.forEach(o => {
+                if (isSalesCanceled(o) || !isDone(o)) return;
+                const d = vDate(o); if (!d) return;
+                const del = isSalesDelivery(o);
+                if (salesMethodFilter==='delivery' && !del) return;
+                if (salesMethodFilter==='pickup' && del) return;
+                if (!salesPassCategory(o)) return;
+                const k = salesPersonKey(o);
+                if (!all.has(k)) all.set(k, { name:'', phone:'', tel:'', first:d.getTime(), last:d.getTime(), inAmt:0, allAmt:0, inCnt:0, inDays:new Set(), visits:new Set() });
+                const g = all.get(k);
+                g.allAmt += parseInt(o.total||0)||0;   // [신규] 전체 이력 구매금액 (기간과 무관)
+                if (o.name && !g.name) g.name = String(o.name);
+                if (o.phone && !g.phone) g.phone = String(o.phone).replace(/\D/g,'');
+                if (!g.tel) g.tel = salesNormPhone(o);  // 문자 발송용은 정규화된 번호만 쓴다
+                if (d.getTime() < g.first) g.first = d.getTime();
+                if (d.getTime() > g.last) g.last = d.getTime();
+                g.visits.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+                const inRange = (!from || d >= from) && (!to || d <= to);
+                if (inRange) { g.inAmt += parseInt(o.total||0)||0; g.inCnt += parseInt(o.qty||0)||0; g.inDays.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`); }
+            });
+
+            const churnMs = 30*24*60*60*1000;
+            const warnMs  = 15*24*60*60*1000;   // [신규] 이탈의심 — 30일을 넘기기 전에 미리 챙기려는 구간
+            const rows = [];
+            all.forEach(g => {
+                const boughtInRange = g.inDays.size > 0;
+                const isNew = boughtInRange && (!from || g.first >= from.getTime());
+                const isRet = boughtInRange && !isNew;
+                const gap = today.getTime() - g.last;
+                const isChurn = gap > churnMs;
+                const isWarn = gap > warnMs && !isChurn;   // 이탈위험과 겹치지 않게 15~30일만
+                if (kind === 'total' && !boughtInRange) return;
+                if (kind === 'new' && !isNew) return;
+                if (kind === 'return' && !isRet) return;
+                if (kind === 'churn' && !isChurn) return;
+                if (kind === 'warn' && !isWarn) return;
+                rows.push({
+                    name: g.name || '(이름없음)',
+                    phone: g.phone ? g.phone.slice(-4) : '',
+                    tel: g.tel || '',                     // 문자 보내기에 쓸 전체 번호
+                    amt: g.inAmt,
+                    allAmt: g.allAmt,
+                    visits: g.visits.size,
+                    last: g.last,
+                    days: Math.floor((today.getTime() - g.last) / (24*60*60*1000))
+                });
+            });
+
+            // 정렬 기준은 표 제목(휴대폰은 위쪽 칩)을 눌러 바꾼다. 기본은 마지막 방문이 가까운 사람부터.
+            custListState = { rows, kind, key: 'last', dir: -1 };
+
+            const title = { total:'총 고객', new:'신규 고객', return:'재구매 고객', warn:'이탈의심 고객(15~30일)', churn:'이탈위험 고객(30일+)' }[kind] || '고객';
+            const _cn = { fruit:'과일', group:'공동구매', sada:'사다드림', other:'상시판매' }[salesCategoryFilter];
+
+            // 이탈위험 명단에서는 바로 문자를 보낼 수 있게 기본 문구를 함께 띄운다
+            const smsBox = ((kind === 'churn' || kind === 'warn') && rows.length) ? `
+                <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:11px; padding:10px 11px; margin-bottom:10px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+                        <div style="font-size:12px; font-weight:900; color:#9a3412;">✉️ 문자 기본 내용</div>
+                        <div style="font-size:10.5px; font-weight:700; color:#c2410c;">{이름} 자리에 고객 이름이 들어갑니다</div>
+                    </div>
+                    <textarea id="churnSmsTpl" rows="3" oninput="markChurnSmsDirty()" placeholder="보내실 문구를 여기에 적고 [저장하기]를 눌러주세요.&#10;예) {이름}님 안녕하세요, 모켓입니다. 좋은 과일 들어왔어요!" style="width:100%; box-sizing:border-box; border:1px solid #fdba74; border-radius:8px; padding:8px; font-size:12.5px; font-weight:600; color:#0f172a; resize:vertical; font-family:inherit;">${gEscapeHtml(loadChurnSmsTpl())}</textarea>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px;">
+                        <span id="churnSmsSaved" style="font-size:10.5px; font-weight:700; color:#16a34a; visibility:hidden;">저장됨</span>
+                        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                            <span onclick="resetChurnSmsTpl()" style="font-size:10.5px; font-weight:800; color:#9a3412; cursor:pointer; text-decoration:underline;">내용 지우기</span>
+                            <span id="churnSmsSaveBtn" onclick="saveChurnSmsTpl()" style="background:#ea580c; color:#fff; font-size:12px; font-weight:900; padding:7px 16px; border-radius:8px; cursor:pointer; white-space:nowrap;">저장하기</span>
+                        </div>
+                    </div>
+                </div>` : '';
+
+            const body = rows.length === 0
+                ? `<div style="padding:30px; text-align:center; color:#94a3b8; font-size:13px; font-weight:700;">해당하는 고객이 없습니다.</div>`
+                : smsBox + `<div id="custListTable"></div>`;
+
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,0.55); display:flex; align-items:center; justify-content:center; padding:16px;';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            modal.innerHTML = `<div style="background:#fff; border-radius:16px; width:100%; max-width:600px; max-height:82vh; display:flex; flex-direction:column; overflow:hidden;">
+                <div style="padding:14px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                    <div style="min-width:0;">
+                        <div style="font-size:15px; font-weight:900; color:#0f172a;">👥 ${title}${_cn?` · ${_cn}`:''}</div>
+                        <div style="font-size:12px; font-weight:700; color:#64748b; margin-top:2px;">${rows.length.toLocaleString()}명</div>
+                    </div>
+                    <span style="font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;" onclick="this.closest('div[style*=fixed]').remove()">&times;</span>
+                </div>
+                <div style="overflow-y:auto; padding:8px 12px 14px;">${body}</div>
+            </div>`;
+            document.body.appendChild(modal);
+            renderCustomerListTable();
+            if (document.getElementById('churnSmsTpl')){
+                pullChurnSmsTpl();   // 다른 기기에서 고친 문구 반영
+                pullChurnSmsLog();   // 다른 기기에서 보낸 날짜 반영
+            }
+        }
+
+        /* [신규] 이탈위험 고객 문자 보내기
+           사장님이 문구를 한 번 만들어 두면(기기에 저장) 목록의 [문자] 버튼으로
+           휴대폰 문자앱이 번호·내용이 채워진 채 열린다. 보내기는 사장님이 직접 누른다. */
+        const CHURN_SMS_KEY = 'moket_churn_sms_tpl';
+        const CHURN_SMS_DEFAULT = '';   // 문구는 사장님이 직접 쓴다(빈 칸으로 시작)
+
+        function gEscapeHtml(s){
+            return String(s == null ? '' : s)
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
+        // 문구는 서버에 두어야 컴퓨터에서 적은 걸 휴대폰에서도 그대로 본다.
+        // 화면은 기기 캐시로 먼저 채우고(끊겨도 보이게), 서버 값이 오면 덮어쓴다.
+        const CHURN_SMS_URL = `${FIREBASE_DB_URL}settings/churn_sms_template.json`;
+
+        function loadChurnSmsTpl(){
+            try { const v = localStorage.getItem(CHURN_SMS_KEY); if (v !== null) return v; } catch(e){}
+            return CHURN_SMS_DEFAULT;
+        }
+
+        async function pullChurnSmsTpl(){
+            try {
+                const res = await fetch(`${CHURN_SMS_URL}?t=${Date.now()}`);
+                if (!res.ok) return;
+                const v = await res.json();
+                if (v === null || v === undefined) return;
+                const text = String(v);
+                try { localStorage.setItem(CHURN_SMS_KEY, text); } catch(e){}
+                const el = document.getElementById('churnSmsTpl');
+                // 사장님이 이미 고쳐쓰고 있는 중이면 가로채지 않는다
+                if (el && document.activeElement !== el && el.value !== text) el.value = text;
+            } catch(e){ console.error('문자 문구 불러오기 실패:', e); }
+        }
+
+        function churnSmsMsg(msg, color){
+            const tag = document.getElementById('churnSmsSaved');
+            if (!tag) return;
+            tag.textContent = msg; tag.style.color = color; tag.style.visibility = 'visible';
+        }
+
+        // 고치는 중에는 아직 저장 전이라는 걸 버튼으로 알려준다
+        function markChurnSmsDirty(){
+            const btn = document.getElementById('churnSmsSaveBtn');
+            if (btn){ btn.textContent = '저장하기'; btn.style.background = '#ea580c'; }
+            churnSmsMsg('아직 저장 전입니다', '#c2410c');
+        }
+
+        async function saveChurnSmsTpl(){
+            const el = document.getElementById('churnSmsTpl');
+            if (!el) return;
+            const text = el.value;
+            try { localStorage.setItem(CHURN_SMS_KEY, text); } catch(e){}
+
+            const btn = document.getElementById('churnSmsSaveBtn');
+            if (btn){ btn.textContent = '저장 중…'; btn.style.background = '#94a3b8'; }
+            churnSmsMsg('저장 중…', '#64748b');
+
+            const ok = await fbPutRetry(CHURN_SMS_URL, text);
+            if (ok){
+                if (btn){ btn.textContent = '저장 완료'; btn.style.background = '#16a34a'; }
+                churnSmsMsg('저장됐습니다 · 휴대폰에서도 보입니다', '#16a34a');
+                clearTimeout(window.__churnSmsSavedT);
+                window.__churnSmsSavedT = setTimeout(() => {
+                    const t = document.getElementById('churnSmsSaved'); if (t) t.style.visibility = 'hidden';
+                    const b = document.getElementById('churnSmsSaveBtn');
+                    if (b){ b.textContent = '저장하기'; b.style.background = '#ea580c'; }
+                }, 2500);
+            } else {
+                if (btn){ btn.textContent = '다시 저장'; btn.style.background = '#dc2626'; }
+                churnSmsMsg('서버 저장 실패 — 이 기기에서만 적용됩니다', '#dc2626');
+            }
+        }
+
+        function resetChurnSmsTpl(){
+            const el = document.getElementById('churnSmsTpl');
+            if (!el) return;
+            el.value = CHURN_SMS_DEFAULT;
+            saveChurnSmsTpl();
+        }
+
+        /* [신규] 문자 보낸 날 기록. 서버에 두어야 컴퓨터에서 보낸 걸 휴대폰에서도 안다.
+           키는 정규화된 번호, 값은 'YYYY-MM-DD'. */
+        const CHURN_SMS_LOG_KEY = 'moket_churn_sms_log';
+        let churnSmsLog = {};
+        try { churnSmsLog = JSON.parse(localStorage.getItem(CHURN_SMS_LOG_KEY) || '{}') || {}; } catch(e){ churnSmsLog = {}; }
+
+        async function pullChurnSmsLog(){
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}customer_sms_log.json?t=${Date.now()}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data && typeof data === 'object'){
+                    churnSmsLog = data;
+                    try { localStorage.setItem(CHURN_SMS_LOG_KEY, JSON.stringify(data)); } catch(e){}
+                    renderCustomerListTable();   // 날짜가 늦게 와도 표에 채워지도록
+                }
+            } catch(e){ console.error('문자 보낸 날 불러오기 실패:', e); }
+        }
+
+        function markChurnSmsSent(tel){
+            if (!tel) return;
+            const d = new Date();
+            const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            churnSmsLog[tel] = iso;
+            try { localStorage.setItem(CHURN_SMS_LOG_KEY, JSON.stringify(churnSmsLog)); } catch(e){}
+            renderCustomerListTable();   // 문자앱으로 넘어가기 전에 화면부터 바꿔둔다
+            // 서버 저장은 기다리지 않는다 — 늦어져도 문자앱이 바로 열려야 하므로
+            fbPutRetry(`${FIREBASE_DB_URL}customer_sms_log/${encodeURIComponent(tel)}.json`, iso)
+                .then(ok => { if (!ok) showToast('문자 보낸 날을 서버에 저장하지 못했습니다. (이 기기에만 남습니다)'); });
+        }
+
+        function churnSmsSentAt(tel){ return (tel && churnSmsLog[tel]) ? String(churnSmsLog[tel]) : ''; }
+
+        function churnSmsTextFor(name){
+            const el = document.getElementById('churnSmsTpl');
+            const tpl = el ? el.value : loadChurnSmsTpl();
+            return String(tpl).replace(/\{이름\}/g, String(name || '고객').replace(/\(이름없음\)/, '고객'));
+        }
+
+        function sendChurnSms(idx){
+            const r = (custListState.view || [])[idx];
+            if (!r) return;
+            if (!r.tel){ showSystemModal('전화번호 없음', '이 고객은 번호가 저장돼 있지 않아 문자를 보낼 수 없습니다.', 'alert'); return; }
+            const text = churnSmsTextFor(r.name);
+            if (!text.trim()){   // 문구가 비어 있으면 빈 문자가 열리므로 먼저 쓰게 한다
+                showSystemModal('문구를 먼저 적어주세요', '위 [문자 기본 내용] 칸에 보내실 문구를 적으면 그대로 문자에 채워집니다.', 'alert');
+                const el = document.getElementById('churnSmsTpl'); if (el) el.focus();
+                return;
+            }
+            markChurnSmsSent(r.tel);   // 누구에게 언제 보냈는지 남긴다(같은 분께 또 보내지 않도록)
+            // PC에서는 문자앱이 없으니 내용을 복사해 두고, 휴대폰에서는 문자앱을 연다
+            try { navigator.clipboard && navigator.clipboard.writeText(text); } catch(e){}
+            // iOS는 body 앞에 '&', 안드로이드는 '?'를 쓴다
+            const sep = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) ? '&' : '?';
+            location.href = `sms:${r.tel}${sep}body=${encodeURIComponent(text)}`;
+        }
+
+        /* [신규] 고객 목록 표 정렬 상태. 제목을 누르면 그 기준으로 다시 그린다.
+           같은 제목을 또 누르면 오름/내림이 뒤집힌다. */
+        let custListState = { rows: [], key: 'amt', dir: -1 };
+
+        function sortCustomerList(key){
+            if (!custListState.rows.length) return;
+            if (custListState.key === key) custListState.dir = -custListState.dir;
+            else { custListState.key = key; custListState.dir = (key === 'name') ? 1 : -1; }  // 이름만 가나다순이 자연스럽다
+            renderCustomerListTable();
+        }
+
+        function renderCustomerListTable(){
+            const wrap = document.getElementById('custListTable');
+            if (!wrap) return;
+            const { rows, key, dir } = custListState;
+
+            // 문자 보낸 적 없는 분이 위로 오도록, 안 보낸 사람은 가장 오래된 값으로 친다
+            const val = (r) => key === 'name' ? r.name
+                : (key === 'smsAt' ? (churnSmsSentAt(r.tel) ? Date.parse(churnSmsSentAt(r.tel)) : 0)
+                : (key === 'last' ? r.last : r[key]));
+            const sorted = rows.slice().sort((a, b) => {
+                const x = val(a), y = val(b);
+                let c;
+                if (key === 'name') c = String(x).localeCompare(String(y), 'ko');
+                else c = (x - y);
+                if (c === 0) c = (a.amt - b.amt) || String(a.name).localeCompare(String(b.name), 'ko');
+                return c * dir;
+            });
+
+            custListState.view = sorted;   // [문자] 버튼이 정렬된 순서 그대로 사람을 찾도록
+
+            const fd = t => { const d = new Date(t); return `${d.getMonth()+1}/${d.getDate()}`; };
+            const arrow = k => key === k ? `<span style="color:#2563eb;"> ${dir < 0 ? '▼' : '▲'}</span>` : '';
+            const th = (k, label, align) => `<th onclick="sortCustomerList('${k}')" style="padding:7px 6px; text-align:${align}; white-space:nowrap; cursor:pointer; user-select:none; color:${key===k?'#2563eb':'#475569'};">${label}${arrow(k)}</th>`;
+            const sms = custListState.kind === 'churn' || custListState.kind === 'warn';
+
+            // 문자 보낸 날 표시 (없으면 null).
+            // recent = 오늘 보낸 사람. 이 사람만 버튼이 '다시'로 바뀐다.
+            // 오늘 돌리는 중에 같은 분께 두 번 보내는 것만 막으면 되므로 당일 기준으로 둔다.
+            const smsCell = (r) => {
+                const s = churnSmsSentAt(r.tel);
+                if (!s) return null;
+                const sd = new Date(s + 'T00:00:00');
+                const days = Math.floor((salesTodayMidnight().getTime() - sd.getTime()) / (24*60*60*1000));
+                return { md: `${sd.getMonth()+1}/${sd.getDate()}`, ago: days <= 0 ? '오늘' : days + '일 전', days, recent: days <= 0 };
+            };
+
+            /* 휴대폰에서는 칸이 일곱이면 글자가 뭉개진다. 좁은 화면은 한 사람씩 카드로 보여주고
+               정렬은 표 제목 대신 위쪽 버튼으로 고른다. */
+            if (window.innerWidth < 640){
+                const chip = (k, label) => `<span onclick="sortCustomerList('${k}')" style="flex-shrink:0; padding:5px 10px; border-radius:999px; font-size:11.5px; font-weight:800; cursor:pointer; white-space:nowrap; border:1.5px solid ${key===k?'#2563eb':'#e2e8f0'}; background:${key===k?'#eff6ff':'#fff'}; color:${key===k?'#2563eb':'#64748b'};">${label}${key===k?(dir<0?' ▼':' ▲'):''}</span>`;
+                wrap.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:5px; overflow-x:auto; padding:0 0 8px; -webkit-overflow-scrolling:touch;">
+                        <span style="flex-shrink:0; font-size:11px; font-weight:800; color:#94a3b8; padding-right:2px;">정렬</span>
+                        ${chip('visits','방문')}${chip('allAmt','총 매출')}${chip('amt','기간 매출')}${chip('last','마지막')}${sms?chip('smsAt','문자보냄'):''}${chip('name','이름')}
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:7px;">${sorted.map((r, i) => {
+                        const sc = smsCell(r);
+                        return `<div style="border:1px solid #e2e8f0; border-radius:11px; padding:9px 10px;">
+                            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                                <div style="min-width:0;">
+                                    <div style="font-size:13.5px; font-weight:900; color:#0f172a;">${r.name}${r.phone?` <span style="color:#94a3b8; font-weight:700; font-size:11.5px;">☎${r.phone}</span>`:''}</div>
+                                    <div style="font-size:11px; font-weight:700; color:#64748b; margin-top:3px;">
+                                        마지막 ${fd(r.last)} · <span style="color:${r.days>=30?'#dc2626':'#64748b'};">${r.days}일 전</span> · ${r.visits}회 방문
+                                    </div>
+                                </div>
+                                ${sms ? (r.tel
+                                    ? `<span onclick="sendChurnSms(${i})" style="flex-shrink:0; background:${(sc&&sc.recent)?'#c4b5fd':'#f97316'}; color:#fff; font-size:12px; font-weight:900; padding:8px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;">${(sc&&sc.recent)?'다시':'문자'}</span>`
+                                    : `<span style="flex-shrink:0; font-size:10.5px; font-weight:700; color:#cbd5e1;">번호없음</span>`) : ''}
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:7px;">
+                                <span style="font-size:11px; font-weight:800; color:#0f172a; background:#f1f5f9; border-radius:6px; padding:3px 7px;">총 ${r.allAmt.toLocaleString()}원</span>
+                                <span style="font-size:11px; font-weight:800; color:#d97706; background:#fffbeb; border-radius:6px; padding:3px 7px;">기간 ${r.amt.toLocaleString()}원</span>
+                                ${sms && sc ? `<span style="font-size:11px; font-weight:800; color:#7c3aed; background:#f5f3ff; border-radius:6px; padding:3px 7px;">문자 ${sc.md} (${sc.ago})</span>` : ''}
+                            </div>
+                        </div>`;
+                    }).join('')}</div>`;
+                return;
+            }
+
+            wrap.innerHTML = `<table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+                <thead><tr style="border-bottom:1.5px solid #e2e8f0; font-weight:800; background:#f8fafc;">
+                    ${th('name','고객','left')}
+                    ${th('amt','기간 매출','right')}
+                    ${th('allAmt','총 매출','right')}
+                    ${th('visits','방문','right')}
+                    ${th('last','마지막','right')}
+                    ${sms ? th('smsAt','문자보냄','right') : ''}
+                    ${sms ? `<th style="padding:7px 4px; text-align:center; color:#475569;">문자</th>` : ''}
+                </tr></thead><tbody>${sorted.map((r, i) => `
+                    <tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:6px; font-weight:800; color:#0f172a;">${r.name}${r.phone?` <span style="color:#94a3b8; font-weight:700;">☎${r.phone}</span>`:''}</td>
+                        <td style="padding:6px; text-align:right; font-weight:800; color:#d97706; white-space:nowrap;">${r.amt.toLocaleString()}원</td>
+                        <td style="padding:6px; text-align:right; font-weight:800; color:#0f172a; white-space:nowrap;">${r.allAmt.toLocaleString()}원</td>
+                        <td style="padding:6px; text-align:right; font-weight:700; color:#475569; white-space:nowrap;">${r.visits}회</td>
+                        <td style="padding:6px; text-align:right; font-weight:700; color:${r.days>=30?'#dc2626':'#475569'}; white-space:nowrap;">${fd(r.last)}<br><span style="font-size:10.5px;">${r.days}일 전</span></td>
+                        ${sms ? `<td style="padding:6px; text-align:right; font-weight:700; white-space:nowrap;">${(() => {
+                            const sc = smsCell(r);
+                            if (!sc) return `<span style="color:#cbd5e1;">—</span>`;
+                            return `<span style="color:#7c3aed;">${sc.md}</span>`
+                                 + `<br><span style="font-size:10.5px; color:#a78bfa;">${sc.ago}</span>`;
+                        })()}</td>` : ''}
+                        ${sms ? `<td style="padding:6px 4px; text-align:center;">${r.tel
+                            ? (() => { const sc = smsCell(r); const again = !!(sc && sc.recent);
+                                return `<span onclick="sendChurnSms(${i})" style="display:inline-block; background:${again ? '#c4b5fd' : '#f97316'}; color:#fff; font-size:11px; font-weight:900; padding:5px 9px; border-radius:7px; cursor:pointer; white-space:nowrap;">${again ? '다시' : '문자'}</span>`; })()
+                            : `<span style="font-size:10.5px; font-weight:700; color:#cbd5e1;">번호없음</span>`}</td>` : ''}
+                    </tr>`).join('')}</tbody></table>`;
+        }
+
         function renderCustomerStats(box){
             const { from, to } = getSalesPeriodRange();
             const today = salesTodayMidnight();
@@ -10782,8 +11381,11 @@
                 const c = am ? am.days.size : 1;
                 if (c>=10) gVIP++; else if (c>=5) gDangol++; else if (c>=2) gRe++; else gNew++;
             });
-            let churn=0; const churnMs=30*24*60*60*1000;
-            allMap.forEach(g=>{ if ((today.getTime()-g.last) > churnMs) churn++; });
+            let churn=0, warn=0; const churnMs=30*24*60*60*1000, warnMs=15*24*60*60*1000;
+            allMap.forEach(g=>{ const gap=today.getTime()-g.last;
+                if (gap > churnMs) churn++;                 // 이탈위험
+                else if (gap > warnMs) warn++;              // [신규] 이탈의심 — 아직 되돌릴 수 있는 구간
+            });
 
             if (totalCust === 0){ box.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-sub); font-size:13px;">해당 기간 고객이 없습니다.</div>`; return; }
 
@@ -10807,11 +11409,30 @@
             const aColor = k => agePalette[k] || '#8b5cf6';
 
             box.innerHTML = `
+                <!-- [신규] 누르면 그 사람들이 누구인지 명단이 뜬다 -->
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
-                    ${salesStatChip('총 고객(기간)', totalCust+'명')}
-                    ${salesStatChip('신규 / 재구매', newC+' / '+retC+'명')}
-                    ${salesStatChip('이탈위험(30일+)', churn+'명', churn>0?'#dc2626':null)}
+                    <div onclick="showCustomerListDetail('total')" style="cursor:pointer;" title="누르면 명단">${salesStatChip('총 고객(기간) ▸', totalCust+'명')}</div>
+                    <div onclick="showCustomerListDetail('new')" style="cursor:pointer;" title="누르면 명단">${salesStatChip('신규 ▸', newC+'명', '#10b981')}</div>
+                    <div onclick="showCustomerListDetail('return')" style="cursor:pointer;" title="누르면 명단">${salesStatChip('재구매 ▸', retC+'명', '#2563eb')}</div>
+                    <div onclick="showCustomerListDetail('warn')" style="cursor:pointer;" title="누르면 명단">${salesStatChip('이탈의심(15일+) ▸', warn+'명', warn>0?'#f59e0b':null)}</div>
+                    <div onclick="showCustomerListDetail('churn')" style="cursor:pointer;" title="누르면 명단">${salesStatChip('이탈위험(30일+) ▸', churn+'명', churn>0?'#dc2626':null)}</div>
                 </div>
+
+                <!-- [신규] 위 숫자들이 늘고 있는지 줄고 있는지 선으로 본다 -->
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:12px 0 6px; flex-wrap:wrap;">
+                    <div style="font-size:13px; font-weight:800; color:#334155;">📉 고객 추이</div>
+                    <div style="display:flex; gap:4px;">
+                        ${['day','week','month','year'].map(u => {
+                            const on = custTrendUnit === u;
+                            const nm = { day:'일', week:'주', month:'월', year:'년' }[u];
+                            return `<button type="button" onclick="setCustTrendUnit('${u}')" style="padding:5px 12px; border:1.5px solid ${on?'var(--primary)':'var(--border)'}; background:${on?'var(--primary-light)':'#fff'}; color:${on?'var(--primary)':'var(--text-sub)'}; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">${nm}</button>`;
+                        }).join('')}
+                    </div>
+                </div>
+                <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px 6px 6px;">
+                    ${customerTrendSvg(buildCustomerTrend(custTrendUnit))}
+                </div>
+
                 ${sec('👩 성별 분포')}
                 ${distBar(genderKeys.map(k=>({label:k, count:genderDist[k], color:gColor(k)})))}
                 ${sec('🎂 연령대 분포')}
@@ -10896,7 +11517,8 @@
 
         // [신규] 그래프 단위 버튼 (자동 · 시간 · 일 · 주 · 월 · 년)
         //  '자동'은 고른 기간에 맞춘 기본 모습이고, 나머지는 그 단위로 강제로 쪼개 본다.
-        const TREND_UNITS = [[null, '자동'], ['hour', '시간'], ['day', '일'], ['week', '주'], ['month', '월'], ['year', '년']];
+        // [신규] '요일' 추가 — 고른 기간을 월~일 일곱 칸으로 모아 본다 (어느 요일에 잘 나가는지)
+        const TREND_UNITS = [[null, '자동'], ['hour', '시간'], ['dow', '요일'], ['day', '일'], ['week', '주'], ['month', '월'], ['year', '년']];
 
         function buildTrendUnitTabs() {
             const box = document.getElementById('trend-unit-tabs');
@@ -10912,14 +11534,49 @@
             const box = document.getElementById('sales-daily-trend');
             const titleEl = document.getElementById('sales-trend-title');
             const _pad = n => String(n).padStart(2, '0');
-            const nameMap = { hour: '시간대별', day: '일자별', week: '주별', month: '월별', year: '연도별' };
-            if (titleEl) titleEl.innerText = `📈 ${nameMap[unit] || ''} 매출 추이`;
+            const nameMap = { hour: '시간대별', dow: '요일별', day: '일자별', week: '주별', month: '월별', year: '연도별' };
+            if (titleEl) titleEl.innerText = `📈 ${nameMap[unit] || ''} ${salesMetricName()} 추이`;
+
+            /* [신규] 요일별 — 고른 기간의 날짜를 월~일 일곱 칸으로 모은다.
+               같은 요일이 여러 번 들어 있으므로 '합계'와 함께 '하루 평균'도 적어 준다.
+               (4주짜리 기간이면 월요일이 4번 들어가므로 합계만 보면 주별 그래프와 헷갈린다) */
+            if (unit === 'dow') {
+                const names = ['월', '화', '수', '목', '금', '토', '일'];
+                const rows = names.map(n => ({ name: n, amount: 0, days: 0 }));
+                const seen = new Set();
+                dayMap.forEach((amt, ds) => {
+                    const p = String(ds).split('-');
+                    if (p.length !== 3) return;
+                    const d = new Date(+p[0], +p[1] - 1, +p[2]);
+                    const idx = (d.getDay() + 6) % 7;      // 월요일이 0
+                    rows[idx].amount += amt;
+                    if (!seen.has(ds)) { seen.add(ds); rows[idx].days += 1; }
+                });
+                const dmax = Math.max.apply(null, rows.map(r => r.amount).concat([1]));
+                box.innerHTML = `<div style="display:flex; flex-direction:column; gap:5px; height:196px;">` + rows.map(v => {
+                    const pct = Math.round(v.amount / dmax * 100);
+                    const avg = v.days ? Math.round(v.amount / v.days) : 0;
+                    const _i = names.indexOf(v.name);
+                    return `<div onclick="showDowDetail(${_i},'${escapeArg(v.name + '요일')}')" style="display:flex; align-items:center; gap:8px; flex:1 1 0; min-height:0; cursor:pointer;" title="${v.days}일치 합계 · 클릭 시 판매 상품 내역">
+                        <div style="width:36px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${v.name}</div>
+                        <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:100%;">
+                            <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
+                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;">
+                                <span>${v.amount.toLocaleString()}${salesMetricUnit()}</span>
+                                <span style="color:#64748b; font-size:10px; font-weight:700;">${v.days ? `평균 ${avg.toLocaleString()}${salesMetricUnit()} ▶` : '▶'}</span>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('') + `</div>`;
+                return;
+            }
 
             // 시간대는 날짜별 합계로는 만들 수 없어 주문에서 직접 센다
             if (unit === 'hour') {
                 const { from, to } = getSalesPeriodRange();
                 const bands = [];
                 for (let b = 0; b < 6; b++) bands.push({ s: b * 4, e: b * 4 + 4, amount: 0 });
+                const _hDays = new Set();   // [신규] 평균을 내려면 며칠치인지 알아야 한다
                 getSalesSourceOrders().forEach(o => {
                     if (isSalesCanceled(o)) return;
                     const d = salesOrderDate(o);
@@ -10928,17 +11585,20 @@
                     if (to && d > to) return;
                     const t = parseTimestampToDate(o.timestamp);
                     const h = (t && !isNaN(t.getTime())) ? t.getHours() : 0;
-                    bands[Math.min(5, Math.floor(h / 4))].amount += parseInt(o.total || 0) || 0;
+                    bands[Math.min(5, Math.floor(h / 4))].amount += (salesTrendMetric === 'count' ? (parseInt(o.qty || 0) || 0) : (parseInt(o.total || 0) || 0));
+                    _hDays.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
                 });
+                const _hd = _hDays.size || 1;
                 const hmax = Math.max.apply(null, bands.map(b => b.amount).concat([1]));
                 box.innerHTML = `<div style="display:flex; flex-direction:column; gap:5px; height:196px;">` + bands.map(v => {
                     const pct = Math.round(v.amount / hmax * 100);
                     const label = `${_pad(v.s)}-${_pad(v.e)}시`;
-                    return `<div onclick="showHourBandDetail(${v.s},${v.e},'${escapeArg(label)}')" style="display:flex; align-items:center; gap:8px; flex:1 1 0; min-height:0; cursor:pointer;" title="클릭 시 판매 상품 내역">
+                    const avg = Math.round(v.amount / _hd);   // 하루 평균
+                    return `<div onclick="showHourBandDetail(${v.s},${v.e},'${escapeArg(label)}')" style="display:flex; align-items:center; gap:8px; flex:1 1 0; min-height:0; cursor:pointer;" title="${_hd}일치 합계 · 클릭 시 판매 상품 내역">
                         <div style="width:64px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${label}</div>
                         <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:100%;">
                             <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
-                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}원</span><span style="color:#64748b; font-size:10px;">▶</span></div>
+                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}${salesMetricUnit()}</span><span style="color:#64748b; font-size:10px; font-weight:700;">평균 ${avg.toLocaleString()}${salesMetricUnit()} ▶</span></div>
                         </div>
                     </div>`;
                 }).join('') + `</div>`;
@@ -11011,7 +11671,7 @@
                     <div style="width:${lblW}px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${v.label}</div>
                     <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:100%;">
                         <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
-                        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}원</span><span style="color:#64748b; font-size:10px;">▶</span></div>
+                        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}${salesMetricUnit()}</span><span style="color:#64748b; font-size:10px;">▶</span></div>
                     </div>
                 </div>`;
             }).join('') + `</div>`;
@@ -11054,8 +11714,10 @@
                 const isDelivery = isSalesDelivery(o);
                 if (salesMethodFilter === 'delivery' && !isDelivery) return;
                 if (salesMethodFilter === 'pickup' && isDelivery) return;
+                if (!salesPassCategory(o)) return;   // [신규] 분류 골라 보기 (매출 추이도 같이 걸린다)
                 const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                map.set(ds, (map.get(ds) || 0) + (parseInt(o.total || 0) || 0));
+                // [수정] 건수 보기일 때는 주문한 수량대로 센다 (한 줄에서 2개 시켰으면 2건)
+                map.set(ds, (map.get(ds) || 0) + (salesTrendMetric === 'count' ? (parseInt(o.qty || 0) || 0) : (parseInt(o.total || 0) || 0)));
             });
             return map;
         }
@@ -11134,6 +11796,7 @@
             const titleEl = document.getElementById('sales-trend-title');
             if (!box) return;
 
+
             // [신규] 그래프 단위를 직접 고른 경우, 고른 기간을 그 단위로 쪼개 그린다
             buildTrendUnitTabs();
             if (salesTrendUnitOverride) {
@@ -11143,7 +11806,7 @@
 
             // [신규] 일: 시간대별(4시간 6구간, 24시간제) — 00시부터 오름차순(00-04시가 맨 위 → 20-24시), 전체 높이 고정, 막대 클릭 시 주문내역
             if (salesUnit === 'today' || salesUnit === 'day'){
-                if (titleEl) titleEl.innerText = '📈 시간대별 매출 추이';
+                if (titleEl) titleEl.innerText = `📈 시간대별 ${salesMetricName()} 추이`;
                 const hourMap = _salesHourCache || new Map();
                 const _p2 = n => String(n).padStart(2,'0');
                 const bands = [];
@@ -11159,7 +11822,7 @@
                         <div style="width:64px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${bandLabel}</div>
                         <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:100%;">
                             <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
-                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}원</span><span style="color:#64748b; font-size:10px;">▶</span></div>
+                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}${salesMetricUnit()}</span><span style="color:#64748b; font-size:10px;">▶</span></div>
                         </div>
                     </div>`;
                 }).join('') + `</div>`;
@@ -11168,7 +11831,7 @@
             // [신규] 주/월/분기/년: 선택 기간을 하위 구간으로 쪼개 표시 — 일자(기간) 내림차순(최근이 위), 전체 높이 고정
             if (salesUnit === 'week' || salesUnit === 'month' || salesUnit === 'quarter' || salesUnit === 'year'){
                 const _tmap = { week:'일별', month:'주별', quarter:'월별', year:'분기별' };
-                if (titleEl) titleEl.innerText = `📈 ${_tmap[salesUnit]} 매출 추이`;
+                if (titleEl) titleEl.innerText = `📈 ${_tmap[salesUnit]} ${salesMetricName()} 추이`;
                 const { buckets, keyOf, wideFrom, wideTo } = salesSubTrendBuckets();
                 const bmap = new Map(buckets.map(b => [b.key, b]));
                 // [수정] 기간 밖으로 걸친 주(전달 끝·다음달 초)는 dayMap에 없으므로 주문에서 직접 채운다.
@@ -11185,7 +11848,7 @@
                         <div style="width:${lblW}px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${v.label}</div>
                         <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:100%;">
                             <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
-                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}원</span><span style="color:#64748b; font-size:10px;">▶</span></div>
+                            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}${salesMetricUnit()}</span><span style="color:#64748b; font-size:10px;">▶</span></div>
                         </div>
                     </div>`;
                 }).join('') + `</div>`;
@@ -11195,7 +11858,7 @@
             const autoUnit = (salesPeriod === 'yearall' || salesPeriod === 'recent_year') ? 'month'
                            : (salesPeriod === 'month' || salesPeriod === 'recent_month') ? 'week' : 'day';
             const unit = salesTrendUnitOverride || autoUnit;
-            if (titleEl) titleEl.innerText = (unit === 'week') ? '📈 주차별 매출 추이' : (unit === 'month' ? '📈 월별 매출 추이' : '📈 일자별 매출 추이');
+            if (titleEl) titleEl.innerText = `📈 ${(unit === 'week') ? '주차별' : (unit === 'month' ? '월별' : '일자별')} ${salesMetricName()} 추이`;
             // 일/주/월 탭 활성 표시
             ['day','week','month'].forEach(u => { const b = document.getElementById('trend-unit-' + u); if (b) b.classList.toggle('active', u === unit); });
 
@@ -11245,7 +11908,7 @@
                     <div style="width:${v.range ? 100 : 48}px; font-size:11px; color:var(--text-sub); text-align:right; flex-shrink:0; white-space:nowrap;">${lbl}</div>
                     <div style="flex:1; position:relative; background:#f1f5f9; border-radius:4px; overflow:hidden; height:22px;">
                         <div style="width:${pct}%; height:100%; background:var(--primary); min-width:2px;"></div>
-                        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}원</span><span style="color:#64748b; font-size:10px;">▶</span></div>
+                        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px; font-weight:800; color:#1e293b;"><span>${v.amount.toLocaleString()}${salesMetricUnit()}</span><span style="color:#64748b; font-size:10px;">▶</span></div>
                     </div>
                 </div>`;
             }).join('') + `</div>`;
@@ -11278,7 +11941,7 @@
                     <th onclick="sortTrendDetail('cnt')" style="${th} text-align:right;">건수${_trendArrow('cnt')}</th>
                     <th onclick="sortTrendDetail('amount')" style="${th} text-align:right;">금액${_trendArrow('amount')}</th>
                 </tr></thead>
-                <tbody>${sorted.map(([nm, v]) => `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:8px; word-break:break-all;">${nm}</td><td style="padding:8px; text-align:right; white-space:nowrap; font-weight:800; color:#2563eb;">${v.cnt}건</td><td style="padding:8px; text-align:right; white-space:nowrap; font-weight:700;">${v.amount.toLocaleString()}원</td></tr>`).join('')}</tbody>
+                <tbody>${sorted.map(([nm, v]) => `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:8px; word-break:break-all;">${nm}</td><td style="padding:8px; text-align:right; white-space:nowrap; font-weight:800; color:#2563eb;">${v.cnt}건</td><td style="padding:8px; text-align:right; white-space:nowrap; font-weight:700;">${v.amount.toLocaleString()}${salesMetricUnit()}</td></tr>`).join('')}</tbody>
             </table>`;
         }
         function showTrendDetail(startISO, endISO, title){
@@ -11295,15 +11958,51 @@
                 const isDel = isSalesDelivery(o);
                 if (salesMethodFilter === 'delivery' && !isDel) return;
                 if (salesMethodFilter === 'pickup' && isDel) return;
+                if (!salesPassCategory(o)) return;   // [신규] 위에서 고른 분류만 (그래프와 같은 내역이 나오게)
                 const nm = String(o.item || '상품명 없음');
                 if (!items.has(nm)) items.set(nm, { cnt: 0, amount: 0 });
+                // [수정] 주문한 횟수가 아니라 산 개수로 센다 (한 줄에서 2개면 2건).
+                //  막대 그래프와 같은 기준이라야 눌러 들어갔을 때 숫자가 맞는다.
+                const _q = parseInt(o.qty || 0) || 0;
                 const it = items.get(nm);
-                it.cnt += 1; it.amount += parseInt(o.total || 0) || 0;
-                totalCnt += 1; totalAmt += parseInt(o.total || 0) || 0;
+                it.cnt += _q; it.amount += parseInt(o.total || 0) || 0;
+                totalCnt += _q; totalAmt += parseInt(o.total || 0) || 0;
             });
             _trendDetail.rows = [...items.entries()];
-            _openSalesDetailModal(title, totalAmt, totalCnt);
+            // 지금 분류를 골라 본 상태면 제목에도 드러낸다
+            const _cn = { fruit: '과일', group: '공동구매', sada: '사다드림', other: '상시판매' }[salesCategoryFilter];
+            _openSalesDetailModal(_cn ? `${title} · ${_cn}` : title, totalAmt, totalCnt);
         }
+        // [신규] 요일 막대 클릭 → 고른 기간 안에서 그 요일에 팔린 상품 내역
+        //  (하루가 아니라 여러 날이 묶여 있으므로 날짜 범위가 아니라 요일로 거른다)
+        function showDowDetail(dowIdx, title){
+            const { from, to } = getSalesPeriodRange();
+            const items = new Map(); let totalAmt = 0, totalCnt = 0;
+            const days = new Set();
+            getSalesSourceOrders().forEach(o => {
+                if (isSalesCanceled(o)) return;
+                const st = String(o.status || ''); if (st !== '배달완료' && st !== '픽업') return;
+                const d = salesOrderDate(o);
+                if (!d || isNaN(d.getTime()) || d.getFullYear() < 2000) return;
+                if (from && d < from) return; if (to && d > to) return;
+                if (((d.getDay() + 6) % 7) !== dowIdx) return;   // 월요일이 0
+                const isDel = isSalesDelivery(o);
+                if (salesMethodFilter === 'delivery' && !isDel) return;
+                if (salesMethodFilter === 'pickup' && isDel) return;
+                if (!salesPassCategory(o)) return;
+                const nm = String(o.item || '상품명 없음');
+                if (!items.has(nm)) items.set(nm, { cnt: 0, amount: 0 });
+                const _q = parseInt(o.qty || 0) || 0;
+                const it = items.get(nm); it.cnt += _q; it.amount += parseInt(o.total || 0) || 0;
+                totalCnt += _q; totalAmt += parseInt(o.total || 0) || 0;
+                days.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+            });
+            _trendDetail.rows = [...items.entries()];
+            const _cn = { fruit: '과일', group: '공동구매', sada: '사다드림', other: '상시판매' }[salesCategoryFilter];
+            const _t = `${title}${days.size ? ` (${days.size}일치)` : ''}${_cn ? ` · ${_cn}` : ''}`;
+            _openSalesDetailModal(_t, totalAmt, totalCnt);
+        }
+
         // [신규] 시간대(4시간 구간) 클릭 → 그 날짜·시간대의 판매 상품 내역 (주문시각 hour 기준)
         function showHourBandDetail(hStart, hEnd, title){
             const { from, to } = getSalesPeriodRange();
@@ -11316,17 +12015,20 @@
                 const isDel = isSalesDelivery(o);
                 if (salesMethodFilter === 'delivery' && !isDel) return;
                 if (salesMethodFilter === 'pickup' && isDel) return;
+                if (!salesPassCategory(o)) return;   // [신규] 위에서 고른 분류만
                 const ot = parseTimestampToDate(o.timestamp);
                 if (!ot || isNaN(ot.getTime())) return;
                 const h = ot.getHours();
                 if (h < hStart || h >= hEnd) return;
                 const nm = String(o.item || '상품명 없음');
                 if (!items.has(nm)) items.set(nm, { cnt: 0, amount: 0 });
-                const it = items.get(nm); it.cnt += 1; it.amount += parseInt(o.total || 0) || 0;
-                totalCnt += 1; totalAmt += parseInt(o.total || 0) || 0;
+                const _q = parseInt(o.qty || 0) || 0;   // [수정] 산 개수로 센다 (그래프와 같은 기준)
+                const it = items.get(nm); it.cnt += _q; it.amount += parseInt(o.total || 0) || 0;
+                totalCnt += _q; totalAmt += parseInt(o.total || 0) || 0;
             });
             _trendDetail.rows = [...items.entries()];
-            _openSalesDetailModal(title, totalAmt, totalCnt);
+            const _cn2 = { fruit: '과일', group: '공동구매', sada: '사다드림', other: '상시판매' }[salesCategoryFilter];
+            _openSalesDetailModal(_cn2 ? `${title} · ${_cn2}` : title, totalAmt, totalCnt);
         }
         // [공용] 판매 상세 모달 (정렬 헤더 있는 표) — 매출추이·카테고리 공용
         // extraHtml: 표 위에 끼워 넣을 추가 분석 영역 (사다드림 고객 구성 등, 없으면 빈 문자열)
@@ -11371,8 +12073,9 @@
                 const bucket = (c === 'fruit') ? 'fruit' : (c === 'sada') ? 'sada' : (c === 'group') ? 'group' : 'other';
                 if (bucket !== cat) return;
                 if (!items.has(nm)) items.set(nm, { cnt: 0, amount: 0 });
-                const it = items.get(nm); it.cnt += 1; it.amount += parseInt(o.total || 0) || 0;
-                totalCnt += 1; totalAmt += parseInt(o.total || 0) || 0;
+                const _q = parseInt(o.qty || 0) || 0;   // [수정] 산 개수로 센다 (그래프와 같은 기준)
+                const it = items.get(nm); it.cnt += _q; it.amount += parseInt(o.total || 0) || 0;
+                totalCnt += _q; totalAmt += parseInt(o.total || 0) || 0;
             });
             _trendDetail.rows = [...items.entries()];
             // [신규] 사다드림은 '사다드림만 산 고객 vs 다른 상품도 함께 산 고객' 구성을 함께 보여준다.
