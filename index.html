@@ -2040,6 +2040,34 @@
         }
         /* [신규] 상품명 아랫줄의 노출·매주노출 버튼 — 둘이 반씩 나눠 갖는다.
            .price-option-btn이 116px로 고정돼 있어 여기서만 풀어 준다. */
+        /* [신규] 보관방법 버튼 — 냉동·냉장·상온 세 개를 한 줄에 정확히 3등분.
+           flex:1 1 0 + min-width:0 이라야 글자 수가 달라도 폭이 어긋나지 않는다.
+           좁은 폰에서도 세 개가 한 줄에 들어가도록 글자·여백을 줄여 뒀다. */
+        #tab-admin-products .storage-btn {
+            flex: 1 1 0;
+            min-width: 0;
+            box-sizing: border-box;
+            text-align: center;
+            padding: 11px 4px;
+            font-size: 13px;
+            font-weight: 800;
+            white-space: nowrap;
+            border-radius: var(--radius-sub);
+            border: 1.5px solid var(--border);
+            background: #ffffff;
+            color: var(--text-sub);
+            cursor: pointer;
+            transition: background .15s, border-color .15s, color .15s;
+        }
+        #tab-admin-products .storage-btn.active {
+            border-color: var(--primary);
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+        @media (max-width: 360px) {
+            #tab-admin-products .storage-btn { font-size: 12px; padding: 10px 2px; }
+        }
+
         #tab-admin-products .name-btn-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -2297,16 +2325,17 @@
                                 </div>
                             </div>
 
-                            <!-- 보관방법 지정 -->
+                            <!-- 보관방법 지정 : 드롭다운 대신 버튼 3개를 한 줄에 균등 배치 -->
                             <div class="form-group">
-                                <label>보관방법 지정</label>
-                                <select id="storageType" class="form-control" style="background-color: white; border: 1.5px solid var(--border); font-weight: 700;">
-                                    <option value="auto">자동 분석 (상품 설명 기준)</option>
-                                    <option value="frozen">냉동보관 (frozen)</option>
-                                    <option value="fridge">냉장보관 (fridge)</option>
-                                    <option value="room">실온보관 (room)</option>
-                                    <option value="none">표시안함 (none)</option>
-                                </select>
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+                                    <label style="margin-bottom:0;">보관방법 지정</label>
+                                    <span id="storageTypeHint" style="font-size:11px; font-weight:700; color:var(--text-sub);">안 고르면 표시 안 함</span>
+                                </div>
+                                <div style="display:flex; gap:6px; width:100%;">
+                                    <button type="button" class="storage-btn" data-storage="냉동" onclick="setStorageType('냉동')">❄️ 냉동</button>
+                                    <button type="button" class="storage-btn" data-storage="냉장" onclick="setStorageType('냉장')">🧊 냉장</button>
+                                    <button type="button" class="storage-btn" data-storage="상온" onclick="setStorageType('상온')">📦 상온</button>
+                                </div>
                             </div>
 
                             <!-- 재고 수량 -->
@@ -7913,6 +7942,40 @@
         let uploadMaxAmount = 0;         // 최대금액 (0이면 상한 없음)
         let uploadProductOptions = [];   // 폼에 반영된 옵션 그룹 목록
         let uploadUseAgencyFee = false;  // 사다드림 대행료 사용 여부
+
+        /* [신규] 보관방법(냉동·냉장·상온). 상품 카드에 보관 뱃지로 나간다.
+           ''이면 안 붙는다. 고른 버튼을 다시 누르면 해제된다. */
+        let uploadStorageType = '';
+
+        function setStorageType(v){
+            uploadStorageType = (uploadStorageType === v) ? '' : v;   // 같은 걸 또 누르면 해제
+            paintStorageType();
+        }
+
+        function paintStorageType(){
+            document.querySelectorAll('#tab-admin-products .storage-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.storage === uploadStorageType);
+            });
+            const hint = document.getElementById('storageTypeHint');
+            if (hint){
+                hint.innerText = uploadStorageType ? '한 번 더 누르면 해제' : '안 고르면 표시 안 함';
+            }
+        }
+
+        /* [신규] 상품목록에 붙일 보관방법 뱃지.
+           주문서 카드(gStorageBadge)와 같은 기준·같은 색으로 맞춘다.
+           보관방법을 따로 지정하지 않았어도 분류(matchKey)가 냉동/냉장/상온이면 그것으로 본다.
+           지정도 분류도 없으면 아무것도 안 붙인다. */
+        function gListStorageBadge(prod){
+            const s = String((prod && prod.storage) || '') + ' ' + String((prod && prod.matchKey) || '');
+            let label, bg, fg;
+            if (/냉동/.test(s))      { label = '❄️ 냉동'; bg = '#eef4ff'; fg = '#1d4ed8'; }
+            else if (/냉장/.test(s)) { label = '🧊 냉장'; bg = '#eafaf2'; fg = '#047857'; }
+            else if (/상온|실온/.test(s)) { label = '📦 상온'; bg = '#fff4e9'; fg = '#c2610a'; }
+            else return '';
+            return `<span style="font-size:10px; font-weight:800; background:${bg}; color:${fg};`
+                 + ` padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:2px;">${label}</span>`;
+        }
         let uploadAgencyFeeTiers = [];   // 금액 구간별 대행료: [{ from: 기준금액(이상), fee: 대행료 }]
         let optionModalDraft = null;     // 모달에서 편집 중인 임시 사본 (저장 눌러야 폼에 반영)
 
@@ -11217,7 +11280,9 @@
             try { navigator.clipboard && navigator.clipboard.writeText(text); } catch(e){}
             // iOS는 body 앞에 '&', 안드로이드는 '?'를 쓴다
             const sep = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) ? '&' : '?';
-            location.href = `sms:${r.tel}${sep}body=${encodeURIComponent(text)}`;
+            // 줄바꿈은 CRLF로 보낸다. LF만 넣으면 줄을 무시하고 한 덩어리로 붙여버리는 문자앱이 있다.
+            const smsText = text.replace(/\r?\n/g, '\r\n');
+            location.href = `sms:${r.tel}${sep}body=${encodeURIComponent(smsText)}`;
         }
 
         /* [신규] 고객 목록 표 정렬 상태. 제목을 누르면 그 기준으로 다시 그린다.
@@ -13812,6 +13877,9 @@
                         ? `<span style="font-size: 10px; font-weight: 800; background: #fee2e2; color: #ef4444; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🙈 숨김</span>`
                         : `<span style="font-size: 10px; font-weight: 800; background: #dcfce7; color: #22c55e; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">👁️ 노출중</span>`;
 
+                    // [신규] 보관방법 뱃지. 주문서 상품카드에 뜨는 것과 같은 색으로 맞춰 둔다.
+                    const storageBadge = gListStorageBadge(prod);
+
                     // [신규] 재고관리 모드: 선반 지정 드롭다운
                     let actionsHtml;
                     if (uploadManageDeliveryType === 'inventory') {
@@ -13864,7 +13932,7 @@
                                 ${prod.productCode ? `<span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${prod.productCode}</span>` : ``}
                                 <span>${parseInt(prod.price).toLocaleString()}원</span>
                                 ${stockText ? `<span style="color: var(--text-sub);">|</span><span>${stockText}</span>` : ``}
-                                ${statusBadge}
+                                ${storageBadge}${statusBadge}
                             </div>
                         </div>
                         ${actionsHtml}
@@ -14297,6 +14365,9 @@
                 const shelfEl = document.getElementById('productShelf');
                 if (shelfEl) productObj.shelf = shelfEl.value;
 
+                // [신규] 보관방법(냉동·냉장·상온) → 주문서 상품카드의 보관 뱃지
+                productObj.storage = uploadStorageType || '';
+
                 // ===== [신규] 같은 이름의 상품은 만들지 못하게 막는다 =====
                 //  상품명이 사실상 상품을 구분하는 열쇠다(재고 조정키·주문 기록·주문서 중복차단이 전부 이름 기준).
                 //  이름이 겹치면 주문서에서 한쪽이 통째로 안 보이고 재고·주문 집계도 엉킨다.
@@ -14720,6 +14791,18 @@
             // [수정] 규칙이 저장돼 있으면 그대로 쓰고, 예전 구간표만 있는 상품은 규칙으로 되돌려 읽는다
             uploadAgencyFeeRule = gNormalizeAgencyRule(prod.agencyFeeRule, prod.agencyFeeTiers);
             uploadAgencyFeeTiers = gAgencyRuleToTiers(uploadAgencyFeeRule);
+            // [신규] 보관방법 — 저장된 값이 없으면 분류(matchKey)에서 읽어 온다.
+            //  예전 상품은 storage 없이 matchKey만 '냉동' 식으로 갖고 있어서, 그래야 버튼이 비어 보이지 않는다.
+            uploadStorageType = (() => {
+                const s = String(prod.storage || '').trim();
+                if (s === '냉동' || s === '냉장' || s === '상온') return s;
+                const mk = String(prod.matchKey || '');
+                if (/냉동/.test(mk)) return '냉동';
+                if (/냉장/.test(mk)) return '냉장';
+                if (/상온|실온/.test(mk)) return '상온';
+                return '';
+            })();
+            paintStorageType();
             updateDetailOptionButtonUI();
             updatePriceFieldForAmountLimit();
 
@@ -14773,6 +14856,8 @@
             uploadEditShelf = ''; // [신규] 선반위치 기억값 초기화
             uploadEditIsSada = false; // [신규] 사다드림 체크 기억값 초기화
             uploadIsFresh = false;    // [신규] 신선식품 선택도 함께 초기화
+            uploadStorageType = '';   // [신규] 보관방법 버튼도 해제
+            paintStorageType();
             uploadEditIsRecommend = false; // [신규] 오늘의추천 체크 기억값 초기화
             uploadDisplayTab = ''; // [신규] 분류탭 초기화 (새 상품은 '없음'으로 시작)
             updateDisplayTabUI();
