@@ -3974,6 +3974,43 @@
             return APARTMENT_EXTRA.concat(APARTMENT_DATA);
         }
 
+        /* [신규] 아파트 표를 서버(apartment_table)에서 받아 위 기본표를 갈아끼운다.
+           예전에는 같은 표가 주문관리와 배달기사에 따로 한 벌씩 있어서, 한쪽만 고치면
+           다른 쪽은 그대로였다. 스타힐스가 배달기사에서만 '기타'로 떨어진 게 그 탓이다.
+           이제 서버 한 벌을 두 화면이 같이 읽으므로 한 번만 고치면 된다.
+           아래 코드에 박힌 표는 서버를 못 받았을 때 쓰는 예비본으로 남긴다. */
+        const APT_TABLE_KEY = 'moket_apt_table';
+
+        function gApplyApartmentTable(rows) {
+            if (!Array.isArray(rows) || rows.length === 0) return false;
+            const mapped = rows.filter(r => r && r.name).map(r => ({
+                name: String(r.name),
+                roads: Array.isArray(r.roads) ? r.roads : [],
+                lots: Array.isArray(r.lots) ? r.lots : [],
+                keywords: Array.isArray(r.keywords) ? r.keywords : [],
+                aliases: Array.isArray(r.aliases) ? r.aliases : []
+            }));
+            if (!mapped.length) return false;
+            APARTMENT_DATA.length = 0;         // 순서가 판정에 영향을 주므로 통째로 갈아끼운다
+            mapped.forEach(m => APARTMENT_DATA.push(m));
+            return true;
+        }
+
+        async function loadApartmentTable() {
+            try {
+                const cached = localStorage.getItem(APT_TABLE_KEY);
+                if (cached) gApplyApartmentTable(JSON.parse(cached));
+            } catch (e) {}
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}apartment_table.json?t=${Date.now()}`);
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                const rows = await res.json();
+                if (gApplyApartmentTable(rows)) {
+                    try { localStorage.setItem(APT_TABLE_KEY, JSON.stringify(rows)); } catch (e) {}
+                }
+            } catch (e) { console.warn('아파트 표 불러오기 실패(예비본 사용):', e); }
+        }
+
         // [신규] 사장님이 직접 넣는 검색 별칭. Firebase(apartment_alias)에 아파트명을 키로 저장한다.
         //  기본표(APARTMENT_DATA)의 aliases는 코드에 박혀 있어 손댈 수 없으므로, 여기에 더해서 쓴다.
         //  { 아파트명: [별칭, ...] }
@@ -9054,7 +9091,7 @@
         }
 
         async function renderApartmentAdmin() {
-            await Promise.all([loadApartmentCustom(), loadApartmentAlias(), loadApartmentExtra()]);
+            await Promise.all([loadApartmentCustom(), loadApartmentAlias(), loadApartmentExtra(), loadApartmentTable()]);
             renderApartmentTest();
             buildApartPeriodTabs();
 
@@ -11110,13 +11147,10 @@
                         <div style="font-size:12px; font-weight:900; color:#9a3412;">✉️ 문자 기본 내용</div>
                         <div style="font-size:10.5px; font-weight:700; color:#c2410c;">{이름} 자리에 고객 이름이 들어갑니다</div>
                     </div>
-                    <textarea id="churnSmsTpl" rows="3" oninput="markChurnSmsDirty()" placeholder="보내실 문구를 여기에 적고 [저장하기]를 눌러주세요.&#10;예) {이름}님 안녕하세요, 모켓입니다. 좋은 과일 들어왔어요!" style="width:100%; box-sizing:border-box; border:1px solid #fdba74; border-radius:8px; padding:8px; font-size:12.5px; font-weight:600; color:#0f172a; resize:vertical; font-family:inherit;">${gEscapeHtml(loadChurnSmsTpl())}</textarea>
+                    <textarea id="churnSmsTpl" rows="3" readonly placeholder="여기를 눌러 문구를 적어주세요." style="width:100%; box-sizing:border-box; border:1px solid #fdba74; border-radius:8px; padding:8px; font-size:12.5px; font-weight:600; color:#0f172a; resize:vertical; font-family:inherit;">${gEscapeHtml(loadChurnSmsTpl())}</textarea>
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px;">
                         <span id="churnSmsSaved" style="font-size:10.5px; font-weight:700; color:#16a34a; visibility:hidden;">저장됨</span>
-                        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-                            <span onclick="resetChurnSmsTpl()" style="font-size:10.5px; font-weight:800; color:#9a3412; cursor:pointer; text-decoration:underline;">내용 지우기</span>
-                            <span id="churnSmsSaveBtn" onclick="saveChurnSmsTpl()" style="background:#ea580c; color:#fff; font-size:12px; font-weight:900; padding:7px 16px; border-radius:8px; cursor:pointer; white-space:nowrap;">저장하기</span>
-                        </div>
+                        <span id="churnSmsSaveBtn" onclick="openChurnSmsEditor()" style="background:#ea580c; color:#fff; font-size:12px; font-weight:900; padding:8px 18px; border-radius:8px; cursor:pointer; white-space:nowrap; flex-shrink:0;">✏️ 문구 수정</span>
                     </div>
                 </div>` : '';
 
@@ -11139,9 +11173,18 @@
             </div>`;
             document.body.appendChild(modal);
             renderCustomerListTable();
-            if (document.getElementById('churnSmsTpl')){
+            const _tpl = document.getElementById('churnSmsTpl');
+            if (_tpl){
                 pullChurnSmsTpl();   // 다른 기기에서 고친 문구 반영
                 pullChurnSmsLog();   // 다른 기기에서 보낸 날짜 반영
+                // 명단 안의 칸은 세 줄뿐이라 컴퓨터에서도 고쳐 쓰기엔 좁다.
+                // 어느 화면이든 누르면 큰 편집창으로 보내고, 이 칸은 미리보기로만 둔다.
+                _tpl.readOnly = true;
+                _tpl.style.cursor = 'pointer';
+                _tpl.style.background = '#fffdf9';
+                _tpl.placeholder = '여기를 눌러 문구를 적어주세요.';
+                _tpl.onclick = openChurnSmsEditor;
+                _tpl.onfocus = openChurnSmsEditor;
             }
         }
 
@@ -11199,22 +11242,17 @@
             const text = el.value;
             try { localStorage.setItem(CHURN_SMS_KEY, text); } catch(e){}
 
-            const btn = document.getElementById('churnSmsSaveBtn');
-            if (btn){ btn.textContent = '저장 중…'; btn.style.background = '#94a3b8'; }
+            // 버튼은 '문구 수정'으로 그대로 두고, 진행 상황은 옆 글자로만 알린다
             churnSmsMsg('저장 중…', '#64748b');
 
             const ok = await fbPutRetry(CHURN_SMS_URL, text);
             if (ok){
-                if (btn){ btn.textContent = '저장 완료'; btn.style.background = '#16a34a'; }
                 churnSmsMsg('저장됐습니다 · 휴대폰에서도 보입니다', '#16a34a');
                 clearTimeout(window.__churnSmsSavedT);
                 window.__churnSmsSavedT = setTimeout(() => {
                     const t = document.getElementById('churnSmsSaved'); if (t) t.style.visibility = 'hidden';
-                    const b = document.getElementById('churnSmsSaveBtn');
-                    if (b){ b.textContent = '저장하기'; b.style.background = '#ea580c'; }
                 }, 2500);
             } else {
-                if (btn){ btn.textContent = '다시 저장'; btn.style.background = '#dc2626'; }
                 churnSmsMsg('서버 저장 실패 — 이 기기에서만 적용됩니다', '#dc2626');
             }
         }
@@ -11258,6 +11296,70 @@
         }
 
         function churnSmsSentAt(tel){ return (tel && churnSmsLog[tel]) ? String(churnSmsLog[tel]) : ''; }
+
+        /* [신규] 문자 문구 크게 쓰기.
+           명단 안의 작은 칸은 휴대폰에서 세 줄밖에 안 보여 긴 문구를 고치기가 어렵다.
+           화면 가득한 편집창을 따로 띄우고, 저장하면 원래 칸으로 값을 돌려준다. */
+        function openChurnSmsEditor(){
+            const src = document.getElementById('churnSmsTpl');
+            const cur = src ? src.value : loadChurnSmsTpl();
+            document.getElementById('churnSmsEditor') && document.getElementById('churnSmsEditor').remove();
+
+            const box = document.createElement('div');
+            box.id = 'churnSmsEditor';
+            box.style.cssText = 'position:fixed; inset:0; z-index:10060; background:rgba(15,23,42,0.6); display:flex; align-items:center; justify-content:center; padding:12px;';
+            box.innerHTML = `<div style="background:#fff; border-radius:14px; width:100%; max-width:560px; height:88vh; display:flex; flex-direction:column; overflow:hidden;">
+                <div style="padding:12px 14px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                    <div style="font-size:14px; font-weight:900; color:#9a3412;">✉️ 문자 문구 쓰기</div>
+                    <span onclick="closeChurnSmsEditor()" style="font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+                </div>
+                <div style="padding:8px 12px 0; font-size:11px; font-weight:700; color:#c2410c;">{이름} 자리에 고객 이름이 들어갑니다</div>
+                <textarea id="churnSmsBig" placeholder="보내실 문구를 적어주세요." style="flex:1; margin:8px 12px; padding:12px; box-sizing:border-box; border:1.5px solid #fdba74; border-radius:10px; font-size:15px; line-height:1.6; font-weight:600; color:#0f172a; resize:none; font-family:inherit;"></textarea>
+                <div style="padding:0 12px 6px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                    <span id="churnSmsBigCount" style="font-size:11px; font-weight:800; color:#64748b;"></span>
+                    <span onclick="resetChurnSmsBig()" style="font-size:11px; font-weight:800; color:#9a3412; cursor:pointer; text-decoration:underline;">내용 지우기</span>
+                </div>
+                <div style="padding:10px 12px 12px; display:flex; gap:8px; border-top:1px solid #e2e8f0;">
+                    <button type="button" onclick="closeChurnSmsEditor()" style="flex:1; padding:13px 0; border:1.5px solid var(--border); background:#fff; color:#475569; border-radius:10px; font-size:14px; font-weight:900; cursor:pointer;">취소</button>
+                    <button type="button" onclick="saveChurnSmsFromEditor()" style="flex:2; padding:13px 0; border:none; background:#ea580c; color:#fff; border-radius:10px; font-size:14px; font-weight:900; cursor:pointer;">저장하기</button>
+                </div>
+            </div>`;
+            document.body.appendChild(box);
+
+            const big = document.getElementById('churnSmsBig');
+            big.value = cur;
+            big.oninput = paintChurnSmsBigCount;
+            paintChurnSmsBigCount();
+            big.focus();
+        }
+
+        function paintChurnSmsBigCount(){
+            const big = document.getElementById('churnSmsBig');
+            const tag = document.getElementById('churnSmsBigCount');
+            if (!big || !tag) return;
+            // 한글은 한 자에 2바이트다. 90바이트를 넘으면 LMS 요금으로 넘어간다.
+            const bytes = new Blob([big.value]).size;
+            tag.innerText = `${big.value.length}자 · ${bytes}바이트 · ${bytes > 90 ? 'LMS' : 'SMS'}`;
+            tag.style.color = bytes > 90 ? '#c2410c' : '#16a34a';
+        }
+
+        function resetChurnSmsBig(){
+            const big = document.getElementById('churnSmsBig');
+            if (big){ big.value = ''; paintChurnSmsBigCount(); big.focus(); }
+        }
+
+        function closeChurnSmsEditor(){
+            const box = document.getElementById('churnSmsEditor');
+            if (box) box.remove();
+        }
+
+        async function saveChurnSmsFromEditor(){
+            const big = document.getElementById('churnSmsBig');
+            const src = document.getElementById('churnSmsTpl');
+            if (big && src) src.value = big.value;   // 작은 칸에 돌려주고 기존 저장 로직을 그대로 쓴다
+            closeChurnSmsEditor();
+            await saveChurnSmsTpl();
+        }
 
         function churnSmsTextFor(name){
             const el = document.getElementById('churnSmsTpl');
@@ -15102,7 +15204,7 @@
         window.onload = function() {
             _relocatePurchaseAgg();          // [신규] 발주집계를 주문관리 하위로 이동 (판매관리에 안 보이게)
             // [신규] 사장님이 묶은 구역·명칭을 먼저 읽어 둔다 (카드·인쇄 표시와 검색에 바로 반영)
-            Promise.all([loadApartmentCustom(), loadApartmentAlias(), loadApartmentExtra()]).then(() => {
+            Promise.all([loadApartmentCustom(), loadApartmentAlias(), loadApartmentExtra(), loadApartmentTable()]).then(() => {
                 if (APARTMENT_CUSTOM.length > 0 && typeof renderFilteredOrders === 'function') renderFilteredOrders();
             });
             // 캐시가 있으면 즉시 화면에 먼저 그려주고, 실시간 리스너로 최신 데이터를 이어받음
@@ -16378,6 +16480,11 @@
            · 매입 = 발주의 총 발주금액. 발주일자 기준.
            월별로 묶어 나란히 보여 주고, 남은 돈(매출-매입)과 그 비율을 낸다.
            ============================================================ */
+        /* [신규] 매입을 언제부터 셀지. 2026년 8월부터 발주를 제대로 적기 시작했고,
+           그 전 자료는 빠진 것과 날짜 없는 것이 섞여 있어 매입 통계를 왜곡한다.
+           매출(직접 입력)은 그대로 다 센다 — 여기만 잘라야 '남은 돈'이 엉뚱해지지 않는다. */
+        const PROFIT_BUY_FROM_MONTH = '2026-08';
+
         let profitRangeKind = '6m';
         let manualSales = {};            // { 'YYYY-MM-DD': { pos, transfer } }
         let manualSalesLoaded = false;
@@ -16555,15 +16662,20 @@
 
             // ── 매입: 발주금액, 발주일자 기준 (날짜가 'X' 같은 옛 자료는 달을 알 수 없어 뺀다)
             const buyByMonth = new Map();
-            let buySkipped = 0;
+            let buySkipped = 0, buyTooOld = 0;
             purchaseOrders.concat(purchaseArchive).forEach(po => {
                 const ds = String(po.date || '');
+                // 날짜 검사를 먼저 해야 한다. 'X' 같은 값은 글자 비교에서 '2026-08'보다 크게 나온다.
                 if (!fIsPurchaseDate(ds)) { buySkipped++; return; }
                 const k = ds.slice(0, 7);
+                if (k < PROFIT_BUY_FROM_MONTH) { buyTooOld++; return; }   // 그 전 달은 매입 통계에서 뺀다
                 buyByMonth.set(k, (buyByMonth.get(k) || 0) + (parseInt(po.totalPrice || 0) || 0));
             });
 
-            const allMonths = [...new Set([...saleByMonth.keys(), ...buyByMonth.keys()])].sort();
+            // 매입을 8월부터만 세므로 그 전 달은 표에서도 뺀다.
+            // 남겨 두면 매출만 있고 매입이 0인 달이 되어 '남은 돈'이 전액 남은 것처럼 보인다.
+            const allMonths = [...new Set([...saleByMonth.keys(), ...buyByMonth.keys()])]
+                .filter(m => m >= PROFIT_BUY_FROM_MONTH).sort();
             const fromM = getProfitFromMonth(allMonths);
             const months = allMonths.filter(m => m >= fromM).sort((a, b) => b.localeCompare(a)); // 최근 달 먼저
 
@@ -16591,7 +16703,8 @@
             ].map(x => `<div class="po-calc-cell"><div class="po-calc-label">${x.l}</div><div class="po-calc-val" style="color:${x.c};">${x.v}</div></div>`).join('');
 
             const bd = document.getElementById('profit-breakdown');
-            if (bd) bd.innerHTML = `💳 포스 <b style="color:#0284c7;">${tPos.toLocaleString()}원</b> &nbsp;·&nbsp; 🏦 계좌이체 <b style="color:#7c3aed;">${tTr.toLocaleString()}원</b>`;
+            if (bd) bd.innerHTML = `💳 포스 <b style="color:#0284c7;">${tPos.toLocaleString()}원</b> &nbsp;·&nbsp; 🏦 계좌이체 <b style="color:#7c3aed;">${tTr.toLocaleString()}원</b>`
+                + `<div style="margin-top:5px; color:#94a3b8; font-weight:700;">${PROFIT_BUY_FROM_MONTH.replace('-', '년 ')}월부터 셉니다. 그 전 발주는 빠진 자료가 많아 제외했습니다.</div>`;
 
             if (months.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" style="padding:30px; text-align:center; color:#94a3b8; font-weight:700;">이 기간에 자료가 없습니다.</td></tr>`;
