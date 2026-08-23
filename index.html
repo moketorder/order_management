@@ -261,21 +261,37 @@
             display: none;
         }
 
+        /* [수정] 년·월 고르는 칸. 폭의 절반쯤을 브라우저 기본 화살표가 먹고 있어,
+           화살표를 끄고(appearance:none) 작은 ▾를 배경으로 직접 그렸다.
+           라벨도 '26' '8'로 줄여 40px까지 줄였고, 그만큼 일 탭이 하나 더 보인다. */
         .year-select {
-            padding: 6px 8px;
+            width: 40px;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 0 9px 0 3px;
             border-radius: 8px;
             border: 1.5px solid var(--border);
-            background: white;
             font-family: inherit;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 800;
             color: var(--text-main);
             cursor: pointer;
             outline: none;
             flex-shrink: 0;
-            height: 32px;
+            height: 30px;
             align-self: center;
+            text-align: center;
+            text-align-last: center;
+            -webkit-appearance: none;
+            appearance: none;
+            /* 오른쪽 아래에 작은 ▾ (눌러서 고르는 칸이라는 표시) */
+            background-color: #fff;
+            background-image: linear-gradient(45deg, transparent 50%, #94a3b8 50%), linear-gradient(135deg, #94a3b8 50%, transparent 50%);
+            background-position: calc(100% - 6px) calc(50% + 1px), calc(100% - 3px) calc(50% + 1px);
+            background-size: 3px 3px, 3px 3px;
+            background-repeat: no-repeat;
         }
+        .year-select:disabled { cursor: default; }
 
         .main-tab-btn {
             flex: 0 0 auto;
@@ -411,6 +427,31 @@
             background: var(--primary-light);
             color: var(--primary);
             box-shadow: inset 0 0 0 1px var(--primary);
+        }
+
+        /* [신규] 메모 종류 버튼 (고객고정 / 인쇄고정 / 이번주문) — 한 줄 3칸 */
+        .memo-type-btn {
+            min-width: 0;
+            padding: 10px 4px;
+            border: 1.5px solid var(--border);
+            border-radius: 9px;
+            background: #fff;
+            color: var(--text-sub);
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 800;
+            line-height: 1.3;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: var(--transition);
+        }
+        .memo-type-btn:hover { border-color: var(--primary); color: var(--primary); }
+        .memo-type-btn.active {
+            border-color: var(--primary);
+            background: var(--primary-light);
+            color: var(--primary);
         }
 
         /* [신규] CSV 내보내기 창의 기간 빠른 선택 버튼 */
@@ -2264,20 +2305,14 @@
             background: var(--primary-light);
             color: var(--primary);
         }
+        /* [신규] '매주 노출'은 성격이 달라 켜졌을 때 보라색으로 구분한다 (예전 버튼 색 그대로) */
+        #tab-admin-products .storage-btn.active.purple {
+            border-color: #7c3aed;
+            background: #f5f3ff;
+            color: #7c3aed;
+        }
         @media (max-width: 360px) {
             #tab-admin-products .storage-btn { font-size: 12px; padding: 10px 2px; }
-        }
-
-        #tab-admin-products .name-btn-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
-            margin-top: 6px;
-        }
-        #tab-admin-products .name-btn-row .price-option-btn {
-            width: auto;
-            flex: 1 1 0;
-            min-width: 0;
         }
 
         #tab-admin-products .price-option-btn:hover {
@@ -2362,13 +2397,17 @@
                 <option value="입금완료">입금완료</option>
             </select>
 
-            <!-- 분류 탭 (연도 + 월 / 일) -->
+            <!-- 분류 탭 (연도·월 고르기 + 일 탭) -->
+            <!-- [수정] 월도 드롭다운으로 바꾸고, 일 탭을 그 옆에 붙여 한 줄로 만들었다.
+                 (예전에는 월 버튼 줄과 일 버튼 줄이 각각 한 줄씩 차지했다) -->
             <div class="tabs-section">
-                <div class="main-tabs" id="month-tabs">
-                    <!-- 월 탭 동적 로드 -->
-                </div>
-                <div class="date-filter-container" id="day-tabs">
-                    <!-- 일 탭 동적 로드 -->
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <div class="main-tabs" id="month-tabs" style="flex:0 0 auto; overflow:visible; padding:0;">
+                        <!-- 년·월 고르는 칸이 동적으로 들어간다 -->
+                    </div>
+                    <div class="date-filter-container" id="day-tabs" style="flex:1 1 0; min-width:0; padding:0;">
+                        <!-- 일 탭 동적 로드 -->
+                    </div>
                 </div>
                 <div id="order-custom-range" style="display:none; gap:6px; margin-top:6px; align-items:center; flex-wrap:wrap;">
                     <input type="date" id="order-custom-from" class="form-control" style="width:auto; height:36px;" onchange="handleFilterChange()">
@@ -2377,20 +2416,13 @@
                 </div>
             </div>
 
-            <div class="controls-card no-print">
-                <div class="controls-row button-row">
-                    <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
-                    <button class="btn-common" style="border: 1.5px solid #dc2626; background: #fef2f2; color: #dc2626; font-weight: 700;" onclick="showOverdueModal()">⚠️ 미완료</button>
-                    <button class="btn-common" style="border: 1.5px solid var(--border); background:white;" onclick="openCsvExportModal()">📤 CSV</button>
-                </div>
-            </div>
+            <!-- [수정] 이 자리에 있던 버튼 줄은 모두 옮겼다.
+                 미완료 → 아래 상태 탭 줄 끝 (건수도 함께 보이게)
+                 주문현황·CSV → 주문 집계의 요약칩 아랫줄 -->
 
-            <!-- [신규] 상태별 탭 (개수 표시, 클릭 시 그 상태만) -->
-            <div id="order-status-tabs" class="no-print" style="display:flex; flex-wrap:nowrap; gap:3px; padding:0; margin:0 0 12px; overflow-x:auto; -webkit-overflow-scrolling:touch;"></div>
-            <div id="order-status-tabs2" class="no-print" style="display:none;"></div>
-
-            <!-- [신규] 수령방법(작게) + 검색(크게) -->
-            <div class="no-print" style="display:flex; gap:8px; align-items:center; margin-bottom:4px;">
+            <!-- [수정] 기간(일·주·월)+검색 줄을 상태 탭 줄보다 위로 올렸다.
+                 날짜 → 기간 → 검색으로 좁혀 놓은 다음에 상태를 고르는 순서가 자연스럽다. -->
+            <div class="no-print" style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
                 <!-- [수정] 수령방법 순환 버튼(전체→픽업→배달)은 뺐다. 상태 탭에서 픽업·배달을 이미 나눠 보고 있다.
                      아래 숨긴 select는 값('전체')만 쓰이므로 그대로 둔다. -->
                 <select id="filterShipping" style="display:none;" onchange="handleFilterChange()">
@@ -2410,6 +2442,10 @@
                     <button id="clearSearchBtn" class="clear-search-btn" onclick="clearSearch()">&times;</button>
                 </div>
             </div>
+
+            <!-- [신규] 상태별 탭 (개수 표시, 클릭 시 그 상태만) -->
+            <div id="order-status-tabs" class="no-print" style="display:flex; flex-wrap:nowrap; gap:3px; padding:0; margin:0 0 12px; overflow-x:auto; -webkit-overflow-scrolling:touch;"></div>
+            <div id="order-status-tabs2" class="no-print" style="display:none;"></div>
 
             <!-- 일괄 처리 툴바 -->
             <div class="batch-action-bar no-print">
@@ -2460,7 +2496,8 @@
                 <!-- 구버전 tab-upload 컨테이너 복원 (세그먼트 탭 렌더링 선택자 에러 완벽 해결) -->
                 <div id="tab-upload" class="tab-content active">
                     <div class="card">
-                        <div class="card-title" id="form-card-title" style="display:none;"></div>
+                        <!-- [수정] '✏️ 상품 수정: 상품명' 줄은 뺐다. 수정 중인 것은 버튼 글자(수정 완료·취소)로
+                             이미 알 수 있고, 상품명이 길면 두 줄까지 차지했다. -->
 
                         <form id="productForm" onsubmit="submitForm(event)">
                             <!-- 대분류 세그먼트 -->
@@ -2480,107 +2517,117 @@
                                 <div id="categoryContainer"></div>
                             </div>
 
-                            <!-- [신규] 주문서에서 이 상품이 들어갈 탭을 직접 지정한다.
-                                 기본 분류는 지금처럼 상품명·분류(matchKey)로 판단하고, 이 값은 그보다 '우선'하는 덮어쓰기다.
-                                 지정하지 않으면 '없음'이라 기존 동작 그대로다. -->
-
-                            <div class="form-group">
-                                <label>분류탭 설정 <span style="font-weight:600; color:var(--text-sub);">(주문서에서 보일 위치)</span></label>
-                                <div style="display: flex; flex-wrap: nowrap; gap: 6px; align-items: stretch;">
-                                    <input type="text" id="displayTabLabel" class="form-control" readonly value="없음"
-                                        onclick="openDisplayTabSetting()"
-                                        style="flex: 1 1 auto; width: auto; min-width: 0; background-color:#f8fafc; cursor:pointer; font-weight:700;">
-                                    <button type="button" id="btn-display-tab" class="price-option-btn" onclick="openDisplayTabSetting()">분류탭</button>
-                                </div>
-                                <div style="margin-top:6px; font-size:11.5px; font-weight:700; color:var(--text-sub); line-height:1.5;">
-                                    지정하면 기존 분류보다 우선해서 그 탭에 보입니다.
-                                </div>
-                            </div>
+                            <!-- [수정] 분류탭 설정은 위 '상세 분류' 줄의 세 번째 칸으로 옮겼다.
+                                 (버튼 하나만 두고, 고른 탭 이름이 버튼 글자로 나온다) -->
 
                             <!-- 상품명 -->
                             <!-- [수정] '당일구매 노출 / 예약구매 노출'은 없앴다.
                                  노출·숨김은 상품목록에서 상품을 골라 👁️노출 / 🙈숨김으로 하는 편이 헷갈리지 않는다.
                                  남은 '매주 노출(자동 연장)'만 상품명 옆으로 옮겼다. -->
                             <div class="form-group">
-                                <label>상품명</label>
+                                <!-- [수정] 식별번호는 발주와 이어 주는 참고값일 뿐인데 한 줄을 통째로 차지하고 있었다.
+                                     상품명 라벨 오른쪽 끝에 작은 표로 붙여 자리를 안 먹게 한다.
+                                     번호가 아직 없는 상품(발주 전)에서는 아예 보이지 않는다. -->
+                                <label style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                                    <span>상품명</span>
+                                    <span id="product-code-badge" style="display:none; align-items:center; gap:4px; font-size:11px; font-weight:800; color:#475569; background:#f1f5f9; border:1px solid var(--border); border-radius:6px; padding:2px 8px; letter-spacing:0;">🔖 <span id="productCodeText"></span></span>
+                                </label>
                                 <!-- [수정] 상품명 칸이 버튼 두 개에 밀려 모바일에서 너무 좁았다.
                                      이름칸은 한 줄을 다 쓰고, 버튼 두 개는 아랫줄에 반반으로 놓는다. -->
                                 <input type="text" id="productName" class="form-control" placeholder="예: 무농약 프리미엄 딸기 1kg" required style="width: 100%; box-sizing: border-box;">
-                                <div class="name-btn-row">
-                                    <!-- [신규] 손님 화면에 보일지 여부. 예전에는 상품목록에서만 바꿀 수 있었는데,
-                                         등록·수정하면서 바로 정하는 편이 편해서 폼에도 넣었다. -->
-                                    <button type="button" id="btnShowVisible" class="price-option-btn" onclick="toggleExposure('Visible')" title="손님 화면 노출 / 숨김">👁️ 노출</button>
-                                    <button type="button" id="btnShowWeekly" class="price-option-btn" onclick="toggleExposure('Weekly')" title="매주 노출 (자동 연장)">🔁 매주 노출</button>
-                                </div>
-
-                                <!-- [신규] 식별번호 — 발주와 이어 주는 번호. 상품등록에 꼭 필요한 값은 아니라
-                                     발주가 있는 상품에만 붙는다. 손으로 못 고치게 읽기전용으로 둔다. -->
-                                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
-                                    <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
-                                    <input type="text" id="productCodeField" class="form-control" placeholder="없음" readonly tabindex="-1" style="flex:0 0 110px; height:36px; padding:7px 10px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:13px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
-                                    <span id="product-code-hint" style="font-size:12px; font-weight:700; color:#64748b; flex:1 1 200px; min-width:0;">발주를 넣으면 자동으로 생깁니다.</span>
-                                </div>
+                                <!-- [수정] 노출 버튼 두 개는 아래 '보관방법 / 노출여부' 줄로 옮겼다. -->
                             </div>
 
-                            <!-- 가격 -->
-                            <div class="form-group">
-                                <label>가격 (원)</label>
-                                <!-- [신규] 가격 칸 오른쪽에 상세옵션 버튼 배치 (모바일에서도 줄바꿈 없이 한 줄 유지) -->
-                                <div style="display: flex; flex-wrap: nowrap; gap: 6px; align-items: stretch;">
-                                    <input type="number" id="productPrice" class="form-control" placeholder="예: 15000" min="0" required style="flex: 1 1 auto; width: auto; min-width: 0;">
-                                    <button type="button" id="btn-detail-option" class="price-option-btn" onclick="openDetailOptionSetting()">상세옵션</button>
-                                </div>
-                            </div>
-
-                            <!-- 보관방법 지정 : 드롭다운 대신 버튼 3개를 한 줄에 균등 배치 -->
+                            <!-- [수정] 가격·상세옵션·재고가 각각 줄을 차지하던 것을 한 줄 세 칸으로 합쳤다. -->
                             <div class="form-group">
                                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
-                                    <label style="margin-bottom:0;">보관방법 지정</label>
+                                    <label style="margin-bottom:0;">가격(원)  ·  재고  ·  상세옵션</label>
+                                    <label class="switch-container" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="checkbox" id="unlimitedStock" onchange="toggleUnlimitedStock()" style="cursor:pointer; width:16px; height:16px;">
+                                        <span style="font-size:12px; font-weight:700; color:var(--text-sub); user-select:none;">재고 무제한</span>
+                                    </label>
+                                </div>
+                                <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px; align-items:stretch;">
+                                    <input type="number" id="productPrice" class="form-control" placeholder="가격" min="0" required style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <input type="number" id="productStock" class="form-control" placeholder="재고" min="0" required style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <button type="button" id="btn-detail-option" class="price-option-btn" onclick="openDetailOptionSetting()" style="width:100%; min-width:0; height:45px; box-sizing:border-box; padding:0 8px; overflow:hidden; text-overflow:ellipsis;">상세옵션</button>
+                                </div>
+                            </div>
+
+                            <!-- [수정] 노출여부(노출·매주)와 보관방법(냉동·냉장·상온)이 각각 한 줄씩 쓰던 것을
+                                 한 줄 다섯 칸으로 합쳤다. 둘 다 '이 상품을 어떻게 내놓을지' 정하는 값이라 같이 둔다. -->
+                            <div class="form-group">
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+                                    <label style="margin-bottom:0;">보관방법 / 노출여부</label>
                                     <span id="storageTypeHint" style="font-size:11px; font-weight:700; color:var(--text-sub);">안 고르면 표시 안 함</span>
                                 </div>
-                                <div style="display:flex; gap:6px; width:100%;">
+                                <!-- [수정] 보관방법(냉동·냉장·상온)을 앞에, 노출여부(노출·매주)를 뒤에 두고
+                                     성격이 다른 두 묶음이라 사이에 세로 구분선을 넣는다. -->
+                                <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)) auto repeat(2, minmax(0,1fr)); gap:5px; align-items:stretch;">
                                     <button type="button" class="storage-btn" data-storage="냉동" onclick="setStorageType('냉동')">❄️ 냉동</button>
                                     <button type="button" class="storage-btn" data-storage="냉장" onclick="setStorageType('냉장')">🧊 냉장</button>
                                     <button type="button" class="storage-btn" data-storage="상온" onclick="setStorageType('상온')">📦 상온</button>
+                                    <span aria-hidden="true" style="width:1px; background:var(--border); margin:3px 2px;"></span>
+                                    <!-- 손님 화면에 보일지 여부 -->
+                                    <button type="button" id="btnShowVisible" class="storage-btn" onclick="toggleExposure('Visible')" title="손님 화면 노출 / 숨김">👁️ 노출</button>
+                                    <button type="button" id="btnShowWeekly" class="storage-btn" onclick="toggleExposure('Weekly')" title="매주 노출 (자동 연장)">🔁 매주</button>
                                 </div>
                             </div>
 
-                            <!-- 재고 수량 -->
-                            <div class="form-group">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                    <label style="margin-bottom: 0;">주문 가능 재고량</label>
-                                    <label class="switch-container" style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                        <input type="checkbox" id="unlimitedStock" onchange="toggleUnlimitedStock()" style="cursor: pointer; width: 16px; height: 16px;">
-                                        <span style="font-size: 12px; font-weight: 700; color: var(--text-sub); user-select: none;">무제한</span>
-                                    </label>
-                                </div>
-                                <input type="number" id="productStock" class="form-control" placeholder="예: 50" min="0" required>
-                            </div>
+                            <!-- [수정] 재고 칸은 위 '가격 · 상세옵션 · 재고' 줄로 옮겼다. -->
 
                             <!-- 상세 설명 -->
                             <div class="form-group">
                                 <label>상세설명</label>
-                                <textarea id="productDesc" rows="3" placeholder="상품에 대한 맛, 크기, 원산지 등의 상세 설명을 입력하세요..." oninput="autoResizeTextarea(this)"></textarea>
+                                <!-- [신규] 수정할 때는 이미 적어 둔 글이라 칸만 길게 자리를 먹는다.
+                                     사진처럼 접어 두고, 고칠 때만 눌러서 편다. (새 상품 등록에서는 이 버튼이 안 나오고 칸이 늘 열려 있다) -->
+                                <button type="button" id="desc-toggle" onclick="toggleDescBox()" style="display:none; width:100%; height:50px; box-sizing:border-box; padding:0 14px; align-items:center; justify-content:space-between; gap:8px; background:#f8fafc; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-family:inherit; font-size:14px; font-weight:800; color:#334155; cursor:pointer;">
+                                    <span id="desc-toggle-text" style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left;">상세설명</span>
+                                    <span id="desc-toggle-caret" style="flex:0 0 auto; color:#94a3b8; font-size:11px;">▼</span>
+                                </button>
+                                <div id="desc-box" style="margin-top:8px;">
+                                    <textarea id="productDesc" rows="3" placeholder="상품에 대한 맛, 크기, 원산지 등의 상세 설명을 입력하세요..." oninput="autoResizeTextarea(this)"></textarea>
+                                </div>
                             </div>
 
                             <!-- 상품 사진 업로드 -->
                             <div class="form-group">
                                 <label>상품 사진</label>
-                                <div class="file-upload-zone" id="uploadZone" onclick="triggerFileInput()" style="border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 24px; text-align: center; cursor: pointer; background: #fafafa; transition: var(--transition);">
-                                    <div style="font-size: 32px; margin-bottom: 8px;">📸</div>
-                                    <div style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">사진 첨부하기</div>
-                                    <div style="font-size: 12px; color: var(--text-sub);">여기를 탭하여 사진 선택</div>
-                                    <input type="file" id="imageFile" accept="image/*" multiple style="display: none;" onchange="handleFileSelection(event)">
+                                <!-- [수정] 사진이 없을 때는 '사진 첨부하기'가 여기(맨 위)에 있고,
+                                     사진이 있으면 아래 목록 안(다운로드 버튼 위)으로 옮겨 간다.
+                                     칸을 옮기는 일은 renderSelectedFilesList가 한다. -->
+                                <div id="upload-zone-top">
+                                    <!-- [수정] 세로로 큰 칸이었는데 자리만 많이 먹었다. '등록 완료' 버튼과 같은 높이(50px) 한 줄로 줄인다. -->
+                                    <div class="file-upload-zone" id="uploadZone" onclick="triggerFileInput()" style="border: 2px dashed var(--border); border-radius: var(--radius-sm); height: 50px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; background: #fafafa; transition: var(--transition);">
+                                        <span style="font-size: 18px; line-height: 1;">📸</span>
+                                        <span style="font-size: 14px; font-weight: 700; color: var(--text-main);">사진 첨부하기</span>
+                                        <input type="file" id="imageFile" accept="image/*" multiple style="display: none;" onchange="handleFileSelection(event)">
+                                    </div>
                                 </div>
-                                
-                                <!-- 첨부 이미지 리스트 -->
-                                <div id="imageListContainer" style="display: none; margin-top: 12px;">
-                                    <div id="selectedFilesList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+
+                                <!-- [신규] 담긴 사진 장수. 누르면 아래 바둑판 목록이 펴진다/접힌다.
+                                     오른쪽 ＋는 목록을 펼치지 않고도 사진을 더 넣는 버튼. -->
+                                <div id="photo-count-row" style="display:none; gap:6px; margin-top:8px;">
+                                    <button type="button" id="photo-count-toggle" onclick="togglePhotoList()" style="flex:1 1 0; min-width:0; height:50px; box-sizing:border-box; padding:0 14px; display:flex; align-items:center; justify-content:space-between; gap:8px; background:#f8fafc; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-family:inherit; font-size:14px; font-weight:800; color:#334155; cursor:pointer;">
+                                        <span id="photo-count-text">사진 0장</span>
+                                        <span id="photo-count-caret" style="color:#94a3b8; font-size:11px;">▼</span>
+                                    </button>
+                                    <button type="button" id="photo-add-btn" onclick="triggerFileInput()" title="사진 더 넣기" style="flex:0 0 50px; width:50px; height:50px; box-sizing:border-box; padding:0; display:flex; align-items:center; justify-content:center; background:#fff; border:2px dashed var(--border); border-radius:var(--radius-sm); font-family:inherit; font-size:20px; font-weight:800; color:#64748b; line-height:1; cursor:pointer;">＋</button>
+                                </div>
+
+                                <!-- 첨부 이미지 목록 (바둑판) -->
+                                <div id="imageListContainer" style="display: none; margin-top: 8px;">
+                                    <div id="selectedFilesList" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;"></div>
+                                    <div style="margin-top:7px; font-size:11.5px; font-weight:700; color:var(--text-sub); line-height:1.5;">사진을 눌러 대표를 정하고, 끌어서 순서를 바꿉니다.</div>
+
+                                    <!-- 사진이 있을 때 '사진 첨부하기' 칸이 들어올 자리 (다운로드 버튼 바로 위) -->
+                                    <div id="upload-zone-slot"></div>
+
+                                    <!-- [수정] 사진 다운로드는 목록을 펼쳤을 때만 보이게 이 안으로 옮겼다.
+                                         (접혀 있을 때 버튼만 덩그러니 남아 무엇에 대한 것인지 알기 어려웠다) -->
+                                    <button type="button" id="btn-download-images" onclick="downloadProductImages()" style="display: none; width: 100%; height: 50px; box-sizing: border-box; margin-top: 10px; background: white; border: 1.5px solid #0284c7; color: #0284c7; border-radius: var(--radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">⬇️ 사진 다운로드</button>
                                 </div>
                             </div>
-
-                            <!-- [신규] 수정 모드: 이 상품에 등록된 이미지 다운로드 -->
-                            <button type="button" id="btn-download-images" onclick="downloadProductImages()" style="display: none; width: 100%; height: 46px; margin-top: 16px; background: white; border: 1.5px solid #0284c7; color: #0284c7; border-radius: var(--radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">⬇️ 사진 다운로드</button>
 
                             <div style="display: flex; gap: 8px; margin-top: 24px;">
                                 <button type="button" id="btn-duplicate-form" onclick="duplicateFromForm(event)" style="display: none; flex: 1 1 0; min-width: 0; padding: 0; height: 50px; background: #7c3aed; color: white; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(124,58,237,0.25); transition: var(--transition);">👯 복제하기</button>
@@ -2618,16 +2665,15 @@
                     <!-- 상품 목록 소분류 하위 탭 -->
                     <div id="sub-products-list-tabs" class="sub-tabs-container" style="display: none; margin-bottom: 12px;"></div>
                     
-                    <!-- 상품 검색창 -->
-                    <div class="search-box-container" style="margin-bottom: 12px; position: relative;">
-                        <input type="text" id="product-search-input" placeholder="🔍 상품명 또는 식별번호(P0013)로 검색..." oninput="onProductSearchInput(this.value)" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; box-sizing: border-box; outline: none; transition: var(--transition);">
-                        <button type="button" onclick="clearProductSearch(); renderProductsList();" id="btn-clear-product-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 18px; color: var(--text-sub); cursor: pointer; line-height: 1;">&times;</button>
-                    </div>
-
-                    <!-- [신규] 상품 목록 CSV 내보내기 / 업로드 -->
-                    <div style="display:flex; gap:8px; margin-bottom:12px;">
-                        <button type="button" onclick="exportProductsToCSV()" style="flex:1; padding:9px 6px; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:var(--radius-sm); font-size:12.5px; font-weight:800; cursor:pointer;">📤 목록 CSV</button>
-                        <button type="button" onclick="document.getElementById('product-csv-file').click()" style="flex:1; padding:9px 6px; border:1.5px solid #059669; background:#ecfdf5; color:#059669; border-radius:var(--radius-sm); font-size:12.5px; font-weight:800; cursor:pointer;">📥 CSV 업로드</button>
+                    <!-- [수정] 검색창과 CSV 버튼 두 개가 각각 한 줄씩 쓰던 것을 한 줄로 합쳤다.
+                         버튼은 글자를 빼고 이모지만 남겨 검색창 폭을 최대한 남긴다. -->
+                    <div style="display:flex; gap:6px; align-items:center; margin-bottom:12px;">
+                        <div class="search-box-container" style="flex:1 1 0; min-width:0; position: relative;">
+                            <input type="text" id="product-search-input" placeholder="🔍 상품명 또는 식별번호(P0013)로 검색..." oninput="onProductSearchInput(this.value)" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; box-sizing: border-box; outline: none; transition: var(--transition);">
+                            <button type="button" onclick="clearProductSearch(); renderProductsList();" id="btn-clear-product-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 18px; color: var(--text-sub); cursor: pointer; line-height: 1;">&times;</button>
+                        </div>
+                        <button type="button" onclick="exportProductsToCSV()" title="상품 목록을 CSV로 내려받기" style="flex:0 0 auto; width:42px; height:42px; padding:0; display:flex; align-items:center; justify-content:center; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:var(--radius-sm); font-size:16px; cursor:pointer;">📤</button>
+                        <button type="button" onclick="document.getElementById('product-csv-file').click()" title="CSV로 상품 목록 올리기" style="flex:0 0 auto; width:42px; height:42px; padding:0; display:flex; align-items:center; justify-content:center; border:1.5px solid #059669; background:#ecfdf5; color:#059669; border-radius:var(--radius-sm); font-size:16px; cursor:pointer;">📥</button>
                         <input type="file" id="product-csv-file" accept=".csv,text/csv" style="display:none;" onchange="importProductsFromCSV(this)">
                     </div>
 
@@ -2882,10 +2928,6 @@
                         <!-- [수정] 검색창을 맨 위로 올렸다. 대개 검색으로 찾고, 기간은 그 다음에 좁힌다. -->
                         <input type="text" id="purchaseSearchInput" onkeyup="renderPurchaseOrdersList()" class="form-control" placeholder="🔍 상품명/업체명/날짜로 검색" style="width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; border: 1.5px solid #cbd5e1;">
 
-                        <!-- [수정] 결과 줄. 처음에는 안 보이고, 찾은 것이 있을 때만 검색창 바로 아래 한 줄로 뜬다.
-                             (예전에는 '총 N건 보관 중'이 늘 떠 있어 무엇을 뜻하는지 알기 어려웠다) -->
-                        <div id="purchase-total-count-badge" style="display:none; justify-content:space-between; align-items:center; gap:8px; width:100%; box-sizing:border-box; margin-top:7px; padding:7px 11px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:12px; font-weight:800; color:#475569;"></div>
-
                         <!-- [수정] 기간 버튼 넷을 한 줄에 균등하게. 아무것도 안 고른 상태(기본)가 곧 '전체'이고,
                              고른 버튼을 다시 누르면 해제된다. -->
                         <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:5px; margin-top:10px;">
@@ -2905,6 +2947,11 @@
                                 <input type="date" id="purchaseEndDate" onchange="onPurchaseDateInputChange()" class="form-control purchase-date-filter">
                             </div>
                         </div>
+
+                        <!-- [수정] 결과 줄. 기간 칸 바로 아랫줄에 놓는다. 처음에는 안 보이고,
+                             검색하거나 기간을 고르면 그때 한 줄로 뜬다.
+                             (예전에는 '총 N건 보관 중'이 늘 떠 있어 무엇을 뜻하는지 알기 어려웠다) -->
+                        <div id="purchase-total-count-badge" style="display:none; justify-content:space-between; align-items:center; gap:8px; width:100%; box-sizing:border-box; margin-top:10px; padding:8px 11px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:12px; font-weight:800; color:#475569;"></div>
 
                         <!-- [신규] '이 상품 발주목록'으로 좁혀 볼 때 뜨는 띠 -->
                         <div id="purchase-code-filter-chip" style="display:none; margin-top:10px; padding:9px 11px; background:#f8fafc; border:1.5px solid #c7d2fe; border-radius:10px; align-items:center; gap:7px; flex-wrap:wrap;"></div>
@@ -3293,6 +3340,12 @@
                         <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn up-cat-other" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">상시판매</button>
                     </div>
                     <div id="sales-upcoming-summary" style="display:flex; gap:8px; flex-wrap:nowrap;"></div>
+                    <!-- [수정] 주문 내역 위에 있던 '주문현황·CSV'를 여기(요약칩 아랫줄)로 옮겼다.
+                         둘 다 모아 보는 기능이라 집계 화면에 두는 편이 맞다. -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:9px;">
+                        <button type="button" class="btn-common" onclick="showTodaySummary('sales')" title="위 집계 범위(날짜)에 맞춰 보여줍니다" style="min-width:0; border:1.5px solid var(--purple); background:var(--purple-light); color:var(--purple); font-weight:700;">📊 주문현황</button>
+                        <button type="button" class="btn-common" onclick="openCsvExportModal()" style="min-width:0; border:1.5px solid var(--border); background:#fff;">📤 CSV</button>
+                    </div>
                 </div>
                 <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px; width:100%;">
                     <input type="text" id="sales-upcoming-search" placeholder="🔍 상품 검색" oninput="renderSalesUpcoming()" style="flex:1 1 0; min-width:0; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; box-sizing:border-box;">
@@ -3312,10 +3365,10 @@
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:nowrap; margin-bottom:10px;">
                     <div id="sales-archive-status" style="font-size:11px; color:var(--text-sub); font-weight:700; min-width:0; flex:1 1 auto;"></div>
                     <button type="button" onclick="refreshSalesArchive(true)" title="전체 데이터 갱신" style="flex-shrink:0; padding:6px 10px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:8px; font-size:14px; font-weight:800; cursor:pointer; white-space:nowrap; line-height:1;">🔄</button>
+                    <!-- [수정] 한 줄을 통째로 쓰던 '판매 리포트 CSV 내보내기'를 갱신 버튼 옆으로 올렸다. -->
+                    <button type="button" onclick="exportSalesCSV()" title="판매 리포트 CSV 내보내기" style="flex-shrink:0; padding:6px 10px; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:8px; font-size:14px; font-weight:800; cursor:pointer; white-space:nowrap; line-height:1;">📤</button>
                 </div>
 
-                <!-- [수정] 리포트 내보내기는 자주 쓰는 기능이라 기간 고르기보다 위로 올렸다 -->
-                <button type="button" onclick="exportSalesCSV()" style="width:100%; padding:9px; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:var(--radius-sm); font-size:13px; font-weight:800; cursor:pointer; margin-bottom:12px;">📤 판매 리포트 CSV 내보내기</button>
                 <!-- 컨트롤 패널: 집계기준 / 배송유형 / 기간 — 주문 내역 날짜필터 박스와 동일 디자인 -->
                 <div style="background:white; border:1px solid var(--border); border-radius:var(--radius-main); box-shadow:var(--shadow); padding:10px 8px; margin-bottom:14px;">
                     <div id="sales-period-row1" style="display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; align-items:center; margin-bottom:8px;"></div>
@@ -3870,7 +3923,16 @@
             // 년도 선택 셀렉트 박스 추가
             const yearSelect = document.createElement('select');
             yearSelect.className = 'year-select';
+            const isCustomRange = (currentMonth === "직접");
             yearSelect.onchange = (e) => {
+                // [수정] '직접(기간입력)'을 월 버튼에서 연도 칸 안으로 옮겼다.
+                //  고르면 연도는 그대로 두고 기간 입력칸만 띄운다.
+                if (e.target.value === "__custom__") {
+                    currentMonth = "직접";
+                    currentDay = "";
+                    buildDateTabs(true);
+                    return;
+                }
                 currentYear = e.target.value;
                 currentMonth = "";
                 currentDay = "";
@@ -3879,10 +3941,17 @@
             sortedYears.forEach(y => {
                 const opt = document.createElement('option');
                 opt.value = y; // 내부값은 "2026년" 유지(필터 로직 호환)
-                opt.text = y.replace(/^\d{2}(\d{2}년)$/, '$1'); // 표시만 "26년" 서식
-                opt.selected = (y === currentYear);
+                opt.text = y.replace(/^\d{2}(\d{2})년$/, '$1'); // [수정] 칸이 좁아 '년'은 뗀다 ("26")
+                opt.selected = (!isCustomRange && y === currentYear);
                 yearSelect.appendChild(opt);
             });
+            {
+                const opt = document.createElement('option');
+                opt.value = "__custom__";
+                opt.text = "직접";
+                opt.selected = isCustomRange;
+                yearSelect.appendChild(opt);
+            }
             monthContainer.appendChild(yearSelect);
 
             if (sortedMonths.length === 0) {
@@ -3948,33 +4017,35 @@
                 if (currentMonth && currentMonth !== "기타" && currentMonth !== "전체" && currentMonth !== "직접" && !displayMonths.includes(currentMonth)) displayMonths.unshift(currentMonth);
             }
             displayMonths = displayMonths.filter(m => m !== "기타"); // [변경] 기타 제거
-            displayMonths.push("직접"); // [변경] 전체 버튼 제거 — 월 토글로 대체 / 직접 기간입력만 유지
-            displayMonths.forEach(month => {
-                const btn = document.createElement('button');
-                btn.className = `main-tab-btn ${month === currentMonth ? 'active' : ''}`;
-                btn.innerText = (month === "직접") ? "📅 직접" : month;
-                btn.onclick = () => {
-                    if (month !== "직접" && currentMonth === month) {
-                        // [변경] 토글: 같은 월 재클릭 시 해제 → 그 연도 전체
-                        currentMonth = "전체";
-                        currentDay = "";
-                    } else {
-                        currentMonth = month;
-                        // [신규] 현재달은 오늘(특정일) 기본, 지난달/다른 달은 '전체'(그 달 전부) 기본
-                        const isCurMonth = (currentYear === (new Date().getFullYear() + "년") && month === ((new Date().getMonth() + 1) + "월"));
-                        currentDay = (isCurMonth ? "" : "전체");
-                    }
-                    buildDateTabs(true); // 일 탭 재구성 (사용자 액션 플래그 true)
-                };
-                monthContainer.appendChild(btn);
 
-                // 활성화된 월 탭 스크롤
-                if (month === currentMonth) {
-                    setTimeout(() => {
-                        btn.scrollIntoView({ behavior: isUserAction ? 'smooth' : 'auto', inline: 'center', block: 'nearest' });
-                    }, 50);
+            /* [수정] 월도 버튼 줄 대신 고르는 칸으로 바꿨다. 달이 늘어날수록 줄이 길어져
+               일 탭과 한 줄에 놓을 수 없었기 때문. 같은 달 다시 눌러 해제하던 토글은
+               '전체(그 해 전부)' 항목으로 대신한다. */
+            const monthSelect = document.createElement('select');
+            monthSelect.className = 'year-select';
+            monthSelect.disabled = isCustomRange;   // 기간을 직접 넣는 중에는 월 고르기가 뜻이 없다
+            if (isCustomRange) { monthSelect.style.opacity = '0.45'; monthSelect.style.cursor = 'default'; }
+            monthSelect.onchange = (e) => {
+                const m = e.target.value;
+                currentMonth = m;
+                if (m === "전체") {
+                    currentDay = "";
+                } else {
+                    // 이번 달은 오늘(특정일) 기본, 지난달·다른 달은 '전체'(그 달 전부) 기본
+                    const isCurMonth = (currentYear === (new Date().getFullYear() + "년") && m === ((new Date().getMonth() + 1) + "월"));
+                    currentDay = (isCurMonth ? "" : "전체");
                 }
+                buildDateTabs(true);
+            };
+            ["전체"].concat(displayMonths).forEach(month => {
+                const opt = document.createElement('option');
+                opt.value = month;
+                // [수정] 칸이 좁아 '월'은 뗀다 ("8"). '전체'는 그대로.
+                opt.text = (month === "전체") ? month : String(month).replace(/월$/, '');
+                opt.selected = (month === currentMonth);
+                monthSelect.appendChild(opt);
             });
+            monthContainer.appendChild(monthSelect);
 
             // 일 탭 그리기
             buildDayTabs(isUserAction);
@@ -4373,6 +4444,51 @@
             return s === '배달완료' || s === '픽업' || s === '픽업완료';
         }
 
+        // [신규] 고객카드 키 (이름_연락처_수령방법_수령일).
+        //  상태 탭 개수와 목록 필터가 같은 기준을 쓰도록 한 곳에 모았다.
+        function gCardKeyOf(item){
+            const asm = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
+            const dateStr = getOrderDateInfo(item).dateStr || "기타";
+            return `${item.name}_${item.phone}_${asm}_${dateStr}`;
+        }
+
+        /* [신규] '취소'는 고객카드가 통째로 취소된 것만 센다.
+           예전에는 상품 하나만 빼도(부분취소) 그 카드가 취소로 잡혀, 실제로 살아 있는 주문까지
+           취소 개수에 들어갔다. 카드 안의 모든 품목이 취소여야 취소로 본다. */
+        function gFullyCanceledCards(items){
+            const total = new Map(), cancel = new Map();
+            (items || []).forEach(item => {
+                const k = gCardKeyOf(item);
+                total.set(k, (total.get(k) || 0) + 1);
+                const c = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                if (c) cancel.set(k, (cancel.get(k) || 0) + 1);
+            });
+            const out = new Set();
+            total.forEach((n, k) => { if ((cancel.get(k) || 0) >= n) out.add(k); });
+            return out;
+        }
+
+        /* [신규] 지난 미완료 고객 수 — 오늘 이전 예정일인데 아직 픽업·배달·취소가 아닌 주문.
+           showOverdueModal이 묶는 기준(이름_연락처)과 똑같이 세어, 버튼 숫자와 창 내용이 맞도록 한다.
+           날짜 탭과 무관한 '전체 기준' 숫자다. */
+        function gOverdueCardCount(){
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const keys = new Set();
+            (rawOrders || []).forEach(o => {
+                const canceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                if (canceled) return;
+                const st = String(o.status || '대기');
+                if (st === '픽업' || st === '배달완료' || st === '취소') return;
+                const info = getOrderDateInfo(o);
+                if (!info.dateStr || info.dateStr === '기타') return;
+                const p = info.dateStr.split('-');
+                const d = new Date(+p[0], +p[1] - 1, +p[2]);
+                if (d.getFullYear() < 2000 || d >= today) return;
+                keys.add((o.name || '무명') + '_' + String(o.phone || ''));
+            });
+            return keys.size;
+        }
+
         // [신규] 상태별 탭(개수) — 상태 제외 필터된 항목으로 각 상태의 "고객 카드 수" 계산 후 렌더
         // [수정] 품목 개수가 아니라 화면에 보이는 사람 카드(이름+연락처+수령방법+수령일) 개수로 집계
         function buildOrderStatusTabs(items){
@@ -4380,6 +4496,7 @@
             const c2 = document.getElementById('order-status-tabs2');
             if (!c1) return;
             const sets = { all: new Set(), '대기': new Set(), '입고': new Set(), '미픽업': new Set(), '미배달': new Set(), '취소': new Set(), '배달미입금': new Set(), '픽업미입금': new Set(), '배달완료': new Set(), '픽업': new Set(), _총픽업: new Set(), _총배달: new Set(), _사다픽업총: new Set() };
+            const fullCanceled = gFullyCanceledCards(items);   // 카드 전체가 취소된 것만
             (items || []).forEach(item => {
                 const status = item.status || '대기';
                 const asm = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
@@ -4392,7 +4509,7 @@
                 sets.all.add(cardKey);
                 if (status === '대기') sets['대기'].add(cardKey);
                 else if (status === '입고') sets['입고'].add(cardKey);
-                if (canceled) sets['취소'].add(cardKey);
+                if (fullCanceled.has(cardKey)) sets['취소'].add(cardKey);   // [수정] 부분취소는 빼고 통째로 취소된 카드만
                 // [신규] 미픽업 = 픽업주문인데 아직 픽업완료 아님 / 미배달 = 배달주문인데 아직 배달완료 아님 (취소 제외)
                 if (asm === '매장픽업' && !canceled) sets['_총픽업'].add(cardKey); // 전체 픽업주문(취소 제외)
                 if (asm === '배달주문' && !canceled) sets['_총배달'].add(cardKey); // 전체 배달주문(취소 제외)
@@ -4412,12 +4529,14 @@
             const cur = document.getElementById('filterStatus').value;
             const COLORS = { all:'#475569', '대기':'#94a3b8', '입고':'#d97706', '미픽업':'#7c3aed', '미배달':'#059669', '취소':'#dc2626', '배달미입금':'#dc2626', '픽업미입금':'#db2777' };
             // [공통] 탭 버튼 마크업 — next는 눌렀을 때 적용할 상태값
-            const tabBtnHtml = ({ active, c, label, numText, zero, next, fill, title }) => {
+            const tabBtnHtml = ({ active, c, label, numText, zero, next, fill, title, onclickJs }) => {
                 const labelColor = active ? '#fff' : (zero ? '#94a3b8' : 'var(--text-main)');
                 // 숫자: 박스 없이 텍스트만
                 const numColor = active ? '#fff' : (zero ? '#cbd5e1' : c);
                 const flexRule = fill ? 'flex:1 1 0; min-width:0;' : 'flex:0 0 auto;';
-                return `<button type="button" onclick="selectOrderStatus('${next}')"${title ? ` title="${title}"` : ''} style="${flexRule} display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; white-space:nowrap; padding:8px 2px; border-radius:8px; border:1.5px solid ${active ? c : 'var(--border)'}; background:${active ? c : '#fff'}; cursor:pointer; box-shadow:${active ? '0 2px 7px '+c+'44' : 'none'}; transition:all .12s;">
+                // [신규] onclickJs를 주면 상태 필터 대신 그 동작을 한다 (미완료는 창을 띄운다)
+                const click = onclickJs || `selectOrderStatus('${next}')`;
+                return `<button type="button" onclick="${click}"${title ? ` title="${title}"` : ''} style="${flexRule} display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; white-space:nowrap; padding:8px 2px; border-radius:8px; border:1.5px solid ${active ? c : 'var(--border)'}; background:${active ? c : '#fff'}; cursor:pointer; box-shadow:${active ? '0 2px 7px '+c+'44' : 'none'}; transition:all .12s;">
                     <span style="font-size:12px; font-weight:800; color:${labelColor}; line-height:1;">${label}</span>
                     <span style="font-size:16px; font-weight:900; color:${numColor}; line-height:1;">${numText}</span>
                 </button>`;
@@ -4470,9 +4589,37 @@
                     title: '전체에서 한 번 더 누르면 대기만 봅니다'
                 });
             };
-            // 8개 상태를 한 줄에 균등 분배
-            const tail = [['배달미입금','배미'],['픽업미입금','픽미'],['취소','취소']];
-            c1.innerHTML = allTab() + cycleTab(true) + cycleTab(false) + tail.map(renderTab(true)).join('');
+            /* [신규] 배미·픽미를 버튼 하나로 합쳐 토글한다: 배달미입금 → 픽업미입금 → 전체(해제).
+               자리가 하나 남아 취소를 앞으로 당기고, 그 끝자리에 '미완료'를 넣었다. */
+            const unpaidTab = () => {
+                const delV = '배달미입금', pickV = '픽업미입금';
+                let label, cnt, tot, c, next;
+                if (cur === delV) {          // 배미 보는 중 → 다음은 픽미
+                    label = '배미'; cnt = counts[delV]; tot = counts['_총배달']; c = COLORS[delV]; next = pickV;
+                } else if (cur === pickV) {  // 픽미 보는 중 → 다음은 전체
+                    label = '픽미'; cnt = counts[pickV]; tot = counts['_사다픽업총']; c = COLORS[pickV]; next = 'all';
+                } else {                     // 선택 안 됨 → 다음은 배미
+                    label = '배미'; cnt = counts[delV]; tot = counts['_총배달']; c = COLORS[delV]; next = delV;
+                }
+                return tabBtnHtml({
+                    active: (cur === delV || cur === pickV), c, label,
+                    numText: `${cnt}/${tot}`, zero: (cnt === 0), next, fill: true,
+                    title: '누를 때마다 배달미입금 → 픽업미입금 → 전체'
+                });
+            };
+            // [신규] 미완료 — 상태 필터가 아니라 지난 미완료 창을 띄운다 (예전 컨트롤 줄에 있던 버튼)
+            const overdueTab = () => {
+                const n = gOverdueCardCount();
+                return tabBtnHtml({
+                    active: false, c: '#dc2626', label: '미완료', numText: `${n}`,
+                    zero: (n === 0), next: 'all', fill: true,
+                    title: '오늘 이전인데 아직 픽업·배달 안 된 주문 보기',
+                    onclickJs: 'showOverdueModal()'
+                });
+            };
+            // 한 줄에 균등 분배: 전체 · 배달 · 픽업 · 배미/픽미 · 취소 · 미완료
+            c1.innerHTML = allTab() + cycleTab(true) + cycleTab(false) + unpaidTab()
+                + renderTab(true)(['취소', '취소']) + overdueTab();
             if (c2) c2.innerHTML = '';
         }
         function selectOrderStatus(v){
@@ -4579,12 +4726,14 @@
 
                 // 2-1단계: 상태별 개수 탭 갱신 후, 선택된 상태로 필터
                 buildOrderStatusTabs(filtered);
+                // [수정] '취소' 탭은 카드 전체가 취소된 건만 본다. 탭 숫자와 목록이 어긋나지 않도록 같은 기준을 쓴다.
+                const _fullCanceled = (statusFilter === '취소') ? gFullyCanceledCards(filtered) : null;
                 if (statusFilter !== 'all') {
                     filtered = filtered.filter(item => {
                         const status = item.status || "대기";
                         const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
                         const canceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
-                        if (statusFilter === '취소') return canceled;
+                        if (statusFilter === '취소') return _fullCanceled.has(gCardKeyOf(item));
                         if (statusFilter === '대기') return status === '대기';
                         if (statusFilter === '입고') return status === '입고';
                         if (statusFilter === '픽업') return status === '픽업';
@@ -6133,25 +6282,31 @@
         // [신규] 고객별 메모 수정 기능 (비인증/번호 유실 고객의 복제 현상 완벽 해결)
         // [신규] 고객별 메모 수정 기능 (비인증 및 날짜별 개별 주문 카드 단위 격리 메모 적용)
         // [신규] 메모 모달 — 드롭다운(고정메모/주문메모/인쇄용)으로 종류 선택 후 그 자리에서 바로 작성
-        let _memoModal = { name: '', phone: '', orderTime: '', values: {} };
+        // [수정] 드롭다운으로 고르던 것을 한 줄 세 버튼으로 바꿨다. 무엇이 골라져 있는지 바로 보인다.
+        const MEMO_TYPES = [
+            { key: 'fixed', label: '📌 고객고정', desc: '이 고객의 모든 주문에 항상 보입니다.' },
+            { key: 'print', label: '🖨️ 인쇄고정', desc: '영수증을 인쇄할 때 함께 찍힙니다.' },
+            { key: 'order', label: '📝 이번주문', desc: '이 주문 카드에만 보입니다.' }
+        ];
+        let _memoModal = { name: '', phone: '', orderTime: '', type: 'fixed', values: {}, original: {} };
         function openMemoModal(name, phone, orderTime){
             const cleanPhone = String(phone || '').replace(/\D/g, '');
             const baseKey = (!cleanPhone) ? ((name || '무명').trim() + '_비인증') : cleanPhone;
             const memoKey = baseKey + '_' + String(orderTime).replace(/\s+/g, '');
-            _memoModal = { name, phone, orderTime, values: {
+            const vals = {
                 fixed: fixedMemos[baseKey] || '', order: customerMemos[memoKey] || '', print: printFixedMemos[baseKey] || ''
-            } };
+            };
+            _memoModal = { name, phone, orderTime, type: 'fixed', values: { ...vals }, original: { ...vals } };
             const old = document.getElementById('memo-choice-modal'); if (old) old.remove();
             const m = document.createElement('div');
             m.id = 'memo-choice-modal'; m.className = 'summary-modal-overlay';
             m.innerHTML = `<div class="summary-modal-content" style="max-width:380px;">
                 <div class="summary-modal-header"><h2>📝 ${name} 메모</h2><button class="summary-modal-close" onclick="closeMemoModal()">&times;</button></div>
                 <div class="summary-modal-body">
-                    <select id="memo-type-select" onchange="onMemoTypeChange()" class="form-control" style="width:100%; height:42px; margin-bottom:8px; font-size:13px; font-weight:800;">
-                        <option value="fixed">📌 고정메모 (모든 주문에 항상 표시)</option>
-                        <option value="order">📝 주문메모 (이 주문 카드에만)</option>
-                        <option value="print">🖨️ 인쇄용 고정메모 (영수증 인쇄 시)</option>
-                    </select>
+                    <div id="memo-type-btns" style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px;">
+                        ${MEMO_TYPES.map(t => `<button type="button" class="memo-type-btn" data-memo-type="${t.key}" onclick="setMemoType('${t.key}')" title="${t.desc}">${t.label}</button>`).join('')}
+                    </div>
+                    <div id="memo-type-desc" style="margin:7px 0 8px; font-size:12px; font-weight:700; color:var(--text-sub);"></div>
                     <textarea id="memo-textarea" placeholder="메모를 입력하세요 (비우고 저장하면 삭제됩니다)" style="width:100%; min-height:110px; padding:10px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; resize:vertical;"></textarea>
                 </div>
                 <div class="summary-modal-footer" style="display:flex; gap:8px;">
@@ -6160,16 +6315,35 @@
                 </div>
             </div>`;
             document.body.appendChild(m);
-            setTimeout(() => { m.classList.add('active'); onMemoTypeChange(); }, 10);
+            setTimeout(() => { m.classList.add('active'); setMemoType('fixed'); }, 10);
         }
-        function onMemoTypeChange(){
-            const sel = document.getElementById('memo-type-select'); const ta = document.getElementById('memo-textarea');
-            if (sel && ta) ta.value = _memoModal.values[sel.value] || '';
+
+        // 종류를 바꿔도 쓰던 글은 그 종류 자리에 담아 둔다. (실수로 눌러도 적던 게 날아가지 않게)
+        function setMemoType(type){
+            const ta = document.getElementById('memo-textarea');
+            if (ta && _memoModal.type) _memoModal.values[_memoModal.type] = ta.value;
+            _memoModal.type = type;
+            document.querySelectorAll('#memo-type-btns .memo-type-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.memoType === type);
+            });
+            if (ta) ta.value = _memoModal.values[type] || '';
+            const desc = document.getElementById('memo-type-desc');
+            const hit = MEMO_TYPES.find(t => t.key === type);
+            if (desc && hit) desc.innerText = hit.desc;
         }
+
         async function saveMemoFromModal(){
-            const sel = document.getElementById('memo-type-select'); const ta = document.getElementById('memo-textarea');
-            if (!sel || !ta) return;
-            await saveMemoDirect(sel.value, _memoModal.name, _memoModal.phone, _memoModal.orderTime, ta.value);
+            const ta = document.getElementById('memo-textarea');
+            if (!ta) return;
+            _memoModal.values[_memoModal.type] = ta.value;
+            // 종류를 오가며 고쳤을 수 있으므로, 처음 값과 달라진 것만 골라 저장한다
+            const changed = MEMO_TYPES
+                .map(t => t.key)
+                .filter(k => String(_memoModal.values[k] || '').trim() !== String(_memoModal.original[k] || '').trim());
+            if (changed.length === 0) { closeMemoModal(); return; }
+            for (const k of changed) {
+                await saveMemoDirect(k, _memoModal.name, _memoModal.phone, _memoModal.orderTime, _memoModal.values[k]);
+            }
             closeMemoModal();
         }
         async function saveMemoDirect(type, name, phone, orderTime, value){
@@ -6946,15 +7120,52 @@
             }
         }
 
-        // 오늘 주문현황 요약 모달 표시
-        function showTodaySummary() {
-            const search = document.getElementById('searchInput').value.toLowerCase().trim();
-            const shippingFilter = document.getElementById('filterShipping') ? document.getElementById('filterShipping').value : 'all';
-            const statusFilter = document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : 'all';
+        /* [신규] 주문 집계 화면의 '집계 범위' 탭(전체 / 날짜별 / 기간설정)에 맞는지.
+           renderSalesUpcoming의 날짜 규칙과 똑같이 맞춰, 위 날짜 버튼과 주문현황이 어긋나지 않게 한다. */
+        function gMatchesSalesUpcomingScope(item){
+            const info = getOrderDateInfo(item);
+            if (!info.dateStr || info.dateStr === '기타') return false;
+            const p = info.dateStr.split('-');
+            const d = new Date(+p[0], +p[1] - 1, +p[2]);
+            if (salesUpcomingRange === 'custom') {
+                const fv = (document.getElementById('sales-up-from') || {}).value || '';
+                const tv = (document.getElementById('sales-up-to') || {}).value || '';
+                const from = fv ? new Date(fv + 'T00:00:00') : null;
+                const to = tv ? new Date(tv + 'T23:59:59') : null;
+                if (from && d < from) return false;
+                if (to && d > to) return false;
+                return true;
+            }
+            if (/^\d{4}-\d{2}-\d{2}$/.test(salesUpcomingRange)) return info.dateStr === salesUpcomingRange;
+            return d >= salesTodayMidnight();   // 전체(오늘 포함 이후)
+        }
+
+        // 집계 범위를 사람이 읽는 글로 (모달 제목용)
+        function gSalesRangeTitle(){
+            if (salesUpcomingRange === 'custom') {
+                const fv = (document.getElementById('sales-up-from') || {}).value || '';
+                const tv = (document.getElementById('sales-up-to') || {}).value || '';
+                return (fv || tv) ? `${fv || '처음'} ~ ${tv || '끝'}` : '기간 설정';
+            }
+            if (/^\d{4}-\d{2}-\d{2}$/.test(salesUpcomingRange)) return fmtMD(salesUpcomingRange);
+            return '오늘 이후 전체';
+        }
+
+        /* 오늘 주문현황 요약 모달 표시
+           [수정] scope='sales'로 부르면 주문 집계 화면의 '집계 범위' 탭을 따른다.
+            (주문현황 버튼이 그 화면으로 옮겨가면서, 정작 화면에 보이는 날짜 버튼과
+             다른 기준으로 집계돼 숫자가 안 맞아 보였다. 이때는 주문내역 쪽 검색·상태 필터도 쓰지 않는다) */
+        function showTodaySummary(scope) {
+            const useSales = (scope === 'sales');
+            const search = useSales ? '' : document.getElementById('searchInput').value.toLowerCase().trim();
+            const shippingFilter = useSales ? 'all' : (document.getElementById('filterShipping') ? document.getElementById('filterShipping').value : 'all');
+            const statusFilter = useSales ? 'all' : (document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : 'all');
             const searchRange = document.getElementById('filterDateRange') ? document.getElementById('filterDateRange').value : 'day';
 
-            // 1단계: 날짜(년/월/일) 탭 필터 — 검색 여부와 무관하게 현재 선택한 날짜 탭 범위 유지
-            let targetOrders = rawOrders.filter(item => matchesCurrentDateScope(item));
+            // 1단계: 날짜 범위 필터 — 검색 여부와 무관하게 지금 고른 날짜 범위를 유지
+            let targetOrders = rawOrders.filter(item => useSales ? gMatchesSalesUpcomingScope(item) : matchesCurrentDateScope(item));
+            // [신규] '취소'는 카드 전체가 취소된 것만 — 주문내역 탭과 같은 기준
+            const _summaryFullCanceled = (statusFilter === '취소') ? gFullyCanceledCards(targetOrders) : null;
 
             // 2단계: 수령방법 및 검색 키워드 필터
             targetOrders = targetOrders.filter(item => {
@@ -6965,7 +7176,7 @@
                 const status = item.status || "대기";
                 if (statusFilter !== 'all') {
                     const _canceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
-                    if (statusFilter === '취소') matchStatus = _canceled;
+                    if (statusFilter === '취소') matchStatus = _summaryFullCanceled.has(gCardKeyOf(item));
                     else if (statusFilter === '대기') matchStatus = status === '대기';
                     else if (statusFilter === '입고') matchStatus = status === '입고';
                     else if (statusFilter === '픽업') matchStatus = status === '픽업';
@@ -7010,7 +7221,9 @@
                 return matchShipping && matchStatus && matchSearch;
             });
 
-            let dateTitle = `${currentYear || ''} ${currentMonth || ''} ${currentDay || ''}`.trim() || '전체';
+            let dateTitle = useSales
+                ? gSalesRangeTitle()
+                : (`${currentYear || ''} ${currentMonth || ''} ${currentDay || ''}`.trim() || '전체');
             if (search !== "") {
                 dateTitle += ` (검색어: "${search}" 필터 결과)`;
             }
@@ -8579,7 +8792,9 @@
         }
 
         function paintStorageType(){
-            document.querySelectorAll('#tab-admin-products .storage-btn').forEach(b => {
+            // [수정] 노출 버튼들이 같은 줄에서 같은 모양(.storage-btn)을 쓰게 되면서
+            //  여기서 함께 잡히면 그 버튼들의 눌린 표시가 지워진다. 보관방법 값이 붙은 것만 고른다.
+            document.querySelectorAll('#tab-admin-products .storage-btn[data-storage]').forEach(b => {
                 b.classList.toggle('active', b.dataset.storage === uploadStorageType);
             });
             const hint = document.getElementById('storageTypeHint');
@@ -9482,9 +9697,43 @@
             return '없음';
         }
 
+        // [신규] 버튼에 넣을 짧은 이름. 칸이 좁아 '예약판매 › 사다드림' 대신 '사다드림'만 쓴다.
+        //  고른 게 없으면 버튼 이름 그대로 '분류탭'.
+        function gDisplayTabShort(key) {
+            if (!key) return '분류탭';
+            for (const g of DISPLAY_TAB_GROUPS) {
+                const hit = g.items.find(it => it.key === key);
+                if (hit) return hit.label;
+            }
+            return '분류탭';
+        }
+
+        // [수정] 읽기전용 칸 + 버튼이던 것을 버튼 하나로 합쳤다.
+        //  고른 탭 이름이 버튼 글자가 되고, 고른 상태는 색으로 표시한다.
         function updateDisplayTabUI() {
-            const el = document.getElementById('displayTabLabel');
-            if (el) el.value = gDisplayTabLabel(uploadDisplayTab);
+            const btn = document.getElementById('btn-display-tab');
+            if (!btn) return;
+            const on = !!uploadDisplayTab;
+            btn.innerText = gDisplayTabShort(uploadDisplayTab);
+            btn.title = on
+                ? `분류탭: ${gDisplayTabLabel(uploadDisplayTab)} (눌러서 바꾸기)`
+                : '주문서에서 보일 탭을 고릅니다. 지정하면 기존 분류보다 우선합니다.';
+            btn.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
+            btn.style.background = on ? 'var(--primary-light)' : '#ffffff';
+            btn.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
+        }
+
+        // [신규] 상세 분류 줄의 세 번째 칸으로 들어가는 분류탭 버튼
+        function makeDisplayTabBtn() {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.id = 'btn-display-tab';
+            btn.onclick = openDisplayTabSetting;
+            btn.style.cssText = 'width:100%; min-width:0; height:45px; padding:0 8px; border-radius:10px;'
+                + ' font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap;'
+                + ' overflow:hidden; text-overflow:ellipsis; box-sizing:border-box; text-align:center;'
+                + ' transition:var(--transition);';
+            return btn;
         }
 
         function openDisplayTabSetting() {
@@ -13573,34 +13822,57 @@
             container.innerHTML = '';
 
             if (tab === 'reserve') {
-                document.getElementById('categoryLabel').innerText = "공동구매 날짜 선택  ·  종류(사다드림·신선식품)";
+                document.getElementById('categoryLabel').innerText = "날짜  ·  종류(사다드림·신선식품)  ·  분류탭";
                 // [신규] 왼쪽=날짜(폭 축소), 오른쪽=사다드림 체크박스 배치
                 const row = document.createElement('div');
-                row.style.cssText = 'display:flex; gap:8px; align-items:stretch;';
+                // [수정] flex로는 날짜칸·고르는칸의 고유 폭 때문에 세 칸이 균등해지지 않았다. 격자로 못 박는다.
+                row.style.cssText = 'display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; align-items:stretch;';
+
+                /* [수정] 날짜칸이 'YYYY-MM-DD'를 다 못 보여 주고 잘렸다. 연도는 거의 안 바뀌므로
+                   화면에는 '8/23(토)'만 보여 준다. 브라우저가 정하는 날짜칸 표시 형식은 바꿀 수 없어서,
+                   진짜 날짜칸은 투명하게 깔아 두고(누르면 달력이 그대로 뜬다) 그 위에 글자만 그린다. */
+                const dateWrap = document.createElement('div');
+                dateWrap.style.cssText = 'position:relative; width:100%; min-width:0; height:45px;';
 
                 const input = document.createElement('input');
                 input.type = 'date';
                 input.id = 'categoryValue';
-                input.className = 'form-control';
                 input.value = uploadSelectedDate;
-                // [수정] 모바일 기기에서 크기가 비정상적으로 커지거나 회색 배경이 되는 현상 방지
-                input.style.height = '45px';
-                input.style.background = '#ffffff';
-                input.style.webkitAppearance = 'none';
-                input.style.appearance = 'none';
-                input.style.boxSizing = 'border-box';
-                input.style.flex = '1 1 auto';   // 남는 폭은 날짜칸이 차지 (사다드림은 버튼 크기 고정)
-                input.style.minWidth = '0';
+                input.style.cssText = 'position:absolute; inset:0; width:100%; height:45px; margin:0; padding:0;'
+                    + ' border:none; background:transparent; opacity:0; cursor:pointer; box-sizing:border-box;'
+                    + ' -webkit-appearance:none; appearance:none;';
+
+                const dateFace = document.createElement('div');
+                dateFace.style.cssText = 'position:absolute; inset:0; display:flex; align-items:center; justify-content:center;'
+                    + ' gap:4px; border:1.5px solid var(--border); border-radius:10px; background:#ffffff;'
+                    + ' font-size:13px; font-weight:800; color:var(--text-main); white-space:nowrap;'
+                    + ' pointer-events:none; box-sizing:border-box;';   // 클릭은 밑의 진짜 날짜칸이 받는다
+
+                const paintDateFace = () => {
+                    const v = String(input.value || '').trim();
+                    dateFace.innerText = v ? fmtMD(v) : '날짜 선택';
+                    dateFace.style.color = v ? 'var(--text-main)' : 'var(--text-sub)';
+                };
+                input._paintFace = paintDateFace;   // 값을 코드로 바꿨을 때 다시 그리기 위해 붙여 둔다
                 input.onchange = () => {
                     uploadSelectedDate = input.value;
+                    paintDateFace();
                 };
+                // 글자 부분을 눌러도 달력이 뜨도록 직접 열어 준다.
+                //  기기 종류로 갈라 두면 개발자도구 모바일 모드처럼 애매한 경우에 안 열려서, 항상 시도한다.
+                //  (이미 떠 있거나 지원하지 않는 브라우저면 그냥 무시된다)
+                input.onclick = () => { try { input.showPicker(); } catch (e) {} };
+                paintDateFace();
+
+                dateWrap.appendChild(dateFace);
+                dateWrap.appendChild(input);
 
                 /* [수정] 사다드림 체크 하나였던 것을 '사다드림 / 신선식품' 토글로 바꾼다.
                    셋 중 하나만 켜진다: 아무것도 아님 · 사다드림 · 신선식품.
                    값은 productIsSada(체크박스)와 uploadIsFresh(변수)에 담아 저장한다.
                    화면에는 체크박스를 안 보이고 버튼처럼만 쓴다. */
                 const segWrap = document.createElement('div');
-                segWrap.style.cssText = 'display:flex; flex:0 0 auto;';
+                segWrap.style.cssText = 'display:flex; width:100%; min-width:0;';
 
                 // 저장 로직이 읽어 가는 체크박스는 그대로 두되 화면에서는 숨긴다
                 const sadaChk = document.createElement('input');
@@ -13615,7 +13887,7 @@
                 const kindSel = document.createElement('select');
                 kindSel.id = 'productKindSelect';
                 kindSel.className = 'form-control';
-                kindSel.style.cssText = 'height:45px; width:116px; padding:0 8px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap; flex:0 0 auto; box-sizing:border-box;';
+                kindSel.style.cssText = 'height:45px; width:100%; min-width:0; padding:0 8px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap; box-sizing:border-box;';
                 [['', '선택안함'], ['sada', '사다드림'], ['fresh', '신선식품']].forEach(([v, t]) => {
                     const o = document.createElement('option');
                     o.value = v; o.innerText = t;
@@ -13638,20 +13910,21 @@
 
                 segWrap.appendChild(kindSel);
 
-                row.appendChild(input);
+                row.appendChild(dateWrap);
                 row.appendChild(segWrap);
+                row.appendChild(makeDisplayTabBtn());
                 container.appendChild(row);
             }
             else if (tab === 'onsite') {
-                document.getElementById('categoryLabel').innerText = "보관/분류 카테고리  ·  선반위치(장소)";
+                document.getElementById('categoryLabel').innerText = "보관 분류  ·  위치(선반)  ·  분류탭";
                 // [신규] 왼쪽=보관분류(냉동/냉장/상온), 오른쪽=선반위치(장소) 반반 배치
                 const row = document.createElement('div');
-                row.style.cssText = 'display:flex; gap:8px; align-items:stretch;';
+                row.style.cssText = 'display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; align-items:stretch;';
 
                 const select = document.createElement('select');
                 select.id = 'categoryValue';
                 select.className = 'form-control';
-                select.style.flex = '1';
+                select.style.width = '100%';
                 select.style.minWidth = '0';
                 onsiteCategories.forEach(cat => {
                     const opt = document.createElement('option');
@@ -13663,7 +13936,7 @@
                 const shelfSelect = document.createElement('select');
                 shelfSelect.id = 'productShelf';
                 shelfSelect.className = 'form-control';
-                shelfSelect.style.flex = '1';
+                shelfSelect.style.width = '100%';
                 shelfSelect.style.minWidth = '0';
                 // [신규] 보관분류 바뀌면 선반 옵션도 관련된 것만 갱신
                 select.onchange = () => {
@@ -13678,20 +13951,21 @@
 
                 row.appendChild(select);
                 row.appendChild(shelfSelect);
+                row.appendChild(makeDisplayTabBtn());
                 container.appendChild(row);
                 // 현재 보관분류(기본 냉동, 수정 시엔 이후 editProduct가 다시 세팅)에 맞춰 선반 옵션 채움
                 populateShelfOptions(uploadIsEditMode ? (uploadEditShelf || '') : '');
             }
             else if (tab === 'fruit') {
-                document.getElementById('categoryLabel').innerText = "과채류 분류 선택  ·  오늘의추천 여부";
+                document.getElementById('categoryLabel').innerText = "분류  ·  오늘의추천  ·  분류탭";
                 // [신규] 왼쪽=분류, 오른쪽=오늘의추천 체크 (공동구매 탭의 사다드림 버튼과 같은 모양)
                 const row = document.createElement('div');
-                row.style.cssText = 'display:flex; gap:8px; align-items:stretch;';
+                row.style.cssText = 'display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; align-items:stretch;';
 
                 const select = document.createElement('select');
                 select.id = 'categoryValue';
                 select.className = 'form-control';
-                select.style.flex = '1 1 auto';
+                select.style.width = '100%';   // [수정] 격자 한 칸을 꽉 채운다
                 select.style.minWidth = '0';
                 fruitCategories.forEach(cat => {
                     const opt = document.createElement('option');
@@ -13701,17 +13975,17 @@
                 });
 
                 // 체크 시 상품명 앞에 [오늘의추천] 말머리를 자동으로 붙여 저장한다.
-                //  네이티브 체크박스는 전역 CSS로 숨겨져 있어, input 바로 뒤에 .custom-checkbox 스팬을 둬야 표시된다.
+                //  [수정] 앞에 있던 네모 체크표시는 뺐다. 옆 칸(분류·분류탭)과 같은 버튼 모양으로 두고
+                //  켜졌는지는 색으로만 구분한다. 저장 로직이 읽는 체크박스는 숨겨서 그대로 둔다.
                 const recLabel = document.createElement('label');
                 recLabel.className = 'checkbox-container';
-                // [수정] 아래 '분류탭' 버튼(116px)과 오른쪽 끝이 맞도록 같은 폭으로 고정
-                recLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:6px; height:45px; width:116px; padding:0; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; flex:0 0 auto; box-sizing:border-box;';
+                // [수정] 세 칸(분류·오늘의추천·분류탭)을 같은 폭으로 나눈다
+                recLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:5px; height:45px; padding:0 6px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; overflow:hidden; width:100%; min-width:0; box-sizing:border-box;';
                 const recChk = document.createElement('input');
                 recChk.type = 'checkbox';
                 recChk.id = 'productIsRecommend';
                 recChk.checked = !!(uploadIsEditMode && uploadEditIsRecommend);
-                const recBox = document.createElement('span');
-                recBox.className = 'custom-checkbox';
+                recChk.style.display = 'none';
                 const recTxt = document.createElement('span');
                 recTxt.innerText = '오늘의추천';
                 const paintRec = () => {
@@ -13723,25 +13997,31 @@
                 recChk.onchange = paintRec;
                 paintRec();
                 recLabel.appendChild(recChk);
-                recLabel.appendChild(recBox);
                 recLabel.appendChild(recTxt);
 
                 row.appendChild(select);
                 row.appendChild(recLabel);
+                row.appendChild(makeDisplayTabBtn());
                 container.appendChild(row);
             }
             else if (tab === 'costco') {
-                document.getElementById('categoryLabel').innerText = "코스트코 소분류 선택";
+                document.getElementById('categoryLabel').innerText = "코스트코 소분류  ·  분류탭";
+                const row = document.createElement('div');
+                row.style.cssText = 'display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; align-items:stretch;';
                 const select = document.createElement('select');
                 select.id = 'categoryValue';
                 select.className = 'form-control';
+                select.style.width = '100%';
+                select.style.minWidth = '0';
                 costcoCategories.forEach(cat => {
                     const opt = document.createElement('option');
                     opt.value = cat;
                     opt.innerText = cat;
                     select.appendChild(opt);
                 });
-                container.appendChild(select);
+                row.appendChild(select);
+                row.appendChild(makeDisplayTabBtn());
+                container.appendChild(row);
             }
 
             // [신규] 탭별로 박스 높이가 달라지지 않도록 카테고리 영역의 모든 컨트롤 높이를 45px로 통일
@@ -13749,6 +14029,9 @@
                 el.style.height = '45px';
                 el.style.boxSizing = 'border-box';
             });
+
+            // [신규] 분류탭 버튼은 이 줄을 그릴 때마다 새로 만들어지므로 지금 값으로 다시 칠한다
+            updateDisplayTabUI();
         }
 
         function toggleUnlimitedStock() {
@@ -14278,23 +14561,109 @@
             event.target.value = '';
         }
 
+        /* [신규] 상세설명 접기 — 수정할 때만 쓴다.
+           이미 적어 둔 글이 200px 넘게 자리를 먹어, 아래 칸들이 한참 밀려 있었다.
+           새 상품 등록에서는 처음부터 적어야 하므로 접지 않는다. */
+        let descBoxOpen = true;
+
+        function toggleDescBox() {
+            setDescBoxOpen(!descBoxOpen);
+        }
+
+        function setDescBoxOpen(open) {
+            descBoxOpen = !!open;
+            const box = document.getElementById('desc-box');
+            const caret = document.getElementById('desc-toggle-caret');
+            if (box) box.style.display = descBoxOpen ? 'block' : 'none';
+            if (caret) caret.textContent = descBoxOpen ? '▲' : '▼';
+            // 접혀 있는 동안 늘어난 높이를 재지 못하므로, 펼칠 때 글 길이에 맞춰 다시 맞춘다
+            if (descBoxOpen) autoResizeTextarea(document.getElementById('productDesc'));
+        }
+
+        // 수정 모드로 들어올 때(접기 버튼 노출) / 새 상품으로 돌아올 때(항상 펼침) 상태를 잡아 준다.
+        function setupDescBox(isEdit) {
+            const btn = document.getElementById('desc-toggle');
+            const label = document.getElementById('desc-toggle-text');
+            const ta = document.getElementById('productDesc');
+            if (!btn) return;
+            btn.style.display = isEdit ? 'flex' : 'none';
+            if (!isEdit) { setDescBoxOpen(true); return; }
+
+            // 접힌 채로도 무슨 글인지 알 수 있게 첫 줄을 버튼에 적어 둔다
+            const text = String((ta && ta.value) || '').trim();
+            const first = text.split('\n').map(s => s.trim()).find(Boolean) || '';
+            if (label) label.innerText = first ? first : '상세설명 없음';
+            btn.title = first ? '눌러서 상세설명 펴기/접기' : '상세설명이 비어 있습니다. 눌러서 적으세요.';
+            setDescBoxOpen(false);
+        }
+
+        // [신규] 사진 목록 펼침 여부. 장수 버튼으로 여닫는다 (기본은 접힘).
+        let photoListOpen = false;
+
+        function togglePhotoList() {
+            photoListOpen = !photoListOpen;
+            const box = document.getElementById('imageListContainer');
+            const caret = document.getElementById('photo-count-caret');
+            if (box) box.style.display = photoListOpen ? 'block' : 'none';
+            if (caret) caret.textContent = photoListOpen ? '▲' : '▼';
+        }
+
         function renderSelectedFilesList() {
             const container = document.getElementById('imageListContainer');
             const list = document.getElementById('selectedFilesList');
+            const countRow = document.getElementById('photo-count-row');
+            const countText = document.getElementById('photo-count-text');
+            const caret = document.getElementById('photo-count-caret');
             list.innerHTML = '';
-            
-            if (uploadSelectedFiles.length === 0) {
+
+            // [신규] 사진이 세 장 이하면 접을 이유가 없다. 장수 버튼 없이 바둑판을 바로 보여 주고,
+            //  더 넣는 것은 격자 끝의 ＋ 칸으로 한다. (사진 한 장인데 접힌 줄만 보이는 게 답답했다)
+            const photoCount = uploadSelectedFiles.length;
+            const compact = (photoCount > 0 && photoCount <= 3);
+            // 이미 서버에 올라가 있는 사진이 있을 때만 내려받을 게 있다 (수정 모드에서만)
+            const canDownload = !!(uploadIsEditMode && uploadSelectedFiles.some(it => it && it.isExisting));
+
+            // [신규] '사진 첨부하기' 칸 자리 옮기기.
+            //  사진이 없으면 맨 위(그것 말고는 누를 게 없다), 있으면 목록 안 다운로드 버튼 위로 보낸다.
+            //  세 장 이하일 때는 격자의 ＋ 칸이 대신하므로 감춘다.
+            const zone = document.getElementById('uploadZone');
+            const topSlot = document.getElementById('upload-zone-top');
+            const inSlot = document.getElementById('upload-zone-slot');
+            if (zone && topSlot && inSlot) {
+                const target = (photoCount === 0) ? topSlot : inSlot;
+                if (zone.parentElement !== target) target.appendChild(zone);
+                zone.style.marginTop = (target === inSlot) ? '10px' : '0';
+                zone.style.display = compact ? 'none' : 'flex';
+            }
+
+            if (photoCount === 0) {
                 container.style.display = 'none';
+                if (countRow) countRow.style.display = 'none';
+                photoListOpen = false;
                 return;
             }
-            
-            container.style.display = 'block';
-            
+
+            // [신규] 세 장 이하일 때는 ＋ 칸 아래 절반이 다운로드 버튼을 대신하므로 넓은 버튼은 감춘다
+            const dlBtn = document.getElementById('btn-download-images');
+            if (dlBtn) dlBtn.style.display = (!compact && canDownload) ? 'flex' : 'none';
+
+            if (compact) {
+                if (countRow) countRow.style.display = 'none';
+                container.style.display = 'block';
+                photoListOpen = true;   // 나중에 네 장이 돼도 펴진 채로 이어지게
+            } else {
+                if (countRow) countRow.style.display = 'flex';
+                if (countText) countText.innerText = `사진 ${photoCount}장`;
+                if (caret) caret.textContent = photoListOpen ? '▲' : '▼';
+                container.style.display = photoListOpen ? 'block' : 'none';
+            }
+
             uploadSelectedFiles.forEach((item, idx) => {
                 const row = document.createElement('div');
                 row.dataset.photoRow = String(idx);   // [신규] 끌어서 옮긴 뒤 원래 어느 사진이었는지 찾는 표식
-                row.style = "display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border-radius: 8px; border: 1.5px solid var(--border); gap: 10px;";
-                
+                // [수정] 한 줄에 하나씩 쌓던 것을 바둑판 칸으로 바꿨다. 칸은 정사각형.
+                row.style = "position: relative; aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden;";
+
                 const isChecked = (idx === uploadThumbnailIndex);
                 
                 let imgSrc = '';
@@ -14308,46 +14677,55 @@
                     }
                 }
 
-                const imgTag = imgSrc 
-                    ? `<img src="${imgSrc}" style="width: 36px; height: 36px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); flex-shrink: 0;" onerror="this.onerror=null; this.style.display='none';">` 
-                    : `<div style="width: 36px; height: 36px; background: #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">🖼️</div>`;
-
-                // [신규] 손님 화면에 실제로 보일 순서. 대표 섬네일이 1번이고 나머지는 이 목록 순서대로다.
-                //  (저장할 때 finalImages를 만드는 규칙과 똑같이 계산해, 보이는 번호와 저장 결과가 어긋나지 않게 한다)
-                const hasThumb = (uploadThumbnailIndex >= 0 && uploadThumbnailIndex < uploadSelectedFiles.length);
-                let orderNo;
-                if (isChecked) orderNo = 1;
-                else {
-                    let n = hasThumb ? 1 : 0;
-                    for (let i = 0; i < idx; i++) { if (!(hasThumb && i === uploadThumbnailIndex)) n++; }
-                    orderNo = n + 1;
-                }
+                // [수정] 사진 자체가 손잡이다. 눌러서 대표 섬네일 지정, 끌어서 순서 바꾸기.
+                //  예전에는 옆에 손잡이(⠿)·순서 숫자·체크칸·파일명이 줄줄이 붙어 어수선했다.
+                const dragAttrs = `onpointerdown="photoDragStart(event)" onpointermove="photoDragMove(event)" onpointerup="photoDragEnd(event)" onpointercancel="photoDragEnd(event)" title="눌러서 대표 지정 · 끌어서 순서 바꾸기"`;
+                const fill = `position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box; cursor:pointer; touch-action:none; user-select:none;`;
+                const frame = `border-radius:8px; border:2px solid ${isChecked ? 'var(--primary)' : 'var(--border)'};`;
+                const imgTag = imgSrc
+                    ? `<img src="${imgSrc}" ${dragAttrs} style="${fill} ${frame} object-fit: cover; background:#f1f5f9;" onerror="this.onerror=null; this.style.visibility='hidden';">`
+                    : `<div ${dragAttrs} style="${fill} ${frame} background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-size:20px;">🖼️</div>`;
 
                 row.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
-                        <!-- [신규] 이 손잡이를 잡고 끌면 순서가 바뀐다 (마우스·손가락 모두) -->
-                        <span onpointerdown="photoDragStart(event)" onpointermove="photoDragMove(event)" onpointerup="photoDragEnd(event)" onpointercancel="photoDragEnd(event)"
-                            title="끌어서 순서 바꾸기"
-                            style="flex-shrink:0; padding:2px 5px; color:#94a3b8; font-size:15px; font-weight:900; line-height:1; cursor:grab; touch-action:none; user-select:none;">⠿</span>
-                        <span style="flex-shrink:0; width:22px; height:22px; border-radius:50%; background:${isChecked ? 'var(--primary)' : '#cbd5e1'}; color:#fff; font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center;">${orderNo}</span>
-                        <input type="radio" name="thumbnailSelect" id="thumb_${idx}" ${isChecked ? 'checked' : ''} onchange="setThumbnail(${idx})" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--primary); flex-shrink: 0;">
-                        ${imgTag}
-                        <span style="font-size: 13px; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; flex: 1;" onclick="setThumbnail(${idx})">
-                            ${item.displayName}
-                        </span>
-                        ${isChecked ? '<span style="color: var(--primary); font-size: 11px; font-weight: 800; background: var(--primary-light); padding: 2px 6px; border-radius: 4px; flex-shrink: 0;">대표 섬네일</span>' : ''}
-                    </div>
-                    <div style="display:flex; align-items:center; gap:3px; flex-shrink:0;">
-                        <!-- [신규] 사진 순서 바꾸기 -->
-                        <button type="button" onclick="moveSelectedFile(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="위로"
-                            style="width:26px; height:26px; padding:0; border:1.5px solid var(--border); background:#fff; border-radius:6px; font-size:12px; font-weight:800; cursor:${idx === 0 ? 'default' : 'pointer'}; opacity:${idx === 0 ? '0.35' : '1'}; color:#475569;">▲</button>
-                        <button type="button" onclick="moveSelectedFile(${idx}, 1)" ${idx === uploadSelectedFiles.length - 1 ? 'disabled' : ''} title="아래로"
-                            style="width:26px; height:26px; padding:0; border:1.5px solid var(--border); background:#fff; border-radius:6px; font-size:12px; font-weight:800; cursor:${idx === uploadSelectedFiles.length - 1 ? 'default' : 'pointer'}; opacity:${idx === uploadSelectedFiles.length - 1 ? '0.35' : '1'}; color:#475569;">▼</button>
-                        <button type="button" onclick="removeSelectedFile(${idx})" style="background: none; border: none; color: var(--red); font-size: 18px; font-weight: bold; cursor: pointer; padding: 0 4px; line-height: 1;">&times;</button>
-                    </div>
+                    ${imgTag}
+                    ${isChecked ? '<span style="position:absolute; left:3px; bottom:3px; pointer-events:none; color:#fff; font-size:10px; font-weight:900; background:var(--primary); padding:2px 6px; border-radius:5px;">대표</span>' : ''}
+                    <button type="button" onclick="removeSelectedFile(${idx})" title="이 사진 빼기" style="position:absolute; right:3px; top:3px; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.6); border:none; border-radius:50%; color:#fff; font-size:13px; font-weight:bold; line-height:1; cursor:pointer;">&times;</button>
                 `;
                 list.appendChild(row);
             });
+
+            // [신규] 세 장 이하일 때 격자 맨 끝의 칸.
+            //  내려받을 사진이 있으면 위아래로 반씩 나눠 위=＋(더 넣기), 아래=사진 다운로드.
+            //  없으면 ＋가 칸을 다 쓴다. (data-photo-row가 없어 끌어서 순서 바꾸기에는 끼어들지 않는다)
+            if (compact) {
+                const addTile = document.createElement('div');
+                addTile.style.cssText = 'aspect-ratio:1/1; display:grid; gap:4px; min-width:0;'
+                    + ` grid-template-rows:${canDownload ? '1fr 1fr' : '1fr'};`;
+
+                const plusBtn = document.createElement('button');
+                plusBtn.type = 'button';
+                plusBtn.title = '사진 더 넣기';
+                plusBtn.innerText = '＋';
+                plusBtn.onclick = triggerFileInput;
+                plusBtn.style.cssText = 'width:100%; height:100%; padding:0; display:flex; align-items:center;'
+                    + ' justify-content:center; border:2px dashed var(--border); border-radius:8px; background:#fafafa;'
+                    + ' color:#94a3b8; font-family:inherit; font-size:20px; font-weight:800; line-height:1; cursor:pointer;';
+                addTile.appendChild(plusBtn);
+
+                if (canDownload) {
+                    const dlSmall = document.createElement('button');
+                    dlSmall.type = 'button';
+                    dlSmall.title = '이 상품 사진 내려받기';
+                    dlSmall.innerText = '⬇️';
+                    dlSmall.onclick = downloadProductImages;
+                    dlSmall.style.cssText = 'width:100%; height:100%; padding:0; display:flex; align-items:center;'
+                        + ' justify-content:center; border:1.5px solid #0284c7; border-radius:8px; background:#fff;'
+                        + ' color:#0284c7; font-family:inherit; font-size:16px; font-weight:800; line-height:1; cursor:pointer;';
+                    addTile.appendChild(dlSmall);
+                }
+
+                list.appendChild(addTile);
+            }
         }
 
         /* [신규] 사진 끌어서 순서 바꾸기.
@@ -14363,10 +14741,9 @@
             if (!row || !list) return;
             ev.preventDefault();
             try { handle.setPointerCapture(ev.pointerId); } catch (e) {}
-            photoDrag = { pointerId: ev.pointerId, handle, row, list };
-            row.style.opacity = '0.65';
-            row.style.borderColor = 'var(--primary)';
-            row.style.boxShadow = '0 6px 18px rgba(0,0,0,0.15)';
+            // [신규] 사진 자체가 손잡이라, 누르기만 한 것과 끈 것을 구분해야 한다.
+            //  (조금이라도 움직이면 '끌기', 그대로 떼면 '누르기' = 대표 섬네일 지정)
+            photoDrag = { pointerId: ev.pointerId, handle, row, list, startX: ev.clientX, startY: ev.clientY, moved: false };
             handle.style.cursor = 'grabbing';
         }
 
@@ -14376,25 +14753,43 @@
             const { row, list } = photoDrag;
             const y = ev.clientY;
 
+            const x = ev.clientX;
+
+            // 손가락이 살짝 흔들린 것까지 끌기로 보지 않도록 몇 픽셀은 봐 준다
+            if (!photoDrag.moved) {
+                if (Math.abs(x - photoDrag.startX) < 5 && Math.abs(y - photoDrag.startY) < 5) return;
+                photoDrag.moved = true;
+                row.style.opacity = '0.55';
+                row.style.transform = 'scale(0.94)';
+            }
+
+            // [수정] 바둑판이라 위아래만으로는 자리를 못 정한다.
+            //  지금 손가락이 올라가 있는 칸을 찾아 그 앞/뒤로 옮긴다.
             for (const other of list.querySelectorAll('[data-photo-row]')) {
                 if (other === row) continue;
                 const r = other.getBoundingClientRect();
-                const mid = r.top + r.height / 2;
+                if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
                 const rowIsAfter = !!(other.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING);
-                if (y < mid && rowIsAfter) { list.insertBefore(row, other); break; }
-                if (y > mid && !rowIsAfter) { list.insertBefore(row, other.nextSibling); break; }
+                list.insertBefore(row, rowIsAfter ? other : other.nextSibling);
+                break;
             }
         }
 
         function photoDragEnd(ev) {
             if (!photoDrag) return;
-            const { row, list, handle, pointerId } = photoDrag;
+            const { row, list, handle, pointerId, moved } = photoDrag;
             try { handle.releasePointerCapture(pointerId); } catch (e) {}
             row.style.opacity = '';
-            row.style.borderColor = '';
-            row.style.boxShadow = '';
-            handle.style.cursor = 'grab';
+            row.style.transform = '';
+            handle.style.cursor = 'pointer';
             photoDrag = null;
+
+            // 끌지 않고 그대로 뗐으면 '누르기' — 그 사진을 대표 섬네일로 지정한다
+            if (!moved) {
+                const i = parseInt(row.dataset.photoRow, 10);
+                if (!isNaN(i)) setThumbnail(i);
+                return;
+            }
 
             // 화면에 놓인 순서대로 배열을 다시 만든다. 대표 섬네일은 그 사진을 따라간다.
             const order = [...list.querySelectorAll('[data-photo-row]')].map(r => parseInt(r.dataset.photoRow, 10));
@@ -15607,9 +16002,8 @@
 
             switchAdminTab('product-upload');
 
-            { const fct = document.getElementById('form-card-title'); fct.innerText = `✏️ 상품 수정: ${prod.name}`; fct.style.display = ''; }
             { const dupBtn = document.getElementById('btn-duplicate-form'); if (dupBtn) dupBtn.style.display = 'flex'; } // 수정 모드에선 복제하기 버튼 노출(제출버튼과 반반)
-            { const dlBtn = document.getElementById('btn-download-images'); if (dlBtn) dlBtn.style.display = (prod.images && prod.images.length > 0) ? 'flex' : 'none'; } // 사진이 있을 때만 다운로드 버튼 노출
+            // [수정] 사진 다운로드 버튼 표시는 renderSelectedFilesList가 사진 목록 상태를 보고 정한다 (여기서 따로 안 건드린다)
 
             // 버튼 ID 바인딩 교정 (submitBtn -> btn-submit-form, cancelBtn -> btn-cancel-edit)
             const submitBtn = document.getElementById('btn-submit-form');
@@ -15652,6 +16046,7 @@
             resetPriceField();
             document.getElementById('productPrice').value = prod.price || 0;
             { const _d = document.getElementById('productDesc'); _d.value = prod.desc || ""; autoResizeTextarea(_d); } // [신규] 넣은 글 길이에 맞춰 칸 높이도 맞춰 준다
+            setupDescBox(true); // [신규] 수정 모드에서는 상세설명을 접어 둔다 (버튼을 눌러 편다)
 
             const rawStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null) ? 9999 : parseInt(prod.stock);
             const adjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)] || 0);
@@ -15702,8 +16097,11 @@
             updatePriceFieldForAmountLimit();
 
             if (tabType === 'reserve') {
-                document.getElementById('categoryValue').value = prod.date || "";
+                const _dv = document.getElementById('categoryValue');
+                _dv.value = prod.date || "";
                 uploadSelectedDate = prod.date || "";
+                // [신규] 값을 코드로 바꾸면 onchange가 안 걸리므로 보이는 글자를 직접 다시 그린다
+                if (typeof _dv._paintFace === 'function') _dv._paintFace();
             } else {
                 document.getElementById('categoryValue').value = prod.matchKey || "";
                 // [신규] 상시판매: 보관분류(matchKey)에 맞춰 선반 옵션 갱신 + 기존 선반값 반영
@@ -15732,7 +16130,6 @@
             uploadEditProductKey = null;
             uploadEditProductRef = null;
 
-            { const fct = document.getElementById('form-card-title'); fct.innerText = ""; fct.style.display = 'none'; }
             { const dupBtn = document.getElementById('btn-duplicate-form'); if (dupBtn) dupBtn.style.display = 'none'; } // 신규 등록 모드에선 복제하기 숨김
             { const dlBtn = document.getElementById('btn-download-images'); if (dlBtn) dlBtn.style.display = 'none'; } // 신규 등록 모드에선 사진 다운로드 숨김
             
@@ -15746,6 +16143,7 @@
             // [신규] form.reset()은 값만 지우고 늘려 놨던 높이(inline style)는 그대로 남는다.
             //  빈 칸이 이전 상품 글 길이만큼 커져 있지 않도록 최소 높이로 되돌린다.
             { const _d = document.getElementById('productDesc'); if (_d) { _d.style.height = ''; autoResizeTextarea(_d); } }
+            setupDescBox(false); // [신규] 새 상품 등록 모드 — 상세설명은 접지 않고 늘 열어 둔다
             document.getElementById('unlimitedStock').checked = false;
             document.getElementById('productStock').disabled = false;
             pendingProductCodeFromPurchase = '';   // 발주에서 물려받던 번호도 함께 푼다
@@ -17887,25 +18285,30 @@
         let pendingProductCodeFromPurchase = '';
 
         // [신규] 상품등록 폼의 식별번호 칸을 채운다. 그 번호로 잡힌 발주가 몇 건인지도 알려 준다.
+        // [수정] 식별번호를 상품명 라벨 옆 작은 표로 보여 준다.
+        //  번호가 없으면(발주 전) 표 자체를 감춘다 — 없는 값을 굳이 설명할 자리를 두지 않는다.
+        //  발주와 몇 건 이어져 있는지는 표에 마우스를 올리면 나온다.
         function paintProductCodeField(prod) {
-            const el = document.getElementById('productCodeField');
-            const hint = document.getElementById('product-code-hint');
-            if (!el || !hint) return;
+            const badge = document.getElementById('product-code-badge');
+            const text = document.getElementById('productCodeText');
+            if (!badge || !text) return;
 
             const code = String((prod && prod.productCode) || '').trim();
-            el.value = /^P\d+$/.test(code) ? code : '';
-
             if (!/^P\d+$/.test(code)) {
-                hint.innerHTML = `아직 없습니다. <span style="color:#94a3b8;">이 상품을 발주에 넣으면 그때 자동으로 붙습니다.</span>`;
-                hint.style.color = '#64748b';
+                badge.style.display = 'none';
+                text.innerText = '';
+                badge.title = '';
                 return;
             }
+
+            badge.style.display = 'inline-flex';
+            text.innerText = code;
+
             const pos = purchaseOrders.concat(purchaseArchive).filter(p => String(p.productCode || '').trim() === code);
             const days = pos.map(p => String(p.date || '')).filter(fIsPurchaseDate).sort();
-            hint.innerHTML = pos.length
-                ? `✅ 발주 ${pos.length}건과 이어져 있습니다${days.length ? ` (최근 ${days[days.length - 1]})` : ''}.`
-                : `발주 기록은 아직 없습니다.`;
-            hint.style.color = pos.length ? '#166534' : '#64748b';
+            badge.title = pos.length
+                ? `식별번호 ${code} · 발주 ${pos.length}건과 이어져 있습니다${days.length ? ` (최근 ${days[days.length - 1]})` : ''}.`
+                : `식별번호 ${code} · 발주 기록은 아직 없습니다.`;
         }
 
         // [신규] 상품관리에서 '발주'로 넘어온 상품. 발주가 저장되면 그때 생긴 번호를 이 상품에도 붙여 준다.
