@@ -422,6 +422,55 @@
             transition: var(--transition);
         }
         .dt-chip:hover { border-color: var(--primary); }
+        /* 이름 고치는 중인 칩 — 고르는 것이 아니라 고치는 것이라는 표시 */
+        .dt-chip.editing {
+            border-style: dashed;
+            border-color: #fdba74;
+            background: #fff7ed;
+            color: #c2410c;
+        }
+        /* 고치는 중일 때만 나오는 삭제(×) 단추. 칩 오른쪽 위 모서리에 겹쳐 둔다. */
+        .dt-chip-wrap { position: relative; min-width: 0; display: block; }
+        .dt-chip-wrap .dt-chip { width: 100%; }
+        .dt-chip-del {
+            position: absolute;
+            right: -4px;
+            top: -5px;
+            width: 18px;
+            height: 18px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            border-radius: 50%;
+            background: #dc2626;
+            color: #fff;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1;
+            cursor: pointer;
+        }
+        /* 분류 이름 고치기(✏️) · 추가하기(＋) 작은 버튼 */
+        .dt-mini {
+            width: 26px;
+            height: 22px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1.5px solid var(--border);
+            border-radius: 6px;
+            background: #fff;
+            font-family: inherit;
+            font-size: 12px;
+            line-height: 1;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .dt-mini:hover { border-color: var(--primary); }
+        .dt-mini.on { border-color: #fdba74; background: #fff7ed; }
         .dt-chip.active {
             border-color: var(--primary);
             background: var(--primary-light);
@@ -2504,9 +2553,11 @@
                             <div class="form-group">
                                 <label>대분류 탭</label>
                                 <div class="segment-control" style="display: grid; grid-template-columns: repeat(3, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px;">
-                                    <div class="segment-btn active" data-tab="fruit" onclick="selectMainTab('fruit')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">과일/야채</div>
-                                    <div class="segment-btn" data-tab="reserve" onclick="selectMainTab('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">공동구매</div>
-                                    <div class="segment-btn" data-tab="onsite" onclick="selectMainTab('onsite')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">상시판매</div>
+                                    <!-- [수정] 상품목록 대분류와 같은 이름·순서로 맞춘다. 안쪽 값(fruit/onsite/reserve)은
+                                         저장된 자료와 연결돼 있어 그대로 쓴다. -->
+                                    <div class="segment-btn active" data-tab="fruit" onclick="selectMainTab('fruit')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 당일판매</div>
+                                    <div class="segment-btn" data-tab="onsite" onclick="selectMainTab('onsite')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📦 상시판매</div>
+                                    <div class="segment-btn" data-tab="reserve" onclick="selectMainTab('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 예약판매</div>
                                 </div>
                             </div>
 
@@ -2629,11 +2680,15 @@
                                 </div>
                             </div>
 
+                            <!-- [수정] 취소를 아랫줄에 따로 두지 않고 같은 줄에 넣어 셋을 균등하게 나눈다.
+                                 순서: 복제하기 · 수정 완료 · 취소.
+                                 (새 상품 등록에서는 복제·취소가 숨겨져 '등록 완료'가 줄을 다 쓴다) -->
                             <div style="display: flex; gap: 8px; margin-top: 24px;">
-                                <button type="button" id="btn-duplicate-form" onclick="duplicateFromForm(event)" style="display: none; flex: 1 1 0; min-width: 0; padding: 0; height: 50px; background: #7c3aed; color: white; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(124,58,237,0.25); transition: var(--transition);">👯 복제하기</button>
-                                <button type="submit" class="btn-submit" id="btn-submit-form" style="flex: 1 1 0; min-width: 0; padding: 0; height: 50px; background: var(--text-main); color: white; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: var(--transition);">📤 등록 완료</button>
+                                <button type="button" id="btn-duplicate-form" onclick="duplicateFromForm(event)" style="display: none; flex: 1 1 0; min-width: 0; box-sizing: border-box; padding: 0 4px; height: 50px; background: #7c3aed; color: white; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; box-shadow: 0 4px 10px rgba(124,58,237,0.25); transition: var(--transition);">👯 복제하기</button>
+                                <button type="submit" class="btn-submit" id="btn-submit-form" style="flex: 1 1 0; min-width: 0; box-sizing: border-box; padding: 0 4px; height: 50px; background: var(--text-main); color: white; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: var(--transition);">📤 등록 완료</button>
+                                <!-- margin:0 — .btn-cancel 클래스의 margin-top:8px가 남아 이 버튼만 아래로 밀려 있었다 -->
+                                <button type="button" class="btn-cancel" id="btn-cancel-edit" onclick="exitEditMode()" style="display: none; flex: 1 1 0; min-width: 0; box-sizing: border-box; margin: 0; padding: 0 4px; height: 50px; background: white; border: 1.5px solid var(--border); color: var(--text-sub); border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; white-space: nowrap; transition: var(--transition);">취소</button>
                             </div>
-                            <button type="button" class="btn-cancel" id="btn-cancel-edit" onclick="exitEditMode()" style="display: none; width: 100%; height: 50px; background: white; border: 1.5px solid var(--border); color: var(--text-sub); border-radius: var(--radius-sm); font-size: 15px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; margin-top: 8px; transition: var(--transition);">취소</button>
                         </form>
                     </div>
                 </div>
@@ -9605,11 +9660,15 @@
         let uploadDisplayTab = '';
         let displayTabBeforeEdit = ''; // [신규] 분류탭 창을 열 때의 값 — '취소'로 되돌릴 때 쓴다
 
-        // ===== [신규] 상시판매 음식 종류 분류 =====
-        //  key/label은 주문서ver2의 ONSITE_CATS와 똑같아야 한다 (주문서가 이 값으로 탭을 만든다).
-        //  분류는 상품마다 '분류탭 설정'에서 직접 고른다.
-        const ONSITE_CATS = [
-            { key: 'onsite-fruit', label: '🍎 과일' },
+        /* ===== [신규] 상시판매 음식 종류 분류 =====
+           key/label은 주문서ver2의 ONSITE_CATS와 똑같아야 한다 (주문서가 이 값으로 탭을 만든다).
+           분류는 상품마다 '분류탭 설정'에서 직접 고른다.
+           [수정] 이름을 고치거나 새 분류를 더할 수 있게 서버(settings/onsite_categories)에 둔다.
+            서버 값이 없으면 아래 기본 목록을 쓴다. key는 상품에 저장되는 값이라 절대 바꾸지 않는다. */
+        const ONSITE_CATS_DEFAULT = [
+            // [수정] 이름을 '과일·신선'으로 바꿨다. 당일판매의 과일 탭과 헷갈려서.
+            //  (키는 이미 저장된 상품들이 쓰고 있으므로 그대로 둔다)
+            { key: 'onsite-fruit', label: '🥬 과일·신선' },
             { key: 'onsite-soup', label: '🍲 국·탕·찌개' },
             { key: 'onsite-meat', label: '🍖 고기·반찬' },
             { key: 'onsite-noodle', label: '🍜 면류' },
@@ -9621,6 +9680,30 @@
             { key: 'onsite-grocery', label: '🧂 식재료·양념' },
             { key: 'onsite-living', label: '🧴 생활용품' }
         ];
+        let ONSITE_CATS = ONSITE_CATS_DEFAULT.map(c => ({ ...c }));
+        const ONSITE_CATS_URL = `${FIREBASE_DB_URL}settings/onsite_categories.json`;
+
+        // 서버에 저장해 둔 분류 목록을 받아 온다. 없거나 실패하면 기본 목록 그대로.
+        async function loadOnsiteCats() {
+            try {
+                const res = await fetch(`${ONSITE_CATS_URL}?t=${Date.now()}`);
+                if (!res.ok) return;
+                const arr = await res.json();
+                if (!Array.isArray(arr) || arr.length === 0) return;
+                const clean = arr
+                    .filter(c => c && String(c.key || '').trim() && String(c.label || '').trim())
+                    .map(c => ({ key: String(c.key).trim(), label: String(c.label).trim() }));
+                if (clean.length) ONSITE_CATS = clean;
+            } catch (e) { console.error('상시판매 분류 로드 실패:', e); }
+            rebuildDisplayTabGroups();
+        }
+
+        async function saveOnsiteCats() {
+            rebuildDisplayTabGroups();
+            const ok = await fbPutRetry(ONSITE_CATS_URL, ONSITE_CATS);
+            if (!ok) showToast('분류 저장 실패 — 인터넷 상태를 확인해 주세요.');
+            return ok;
+        }
         // 분류를 아직 정하지 않은 상시판매 상품이 사라지지 않도록 받아 주는 탭.
         //  해당 상품이 있을 때만 탭이 생긴다. (주문서ver2의 ONSITE_ETC와 같은 값)
         const ONSITE_ETC = { key: 'onsite-etc', label: '🧺 기타' };
@@ -9635,19 +9718,35 @@
             return t;
         }
 
-        // 분류탭 지정이 없어도 보관분류(냉동·냉장·상온…)로 보아 상시판매인 상품인지.
-        //  주문서는 matchKey만 보지만, 여기서는 예전 상품을 놓치지 않도록 storage도 함께 본다.
+        /* 분류탭 지정이 없어도 분류(matchKey)로 보아 상시판매인 상품인지.
+           [수정] 예전에는 보관방법(storage)에 '냉장' 같은 값이 있으면 그것만으로 상시판매로 봤다.
+            보관방법은 어느 판매유형에나 붙일 수 있는 표시라서, 공동구매(날짜)나 사다드림 상품에
+            냉장 표시를 해 두면 그 상품이 상시판매 '기타·미지정'에 끌려 나왔다.
+            이제 분류가 다른 판매유형(날짜·사다드림·과일/야채·코스트코)이면 상시판매로 보지 않는다. */
         function gIsOnsiteStorageProduct(p) {
             const mk = String((p && p.matchKey) || '').trim();
             const st = String((p && p.storage) || '').trim();
             if (!mk && !st) return false;
-            return ['냉동', '냉장', '상온', '실온', '현장판매', '상시판매'].some(k => mk.includes(k) || st.includes(k));
+
+            // 분류 자체가 상시판매 계열이면 그것으로 확정
+            if (['냉동', '냉장', '상온', '실온', '현장판매', '상시판매'].some(k => mk.includes(k))) return true;
+
+            // 분류가 다른 판매유형을 가리키면 보관방법이 붙어 있어도 상시판매가 아니다
+            if (/^(?:\d{4}|\d{2})[.\-\/]\d{1,2}[.\-\/]\d{1,2}$/.test(mk)) return false; // 공동구매(날짜)
+            if (isSadaListProduct(p)) return false;                                     // 사다드림
+            if (/과일|야채|채소|기타/.test(mk)) return false;                            // 당일판매 과채류
+            if (mk.includes('코스트코')) return false;
+
+            // 분류가 비어 있는 예전 상품만, 보관방법을 근거로 상시판매로 본다
+            return ['냉동', '냉장', '상온', '실온'].some(k => st.includes(k));
         }
 
         // 이 상품이 상시판매 목록에서 들어갈 분류. 어디에도 안 들어가면 빈 값.
         //  1) 분류를 직접 지정했으면 그 탭  2) 지정이 없는 보관분류 상품은 '기타' 탭
         function gOnsiteTabCatOfList(p) {
             const t = gDisplayTabOfList(p);
+            // [신규] 분류를 지우면서 '기타'로 옮겨 둔 상품 (지정이 남아 있어야 당일 쪽으로 돌아가지 않는다)
+            if (t === ONSITE_ETC.key) return ONSITE_ETC.key;
             if (ONSITE_CATS.some(c => c.key === t)) return t;
             if (t) return '';                                   // 당일·사다드림 등 다른 탭으로 지정된 상품
             return gIsOnsiteStorageProduct(p) ? ONSITE_ETC.key : '';
@@ -9659,37 +9758,43 @@
             return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
         }
 
-        const DISPLAY_TAB_GROUPS = [
-            {
-                group: '당일판매',
-                items: [
-                    { key: 'today-fruit', label: '과일 / 야채', desc: '당일 수령하는 과일·야채' },
-                    { key: 'today-reserve', label: '오늘의 상품', desc: '오늘 날짜 공동구매 (해당 상품이 있을 때만 탭이 생김)' }
-                ]
-            },
-            {
-                // [수정] 보관방법(냉동·냉장·상온) 대신 음식 종류로 나눈다.
-                //  손님은 '무엇을 먹을지'로 찾지 '어디에 보관하는지'로 찾지 않기 때문.
-                //  보관방법은 분류(matchKey)와 선반으로 그대로 관리한다.
-                group: '상시판매',
-                items: ONSITE_CATS.map(c => ({ key: c.key, label: c.label, desc: '' }))
-            },
-            {
-                group: '예약판매',
-                items: [
-                    { key: 'reserve', label: '공동구매', desc: '날짜별로 묶여 보이는 예약 상품' },
-                    { key: 'sada', label: '사다드림', desc: '무료배달 기준 제외 · 대행료 적용 대상' }
-                    // [수정] '코스트코'는 고를 수 있는 목록에서 뺐다.
-                    //  이미 코스트코로 지정해 둔 상품의 값(displayTab:'costco')은 건드리지 않으므로
-                    //  손님 화면의 코스트코 탭은 예전처럼 동작한다.
-                ]
-            }
-        ];
+        // [수정] 상시판매 분류를 고칠 수 있게 되면서, 이 표도 그때그때 다시 만든다.
+        let DISPLAY_TAB_GROUPS = [];
+        function rebuildDisplayTabGroups() {
+            DISPLAY_TAB_GROUPS = [
+                {
+                    group: '당일판매',
+                    items: [
+                        { key: 'today-fruit', label: '과일 / 야채', desc: '당일 수령하는 과일·야채' },
+                        { key: 'today-reserve', label: '오늘의 상품', desc: '오늘 날짜 공동구매 (해당 상품이 있을 때만 탭이 생김)' }
+                    ]
+                },
+                {
+                    // [수정] 보관방법(냉동·냉장·상온) 대신 음식 종류로 나눈다.
+                    //  손님은 '무엇을 먹을지'로 찾지 '어디에 보관하는지'로 찾지 않기 때문.
+                    //  보관방법은 분류(matchKey)와 선반으로 그대로 관리한다.
+                    group: '상시판매',
+                    items: ONSITE_CATS.map(c => ({ key: c.key, label: c.label, desc: '' }))
+                },
+                {
+                    group: '예약판매',
+                    items: [
+                        { key: 'reserve', label: '공동구매', desc: '날짜별로 묶여 보이는 예약 상품' },
+                        { key: 'sada', label: '사다드림', desc: '무료배달 기준 제외 · 대행료 적용 대상' }
+                        // [수정] '코스트코'는 고를 수 있는 목록에서 뺐다.
+                        //  이미 코스트코로 지정해 둔 상품의 값(displayTab:'costco')은 건드리지 않으므로
+                        //  손님 화면의 코스트코 탭은 예전처럼 동작한다.
+                    ]
+                }
+            ];
+        }
+        rebuildDisplayTabGroups();
 
         //  [수정] 이 설정은 기존 분류보다 '우선'하는 덮어쓰기다. 지정하지 않으면 '없음'이고,
         //   그때는 예전처럼 상품명·분류(matchKey)로 판단한다.
         function gDisplayTabLabel(key) {
             if (!key) return '없음';
+            if (key === ONSITE_ETC.key) return `상시판매 › ${ONSITE_ETC.label}`;
             for (const g of DISPLAY_TAB_GROUPS) {
                 const hit = g.items.find(it => it.key === key);
                 if (hit) return `${g.group} › ${hit.label}`;
@@ -9701,6 +9806,7 @@
         //  고른 게 없으면 버튼 이름 그대로 '분류탭'.
         function gDisplayTabShort(key) {
             if (!key) return '분류탭';
+            if (key === ONSITE_ETC.key) return ONSITE_ETC.label;   // 분류가 지워져 기타로 옮겨진 상품
             for (const g of DISPLAY_TAB_GROUPS) {
                 const hit = g.items.find(it => it.key === key);
                 if (hit) return hit.label;
@@ -9736,6 +9842,94 @@
             return btn;
         }
 
+        /* ===== [신규] 상시판매 분류 이름 고치기 / 추가하기 =====
+           키(key)는 상품에 저장되는 값이라 절대 바꾸지 않는다. 보이는 이름(label)만 고친다.
+           고친 값은 서버에 저장돼 주문서(손님 화면)에서도 같은 이름으로 보인다. */
+        let onsiteCatEditMode = false;
+
+        function toggleOnsiteCatEdit() {
+            onsiteCatEditMode = !onsiteCatEditMode;
+            openDisplayTabSetting();   // 창을 다시 그려 모드 반영
+        }
+
+        async function renameOnsiteCat(key) {
+            const hit = ONSITE_CATS.find(c => c.key === key);
+            if (!hit) return;
+            const next = prompt('분류 이름을 적어 주세요. (앞에 이모지를 넣어도 됩니다)', hit.label);
+            if (next === null) return;                       // 취소
+            const label = String(next).trim();
+            if (!label) { showToast('이름이 비어 있습니다.'); return; }
+            if (label === hit.label) return;
+            hit.label = label;
+            await saveOnsiteCats();
+            showToast(`분류 이름을 '${label}'로 바꿨습니다.`);
+            openDisplayTabSetting();
+            buildManageCategoryTabs();   // 상품목록 상시판매 탭에도 바로 반영
+        }
+
+        /* [신규] 분류 지우기. 그 분류로 지정해 둔 상품은 '기타'로 옮긴다.
+           그냥 지우면 그 상품들이 갈 곳을 잃어 손님 화면에서 사라지고,
+           지정만 비우면 분류(matchKey)에 따라 당일판매 쪽으로 되돌아가 버린다.
+           그래서 '기타'(onsite-etc)로 명시해 두고, 사장님이 나중에 새 분류를 골라 주면 된다. */
+        async function deleteOnsiteCat(key) {
+            const hit = ONSITE_CATS.find(c => c.key === key);
+            if (!hit) return;
+            if (ONSITE_CATS.length <= 1) { showToast('분류가 하나뿐이라 지울 수 없습니다.'); return; }
+
+            const targets = (uploadProducts || []).filter(p => p && String(p.displayTab || '') === key);
+            const msg = targets.length
+                ? `'${hit.label}' 분류를 지웁니다.\n\n이 분류의 상품 ${targets.length}개는 '기타'로 옮겨집니다.\n(나중에 각 상품에서 새 분류를 골라 주세요)\n\n진행할까요?`
+                : `'${hit.label}' 분류를 지웁니다.\n이 분류로 지정된 상품은 없습니다.\n\n진행할까요?`;
+            if (!confirm(msg)) return;
+
+            showLoader('🗂️ 분류 정리 중...');
+            try {
+                if (targets.length) {
+                    const updated = uploadProducts.map(p =>
+                        (p && String(p.displayTab || '') === key)
+                            ? { ...p, displayTab: ONSITE_ETC.key, updatedAt: Date.now() }
+                            : p);
+                    const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated)
+                    });
+                    if (!res.ok) throw new Error('상품 분류 이동 실패');
+                    uploadProducts = updated;
+                    updatePublishedProductsTimestamp();
+                }
+                ONSITE_CATS = ONSITE_CATS.filter(c => c.key !== key);
+                await saveOnsiteCats();
+                // 지운 분류를 고른 채로 남아 있으면 풀어 준다
+                if (uploadDisplayTab === key) { uploadDisplayTab = ''; updateDisplayTabUI(); }
+                hideLoader();
+                showToast(targets.length
+                    ? `'${hit.label}' 분류를 지우고 상품 ${targets.length}개를 기타로 옮겼습니다.`
+                    : `'${hit.label}' 분류를 지웠습니다.`);
+                openDisplayTabSetting();
+                buildManageCategoryTabs();
+                renderProductsList();
+            } catch (e) {
+                hideLoader();
+                console.error('분류 삭제 실패:', e);
+                showToast('분류 삭제 실패: ' + e.toString());
+            }
+        }
+
+        async function addOnsiteCat() {
+            const next = prompt('새 분류 이름을 적어 주세요. (앞에 이모지를 넣어도 됩니다)', '');
+            if (next === null) return;
+            const label = String(next).trim();
+            if (!label) { showToast('이름이 비어 있습니다.'); return; }
+            // 키는 겹치지 않게 자동으로 만든다 (상품에 저장되는 값이라 나중에 바뀌면 안 된다)
+            let key = '';
+            do { key = 'onsite-c' + Math.random().toString(36).slice(2, 8); }
+            while (ONSITE_CATS.some(c => c.key === key) || key === ONSITE_ETC.key);
+            ONSITE_CATS.push({ key, label });
+            await saveOnsiteCats();
+            showToast(`'${label}' 분류를 추가했습니다.`);
+            openDisplayTabSetting();
+            buildManageCategoryTabs();
+        }
+
         function openDisplayTabSetting() {
             const old = document.getElementById('display-tab-modal');
             if (old) old.remove();
@@ -9750,10 +9944,36 @@
                     ` onclick="pickDisplayTab('${key}')"${desc ? ` title="${gEscapeHtml(desc)}"` : ''}>${label}</button>`;
             };
 
+            /* [신규] 상시판매 분류는 사장님이 이름을 고치거나 새로 더할 수 있다.
+               · ✏️를 켜면 칩을 눌렀을 때 고르는 대신 이름을 고친다
+               · ＋ 칩으로 새 분류를 만든다 (키는 자동으로 붙는다) */
+            const onsiteEditing = onsiteCatEditMode;
             let html = '';
             DISPLAY_TAB_GROUPS.forEach(g => {
-                html += `<div class="dt-group-title">${g.group}</div>`;
-                html += `<div class="dt-grid">` + g.items.map(it => chip(it.key, it.label, it.desc)).join('') + `</div>`;
+                const isOnsite = (g.group === '상시판매');
+                if (isOnsite) {
+                    html += `<div class="dt-group-title" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">`
+                        + `<span>${g.group}${onsiteEditing ? ' <span style="color:#c2410c;">— 눌러서 이름 고치기 · ×로 지우기</span>' : ''}</span>`
+                        + `<span style="display:flex; gap:4px;">`
+                        + `<button type="button" onclick="toggleOnsiteCatEdit()" title="분류 이름 고치기" class="dt-mini${onsiteEditing ? ' on' : ''}">✏️</button>`
+                        + `<button type="button" onclick="addOnsiteCat()" title="분류 추가하기" class="dt-mini">＋</button>`
+                        + `</span></div>`;
+                } else {
+                    html += `<div class="dt-group-title">${g.group}</div>`;
+                }
+                // [신규] 분류가 지워져 '기타'로 옮겨진 상품은, 지금 어디 있는지 보이도록 기타 칩도 함께 띄운다.
+                //  (평소에는 고르는 목록에 없다 — 기타는 분류를 안 정한 상품이 모이는 자리다)
+                const items = (isOnsite && uploadDisplayTab === ONSITE_ETC.key && !onsiteEditing)
+                    ? g.items.concat([{ key: ONSITE_ETC.key, label: ONSITE_ETC.label, desc: '분류가 지워져 여기로 옮겨진 상품입니다. 새 분류를 골라 주세요.' }])
+                    : g.items;
+                html += `<div class="dt-grid">`
+                    + items.map(it => (isOnsite && onsiteEditing)
+                        ? `<span class="dt-chip-wrap">`
+                            + `<button type="button" class="dt-chip editing" onclick="renameOnsiteCat('${it.key}')" title="이름 고치기">${it.label}</button>`
+                            + `<button type="button" class="dt-chip-del" onclick="deleteOnsiteCat('${it.key}')" title="이 분류 지우기 (상품은 기타로 옮겨집니다)">&times;</button>`
+                            + `</span>`
+                        : chip(it.key, it.label, it.desc)).join('')
+                    + `</div>`;
             });
 
             const modal = document.createElement('div');
@@ -11336,8 +11556,11 @@
                     if (isFruit && isShown && !isOnsiteAssigned) targets.push(key);
                 }
                 if (targets.length){
+                    /* [수정] 예전에는 showToday만 껐다. 그러면 showReserve는 켜진 채 남아
+                       당일에서는 숨김인데 예약판매 쪽에서는 계속 보이는(검색에 잡히는) 상태가 됐다.
+                       손으로 누르는 🙈숨김 버튼과 똑같이 두 값을 함께 끈다. */
                     await Promise.all(targets.map(key => fetch(`${FIREBASE_DB_URL}published_products/${key}.json`, {
-                        method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ showToday:false, updatedAt: Date.now() })
+                        method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ showToday:false, showReserve:false, hide:true, updatedAt: Date.now() })
                     }).catch(e=>console.error('과일 자동숨김 실패:', key, e))));
                     if (typeof showToast === 'function') showToast(`⏰ 15시 지나 과일 ${targets.length}개를 자동 숨김 처리했습니다.`);
                 }
@@ -13756,7 +13979,7 @@
                 // [수정] 위 탭이 음식 종류로 바뀌었으므로, 선반은 어느 종류를 보고 있든 여기서 고른다.
                 //  (예전에는 '냉장·냉동' 그룹을 고른 뒤에야 선반이 나와서, 종류별로 보면 선반을 못 골랐다)
                 //  선반 목록은 INV_GROUPS 한 곳에서 가져와 재고관리 분류와 어긋나지 않게 한다.
-                const subs = [['all', '전체'], [SHELF_NONE_SUB, '📦 미지정'], ['fruit', '🍎 과일']];
+                const subs = [['all', '전체'], [SHELF_NONE_SUB, '📦 미지정'], ['fruit', '🥬 과일·신선']];
                 Object.values(INV_GROUPS).forEach(g => g.shelves.forEach(([k, l]) => { if (k) subs.push([k, l]); }));
                 subContainer.style.display = 'flex';
                 subContainer.innerHTML = subs.map(([key, label]) =>
@@ -13790,12 +14013,12 @@
         ];
         const costcoCategories = ["코스트코 냉동", "코스트코 냉장", "코스트코 상온"];
         // [신규] 상품 등록/수정 폼의 선반위치(장소) 옵션 — 재고관리 탭의 선반 분류와 동일
-        const SHELF_OPTS_FORM = [['', '📦 미지정'], ['fruit', '🍎 과일'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']];
+        const SHELF_OPTS_FORM = [['', '📦 미지정'], ['fruit', '🥬 과일·신선'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']];
         // [신규] 상시판매 보관분류별 선반 옵션 (냉동→냉동4~7, 냉장→냉장1~2, 상온→선반1~3, 공통: 미지정·기타)
         const SHELF_GROUPS = {
             // [수정] 과일도 실제로는 어느 자리에나 둘 수 있어(과일매대·냉장·상온 선반 등) 선반을 막지 않는다.
             //  '과일' 자리를 맨 앞에 두되 나머지 선반도 그대로 고를 수 있게 한다.
-            '과일': [['fruit', '🍎 과일'], ['', '📦 미지정'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']],
+            '과일': [['fruit', '🥬 과일·신선'], ['', '📦 미지정'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']],
             '냉동': [['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['', '📦 미지정'], ['other', '🧺 기타']],
             '냉장': [['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['', '📦 미지정'], ['other', '🧺 기타']],
             '상온': [['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['', '📦 미지정'], ['other', '🧺 기타']]
@@ -13929,7 +14152,9 @@
                 onsiteCategories.forEach(cat => {
                     const opt = document.createElement('option');
                     opt.value = cat;
-                    opt.innerText = (cat === "냉동" ? "🧊냉동" : cat === "냉장" ? "❄️냉장" : cat === "상온" ? "🌡️상온" : cat === "과일" ? "🍎과일" : cat);
+                    // [수정] 보관분류 '과일'도 보이는 이름은 '과일·신선'으로. (분류탭 이름과 맞춘다)
+                    //  저장되는 값(cat)은 '과일' 그대로다 — 이미 등록된 상품들이 이 값을 쓰고 있다.
+                    opt.innerText = (cat === "냉동" ? "🧊냉동" : cat === "냉장" ? "❄️냉장" : cat === "상온" ? "🌡️상온" : cat === "과일" ? "🥬과일·신선" : cat);
                     select.appendChild(opt);
                 });
 
@@ -13941,7 +14166,7 @@
                 // [신규] 보관분류 바뀌면 선반 옵션도 관련된 것만 갱신
                 select.onchange = () => {
                     populateShelfOptions();
-                    // [신규] 상시판매에서 '과일'을 고르면 주문서 분류탭도 '상시판매 › 과일'로 맞춰 준다.
+                    // [신규] 상시판매에서 보관분류 '과일'을 고르면 주문서 분류탭도 '상시판매 › 과일·신선'으로 맞춰 준다.
                     //  (안 그러면 분류가 과일이라 당일판매 과일 쪽에 섞여 버린다. 이미 다른 탭을 골라 뒀으면 건드리지 않는다)
                     if (select.value === '과일' && !uploadDisplayTab) {
                         uploadDisplayTab = 'onsite-fruit';
@@ -15031,8 +15256,10 @@
             // [신규] 재고관리 모드: 선반 순서/라벨 (미지정이 맨 위, 이후 선반 세팅 순서대로)
             const isInventoryView = (uploadManageDeliveryType === 'inventory');
             const isReserveView = (uploadManageDeliveryType === 'reserve');
-            const SHELF_ORDER = { '': 0, 'shelf-1': 1, 'shelf-2': 2, 'shelf-3': 3, 'fridge-1': 4, 'fridge-2': 5, 'freezer-4': 6, 'freezer-5': 7, 'freezer-6': 8, 'freezer-7': 9, 'other': 10 };
-            const SHELF_LABEL = { '': '📦 미지정', 'shelf-1': '🗄️ 선반1', 'shelf-2': '🗄️ 선반2', 'shelf-3': '🗄️ 선반3', 'fridge-1': '❄️ 냉장1', 'fridge-2': '❄️ 냉장2', 'freezer-4': '🧊 냉동4', 'freezer-5': '🧊 냉동5', 'freezer-6': '🧊 냉동6', 'freezer-7': '🧊 냉동7', 'other': '🧺 기타' };
+            /* [수정] 'fruit'(과일·신선 자리)가 두 표에 빠져 있어, 그 선반에 둔 상품의 그룹 제목이
+               이름표 없이 키 그대로 'fruit'로 나왔다. 순서도 맨 뒤로 밀렸다. */
+            const SHELF_ORDER = { '': 0, 'fruit': 1, 'shelf-1': 2, 'shelf-2': 3, 'shelf-3': 4, 'fridge-1': 5, 'fridge-2': 6, 'freezer-4': 7, 'freezer-5': 8, 'freezer-6': 9, 'freezer-7': 10, 'other': 11 };
+            const SHELF_LABEL = { '': '📦 미지정', 'fruit': '🥬 과일·신선', 'shelf-1': '🗄️ 선반1', 'shelf-2': '🗄️ 선반2', 'shelf-3': '🗄️ 선반3', 'fridge-1': '❄️ 냉장1', 'fridge-2': '❄️ 냉장2', 'freezer-4': '🧊 냉동4', 'freezer-5': '🧊 냉동5', 'freezer-6': '🧊 냉동6', 'freezer-7': '🧊 냉동7', 'other': '🧺 기타' };
             const isProductSoldOut = (prod) => {
                 const unl = (prod.stock === "" || prod.stock == null || String(prod.stock).trim() === "무제한");
                 const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)];
@@ -16010,17 +16237,45 @@
             if (submitBtn) submitBtn.innerText = "💾 수정 완료";
             
             const cancelBtn = document.getElementById('btn-cancel-edit');
-            if (cancelBtn) cancelBtn.style.display = "block";
+            if (cancelBtn) cancelBtn.style.display = "flex";   // [수정] 같은 줄 안에서 가운데 정렬되도록 flex로
 
-            let tabType = "reserve";
+            /* [수정] 대분류 탭은 분류탭(displayTab)을 먼저 본다.
+               분류탭은 기존 분류(matchKey)보다 '우선'하는 값인데 여기서 안 보고 있었다.
+               그래서 과일을 '상시판매 › 과일·신선'으로 옮겨 저장해도, 다시 수정하러 들어오면
+               matchKey가 '과일'이라는 이유로 대분류가 과일/야채로 되돌아왔다.
+               (목록에서는 이미 상시판매로 옮겨져 있었는데 수정 화면만 딴소리를 했다)
+               분류탭을 지정하지 않은 상품은 예전처럼 matchKey로 판단한다. */
+            let tabType = "";
             const mKey = prod.matchKey || "";
-            if (mKey.includes("냉동") || mKey.includes("냉장") || mKey.includes("상온") || mKey.includes("실온") || mKey.includes("상시판매") || mKey.includes("현장판매")) {
-                tabType = "onsite";
-            } else if (mKey.includes("과일") || mKey.includes("야채") || mKey.includes("기타")) {
-                // [수정] 과채류 matchKey에서 '_예약' 접미사 제거(2026-08-09) 이후 대응 — '예약' 포함 여부와 무관하게 과일탭으로 인식
-                tabType = "fruit";
-            } else if (mKey.includes("코스트코")) {
-                tabType = "costco";
+            const dTab = String(prod.displayTab || "").trim();
+            if (dTab.startsWith("onsite-")) tabType = "onsite";
+            else if (dTab === "today-fruit" || dTab === "today-reserve") tabType = "fruit";
+            else if (dTab === "reserve" || dTab === "sada") tabType = "reserve";
+            else if (dTab === "costco") tabType = "costco";
+
+            /* [신규] 분류탭이 가리키는 대분류에 이 상품의 분류(matchKey)를 담을 칸이 없으면 쓰지 않는다.
+               저장할 때 matchKey는 그 칸의 값으로 다시 쓰이는데, 칸에 없는 값이면 첫 항목으로 튕겨
+               분류가 조용히 바뀌어 버린다. (예: 공동구매 날짜 상품을 상시판매 분류로 지정해 둔 경우)
+               그런 상품은 예전처럼 matchKey 기준 대분류로 연다. */
+            if (tabType) {
+                const _fits =
+                    (tabType === 'onsite') ? (mKey === '' || onsiteCategories.includes(mKey)) :
+                    (tabType === 'fruit') ? (mKey === '' || fruitCategories.some(c => c.key === mKey)) :
+                    (tabType === 'reserve') ? /^(?:\d{4}|\d{2})[.\-\/]\d{1,2}[.\-\/]\d{1,2}$/.test(mKey) :
+                    (tabType === 'costco') ? costcoCategories.includes(mKey) : true;
+                if (!_fits) tabType = "";
+            }
+
+            if (!tabType) {
+                tabType = "reserve";
+                if (mKey.includes("냉동") || mKey.includes("냉장") || mKey.includes("상온") || mKey.includes("실온") || mKey.includes("상시판매") || mKey.includes("현장판매")) {
+                    tabType = "onsite";
+                } else if (mKey.includes("과일") || mKey.includes("야채") || mKey.includes("기타")) {
+                    // [수정] 과채류 matchKey에서 '_예약' 접미사 제거(2026-08-09) 이후 대응 — '예약' 포함 여부와 무관하게 과일탭으로 인식
+                    tabType = "fruit";
+                } else if (mKey.includes("코스트코")) {
+                    tabType = "costco";
+                }
             }
 
             uploadEditShelf = String(prod.shelf || ''); // [신규] 기존 선반위치를 폼에 반영 (selectMainTab에서 사용)
@@ -16404,6 +16659,10 @@
             // [신규] 사장님이 묶은 구역·명칭을 먼저 읽어 둔다 (카드·인쇄 표시와 검색에 바로 반영)
             Promise.all([loadApartmentCustom(), loadApartmentAlias(), loadApartmentExtra(), loadApartmentTable()]).then(() => {
                 if (APARTMENT_CUSTOM.length > 0 && typeof renderFilteredOrders === 'function') renderFilteredOrders();
+            });
+            // [신규] 상시판매 분류(이름·추가분)을 서버에서 받아 온다. 실패하면 기본 목록으로 동작한다.
+            loadOnsiteCats().then(() => {
+                if (typeof buildManageCategoryTabs === 'function' && document.getElementById('manage-category-tabs')) buildManageCategoryTabs();
             });
             // 캐시가 있으면 즉시 화면에 먼저 그려주고, 실시간 리스너로 최신 데이터를 이어받음
             loadOrdersFromCache();
