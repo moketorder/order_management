@@ -2189,7 +2189,8 @@
         #tab-admin-products .sub-tabs-container {
             display: flex;
             gap: 6px;
-            overflow-x: auto;
+            flex-wrap: wrap;          /* [수정] 선반이 늘어나도 옆으로 숨지 않고 두세 줄로 다 보이게 한다 */
+            overflow-x: visible;
             padding: 4px 0;
             scrollbar-width: none;
         }
@@ -2490,6 +2491,9 @@
                     <input type="text" id="searchInput" class="search-input" style="width:100%; padding-right:35px;" placeholder="고객명·연락처·상품명 검색..." onkeyup="handleSearchInput()">
                     <button id="clearSearchBtn" class="clear-search-btn" onclick="clearSearch()">&times;</button>
                 </div>
+                <!-- [신규] 주문에 손댄 기록 보기 (수령방법·날짜·상태·입금·주소·배달비·삭제) -->
+                <button type="button" class="no-print" onclick="openOrderLogs()" title="주문을 바꾼 기록을 날짜별로 봅니다"
+                    style="flex:0 0 auto; height:38px; padding:0 12px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:9px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">📜 기록</button>
             </div>
 
             <!-- [신규] 상태별 탭 (개수 표시, 클릭 시 그 상태만) -->
@@ -2895,26 +2899,26 @@
 
                                 <!-- 발주 상품명 (등록 상품 자동완성 datalist 연동) -->
                                 <div class="po-f-name">
-                                    <label style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">
-                                        <span>📦 발주 상품명</span>
-                                        <!-- [신규] 등록 상품을 검색해서 고르는 창. 고르면 상품명·판매가·식별번호가 한 번에 채워진다. -->
-                                        <button type="button" onclick="openProductPicker()" style="padding:4px 10px; background:#eff6ff; color:#2563eb; border:1.5px solid #bfdbfe; border-radius:7px; font-size:12px; font-weight:800; cursor:pointer;">🔍 상품 찾기</button>
-                                    </label>
+                                    <!-- [수정] 식별번호가 상품명 아래에 한 줄을 통째로 차지하고 있었다.
+                                         상품등록 화면처럼 상품명 라벨 오른쪽 끝에 붙여 자리를 안 먹게 한다. -->
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">
+                                        <span style="display: inline-flex; align-items: center; gap: 8px;">
+                                            <span>📦 발주 상품명</span>
+                                            <!-- [신규] 등록 상품을 검색해서 고르는 창. 고르면 상품명·판매가·식별번호가 한 번에 채워진다. -->
+                                            <button type="button" onclick="openProductPicker()" style="padding:4px 10px; background:#eff6ff; color:#2563eb; border:1.5px solid #bfdbfe; border-radius:7px; font-size:12px; font-weight:800; cursor:pointer;">🔍 상품 찾기</button>
+                                        </span>
+                                        <!-- [신규] 식별번호 — 이름이 달라도 이 번호가 같으면 같은 상품으로 본다.
+                                             손으로 못 고치게 읽기전용. '🔍 상품 찾기'로 고르면 채워지고, 비어 있으면 저장할 때 자동으로 붙는다. -->
+                                        <span style="display: inline-flex; align-items: center; gap: 6px;">
+                                            <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
+                                            <input type="text" id="purchase-product-code" class="form-control" placeholder="자동" readonly tabindex="-1" style="flex:0 0 100px; width:100px; height:30px; padding:5px 9px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
+                                        </span>
+                                    </div>
                                     <!-- [수정] 브라우저 기본 자동완성 목록(datalist)을 뗐다. 글씨를 칠 때마다 목록이 떠서
                                          거슬리고, 무엇이 왜 뜨는지도 알기 어려웠다. 상품은 '🔍 상품 찾기'로 고른다.
                                          autocomplete="off"로 브라우저가 기억한 입력값도 안 뜨게 한다. -->
                                     <input type="text" id="purchase-item-name" class="form-control" autocomplete="off" placeholder="예: [과일] 나주 배 5kg (또는 위 '상품 찾기'로 선택)" required oninput="onPurchaseItemNameChange(); calcPurchaseTotal();" onchange="onPurchaseItemNameChange()" style="width: 100%; height: 43px; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 14px; font-weight: 700; box-sizing: border-box; background: #ffffff;">
-
-                                    <!-- [신규] 식별번호 — 이름이 달라도 이 번호가 같으면 같은 상품으로 본다.
-                                         등록 상품을 고르면 그 상품의 번호가 자동으로 들어오고,
-                                         번호를 직접 적으면 이름과 상관없이 그 상품의 발주로 잡힌다. -->
-                                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
-                                        <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
-                                        <!-- [수정] 손으로 못 고치게 읽기전용. 잘못 적으면 엉뚱한 상품에 묶여 버린다.
-                                             '🔍 상품 찾기'로 고르면 채워지고, 비어 있으면 저장할 때 자동으로 붙는다. -->
-                                        <input type="text" id="purchase-product-code" class="form-control" placeholder="자동" readonly tabindex="-1" style="flex:0 0 110px; height:36px; padding:7px 10px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:13px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
-                                        <span id="purchase-code-hint" style="font-size:12px; font-weight:700; color:#64748b; flex:1 1 180px; min-width:0;">‘🔍 상품 찾기’로 고르면 자동으로 채워집니다.</span>
-                                    </div>
+                                    <div id="purchase-code-hint" style="font-size:12px; font-weight:700; color:#64748b; margin-top:6px;">‘🔍 상품 찾기’로 고르면 자동으로 채워집니다.</div>
                                 </div>
 
                                 <!-- 발주 수량 (박스/팩) -->
@@ -2966,11 +2970,11 @@
 
                             <!-- 버튼 영역 -->
                             <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                <button type="button" id="btn-purchase-cancel" onclick="resetPurchaseOrderForm()" class="btn-common btn-secondary" style="display: none; padding: 10px 20px; font-size: 14px;">취소</button>
-                                <button type="submit" id="btn-purchase-submit" class="btn-common" style="padding: 10px 24px; font-size: 14px; background: #10b981; color: white; border: none; border-radius: var(--radius-sub); font-weight: 800; cursor: pointer;">💾 발주 내역 저장</button>
+                                <button type="button" id="btn-purchase-cancel" onclick="resetPurchaseOrderForm()" class="btn-common btn-secondary" style="display: none; flex: 1 1 0; min-width: 0; justify-content: center; box-sizing: border-box; border: 1.5px solid transparent; padding: 10px 2px; font-size: 13px; white-space: nowrap;">취소</button>
+                                <button type="submit" id="btn-purchase-submit" class="btn-common" style="flex: 1 1 0; min-width: 0; justify-content: center; box-sizing: border-box; padding: 10px 2px; font-size: 13px; white-space: nowrap; background: #10b981; color: white; border: 1.5px solid #10b981; border-radius: var(--radius-sub); font-weight: 800; cursor: pointer;">💾 저장</button>
                                 <!-- [신규] 저장하고 바로 상품등록까지 이어서 하는 버튼.
                                      예전에는 저장 후 '상품등록 할래요?' 창을 띄웠는데, 매번 묻는 것이 성가셔서 버튼으로 바꿨다. -->
-                                <button type="submit" id="btn-purchase-submit-product" onclick="purchaseSaveThenProduct()" class="btn-common" style="padding: 10px 20px; font-size: 14px; background: #fff; color: #2563eb; border: 1.5px solid #bfdbfe; border-radius: var(--radius-sub); font-weight: 800; cursor: pointer;">💾 저장 후 상품등록</button>
+                                <button type="submit" id="btn-purchase-submit-product" onclick="purchaseSaveThenProduct()" class="btn-common" style="flex: 1 1 0; min-width: 0; justify-content: center; box-sizing: border-box; padding: 10px 2px; font-size: 13px; white-space: nowrap; background: #fff; color: #2563eb; border: 1.5px solid #bfdbfe; border-radius: var(--radius-sub); font-weight: 800; cursor: pointer;" title="발주를 저장하고 바로 상품등록 화면으로 넘어갑니다">💾 저장 &amp; 등록</button>
                             </div>
                         </form>
                     </div>
@@ -3047,12 +3051,14 @@
                                 <span id="purchase-selection-text">발주 선택됨</span>
                             </div>
                         </div>
-                        <div class="batch-buttons" style="display: flex; gap: 5px; width: 100%; box-sizing: border-box; flex-wrap: wrap;">
-                            <button class="btn-batch" onclick="viewPurchasesOfSelected()" style="flex: 1 1 130px; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(79,70,229,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #4338ca; white-space: nowrap; overflow: hidden;">📋 주문전체보기</button>
-                            <button class="btn-batch" onclick="registerProductFromPurchase()" style="flex: 1 1 110px; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(16,185,129,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #10b981; white-space: nowrap; overflow: hidden;">📦 상품등록</button>
-                            <button class="btn-batch" onclick="editSelectedPurchase()" style="flex: 1 1 120px; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(59,130,246,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #2563eb; white-space: nowrap; overflow: hidden;">✏️ 수정</button>
-                            <button class="btn-batch" id="btn-purchase-del" onclick="askDeleteSelectedPurchase()" style="flex: 1 1 120px; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(220,38,38,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #dc2626; white-space: nowrap; overflow: hidden;">🗑️ 삭제</button>
-                            <button class="btn-batch" onclick="clearPurchaseSelection()" style="flex: 0 0 auto; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: var(--text-sub);">닫기</button>
+                        <div class="batch-buttons" style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; width: 100%; box-sizing: border-box;">
+                            <button class="btn-batch" onclick="viewPurchasesOfSelected()" style="grid-column: span 2; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(79,70,229,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #4338ca; white-space: nowrap; overflow: hidden;">📋 주문전체보기</button>
+                            <button class="btn-batch" onclick="registerProductFromPurchase()" style="grid-column: span 2; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(16,185,129,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #10b981; white-space: nowrap; overflow: hidden;">📦 상품등록</button>
+                            <button class="btn-batch" onclick="editSelectedPurchase()" style="grid-column: span 2; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(59,130,246,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #2563eb; white-space: nowrap; overflow: hidden;">✏️ 수정</button>
+                            <!-- [신규] 같은 상품을 또 들여올 때, 이 발주를 그대로 베껴 새 발주로 적는다 -->
+                            <button class="btn-batch" onclick="copySelectedPurchase()" title="이 발주를 그대로 베껴 새 발주로 적습니다 (날짜는 오늘)" style="grid-column: span 2; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(217,119,6,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #d97706; white-space: nowrap; overflow: hidden;">📄 복사 발주</button>
+                            <button class="btn-batch" id="btn-purchase-del" onclick="askDeleteSelectedPurchase()" style="grid-column: span 2; min-width: 0; padding: 10px 2px; border: 1.5px solid rgba(220,38,38,0.3); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: #dc2626; white-space: nowrap; overflow: hidden;">🗑️ 삭제</button>
+                            <button class="btn-batch" onclick="clearPurchaseSelection()" style="grid-column: span 2; min-width: 0; padding: 10px 2px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 12px; font-weight: 800; cursor: pointer; color: var(--text-sub);">닫기</button>
                         </div>
                     </div>
                 </div>
@@ -3083,31 +3089,55 @@
     <style>
         .sales-toggle-btn { padding:7px 12px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; }
         .sales-toggle-btn.active { border-color:var(--primary); background:var(--primary-light); color:var(--primary); }
+        /* [신규] 매출 직접 입력 — 월/일 고르기 버튼 */
+        .ms-mode-btn {
+            padding:7px 14px; border:1.5px solid #cbd5e1; background:#fff; color:#475569;
+            border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;
+        }
+        .ms-mode-btn.active { background:#10b981; border-color:#10b981; color:#fff; }
+        /* 달력 내역 — 한 칸에 날짜·포스·계좌이체가 들어간다 */
+        .ms-cal-grid { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:3px; }
+        .ms-cal-head { text-align:center; font-size:11px; font-weight:800; color:#94a3b8; padding:4px 0; }
+        .ms-cal-cell {
+            min-height:52px; border:1px solid #eef2f6; border-radius:7px; padding:3px 4px;
+            font-size:10px; font-weight:700; background:#fff; cursor:pointer; overflow:hidden;
+        }
+        .ms-cal-cell.empty { background:transparent; border-color:transparent; cursor:default; }
+        .ms-cal-cell.has { background:#f0fdf4; border-color:#bbf7d0; }
+        .ms-cal-cell.today { outline:2px solid #93c5fd; }
+        .ms-cal-day { font-weight:900; color:#334155; }
+        .ms-cal-sun .ms-cal-day { color:#dc2626; }
+        .ms-cal-sat .ms-cal-day { color:#2563eb; }
         /* [신규] 발주 등록 폼 — 12칸 기준으로 자리를 못박아 줄을 맞춘다.
-           상품명은 한 줄 전체(가장 중요하고 길다), 날짜·업체명은 반반,
-           숫자 네 칸(수량·입수량·단가·판매가)은 한 줄에 나란히. */
+           [수정] 좁은 화면에서 칸이 하나씩 세로로 길게 늘어졌다. 전부 '반반'으로 고정한다.
+           1줄: 발주일자(6) + 업체명(6)
+           2줄: 발주 상품명 (한 줄 전체 — 식별번호는 라벨 오른쪽 끝에 붙는다)
+           3줄: 발주 수량(6) + 한 박스에 몇 개(6)
+           4줄: 낱개 단가(6) + 판매 예정가(6) */
         .po-form-grid {
             display: grid; grid-template-columns: repeat(12, 1fr);
-            gap: 14px; margin-bottom: 16px; align-items: start;
+            gap: 14px; margin-bottom: 16px; align-items: stretch;
         }
-        /* 1줄: 발주일자(4) + 업체명(8) — 목록의 '발주일자 먼저' 순서와 맞춘다
-           2줄: 발주 상품명 + 식별번호 (한 줄 전체)
-           3줄: 숫자 네 칸 */
-        .po-form-grid .po-f-date { grid-column: span 4; }
-        .po-form-grid .po-f-sup  { grid-column: span 8; }
+        .po-form-grid .po-f-date { grid-column: span 6; }
+        .po-form-grid .po-f-sup  { grid-column: span 6; }
         .po-form-grid .po-f-name { grid-column: span 12; }
-        .po-form-grid .po-f-q    { grid-column: span 3; }
+        .po-form-grid .po-f-q    { grid-column: span 6; }
 
-        /* 태블릿: 숫자 칸을 2개씩 두 줄로 */
-        @media (max-width: 900px) {
-            .po-form-grid .po-f-q { grid-column: span 6; }
-        }
-        /* 핸드폰: 전부 한 줄에 하나씩 */
+        /* [신규] 라벨 길이가 서로 달라 한쪽만 두 줄이 되면 입력칸 높이가 어긋난다.
+           라벨이 남는 자리를 먹게 해서 입력칸은 항상 칸 아래쪽에 나란히 맞춘다. */
+        .po-form-grid .po-f-date,
+        .po-form-grid .po-f-sup,
+        .po-form-grid .po-f-q { display: flex; flex-direction: column; }
+        .po-form-grid .po-f-date > label,
+        .po-form-grid .po-f-sup > label,
+        .po-form-grid .po-f-q > label { flex: 1 1 auto; }
+
+        /* 핸드폰: 반반은 그대로 두고 글씨·여백만 조인다 */
         @media (max-width: 560px) {
-            .po-form-grid { gap: 12px; }
-            .po-form-grid .po-f-date,
-            .po-form-grid .po-f-sup,
-            .po-form-grid .po-f-q { grid-column: span 12; }
+            .po-form-grid { gap: 10px; }
+            .po-form-grid .po-f-date > label,
+            .po-form-grid .po-f-sup > label,
+            .po-form-grid .po-f-q > label { font-size: 12px; }
         }
 
         /* 계산 결과 네 칸 */
@@ -3121,6 +3151,20 @@
         .po-calc-val { font-size: 16px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         @media (max-width: 700px) {
             .po-calc-box { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* [수정] 매입·매출 요약 네 칸은 바깥 회색 상자를 걷어내고 칸 자체를 키운다.
+           상자 안에 상자가 겹쳐 있어 테두리가 두 겹으로 보였고, 정작 중요한 숫자칸이 작았다.
+           (발주 등록 화면의 계산칸은 그대로 둬야 하므로 #profit-summary 에만 준다) */
+        #profit-summary {
+            background: transparent; border: 0; border-radius: 0; padding: 0; gap: 12px;
+        }
+        #profit-summary .po-calc-cell { padding: 16px 18px; border-radius: 14px; border: 1.5px solid #e2e8f0; }
+        #profit-summary .po-calc-label { font-size: 12.5px; margin-bottom: 7px; }
+        #profit-summary .po-calc-val { font-size: 21px; }
+        @media (max-width: 560px) {
+            #profit-summary .po-calc-cell { padding: 13px 14px; }
+            #profit-summary .po-calc-val { font-size: 18px; }
         }
 
         /* [신규] 발주 목록 표 — 칸이 13개라 1396px가 나와 914px 화면을 482px 넘쳤다.
@@ -3178,12 +3222,21 @@
         @media (max-width: 560px) {
             .purchase-date-label { flex: 1 1 100%; }
         }
-        /* [신규] 매입·매출 페이지 기간 버튼 (발주 목록 버튼과 같은 모양) */
+        /* [신규] 매입·매출 페이지 기간 버튼 (발주 목록 버튼과 같은 모양)
+           [수정] 한 줄에 여섯을 균등하게 나눠 놓으므로, 칸보다 글자가 길어도 삐져나오지 않게 한다 */
         .profit-range-btn {
-            padding: 6px 11px; border: 1.5px solid #cbd5e1; background: #fff; color: #475569;
+            min-width: 0; padding: 8px 3px; border: 1.5px solid #cbd5e1; background: #fff; color: #475569;
             border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap;
+            text-align: center; overflow: hidden; text-overflow: ellipsis;
         }
         .profit-range-btn:hover { background: #f8fafc; }
+        /* [신규] 지금 보고 있는 기간이 어느 버튼인지 색으로 알려 준다.
+           '직접'을 넣으면서 무엇이 켜져 있는지 안 보이면 헷갈리기 때문이다. */
+        .profit-range-btn.active { background: #10b981; border-color: #10b981; color: #fff; }
+        /* 핸드폰: 여섯 칸이 좁아지니 글씨만 한 눈금 줄인다 */
+        @media (max-width: 560px) {
+            .profit-range-btn { font-size: 11px; padding: 8px 2px; }
+        }
 
         /* [신규] 발주 목록 기간 조회 - 자주 쓰는 기간 버튼
            [수정] 한 줄에 넷을 균등하게 나눠 놓으므로, 칸보다 글자가 길어도 삐져나오지 않게 한다 */
@@ -3274,14 +3327,30 @@
             <div id="data-sub-profit" style="display:none;">
                 <!-- 기간 고르기 -->
                 <div class="card" style="background:#fff; border-radius:16px; padding:16px; box-shadow:var(--shadow); border:1px solid var(--border); margin-bottom:14px;">
-                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                        <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap; margin-right:2px;">📅 기간</span>
-                        <button type="button" class="profit-range-btn" onclick="setProfitRange('3m')">최근 3개월</button>
-                        <button type="button" class="profit-range-btn" onclick="setProfitRange('6m')">최근 6개월</button>
-                        <button type="button" class="profit-range-btn" onclick="setProfitRange('12m')">최근 12개월</button>
-                        <button type="button" class="profit-range-btn" onclick="setProfitRange('year')">올해</button>
-                        <button type="button" class="profit-range-btn" onclick="setProfitRange('all')">전체</button>
-                        <button type="button" class="profit-range-btn" onclick="renderProfitReport()" style="margin-left:auto; color:#4338ca; border-color:#c7d2fe;">🔄 새로고침</button>
+                    <!-- [수정] 발주 목록처럼 버튼을 한 줄에 균등하게 나눠 놓는다.
+                         '📅 기간' 글자와 버튼의 '최근'은 뺐다. 어차피 기간 고르는 줄이고,
+                         고른 결과는 바로 아랫줄(profit-range-label)에 글로 나온다.
+                         [수정] '전체'는 뺐다. 매입은 어차피 2026년 8월부터만 세므로
+                         '전체'와 '올해'가 사실상 같은 기간이라 헷갈렸다. 대신 '직접'을 넣는다. -->
+                    <div style="display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:5px; align-items:center;">
+                        <button type="button" class="profit-range-btn" data-range="month" onclick="setProfitRange('month')">이번 달</button>
+                        <button type="button" class="profit-range-btn" data-range="3m" onclick="setProfitRange('3m')">3개월</button>
+                        <button type="button" class="profit-range-btn" data-range="6m" onclick="setProfitRange('6m')">6개월</button>
+                        <button type="button" class="profit-range-btn" data-range="year" onclick="setProfitRange('year')">올해</button>
+                        <button type="button" class="profit-range-btn" data-range="custom" onclick="setProfitRange('custom')">직접</button>
+                        <button type="button" class="profit-range-btn" onclick="renderProfitReport()" style="color:#4338ca; border-color:#c7d2fe;" title="매입·매출을 다시 계산합니다">🔄 갱신</button>
+                    </div>
+
+                    <!-- [신규] '직접'을 눌렀을 때만 나오는 기간 칸.
+                         이 표는 달 단위로만 묶어 세므로 날짜가 아니라 '달'을 고른다.
+                         (8월 15일~9월 10일처럼 골라도 8월·9월을 통째로 셀 수밖에 없어
+                          날짜로 고르게 하면 숫자가 고른 기간과 다르게 보인다) -->
+                    <div id="profit-custom-row" style="display:none; margin-top:8px;">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <input type="month" id="profit-from-month" onchange="onProfitCustomMonthChange()" class="form-control" style="flex:1 1 0; min-width:0; height:38px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800; box-sizing:border-box; background:#fff;">
+                            <span style="font-size:12px; font-weight:800; color:#94a3b8; flex:0 0 auto;">~</span>
+                            <input type="month" id="profit-to-month" onchange="onProfitCustomMonthChange()" class="form-control" style="flex:1 1 0; min-width:0; height:38px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800; box-sizing:border-box; background:#fff;">
+                        </div>
                     </div>
                     <div id="profit-range-label" style="margin-top:9px; font-size:12px; font-weight:800; color:#64748b;"></div>
                 </div>
@@ -3292,17 +3361,12 @@
 
                 <div class="card" style="background:#fff; border-radius:16px; padding:14px; box-shadow:var(--shadow); border:1px solid var(--border); overflow-x:auto;">
                     <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:10px;">📆 월별</div>
+                    <!-- [수정] 달을 세로로 쌓던 표를 가로로 눕혔다. 달이 가로줄(칸 이름),
+                         항목(포스·계좌이체·매출·매입·잔액·마진률)이 세로줄이다.
+                         칸 이름줄은 달 수만큼 달라지므로 JS가 그린다. -->
                     <table style="width:100%; border-collapse:collapse; text-align:left;" id="profit-table">
                         <thead>
-                            <tr style="border-bottom:2px solid #e2e8f0; font-size:12px; font-weight:800; color:#475569; background:#f8fafc;">
-                                <th style="padding:9px 7px; white-space:nowrap;">월</th>
-                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">💳 포스</th>
-                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">🏦 계좌이체</th>
-                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">매출 합계</th>
-                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">매입<br><span style="font-size:10.5px; color:#94a3b8;">발주금액</span></th>
-                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">남은 돈</th>
-                                <th style="padding:9px 7px; text-align:right; white-space:nowrap;">비율</th>
-                            </tr>
+                            <tr id="profit-thead-row" style="border-bottom:2px solid #e2e8f0; font-size:12px; font-weight:800; color:#475569; background:#f8fafc;"></tr>
                         </thead>
                         <tbody id="profit-tbody" style="font-size:13px; font-weight:700;"></tbody>
                     </table>
@@ -3311,12 +3375,27 @@
                 <div class="card" style="background:#fff; border-radius:16px; padding:14px; box-shadow:var(--shadow); border:1px solid var(--border); margin-bottom:14px;">
                     <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:4px;">✍️ 매출 직접 입력</div>
                     <div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin-bottom:11px; line-height:1.6;">
-                        한 달 치 매출(매장 포스·계좌이체)을 월별로 적어 두면 위 통계에 함께 잡힙니다.
+                        매출(매장 포스·계좌이체)을 적어 두면 위 통계에 함께 잡힙니다.<br>
+                        <b>월</b>로 적으면 그 달 전체, <b>일</b>로 적으면 그 날짜에 잡힙니다. 섞어 써도 달 단위로 합쳐집니다.
+                    </div>
+                    <!-- [신규] 월 단위로만 적을 수 있던 것을 날짜로도 적을 수 있게 했다.
+                         날짜로 적어 두면 어느 날 얼마 팔렸는지 달력에서 한눈에 보인다. -->
+                    <div style="display:flex; gap:5px; margin-bottom:9px;">
+                        <button type="button" id="ms-mode-month" onclick="setManualSaleMode('month')" class="ms-mode-btn">📅 월</button>
+                        <button type="button" id="ms-mode-day" onclick="setManualSaleMode('day')" class="ms-mode-btn">🗓️ 일</button>
                     </div>
                     <div style="display:grid; grid-template-columns:repeat(12,1fr); gap:8px; align-items:end;">
                         <div style="grid-column:span 4;">
-                            <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; margin-bottom:5px;">📅 월</label>
+                            <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; margin-bottom:5px;">📅 <span id="ms-date-label">월</span></label>
                             <input type="month" id="ms-month" class="form-control" style="width:100%; height:40px; padding:8px 10px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:700; box-sizing:border-box; background:#fff; -webkit-appearance:none; appearance:none;">
+                            <!-- [수정] 날짜 칸에 연도까지 나와 '2026-08-12'로 길었다. 볼 것은 월·일뿐이라
+                                 화면에는 '08-12'만 적고, 누르면 브라우저 달력(showPicker)이 그대로 뜬다.
+                                 진짜 값은 아래 숨겨 둔 input이 들고 있어서 저장 로직은 그대로다. -->
+                            <div id="ms-date-box" onclick="openMsDatePicker()" style="display:none; position:relative; width:100%; height:40px; padding:8px 10px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:700; box-sizing:border-box; background:#fff; cursor:pointer; align-items:center; justify-content:space-between; gap:6px;">
+                                <span id="ms-date-text" style="color:#0f172a;">-</span>
+                                <span style="flex:0 0 auto; color:#94a3b8;">📅</span>
+                                <input type="date" id="ms-date" onchange="onMsDateChange()" style="position:absolute; left:10px; bottom:0; width:1px; height:1px; opacity:0; border:0; padding:0; pointer-events:none;">
+                            </div>
                         </div>
                         <div style="grid-column:span 4;">
                             <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; margin-bottom:5px;">💳 포스</label>
@@ -3329,7 +3408,8 @@
                     </div>
                     <div style="display:flex; gap:7px; margin-top:10px; align-items:center; flex-wrap:wrap;">
                         <button type="button" onclick="saveManualSale()" style="padding:9px 18px; background:#10b981; color:#fff; border:none; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">💾 저장</button>
-                        <span id="ms-hint" style="font-size:11.5px; font-weight:700; color:#94a3b8;">같은 달을 다시 저장하면 덮어씁니다.</span>
+                        <button type="button" onclick="openManualSaleCalendar()" style="padding:9px 16px; background:#eef2ff; color:#4338ca; border:1.5px solid #c7d2fe; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">📅 내역</button>
+                        <span id="ms-hint" style="font-size:11.5px; font-weight:700; color:#94a3b8;">같은 날짜를 다시 저장하면 덮어씁니다.</span>
                     </div>
                     <div id="ms-list" style="margin-top:12px;"></div>
                 </div>
@@ -3652,6 +3732,7 @@
                 // 데이터 가공/렌더링은 processOrdersSnapshot()에서 공통으로 처리 (실시간 리스너와 로직 공유)
                 ordersByPhone = data || {}; // [증분 동기화] 수동 새로고침 시에도 원본 트리 최신화
                 processOrdersSnapshot(data);
+                setTimeout(() => { try { cleanupOrderLogs(); } catch (e) {} }, 4000);   // [신규] 30일 지난 변경 기록 정리 (하루 한 번)
                 
             } catch (e) {
                 console.error(e);
@@ -4176,10 +4257,23 @@
                 };
                 dayContainer.appendChild(btn);
 
-                // 활성화된 일 탭 스크롤
+                /* [수정] 고른 일 탭을 가운데로 보이게 하는 부분.
+                   scrollIntoView는 '페이지'도 함께 움직인다. 목록 중간에서 배달완료·입금완료를
+                   누르면 탭 줄이 화면 밖에 있어서, 그걸 보이게 하려고 화면이 맨 위로 튀어 올라갔다.
+                   탭 줄만 좌우로 밀어 가운데에 두고, 페이지 세로 위치는 건드리지 않는다. */
                 if (day === currentDay) {
                     setTimeout(() => {
-                        btn.scrollIntoView({ behavior: isUserAction ? 'smooth' : 'auto', inline: 'center', block: 'nearest' });
+                        try {
+                            const wrap = btn.parentElement;
+                            if (!wrap) return;
+                            const left = btn.offsetLeft - (wrap.clientWidth - btn.offsetWidth) / 2;
+                            const to = Math.max(0, Math.min(left, wrap.scrollWidth - wrap.clientWidth));
+                            if (typeof wrap.scrollTo === 'function') {
+                                wrap.scrollTo({ left: to, behavior: isUserAction ? 'smooth' : 'auto' });
+                            } else {
+                                wrap.scrollLeft = to;
+                            }
+                        } catch (e) { /* 못 밀어도 목록 보는 데는 지장이 없다 */ }
                     }, 50);
                 }
             });
@@ -4292,6 +4386,7 @@
                 APARTMENT_EXTRA = Object.entries(data || {}).map(([key, v]) => ({
                     key: key,
                     name: String((v && v.name) || '').trim(),
+                    shortName: String((v && v.shortName) || "").trim(),   // [버그수정] 이걸 안 실어서 배달기사 이름을 고쳐도 카드에 안 보였다
                     roads: (v && v.roads) || [],
                     lots: (v && v.lots) || [],
                     keywords: (v && v.keywords) || [],
@@ -4323,6 +4418,7 @@
                 roads: Array.isArray(r.roads) ? r.roads : [],
                 lots: Array.isArray(r.lots) ? r.lots : [],
                 keywords: Array.isArray(r.keywords) ? r.keywords : [],
+                shortName: (r.shortName ? String(r.shortName) : ""),   // [신규] 배달기사 화면에 나올 짧은 이름 (여기서는 표시만)
                 aliases: Array.isArray(r.aliases) ? r.aliases : []
             }));
             if (!mapped.length) return false;
@@ -4715,6 +4811,189 @@
             });
             if (!dropped.size) return items;
             return items.filter(it => !dropped.has(it));
+        }
+
+        /* [신규] 목록을 다시 그려도 보던 자리에 그대로 있게 한다.
+
+        /* ============================================================
+           [신규] 주문 변경 기록 (order_logs)
+           주문에 손을 댈 때마다 무엇을 어떻게 바꿨는지 남긴다.
+           예전에는 값만 덮어써서, '누구를 픽업에서 배달로 바꿨더라?' 같은 것을
+           나중에 확인할 방법이 없었다.
+
+           · 저장 위치: order_logs/{YYYY-MM-DD}/{자동키}  — 하루치씩 모아 둔다.
+             주문 자료에 끼워 넣지 않는 이유는, 주문이 무거워지고 날짜로 훑기도 어려워서다.
+           · 기록이 실패해도 주문 변경은 그대로 진행한다. 기록 때문에 일이 막히면 안 된다.
+           · 30일이 지난 날짜는 자동으로 지운다 (하루 한 번만 확인).
+           ============================================================ */
+        const ORDER_LOG_KEEP_DAYS = 30;
+
+        function gLogDayKey(d) {
+            const t = d || new Date();
+            return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+        }
+
+        /* 여러 건을 한 번에 남긴다 (일괄 변경이면 요청 한 번으로 끝난다).
+           entries: [{ phone, name, item, what, from, to, note }] */
+        function gLogOrderChange(entries) {
+            const list = (Array.isArray(entries) ? entries : [entries]).filter(Boolean);
+            if (list.length === 0) return;
+            const now = new Date();
+            const day = gLogDayKey(now);
+            const when = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            const patch = {};
+            list.forEach((e, i) => {
+                const key = `${now.getTime()}_${i}_${Math.random().toString(36).slice(2, 6)}`;
+                patch[key] = {
+                    at: now.getTime(), when,
+                    phone: String(e.phone || ''),
+                    name: String(e.name || ''),
+                    item: String(e.item || ''),
+                    what: String(e.what || ''),
+                    from: String(e.from == null ? '' : e.from),
+                    to: String(e.to == null ? '' : e.to),
+                    note: String(e.note || '')
+                };
+            });
+
+            // 기다리지 않는다. 남기지 못해도 주문 변경은 이미 끝났다.
+            fetch(`${FIREBASE_DB_URL}order_logs/${day}.json`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
+            }).catch(e => console.warn('변경 기록 실패:', e));
+        }
+
+        /* 주문 한 건을 고치는 유일한 통로. 여기를 거치면 기록이 저절로 남는다.
+           log를 안 주면 기록 없이 고치기만 한다 (자동 정리 같은 것). */
+        async function gPatchOrder(phoneKey, orderKey, body, log) {
+            const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(phoneKey)}/${encodeURIComponent(orderKey)}.json`;
+            const res = await fetch(url, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            });
+            if (res.ok && log) gLogOrderChange(log);
+            return res;
+        }
+
+
+        /* ===== [신규] 변경 기록 보기 =====
+           날짜별로 그날 손댄 내용을 최근 것부터 보여 준다.
+           '누구를 픽업에서 배달로 바꿨더라?' 같은 것을 여기서 찾는다. */
+        let logViewDay = '';
+        let logViewSearch = '';
+
+        async function openOrderLogs(day) {
+            logViewDay = day || gLogDayKey();
+            logViewSearch = '';
+            const s = document.getElementById('log-search'); if (s) s.value = '';
+            const box = document.getElementById('order-log-modal');
+            if (box) box.style.display = 'flex';
+            await loadOrderLogs();
+        }
+
+        function closeOrderLogs() {
+            const box = document.getElementById('order-log-modal');
+            if (box) box.style.display = 'none';
+        }
+
+        function moveOrderLogDay(delta) {
+            const [y, m, d] = logViewDay.split('-').map(n => parseInt(n));
+            const t = new Date(y, m - 1, d + delta);
+            logViewDay = gLogDayKey(t);
+            loadOrderLogs();
+        }
+
+        function onOrderLogSearch(v) {
+            logViewSearch = String(v || '').trim().toLowerCase();
+            renderOrderLogs(_logCache);
+        }
+
+        let _logCache = null;
+
+        async function loadOrderLogs() {
+            const body = document.getElementById('order-log-body');
+            const title = document.getElementById('order-log-title');
+            if (title) title.innerText = logViewDay;
+            if (body) body.innerHTML = `<div style="padding:26px 0; text-align:center; color:#94a3b8; font-weight:700;">불러오는 중…</div>`;
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}order_logs/${logViewDay}.json?t=${Date.now()}`);
+                _logCache = res.ok ? ((await res.json()) || {}) : {};
+            } catch (e) {
+                console.error('변경 기록 로드 실패:', e);
+                _logCache = {};
+            }
+            renderOrderLogs(_logCache);
+        }
+
+        function renderOrderLogs(data) {
+            const body = document.getElementById('order-log-body');
+            if (!body) return;
+
+            let rows = Object.values(data || {}).filter(Boolean);
+            if (logViewSearch) {
+                rows = rows.filter(r => (`${r.name} ${r.item} ${r.what} ${r.from} ${r.to} ${r.note}`).toLowerCase().includes(logViewSearch));
+            }
+            rows.sort((a, b) => (parseInt(b.at) || 0) - (parseInt(a.at) || 0));   // 최근 것 먼저
+
+            if (rows.length === 0) {
+                body.innerHTML = `<div style="padding:30px 0; text-align:center; color:#94a3b8; font-size:13px; font-weight:700;">${logViewSearch ? '찾는 기록이 없습니다.' : '이 날 바꾼 내용이 없습니다.'}</div>`;
+                return;
+            }
+
+            // 무엇을 바꿨는지에 따라 색을 달리해 훑기 쉽게 한다
+            const tone = { '수령방법': '#7c3aed', '픽업/배달 날짜': '#c2410c', '상태': '#0284c7', '입금': '#15803d', '주소': '#0891b2', '배달비': '#b45309', '주문 삭제': '#dc2626' };
+
+            body.innerHTML = `<div style="font-size:11.5px; font-weight:800; color:#94a3b8; margin-bottom:8px;">${rows.length}건</div>`
+                + rows.map(r => {
+                    const c = tone[r.what] || '#475569';
+                    const arrow = (r.from || r.to)
+                        ? `<span style="color:#94a3b8;">${gEscapeHtml(r.from) || '—'}</span> <span style="color:#cbd5e1;">→</span> <b style="color:${c};">${gEscapeHtml(r.to) || '—'}</b>`
+                        : '';
+                    return `<div style="padding:9px 2px; border-bottom:1px solid #f1f5f9;">
+                        <div style="display:flex; align-items:baseline; gap:7px;">
+                            <span style="flex:0 0 auto; font-size:11px; font-weight:800; color:#94a3b8;">${gEscapeHtml(r.when || '')}</span>
+                            <span style="flex:0 0 auto; font-size:10.5px; font-weight:800; color:${c}; background:${c}18; padding:1px 6px; border-radius:5px;">${gEscapeHtml(r.what || '')}</span>
+                            <span style="flex:1; min-width:0; font-size:12.5px; font-weight:900; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(r.name || '')}</span>
+                        </div>
+                        <div style="margin-top:3px; font-size:11.5px; font-weight:700; color:#475569; word-break:break-all;">${gEscapeHtml(r.item || '')}</div>
+                        ${arrow ? `<div style="margin-top:3px; font-size:12px; font-weight:800;">${arrow}</div>` : ''}
+                        ${r.note ? `<div style="margin-top:2px; font-size:11px; font-weight:700; color:#94a3b8;">${gEscapeHtml(r.note)}</div>` : ''}
+                    </div>`;
+                }).join('');
+        }
+        // 30일 지난 기록을 지운다. 하루에 한 번만 확인한다.
+        async function cleanupOrderLogs() {
+            try {
+                const today = gLogDayKey();
+                if (localStorage.getItem('moket_orderlog_clean_day') === today) return;
+                localStorage.setItem('moket_orderlog_clean_day', today);
+
+                const res = await fetch(`${FIREBASE_DB_URL}order_logs.json?shallow=true&t=${Date.now()}`);
+                if (!res.ok) return;
+                const days = Object.keys((await res.json()) || {});
+                const cut = new Date(); cut.setDate(cut.getDate() - ORDER_LOG_KEEP_DAYS);
+                const cutKey = gLogDayKey(cut);
+                const old = days.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && d < cutKey);
+                for (const d of old) {
+                    await fetch(`${FIREBASE_DB_URL}order_logs/${d}.json`, { method: 'DELETE' });
+                }
+                if (old.length) console.log(`[변경 기록] ${old.length}일치 정리`);
+            } catch (e) { console.warn('변경 기록 정리 실패:', e); }
+        }
+        /* [신규] 목록을 다시 그려도 보던 자리에 그대로 있게 한다.
+           renderFilteredOrders()는 목록을 통째로 새로 만들기 때문에, 배달완료·입금완료처럼
+           목록 중간에서 누르는 버튼을 쓰면 화면이 맨 위로 튀어 올라갔다. 어디까지 처리했는지
+           다시 찾아 내려가야 해서 여러 건을 이어서 처리할 때 특히 번거로웠다.
+
+           그릴 때 높이가 잠깐 달라지므로 한 번만 되돌리면 어긋난다. 그림이 끝난 다음 화면
+           (rAF)과 그 다음 화면까지 두 번 되돌려 놓는다. */
+        function gKeepScroll(fn) {
+            const y = window.scrollY || document.documentElement.scrollTop || 0;
+            try { fn(); }
+            finally {
+                const back = () => window.scrollTo(0, y);
+                back();
+                requestAnimationFrame(() => { back(); requestAnimationFrame(back); });
+            }
         }
 
         function renderFilteredOrders() {
@@ -5953,16 +6232,18 @@
                     }
 
                     // [버그수정] 실제 저장 경로(firebasePhoneKey)에만 PATCH (유령 undefined 주문 생성 방지)
-                    const actualPhoneKey = (target && target.firebasePhoneKey) ? String(target.firebasePhoneKey).trim() : cleanPhone;
+                    const actualPhoneKey = (target && target.firebasePhoneKey) ? String(target.firebasePhoneKey).trim() : "";
                     if (!actualPhoneKey) return;
-                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(actualPhoneKey)}/${orderKey}.json`;
-                    promises.push(
-                        fetch(url, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(patchBody)
-                        })
-                    );
+                    // [신규] 무엇을 어떻게 바꿨는지 기록으로 남긴다 (📜 변경 기록에서 볼 수 있다)
+                    promises.push(gPatchOrder(actualPhoneKey, orderKey, patchBody, [{
+                        phone: actualPhoneKey,
+                        name: (target && target.name) || '',
+                        item: (target && target.item) || '',
+                        what: '수령방법',
+                        from: (target && target.shippingMethod) || '',
+                        to: targetMethod,
+                        note: inheritedAddress ? '주소 자동 채움' : ''
+                    }]));
                 });
                 
                 orderKeys.forEach(orderKey => {
@@ -5985,7 +6266,7 @@
                 } else {
                     showToast(`수령 방법이 ${label}(으)로 전환되었습니다.`);
                 }
-                renderFilteredOrders();
+                gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
             } catch (e) {
                 console.error(e);
                 showToast("변경 중 오류가 발생했습니다.");
@@ -6209,25 +6490,41 @@
                         ? String(target.firebasePhoneKey).trim()
                         : cleanPhone;
                     if (!actualPhoneKey) return;
-                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(actualPhoneKey)}/${encodeURIComponent(orderKey)}.json`;
-                    promises.push(
-                        fetch(url, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(updatePayload)
-                        })
-                    );
+                    // [신규] 주소 변경도 기록으로 남긴다
+                    promises.push(gPatchOrder(actualPhoneKey, orderKey, updatePayload, [{
+                        phone: actualPhoneKey,
+                        name: (target && target.name) || "",
+                        item: (target && target.item) || "",
+                        what: "주소",
+                        from: (target && target.address) || "",
+                        to: newAddress
+                    }]));
                 });
 
                 await Promise.all(promises);
                 showToast("🏡 배송 주소가 저장되었습니다.");
-                renderFilteredOrders();
+                gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
             } catch (e) {
                 console.error(e);
                 showToast("주소 저장 중 오류가 발생했습니다: " + e.toString());
             } finally {
                 hideLoader();
             }
+        }
+
+        /* [신규] 픽업일 표기를 다른 주문과 같은 모양으로 맞춘다.
+           주문서에서 들어온 주문은 '2026년 8월 31일 (월)' 형태로 저장된다. 그런데 관리 화면에서
+           날짜를 옮길 때는 달력 칸 값(2026-08-31)을 그대로 넣고 있었다.
+           배달비 판정은 픽업일 문자열이 정확히 같은지로 손님의 그날 주문을 모으기 때문에,
+           표기가 다르면 같은 날인데도 서로 다른 날로 갈려 배달비가 따로 붙었다. */
+        function fToPickupLabel(v) {
+            const s = String(v || '').trim();
+            const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (!m) return s;                       // 이미 한글 표기거나 알 수 없는 값이면 그대로
+            const d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+            if (isNaN(d.getTime())) return s;
+            const w = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+            return `${m[1]}년 ${parseInt(m[2])}월 ${parseInt(m[3])}일 (${w})`;
         }
 
         async function changeCustomerOrderDate(phone, orderKeysStr, label) {
@@ -6269,21 +6566,25 @@
                     });
 
                     const promises = [];
+                    // [버그수정] 달력 값(2026-08-31)을 그대로 넣으면 다른 주문들('2026년 8월 31일 (월)')과
+                    //  표기가 달라져 같은 날인데도 배달비가 따로 붙었다. 같은 모양으로 맞춰 저장한다.
+                    const savedDate = fToPickupLabel(trimmedDate);
                     targetOrdersToChange.forEach(order => {
-                        const updatePayload = { 
-                            pickupDate: trimmedDate, 
-                            date: trimmedDate,
-                            orderDate: trimmedDate
+                        const updatePayload = {
+                            pickupDate: savedDate,
+                            date: savedDate,
+                            orderDate: savedDate
                         };
                         if (order.matchKey) {
-                            updatePayload.matchKey = trimmedDate;
+                            updatePayload.matchKey = savedDate;
                         }
 
+                        const prevDate = order.pickupDate || order.date || "";   // [신규] 기록에 남길 이전 날짜
                         // 로컬 메모리 상태 즉시 업데이트
-                        order.pickupDate = trimmedDate;
-                        order.date = trimmedDate;
-                        order.orderDate = trimmedDate;
-                        if (order.matchKey) order.matchKey = trimmedDate;
+                        order.pickupDate = savedDate;
+                        order.date = savedDate;
+                        order.orderDate = savedDate;
+                        if (order.matchKey) order.matchKey = savedDate;
 
                         // [버그수정] 실제 저장 경로(firebasePhoneKey)에만 PATCH.
                         // 여러 전화번호 변형에 PATCH하면 없는 경로에 item 없는 유령 주문(undefined)이 생성됨.
@@ -6291,14 +6592,15 @@
                             ? String(order.firebasePhoneKey).trim()
                             : cleanPhone;
                         if (actualPhoneKey) {
-                            const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(actualPhoneKey)}/${encodeURIComponent(order.orderKey)}.json`;
-                            promises.push(
-                                fetch(url, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(updatePayload)
-                                })
-                            );
+                            // [신규] 날짜를 옮긴 것도 기록으로 남긴다 (📜 변경 기록)
+                            promises.push(gPatchOrder(actualPhoneKey, order.orderKey, updatePayload, [{
+                                phone: actualPhoneKey,
+                                name: order.name || '',
+                                item: order.item || '',
+                                what: '픽업/배달 날짜',
+                                from: prevDate,
+                                to: savedDate
+                            }]));
                         }
                     });
                     
@@ -6322,8 +6624,8 @@
                     await checkAndApplyDeliveryFeeAfterCancellation(phone, targetDateStr);
                     await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, targetDateStr);
 
-                    await checkAndApplyDeliveryFeeAfterCancellation(phone, trimmedDate);
-                    await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, trimmedDate);
+                    await checkAndApplyDeliveryFeeAfterCancellation(phone, savedDate);
+                    await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, savedDate);
                 } catch (e) {
                     console.error(e);
                     showToast("날짜 변경 중 오류가 발생했습니다: " + e.toString());
@@ -6426,7 +6728,7 @@
                 if (!res.ok) throw new Error('Firebase 메모 저장 실패');
                 applyLocal();
                 showToast('메모가 저장되었습니다.');
-                renderFilteredOrders();
+                gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
             } catch (e) { console.error(e); showToast('메모 저장 실패: ' + e.toString()); }
             finally { hideLoader(); }
         }
@@ -6463,7 +6765,7 @@
                 }
                 
                 showToast("메모가 저장되었습니다.");
-                renderFilteredOrders();
+                gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
             } catch (e) {
                 console.error(e);
                 showToast("메모 저장 실패: " + e.toString());
@@ -6502,7 +6804,7 @@
                 }
                 
                 showToast("고정 메모가 저장되었습니다.");
-                renderFilteredOrders();
+                gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
             } catch (e) {
                 console.error(e);
                 showToast("고정 메모 저장 실패: " + e.toString());
@@ -6541,7 +6843,7 @@
                 }
                 
                 showToast("인쇄용 고정 메모가 저장되었습니다.");
-                renderFilteredOrders();
+                gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
             } catch (e) {
                 console.error(e);
                 showToast("인쇄용 고정 메모 저장 실패: " + e.toString());
@@ -6624,10 +6926,12 @@
             if (productRows.length === 0) {
                 for (const o of feeRows.concat(refundRows)) {
                     try {
-                        const res = await fetch(`${FIREBASE_DB_URL}orders/${cleanPhone}/${o.orderKey}.json`, {
-                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ canceled: true, received: "취소완료" })
-                        });
+                        // [신규] 자동으로 지운 배달비도 기록에 남긴다 (왜 사라졌는지 알 수 있게)
+                        const res = await gPatchOrder(cleanPhone, o.orderKey, { canceled: true, received: "취소완료" }, [{
+                            phone: cleanPhone, name: o.name || "", item: o.item || "",
+                            what: "배달비", from: String(o.total || o.price || ""), to: "취소",
+                            note: "그 날 상품이 없어 자동 정리"
+                        }]);
                         if (res.ok) { o.canceled = true; o.received = "취소완료"; }
                     } catch (e) { console.error("잔여 배달비 취소 실패:", e); }
                 }
@@ -6723,6 +7027,10 @@
                     });
                     if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
                     rawOrders.push(Object.assign({ orderKey: orderKey }, payload));
+                    // [신규] 배달비가 붙거나 빠진 것도 기록에 남긴다
+                    gLogOrderChange([{ phone: cleanPhone, name: baseOrder.name || "", item: rowName,
+                        what: "배달비", from: "", to: signed.toLocaleString() + "원",
+                        note: `${pDate} 자동 계산` }]);
                     return true;
                 } catch (e) {
                     console.warn(`${rowName} 기록 재시도 ${a}/5:`, e.message);
@@ -6802,6 +7110,19 @@
         }
 
         // 6. 단일/일괄 상태 변경 실행 (Firebase PUT/PATCH 및 구글 시트 동기화)
+        /* [신규] 지금 이 주문이 어떤 상태인지 한 마디로. 변경 기록의 '무엇에서'에 쓴다.
+           상태가 여러 칸(received·delivered·canceled)에 나뉘어 있어 한 곳에서 읽어 준다. */
+        function gStatusLabelOf(o) {
+            if (!o) return '';
+            const c = (o.canceled === true || o.canceled === 'true' || String(o.canceled).toUpperCase() === 'TRUE');
+            if (c) return '취소';
+            const rec = String(o.received || ''), del = String(o.delivered || '');
+            if (o.delivered === true || del === '배달완료') return '배달완료';
+            if (rec === '픽업완료' || o.received === true) return '픽업완료';
+            if (rec === '취소완료') return '취소';
+            return '대기';
+        }
+
         async function updateSingleItemStatus(phone, orderKey, newStatus) {
             showLoader("상태 업데이트 중...");
             const cleanPhone = String(phone || "").replace(/\D/g, "");
@@ -6814,15 +7135,15 @@
                 const patchBody = getStatusPatchBody(newStatus);
                 const promises = [];
                 if (actualPhoneKey) {
-                    const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(actualPhoneKey)}/${orderKey}.json`;
-                    promises.push(
-                        fetch(url, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(patchBody)
-                        })
-                    );
-
+                    // [신규] 상태 변경도 기록으로 남긴다 (📜 변경 기록)
+                    promises.push(gPatchOrder(actualPhoneKey, orderKey, patchBody, [{
+                        phone: actualPhoneKey,
+                        name: (target && target.name) || '',
+                        item: (target && target.item) || '',
+                        what: '상태',
+                        from: gStatusLabelOf(target),
+                        to: newStatus
+                    }]));
                     if (newStatus !== '배달완료') {
                         fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(actualPhoneKey)}/${orderKey}.json`, {
                             method: 'DELETE'
@@ -6868,11 +7189,11 @@
                     // [버그수정] 실제 저장 노드 키(firebasePhoneKey)로 PATCH → 전화번호 형식 불일치로 유령 생성 방지
                     const phoneKey = it.firebasePhoneKey ? it.firebasePhoneKey : cleanPhone;
                     const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(phoneKey)}/${encodeURIComponent(it.orderKey)}.json`;
-                    const p = fetch(url, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(patchBody)
-                    });
+                    // [신규] 손님 전체 상태 변경도 기록으로 남긴다
+                    const p = gPatchOrder(phoneKey, it.orderKey, patchBody, [{
+                        phone: phoneKey, name: it.name || "", item: it.item || "",
+                        what: "상태", from: gStatusLabelOf(it), to: newStatus, note: "손님 전체"
+                    }]);
 
                     if (newStatus !== '배달완료') {
                         fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(phoneKey)}/${encodeURIComponent(it.orderKey)}.json`, {
@@ -6962,11 +7283,11 @@
                     const orderKeyForPath = (target && target.orderKey) ? target.orderKey : orderKey;
                     const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(phoneKey)}/${encodeURIComponent(orderKeyForPath)}.json`;
 
-                    const p = fetch(url, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(patchBody)
-                    }).then(res => {
+                    // [신규] 일괄 상태 변경도 기록으로 남긴다
+                    const p = gPatchOrder(phoneKey, orderKeyForPath, patchBody, [{
+                        phone: phoneKey, name: (target && target.name) || "", item: (target && target.item) || "",
+                        what: "상태", from: gStatusLabelOf(target), to: newStatus, note: "일괄"
+                    }]).then(res => {
                         if (res.ok) {
                             if (target) {
                                 Object.assign(target, patchBody);
@@ -6990,7 +7311,7 @@
                 showToast(`${itemsToProcess.length}개 주문 항목의 상태를 일괄 변경했습니다.` + (skippedDone > 0 ? ` (완료/취소 ${skippedDone}건 제외)` : ``));
                 selectedItems.clear();
                 updateSelectionCountText();
-                renderFilteredOrders();
+                gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
 
                 if (newStatus === '취소') {
                     const uniqueGroups = new Map();
@@ -7055,11 +7376,11 @@
                     const orderKeyForPath = (target && target.orderKey) ? target.orderKey : orderKey;
                     const url = `${FIREBASE_DB_URL}orders/${encodeURIComponent(phoneKey)}/${encodeURIComponent(orderKeyForPath)}.json`;
 
-                    const p = fetch(url, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(patchBody)
-                    }).then(res => {
+                    // [신규] 입금완료도 기록으로 남긴다
+                    const p = gPatchOrder(phoneKey, orderKeyForPath, patchBody, [{
+                        phone: phoneKey, name: (target && target.name) || "", item: (target && target.item) || "",
+                        what: "입금", from: (target && target.paid) ? "입금완료" : "미입금", to: "입금완료"
+                    }]).then(res => {
                         if (res.ok) {
                             if (target) {
                                 target.paid = true;
@@ -7074,7 +7395,7 @@
                 showToast(`${itemsToProcess.length}개 주문 항목의 입금을 확인했습니다.`);
                 selectedItems.clear();
                 updateSelectionCountText();
-                renderFilteredOrders();
+                gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
             } catch (e) {
                 console.error(e);
                 showToast("입금 완료 처리 중 오류가 발생했습니다.");
@@ -7160,6 +7481,9 @@
                     if (!res.ok) {
                         throw new Error(`주문 삭제 실패: ${item.name} (${item.phone})`);
                     }
+                    // [신규] 지운 것도 기록에 남긴다 (지우고 나면 주문 자체가 없어 확인할 방법이 없다)
+                    gLogOrderChange([{ phone: phoneKey, name: item.name || "", item: item.item || "",
+                        what: "주문 삭제", from: "취소됨", to: "삭제", note: item.pickupDate || "" }]);
                 });
 
                 await Promise.all(promises);
@@ -8349,9 +8673,14 @@
             showLoader(`[${newStatus === '픽업' ? '픽업완료' : newStatus}]로 변경 중...`);
             try {
                 const patchBody = getStatusPatchBody(newStatus);
-                await Promise.all(refs.map(r => fetch(`${FIREBASE_DB_URL}orders/${encodeURIComponent(r.pk)}/${encodeURIComponent(r.ok)}.json`, {
-                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody)
-                })));
+                // [신규] 미완료 목록에서 바꾼 것도 기록으로 남긴다
+                await Promise.all(refs.map(r => {
+                    const t0 = (rawOrders || []).find(o => (o.firebasePhoneKey === r.pk || String(o.phone || "").replace(/\D/g, "") === String(r.pk).replace(/\D/g, "")) && o.orderKey === r.ok);
+                    return gPatchOrder(r.pk, r.ok, patchBody, [{
+                        phone: r.pk, name: (t0 && t0.name) || "", item: (t0 && t0.item) || "",
+                        what: "상태", from: gStatusLabelOf(t0), to: newStatus, note: "미완료 목록"
+                    }]);
+                }));
                 // 로컬 rawOrders 갱신 + [신규] 취소↔활성 시 재고 복구/재차감(순차)
                 for (const r of refs){
                     const t = (rawOrders || []).find(o => (o.firebasePhoneKey === r.pk || String(o.phone || '').replace(/\D/g, '') === r.pk) && o.orderKey === r.ok);
@@ -8362,7 +8691,7 @@
                     }
                 }
                 showToast(`[${newStatus === '픽업' ? '픽업완료' : newStatus}]로 변경했습니다.`);
-                renderFilteredOrders();
+                gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
                 closeSummaryModal();
                 setTimeout(showOverdueModal, 80); // 모달 새로고침(처리된 건은 목록에서 빠짐)
             } catch(e){ console.error(e); showToast('변경 중 오류가 발생했습니다.'); }
@@ -9752,6 +10081,105 @@
             return gIsOnsiteStorageProduct(p) ? ONSITE_ETC.key : '';
         }
 
+        /* [신규] 품절 판단 — 재고관리 목록·선반 탭·그룹 나누기가 모두 같은 기준을 쓰도록 한 곳에 둔다.
+           재고를 '무제한'으로 둔 상품은 품절이 되지 않는다. */
+        function gIsProductSoldOut(prod) {
+            if (!prod) return false;
+            const unl = (prod.stock === "" || prod.stock == null || String(prod.stock).trim() === "무제한");
+            const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)];
+            const unlAdj = (adjRaw === "unlimited" || (adjRaw != null && String(adjRaw).startsWith("unlimited")));
+            if (unl || unlAdj) return false;
+            return Math.max(0, parseInt(prod.stock || 0) + parseInt(adjRaw || 0)) <= 0;
+        }
+
+        /* [신규] 품절 상품을 모아 두는 선반 자리.
+           재고가 0인 물건이 선반마다 섞여 있으면 지금 채워야 할 자리를 찾기 어렵다.
+           '⛔ 품절 정리' 버튼으로 실제 shelf 값을 이 값으로 바꿔 옮긴다.
+           옮길 때 원래 자리를 shelfPrev 에 적어 두었다가, 재고가 들어오면 그 자리로 되돌린다. */
+        const SHELF_SOLDOUT = 'soldout';
+
+        /* ============================================================
+           [신규] 선반 목록 — 한 곳에서만 정한다.
+           예전에는 선반 이름이 코드 일곱 군데에 흩어져 있어, 하나를 고치면
+           탭·드롭다운·그룹 제목이 서로 어긋났다. 이제 Firebase(shelves)에서 받아
+           아래 함수들로만 꺼내 쓴다. '⚙️ 선반 관리'에서 고치면 전부 같이 바뀐다.
+
+           '미지정'()과 '품절'(soldout)은 시스템이 쓰는 자리라 목록에 넣지 않는다.
+           (지우거나 이름을 바꾸면 품절 정리·선반 해제가 갈 곳을 잃는다)
+           ============================================================ */
+        const SHELF_UNSET = '';
+        let shelfList = [];          // [{ key, label }] — 사장님이 고칠 수 있는 선반들
+        let shelvesLoaded = false;
+
+        // 처음 쓰거나 저장된 것이 없을 때 깔아 주는 기본 선반
+        const SHELF_DEFAULTS = [
+            { key: 'fruit',     label: '🥬 과일·신선' },
+            { key: 'shelf-1',   label: '🗄️ 선반1' },
+            { key: 'shelf-2',   label: '🗄️ 선반2' },
+            { key: 'shelf-3',   label: '🗄️ 선반3' },
+            { key: 'fridge-1',  label: '❄️ 냉장1' },
+            { key: 'fridge-2',  label: '❄️ 냉장2' },
+            { key: 'freezer-4', label: '🧊 냉동4' },
+            { key: 'freezer-5', label: '🧊 냉동5' },
+            { key: 'freezer-6', label: '🧊 냉동6' },
+            { key: 'freezer-7', label: '🧊 냉동7' },
+            { key: 'other',     label: '🧺 기타' }
+        ];
+
+        // 화면에 늘어놓을 전체 자리 = 미지정 + 사장님 선반들 + 품절
+        function gShelfOptsAll() {
+            return [[SHELF_UNSET, '📦 미지정']]
+                .concat(shelfList.map(s => [s.key, s.label]))
+                .concat([[SHELF_SOLDOUT, '⛔ 품절']]);
+        }
+
+        // 선반 이름표. 목록에서 지워진 옛 값이 남아 있어도 키를 그대로 보여 준다(빈칸보다 낫다).
+        function gShelfLabel(key) {
+            const k = String(key || '');
+            if (k === SHELF_UNSET) return '📦 미지정';
+            if (k === SHELF_SOLDOUT) return '⛔ 품절';
+            const found = shelfList.find(s => s.key === k);
+            return found ? found.label : k;
+        }
+
+        // 목록에 놓을 순서. 미지정이 맨 앞, 품절이 맨 뒤, 지워진 옛 선반은 그 사이 끝쪽.
+        function gShelfOrder(key) {
+            const k = String(key || '');
+            if (k === SHELF_UNSET) return -1;
+            if (k === SHELF_SOLDOUT) return 9999;
+            const i = shelfList.findIndex(s => s.key === k);
+            return i >= 0 ? i : 9998;
+        }
+
+        // 새 선반 키. 이름은 바꿔도 키는 그대로여야 상품에 적힌 값이 안 끊긴다.
+        function gNewShelfKey() {
+            let n = 1;
+            while (shelfList.some(s => s.key === `sh-${n}`)) n++;
+            return `sh-${n}`;
+        }
+
+        async function loadShelves(force = false) {
+            if (shelvesLoaded && !force) return;
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}shelves.json?t=${Date.now()}`);
+                const data = res.ok ? await res.json() : null;
+                const list = Array.isArray(data) ? data : [];
+                shelfList = list
+                    .filter(s => s && String(s.key || '') !== '' && String(s.key) !== SHELF_SOLDOUT)
+                    .map(s => ({ key: String(s.key), label: String(s.label || s.key) }));
+                if (shelfList.length === 0) shelfList = SHELF_DEFAULTS.map(s => ({ ...s }));
+                shelvesLoaded = true;
+            } catch (e) {
+                console.error('선반 목록 로드 실패:', e);
+                if (shelfList.length === 0) shelfList = SHELF_DEFAULTS.map(s => ({ ...s }));
+                shelvesLoaded = true;   // 기본값으로라도 화면은 돌아가게 둔다
+            }
+        }
+
+        async function saveShelves() {
+            return await fbPutRetry(`${FIREBASE_DB_URL}shelves.json`, shelfList);
+        }
+
         // 오늘 날짜 (YYYY-MM-DD). 여기저기서 같은 식을 반복해 쓰던 것을 하나로 모았다.
         function gTodayISO() {
             const n = new Date();
@@ -10338,10 +10766,15 @@
                 const roads = Object.entries(roadHits[apt.name] || {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
 
                 return `<div style="border:1px solid var(--border); border-radius:10px; padding:10px 11px; margin-bottom:7px; background:#fff;">
-                    <div onclick="showApartmentUnits('${escapeArg(apt.name)}')" title="동·호수별 주문 보기" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:pointer;">
-                        <b style="font-size:13.5px; color:var(--text-main);">${apt.name}</b>
-                        ${n > 0 ? `<span style="font-size:10px; font-weight:800; color:var(--primary);">▶ 동·호수</span>` : ''}
-                        <span style="margin-left:auto; font-size:11.5px; font-weight:800; color:${n > 0 ? '#166534' : '#cbd5e1'}; white-space:nowrap;">주문 ${n}건${amt ? ` · ${amt.toLocaleString()}원` : ''}</span>
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                        <span onclick="showApartmentUnits('${escapeArg(apt.name)}')" title="동·호수별 주문 보기" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:pointer;">
+                            <b style="font-size:13.5px; color:var(--text-main);">${apt.name}</b>
+                            ${n > 0 ? `<span style="font-size:10px; font-weight:800; color:var(--primary);">▶ 동·호수</span>` : ''}
+                        </span>
+                        <!-- [신규] 주문관리 이름·배달기사 이름을 여기서 고친다 -->
+                        <span onclick="openApartmentRename('${escapeArg(apt.name)}')" title="이름 고치기 (주문관리 · 배달기사)" style="font-size:10px; font-weight:800; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:2px 7px; cursor:pointer;">✏️ 이름</span>
+                        ${apt.shortName ? `<span title="배달기사 화면에 나오는 이름" style="font-size:10px; font-weight:800; color:#0f766e; background:#ecfeff; border:1px solid #99f6e4; border-radius:6px; padding:2px 7px;">🚚 ${apt.shortName}</span>` : ''}
+                        <span style="margin-left:auto; font-size:11.5px; font-weight:800; color:${n > 0 ? '#166534' : '#cbd5e1'}; white-space:nowrap;">${n > 0 ? `${n}건 · ${amt.toLocaleString()}원` : '주문 없음'}</span>
                     </div>
                     ${line('도로명', (roads.length ? roads.map(([r]) => chip(r, '#0369a1', '#f0f9ff')) : (apt.roads || []).map(r => chip(r, '#0369a1', '#f0f9ff'))).join(''))}
                     ${line('지번', (apt.lots || []).map(l => chip(l, '#0f766e', '#ecfeff')).join(''))}
@@ -10860,6 +11293,107 @@
 
         // [수정] 예전에는 기존 별칭이 채워진 칸을 통째로 고쳐 쓰는 방식이라,
         //  새 단어만 적으면 원래 있던 별칭이 사라졌다. 이제 '하나씩 더하고 하나씩 빼는' 방식이다.
+
+        /* ===== [신규] 아파트 이름 고치기 =====
+           이름이 두 벌 쓰인다.
+           · 주문관리 이름(name)  — 주문 카드·인쇄·검색에 나오는 이름
+           · 배달기사 이름(shortName) — 배달기사 화면 버튼에 나오는 짧은 이름
+             (버튼이 좁아 '푸르지오2차' 같은 긴 이름은 '푸지2차'처럼 줄여 쓴다)
+           비워 두면 배달기사도 주문관리 이름을 그대로 쓴다.
+
+           고친 값은 그 아파트가 담긴 자리(apartment_table 또는 apartment_extra)에 저장한다. */
+        let _aptNameEdit = { name: '', where: '', key: '' };
+
+        async function openApartmentRename(aptName) {
+            const target = String(aptName || '');
+            if (!target) return;
+
+            // 어느 표에 담겨 있는지 찾는다 (사장님이 더한 것은 apartment_extra)
+            // [주의] 이 표들은 배열일 수도, 키 있는 객체일 수도 있다.
+            //  객체인데 인덱스(0,1,…)로 쓰면 엉뚱한 자리에 새 항목이 생긴다. 실제 키를 그대로 잡아 둔다.
+            let where = '', key = '', row = null;
+            try {
+                for (const node of ['apartment_extra', 'apartment_table']) {
+                    const res = await fetch(`${FIREBASE_DB_URL}${node}.json?t=${Date.now()}`);
+                    if (!res.ok) continue;
+                    const raw = await res.json();
+                    if (!raw) continue;
+                    const entries = Array.isArray(raw)
+                        ? raw.map((v, i) => [String(i), v])
+                        : Object.entries(raw);
+                    const hit = entries.find(([, v]) => v && (String(v.shortName || '') === target || String(v.name || '') === target));
+                    if (hit) { where = node; key = hit[0]; row = hit[1]; break; }
+                }
+            } catch (e) { console.error('아파트 찾기 실패:', e); }
+
+            if (!row) { showToast(`'${target}'은(는) 표에서 찾지 못했습니다.`); return; }
+            _aptNameEdit = { name: target, where, key };
+            const old = document.getElementById('apt-rename-modal');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'apt-rename-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10060';
+            modal.innerHTML =
+                `<div class="summary-modal-content" style="max-width:400px; width:92%;">` +
+                `<div style="padding:15px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">✏️ 아파트 이름 고치기</div>` +
+                `<span onclick="closeApartmentRename()" style="font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span></div>` +
+                `<div style="padding:14px 18px;">` +
+                `<div style="font-size:11px; font-weight:800; color:#94a3b8; margin-bottom:4px;">주문관리 이름 <span style="font-weight:700; color:#cbd5e1;">— 주문 카드·인쇄·검색</span></div>` +
+                `<input type="text" id="apt-rename-main" value="${gEscapeHtml(row.name || target)}" placeholder="예: 푸르지오2차"` +
+                ` style="width:100%; box-sizing:border-box; height:42px; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:14px; font-weight:800; margin-bottom:12px;">` +
+                `<div style="font-size:11px; font-weight:800; color:#94a3b8; margin-bottom:4px;">배달기사 이름 <span style="font-weight:700; color:#cbd5e1;">— 버튼에 나올 짧은 이름</span></div>` +
+                `<input type="text" id="apt-rename-short" value="${gEscapeHtml(row.shortName || '')}" placeholder="비우면 위 이름을 그대로 씁니다"` +
+                ` style="width:100%; box-sizing:border-box; height:42px; padding:9px 11px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:14px; font-weight:800;">` +
+                `<div style="margin-top:10px; font-size:11.5px; font-weight:700; color:var(--text-sub); line-height:1.6; background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:9px 11px;">` +
+                `배달기사 버튼은 좁아서 <b>4~6글자</b>가 알맞습니다. (예: 푸르지오2차 → 푸지2차)<br>` +
+                `도로명·지번·인식어는 그대로 두므로, 이름만 바뀌고 <b>주소 판정은 달라지지 않습니다.</b></div>` +
+                `</div>` +
+                `<div style="padding:14px 18px; border-top:1px solid var(--border); display:flex; gap:8px;">` +
+                `<button type="button" onclick="closeApartmentRename()" style="flex:1; height:44px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">취소</button>` +
+                `<button type="button" onclick="saveApartmentRename()" style="flex:1.4; height:44px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">💾 저장</button>` +
+                `</div></div>`;
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => modal.classList.add('active'));
+            setTimeout(() => document.getElementById('apt-rename-main')?.focus(), 100);
+        }
+
+        function closeApartmentRename() {
+            const m = document.getElementById('apt-rename-modal');
+            if (m) m.remove();
+        }
+
+        async function saveApartmentRename() {
+            const mainName = String(document.getElementById('apt-rename-main')?.value || '').trim();
+            const shortName = String(document.getElementById('apt-rename-short')?.value || '').trim();
+            if (!mainName) { showToast('주문관리 이름이 비어 있습니다.'); return; }
+            const { where, key } = _aptNameEdit;
+            if (!where || key === '') { showToast('고칠 자리를 찾지 못했습니다.'); return; }
+
+            showLoader('아파트 이름 저장 중...');
+            try {
+                // 그 한 줄의 이름 칸만 고친다 (도로명·지번·인식어는 손대지 않는다)
+                const body = { name: mainName };
+                body.shortName = shortName || null;   // 비우면 지운다 → 배달기사도 주문관리 이름을 쓴다
+                const res = await fetch(`${FIREBASE_DB_URL}${where}/${encodeURIComponent(key)}.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                });
+                if (!res.ok) throw new Error('저장 실패 ' + res.status);
+
+                showToast(`'${mainName}'으로 저장했습니다.` + (shortName ? ` (배달기사: ${shortName})` : ''));
+                closeApartmentRename();
+                // 표를 다시 받아 화면에 반영한다
+                // 두 표를 모두 다시 받아야 화면에 반영된다 (기본표 + 사장님이 더한 것)
+                if (typeof loadApartmentTable === 'function') await loadApartmentTable();
+                if (typeof loadApartmentExtra === 'function') await loadApartmentExtra();
+                if (typeof renderApartmentAdmin === "function") await renderApartmentAdmin();
+            } catch (e) {
+                console.error('아파트 이름 저장 실패:', e);
+                showToast('저장 실패: ' + e.message);
+            } finally { hideLoader(); }
+        }
+
         function openApartmentAliasTool(aptName) {
             closeApartmentNameTool();
             const mine = APARTMENT_ALIAS[aptName] || [];
@@ -11104,10 +11638,10 @@
         let salesArchiveOrders = [];   // [신규] 보관함(orders_archive) 과거 주문 (판매현황 전체기간 집계용)
         let salesArchiveLoaded = false;
         // [신규] 판매 기간 선택: 상단=단위(salesUnit), 하단=선택 인스턴스(salesUnitIdx, 0=가장 최근/오늘)
-        // salesUnit: day(일·이전 7일 중 선택, 기본) | week(주·8주) | month(월·12개월) | quarter(분기·8분기) | year(년·4년)
-        let salesUnit = 'day';
+        // salesUnit: day(일·이전 7일 중 선택) | week(주·8주) | month(월·12개월, 기본) | quarter(분기·8분기) | year(년·4년)
+        let salesUnit = 'month';   // [수정] 처음 열었을 때 '월'로 시작한다 (하루치보다 한 달치를 먼저 보는 일이 많다)
         let salesUnitIdx = 0;
-        let salesPeriod = 'day';   // (레거시 호환용, salesUnit과 동기화)
+        let salesPeriod = 'month';   // (레거시 호환용, salesUnit과 동기화)
         let salesYear = new Date().getFullYear();
         let salesMonthY = new Date().getFullYear();
         let salesMonthM = new Date().getMonth() + 1;
@@ -13765,6 +14299,45 @@
         }
 
         // [신규] 상품 목록 대분류 동적 카테고리 탭 빌드
+
+        /* [신규] 상시판매 음식 종류별 개수 — { 분류키: { live, total } }
+           total = 그 분류의 상시판매 상품 수, live = 그중 품절이 아닌 것.
+           탭에 '(10/12)'로 붙여, 눌러 보기 전에 어디에 물건이 남았는지 알 수 있게 한다. */
+        function gOnsiteCatCounts() {
+            const out = {};
+            (Array.isArray(uploadProducts) ? uploadProducts : []).forEach(p => {
+                if (!p || p.name === "배달비") return;
+                const c = gOnsiteTabCatOfList(p);
+                if (!c) return;   // 당일 과일·공동구매·사다드림 등은 상시판매가 아니다
+                if (!out[c]) out[c] = { live: 0, total: 0 };
+                out[c].total++;
+                if (!gIsProductSoldOut(p)) out[c].live++;
+            });
+            return out;
+        }
+
+        // 탭 이름표 뒤에 붙일 '(품절아님/전체)'. 다 품절이면 빨갛게 알려 준다.
+        function gCatCountHtml(key, counts) {
+            const c = (counts || {})[key] || { live: 0, total: 0 };
+            const dead = (c.total > 0 && c.live === 0);
+            return `<span class="mtab-count" data-cat="${key}" style="font-size:10px; font-weight:800; ${dead ? 'color:#dc2626;' : 'opacity:0.62;'}">(${c.live}/${c.total})</span>`;
+        }
+
+        /* 개수만 다시 칠한다. 재고를 고치거나 상품을 지우면 숫자가 바뀌는데,
+           탭 전체를 다시 그리면 가로로 밀어 둔 자리가 처음으로 튄다. 숫자 칸만 갈아 끼운다. */
+        function refreshManageTabCounts() {
+            if (uploadManageDeliveryType !== 'inventory') return;
+            const counts = gOnsiteCatCounts();
+            document.querySelectorAll('#manage-category-tabs .mtab-count').forEach(el => {
+                const k = el.getAttribute('data-cat');
+                const c = counts[k] || { live: 0, total: 0 };
+                const dead = (c.total > 0 && c.live === 0);
+                el.innerText = `(${c.live}/${c.total})`;
+                el.style.color = dead ? '#dc2626' : '';
+                el.style.opacity = dead ? '' : '0.62';
+            });
+        }
+
         function buildManageCategoryTabs() {
             const container = document.getElementById('manage-category-tabs');
             if (!container) return;
@@ -13831,7 +14404,9 @@
                 container.style.gridTemplateRows = 'repeat(2, auto)';
                 container.style.gridAutoColumns = 'max-content';
                 container.style.gap = '4px';
-                container.innerHTML = cats.map(([k, l]) => tabHtml(k, l, 'padding:9px 11px; font-size:11.5px;')).join('');
+                // [신규] 탭마다 (품절아님/전체) 개수를 붙인다
+                const _catCounts = gOnsiteCatCounts();
+                container.innerHTML = cats.map(([k, l]) => tabHtml(k, `${l} ${gCatCountHtml(k, _catCounts)}`, "padding:9px 11px; font-size:11.5px;")).join("");
                 enableWheelScroll();
                 scrollActiveIntoView();
             } else {
@@ -13977,27 +14552,39 @@
             }
             else if (uploadManageDeliveryType === 'inventory') {
                 // [수정] 위 탭이 음식 종류로 바뀌었으므로, 선반은 어느 종류를 보고 있든 여기서 고른다.
-                //  (예전에는 '냉장·냉동' 그룹을 고른 뒤에야 선반이 나와서, 종류별로 보면 선반을 못 골랐다)
-                //  선반 목록은 INV_GROUPS 한 곳에서 가져와 재고관리 분류와 어긋나지 않게 한다.
-                const subs = [['all', '전체'], [SHELF_NONE_SUB, '📦 미지정'], ['fruit', '🥬 과일·신선']];
-                Object.values(INV_GROUPS).forEach(g => g.shelves.forEach(([k, l]) => { if (k) subs.push([k, l]); }));
+                //  선반 목록은 gShelfOptsAll() 한 곳에서 가져온다 ('⚙️ 선반 관리'에서 고친 것이 바로 반영).
+                // [수정] 지금 고른 분류에 상품이 하나도 없는 선반은 버튼을 안 만든다.
+                //  선반이 늘 전부 떠 있어서, 눌러 봐야 빈 목록인 칸을 골라내느라 손이 갔다.
+                const shelfHas = new Set();
+                (Array.isArray(uploadProducts) ? uploadProducts : []).forEach(p => {
+                    if (!p || p.name === "배달비") return;
+                    const cat = gOnsiteTabCatOfList(p);
+                    if (!cat) return;   // 당일 과일·공동구매·사다드림 등은 상시판매가 아니다
+                    if (uploadManageTab !== 'inv-all' && cat !== uploadManageTab) return;
+                    shelfHas.add(String(p.shelf || "") || SHELF_NONE_SUB);
+                });
+
+                //  '미지정'은 빈 문자열이라 '전체'와 구분이 안 돼 따로 둔 키(SHELF_NONE_SUB)로 바꿔 단다.
+                const shelves = gShelfOptsAll().map(([k, l]) => [k === SHELF_UNSET ? SHELF_NONE_SUB : k, l]);
+
+                //  지금 보고 있는 선반은 비어도 남겨 둔다. 버튼이 사라지면 무엇을 보는 중인지 알 수 없다.
+                const subs = [['all', '전체']].concat(shelves.filter(([k]) => shelfHas.has(k) || uploadSubTab === k));
+
                 subContainer.style.display = 'flex';
                 subContainer.innerHTML = subs.map(([key, label]) =>
                     `<button type="button" class="sub-tab-btn ${uploadSubTab === key ? 'active' : ''}" data-sub-tab="${key}" onclick="selectManageSubTab('${key}')">${label}</button>`
-                ).join('');
+                ).join('')
+                    // [신규] 품절된 상품을 '품절' 자리로 실제로 옮기는 버튼. 누를 때에만 자료가 바뀐다.
+                    + `<button type="button" class="sub-tab-btn" onclick="tidySoldOutShelf()" title="품절된 상품을 '품절' 자리로 옮기고, 재고가 다시 들어온 상품은 원래 선반으로 되돌립니다" style="background:#fef2f2; color:#b91c1c;">⛔ 품절 정리</button>`
+                    // [신규] 선반 자체를 더하고·고치고·지우는 창
+                    + `<button type="button" class="sub-tab-btn" onclick="openShelfManager()" title="선반을 추가·이름 변경·삭제합니다" style="background:#eef2ff; color:#4338ca;">⚙️ 선반 관리</button>`;
             }
             else {
                 subContainer.style.display = 'none';
             }
         }
 
-        // [신규] 상시판매(재고관리) 2단계 분류: 상단 그룹 → 하위 선반
-        const INV_GROUPS = {
-            'inv-grp-shelf':   { label: '선반', shelves: [['shelf-1', '선반1'], ['shelf-2', '선반2'], ['shelf-3', '선반3']] },
-            'inv-grp-fridge':  { label: '냉장', shelves: [['fridge-1', '냉장1'], ['fridge-2', '냉장2']] },
-            'inv-grp-freezer': { label: '냉동', shelves: [['freezer-4', '냉동4'], ['freezer-5', '냉동5'], ['freezer-6', '냉동6'], ['freezer-7', '냉동7']] },
-            'inv-grp-other':   { label: '기타', shelves: [['other', '기타'], ['', '미지정']] }
-        };
+        // [삭제] INV_GROUPS(선반↔그룹 표)는 없앴다. 선반 목록은 gShelfOptsAll() 하나만 본다.
 
         // [신규] 선반 하위탭에서 '미지정'(shelf가 빈 값)을 가리키는 키.
         //  빈 문자열을 그대로 쓰면 '전체'와 구분이 안 되고 조건문에서 거짓으로 걸려 따로 둔다.
@@ -14012,23 +14599,14 @@
             { key: "기타", label: "기타" }
         ];
         const costcoCategories = ["코스트코 냉동", "코스트코 냉장", "코스트코 상온"];
-        // [신규] 상품 등록/수정 폼의 선반위치(장소) 옵션 — 재고관리 탭의 선반 분류와 동일
-        const SHELF_OPTS_FORM = [['', '📦 미지정'], ['fruit', '🥬 과일·신선'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']];
-        // [신규] 상시판매 보관분류별 선반 옵션 (냉동→냉동4~7, 냉장→냉장1~2, 상온→선반1~3, 공통: 미지정·기타)
-        const SHELF_GROUPS = {
-            // [수정] 과일도 실제로는 어느 자리에나 둘 수 있어(과일매대·냉장·상온 선반 등) 선반을 막지 않는다.
-            //  '과일' 자리를 맨 앞에 두되 나머지 선반도 그대로 고를 수 있게 한다.
-            '과일': [['fruit', '🥬 과일·신선'], ['', '📦 미지정'], ['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['other', '🧺 기타']],
-            '냉동': [['freezer-4', '🧊 냉동4'], ['freezer-5', '🧊 냉동5'], ['freezer-6', '🧊 냉동6'], ['freezer-7', '🧊 냉동7'], ['', '📦 미지정'], ['other', '🧺 기타']],
-            '냉장': [['fridge-1', '❄️ 냉장1'], ['fridge-2', '❄️ 냉장2'], ['', '📦 미지정'], ['other', '🧺 기타']],
-            '상온': [['shelf-1', '🗄️ 선반1'], ['shelf-2', '🗄️ 선반2'], ['shelf-3', '🗄️ 선반3'], ['', '📦 미지정'], ['other', '🧺 기타']]
-        };
-        // 보관분류(categoryValue) 값에 맞춰 선반(productShelf) 옵션을 채움. desiredShelf가 새 목록에 있으면 유지, 없으면 미지정
+        /* [수정] 보관분류(냉동·냉장·상온·과일)별로 고를 수 있는 선반을 막던 표(SHELF_GROUPS)는 없앴다.
+           냉동 상품을 상온 선반에 잠깐 올려 두는 일도 실제로는 생기는데 고를 수가 없었다.
+           이제 어떤 상품이든 모든 선반을 고를 수 있고, 선반 목록은 '⚙️ 선반 관리'에서 정한다. */
         function populateShelfOptions(desiredShelf){
             const catSel = document.getElementById('categoryValue');
             const shelfSel = document.getElementById('productShelf');
-            if (!catSel || !shelfSel) return;
-            const opts = SHELF_GROUPS[catSel.value] || SHELF_OPTS_FORM;
+            if (!shelfSel) return;
+            const opts = gShelfOptsAll();
             const want = (desiredShelf !== undefined && desiredShelf !== null) ? desiredShelf : shelfSel.value;
             shelfSel.innerHTML = '';
             opts.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.innerText = l; shelfSel.appendChild(o); });
@@ -15127,8 +15705,76 @@
             return false;
         }
 
+        /* ===== [신규] 선택옵션 항목별 재고 (보기 전용) =====
+           손님 주문서(주문서ver2)와 똑같은 규칙으로 읽는다.
+           · 기본 수량은 상품에 적혀 있다 (options[].items[].stock). 비어 있으면 제한 없음.
+           · 팔린 만큼은 option_stock 에 조정값(마이너스)으로 쌓인다.
+           · 남은 수량 = 기본 수량 + 조정값.
+           여기서는 고치지 않는다 — 수량을 바꾸려면 상품을 열어 상세옵션 창에서 기본 수량을 고친다. */
+        let optionAdjustments = {};
+
+        async function loadOptionStock(force = false) {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}option_stock.json?t=${Date.now()}`);
+                optionAdjustments = (res.ok ? (await res.json()) : null) || {};
+            } catch (e) {
+                console.error('옵션 재고 로드 실패:', e);
+                optionAdjustments = optionAdjustments || {};
+            }
+        }
+
+        // 옵션 항목 하나를 가리키는 키 (주문서ver2의 gOptStockKey와 같은 규칙이어야 한다)
+        function gOptStockKey(p, groupName, itemName) {
+            const base = fGetAdjKey((p && (p.matchKey || p.date)) || '', (p && p.name) || '');
+            return base + '__' + fSafeKey(groupName) + '__' + fSafeKey(itemName);
+        }
+
+        function gOptBaseStock(it) {
+            if (!it) return null;
+            const v = it.stock;
+            if (v === undefined || v === null || String(v).trim() === '') return null;
+            const n = parseInt(v);
+            return isNaN(n) ? null : Math.max(0, n);
+        }
+
+        // 남은 수량. 제한 없는 항목이면 null.
+        function gOptRemain(p, groupName, it) {
+            const base = gOptBaseStock(it);
+            if (base === null) return null;
+            const adj = parseInt(optionAdjustments[gOptStockKey(p, groupName, it.name)] || 0) || 0;
+            return Math.max(0, base + adj);
+        }
+
+        /* 상품의 옵션 항목을 한 줄씩 볼 수 있게 펴 놓는다.
+           [{ group, name, base, remain }] — base가 null이면 수량 제한이 없는 항목. */
+        function gOptionRowsOf(p) {
+            const out = [];
+            if (!p) return out;
+            // useOptions 필드가 없는 옛 상품은 켜진 것으로 본다 (상품 수정 폼과 같은 기준)
+            const useAll = (p.useOptions === undefined || p.useOptions === null) ? true : (p.useOptions === true || p.useOptions === 'true');
+            const useChoice = (p.useChoiceOptions === true || p.useChoiceOptions === 'true');
+            if (!useAll || !useChoice) return out;
+            ((p.options) || []).forEach(g => {
+                ((g && g.items) || []).forEach(it => {
+                    if (!it || !String(it.name || '').trim()) return;
+                    out.push({ group: g.name || '옵션', name: it.name, base: gOptBaseStock(it), remain: gOptRemain(p, g.name, it) });
+                });
+            });
+            return out;
+        }
+
+        // 목록에서 옵션 줄을 폈다 접었다 한다 (다시 그리지 않고 그 줄만 여닫는다)
+        function toggleOptionStockRow(idx, ev) {
+            if (ev && ev.stopPropagation) ev.stopPropagation();
+            const box = document.getElementById('opt-stock-' + idx);
+            if (!box) return;
+            box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
+        }
+
         async function loadProductsFromServer() {
             try {
+                await loadShelves();   // [신규] 선반 목록을 먼저 받아 둔다 (탭·드롭다운·그룹 제목이 모두 이걸 쓴다)
+                await loadOptionStock();   // [신규] 옵션 항목별 재고 (상품 목록의 옵션 뱃지가 쓴다)
                 const [res, stockRes] = await Promise.all([
                     fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`),
                     fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 재고 로드 실패:", e); return { ok: false }; })
@@ -15258,15 +15904,10 @@
             const isReserveView = (uploadManageDeliveryType === 'reserve');
             /* [수정] 'fruit'(과일·신선 자리)가 두 표에 빠져 있어, 그 선반에 둔 상품의 그룹 제목이
                이름표 없이 키 그대로 'fruit'로 나왔다. 순서도 맨 뒤로 밀렸다. */
-            const SHELF_ORDER = { '': 0, 'fruit': 1, 'shelf-1': 2, 'shelf-2': 3, 'shelf-3': 4, 'fridge-1': 5, 'fridge-2': 6, 'freezer-4': 7, 'freezer-5': 8, 'freezer-6': 9, 'freezer-7': 10, 'other': 11 };
-            const SHELF_LABEL = { '': '📦 미지정', 'fruit': '🥬 과일·신선', 'shelf-1': '🗄️ 선반1', 'shelf-2': '🗄️ 선반2', 'shelf-3': '🗄️ 선반3', 'fridge-1': '❄️ 냉장1', 'fridge-2': '❄️ 냉장2', 'freezer-4': '🧊 냉동4', 'freezer-5': '🧊 냉동5', 'freezer-6': '🧊 냉동6', 'freezer-7': '🧊 냉동7', 'other': '🧺 기타' };
-            const isProductSoldOut = (prod) => {
-                const unl = (prod.stock === "" || prod.stock == null || String(prod.stock).trim() === "무제한");
-                const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)];
-                const unlAdj = (adjRaw === "unlimited" || (adjRaw != null && String(adjRaw).startsWith("unlimited")));
-                if (unl || unlAdj) return false;
-                return Math.max(0, parseInt(prod.stock || 0) + parseInt(adjRaw || 0)) <= 0;
-            };
+            // [수정] 선반 순서·이름표는 gShelf* 로만 가져온다 (선반 관리에서 고친 것이 바로 반영)
+            //  (예전에는 여기에 표를 따로 적어 두어, 선반을 고치면 목록 제목만 옛 이름으로 남았다)
+            // [수정] 같은 판단을 두 곳에서 따로 적어 두면 어긋난다. gIsProductSoldOut 하나만 쓴다.
+            const isProductSoldOut = gIsProductSoldOut;
 
             const grouped = {};
             filteredProducts.forEach(({ prod, index }) => {
@@ -15281,8 +15922,8 @@
 
             const groupKeys = Object.keys(grouped).sort((a, b) => {
                 if (isInventoryView) {
-                    const oa = (SHELF_ORDER[a] !== undefined) ? SHELF_ORDER[a] : 99;
-                    const ob = (SHELF_ORDER[b] !== undefined) ? SHELF_ORDER[b] : 99;
+                    const oa = gShelfOrder(a);
+                    const ob = gShelfOrder(b);
                     return oa - ob;
                 }
                 if (isReserveView) {
@@ -15309,7 +15950,7 @@
                 
                 let displayTitle = mKey;
                 if (isInventoryView) {
-                    displayTitle = (SHELF_LABEL[mKey] !== undefined) ? SHELF_LABEL[mKey] : (mKey || '📦 미지정');
+                    displayTitle = gShelfLabel(mKey);
                 }
                 else if (isReserveView) {
                     displayTitle = /^\d{4}-\d{2}-\d{2}$/.test(mKey) ? `🗓️ ${mKey}` : '🗓️ 날짜미정';
@@ -15391,10 +16032,50 @@
                     // [신규] 보관방법 뱃지. 주문서 상품카드에 뜨는 것과 같은 색으로 맞춰 둔다.
                     const storageBadge = gListStorageBadge(prod);
 
+                    /* [신규] 선택옵션 뱃지 — 옵션이 있는 상품에만 붙는다.
+                       평소에는 '🎛️ 옵션(3)'처럼 항목 수만 보여 주고, 누르면 그 상품의 옵션 줄이 펴진다.
+                       수량이 정해진 항목이 다 팔렸으면 뱃지를 빨갛게 해서 목록을 훑을 때 바로 눈에 띄게 한다.
+                       (여기서는 보기만 한다. 수량을 고치려면 상품을 열어 상세옵션 창에서 기본 수량을 고친다) */
+                    const optRows = gOptionRowsOf(prod);
+                    let optionBadge = '', optionPanel = '';
+                    if (optRows.length > 0) {
+                        const anyOut = optRows.some(r => r.base !== null && r.remain <= 0);
+                        optionBadge = `<span onclick="toggleOptionStockRow(${index}, event)" title="옵션 항목별 남은 수량 보기"`
+                            + ` style="font-size:10px; font-weight:800; background:${anyOut ? '#fee2e2' : '#eef2ff'}; color:${anyOut ? '#dc2626' : '#4338ca'};`
+                            + ` padding:2px 7px; border-radius:5px; cursor:pointer; user-select:none;">🎛️ 옵션(${optRows.length})</span>`;
+
+                        /* [수정] 옵션 그룹 이름을 줄마다 되풀이해 적으니 같은 글자가 세로로 쌓여
+                           정작 봐야 할 항목 이름이 묻혔다. 그룹 이름은 머리줄에 한 번만 적고
+                           그 아래 항목을 한 칸 들여쓴다. */
+                        const byGroup = [];
+                        optRows.forEach(r => {
+                            let g = byGroup.find(x => x.name === r.group);
+                            if (!g) { g = { name: r.group, items: [] }; byGroup.push(g); }
+                            g.items.push(r);
+                        });
+
+                        optionPanel = `<div id="opt-stock-${index}" style="display:none; margin-top:6px; padding:7px 9px; background:#f8fafc; border:1px solid var(--border); border-radius:8px;">`
+                            + byGroup.map(g =>
+                                `<div style="font-size:11px; font-weight:900; color:#334155; margin:4px 0 2px;">${gEscapeHtml(g.name)}</div>`
+                                + g.items.map(r => {
+                                    const limited = (r.base !== null);
+                                    const out = limited && r.remain <= 0;
+                                    const right = !limited ? `<span style="color:#94a3b8;">제한없음</span>`
+                                        : `<span style="color:${out ? '#dc2626' : '#0f172a'};">${r.remain}/${r.base}</span>${out ? ` <span style="color:#dc2626;">품절</span>` : ''}`;
+                                    return `<div style="display:flex; align-items:center; gap:8px; padding:2px 0 2px 10px; font-size:11px; font-weight:700;">`
+                                        + `<span style="flex:0 0 auto; color:#cbd5e1;">└</span>`
+                                        + `<span style="flex:1; min-width:0; color:#475569; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(r.name)}</span>`
+                                        + `<span style="flex:0 0 auto; font-weight:800;">${right}</span></div>`;
+                                }).join('')
+                            ).join('')
+                            + `</div>`;
+                    }
+
+
                     // [신규] 재고관리 모드: 선반 지정 드롭다운
                     let actionsHtml;
                     if (uploadManageDeliveryType === 'inventory') {
-                        const shelfOpts = [['', '미지정'], ['fruit', '과일'], ['shelf-1', '선반1'], ['shelf-2', '선반2'], ['shelf-3', '선반3'], ['fridge-1', '냉장1'], ['fridge-2', '냉장2'], ['freezer-4', '냉동4'], ['freezer-5', '냉동5'], ['freezer-6', '냉동6'], ['freezer-7', '냉동7'], ['other', '기타']];
+                        const shelfOpts = gShelfOptsAll();   // [수정] 선반 관리에서 정한 목록 그대로
                         const cur = String(prod.shelf || '');
                         // 현재 실재고(또는 무제한)를 입력칸 기본값으로
                         let stockInputVal = '무제한';
@@ -15443,8 +16124,9 @@
                                 ${prod.productCode ? `<span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${prod.productCode}</span>` : ``}
                                 <span>${parseInt(prod.price).toLocaleString()}원</span>
                                 ${stockText ? `<span style="color: var(--text-sub);">|</span><span>${stockText}</span>` : ``}
-                                ${storageBadge}${statusBadge}
+                                ${storageBadge}${statusBadge}${optionBadge}
                             </div>
+                            ${optionPanel}
                         </div>
                         ${actionsHtml}
                     `;
@@ -15493,6 +16175,9 @@
                     container.appendChild(item);
                 });
             });
+
+            // [신규] 재고를 고치거나 상품을 지우면 개수가 바뀐다. 탭의 숫자만 갈아 끼운다.
+            refreshManageTabCounts();
         }
 
         function toggleSelectProduct(index) {
@@ -16134,6 +16819,213 @@
             }
         }
 
+        /* ============================================================
+           [신규] 선반 관리 — 선반을 더하고, 이름을 고치고, 지운다.
+           창을 열면 지금 목록을 베껴 두고(shelfDraft) 거기서만 고친다.
+           '저장'을 눌러야 실제 목록과 Firebase에 반영된다 — 잘못 눌러도 닫으면 그만이다.
+           ============================================================ */
+        let shelfDraft = [];          // [{ key, label }] — 창 안에서만 쓰는 사본
+        let shelfDraftRemoved = [];   // 지우기로 표시한 선반 키들 (저장할 때 상품을 미지정으로 옮긴다)
+
+        async function openShelfManager() {
+            await loadShelves();
+            shelfDraft = shelfList.map(s => ({ ...s }));
+            shelfDraftRemoved = [];
+            renderShelfManager();
+            const m = document.getElementById('shelf-manager-modal');
+            if (m) m.style.display = 'flex';
+        }
+
+        function closeShelfManager() {
+            const m = document.getElementById('shelf-manager-modal');
+            if (m) m.style.display = 'none';
+        }
+
+        function renderShelfManager() {
+            const box = document.getElementById('shelf-manager-list');
+            if (!box) return;
+
+            // 선반마다 지금 몇 개가 올라가 있는지 세어 준다 (지우기 전에 규모를 알 수 있게)
+            const count = new Map();
+            (Array.isArray(uploadProducts) ? uploadProducts : []).forEach(p => {
+                if (!p || p.name === "배달비") return;
+                const k = String(p.shelf || '');
+                if (k) count.set(k, (count.get(k) || 0) + 1);
+            });
+
+            if (shelfDraft.length === 0) {
+                box.innerHTML = `<div style="padding:26px 0; text-align:center; color:#94a3b8; font-size:13px; font-weight:700;">선반이 없습니다. 아래 '＋ 선반 추가'를 눌러 주세요.</div>`;
+                return;
+            }
+
+            const last = shelfDraft.length - 1;
+            box.innerHTML = shelfDraft.map((s, i) => {
+                const n = count.get(s.key) || 0;
+                const upOff = (i === 0), dnOff = (i === last);
+                return `
+                <div style="display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid #f1f5f9;">
+                    <input type="text" value="${gEscapeHtml(s.label)}" oninput="onShelfLabelInput(${i}, this.value)" placeholder="선반 이름"
+                        style="flex:1 1 0; min-width:0; padding:9px 10px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:800; box-sizing:border-box; background:#fff;">
+                    <span style="flex:0 0 auto; font-size:11px; font-weight:800; color:${n ? '#475569' : '#cbd5e1'}; min-width:32px; text-align:right;">${n}개</span>
+                    <button type="button" onclick="moveShelfRow(${i}, -1)" title="위로"
+                        style="flex:0 0 auto; width:28px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:${upOff ? '#e2e8f0' : '#475569'}; border-radius:8px; font-size:12px; font-weight:800; cursor:${upOff ? 'default' : 'pointer'};">▲</button>
+                    <button type="button" onclick="moveShelfRow(${i}, 1)" title="아래로"
+                        style="flex:0 0 auto; width:28px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:${dnOff ? '#e2e8f0' : '#475569'}; border-radius:8px; font-size:12px; font-weight:800; cursor:${dnOff ? 'default' : 'pointer'};">▼</button>
+                    <button type="button" onclick="removeShelfRow(${i})" title="삭제"
+                        style="flex:0 0 auto; width:30px; height:32px; border:1.5px solid #fecaca; background:#fef2f2; color:#dc2626; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">🗑️</button>
+                </div>`;
+            }).join('');
+        }
+
+        // 이름은 입력할 때마다 사본에만 적어 둔다 (다시 그리면 글자 치던 자리를 잃으므로 렌더하지 않는다)
+        function onShelfLabelInput(i, value) {
+            if (shelfDraft[i]) shelfDraft[i].label = String(value || '');
+        }
+
+        function moveShelfRow(i, dir) {
+            const j = i + dir;
+            if (j < 0 || j >= shelfDraft.length) return;
+            const t = shelfDraft[i]; shelfDraft[i] = shelfDraft[j]; shelfDraft[j] = t;
+            renderShelfManager();
+        }
+
+        function removeShelfRow(i) {
+            const s = shelfDraft[i];
+            if (!s) return;
+            const n = (Array.isArray(uploadProducts) ? uploadProducts : [])
+                .filter(p => p && p.name !== "배달비" && String(p.shelf || '') === s.key).length;
+            const msg = n > 0
+                ? `'${s.label}' 선반을 지웁니다.\n여기 있던 상품 ${n}개는 '📦 미지정'으로 옮겨집니다.\n\n계속할까요?`
+                : `'${s.label}' 선반을 지웁니다. 계속할까요?`;
+            if (!confirm(msg)) return;
+            shelfDraftRemoved.push(s.key);
+            shelfDraft.splice(i, 1);
+            renderShelfManager();
+        }
+
+        function addShelfRow() {
+            // 새 키는 지금 사본과 지운 것까지 피해서 만든다 (지웠다 다시 만들 때 옛 상품에 붙지 않도록)
+            const used = new Set(shelfDraft.map(s => s.key).concat(shelfDraftRemoved).concat(shelfList.map(s => s.key)));
+            let n = 1;
+            while (used.has(`sh-${n}`)) n++;
+            shelfDraft.push({ key: `sh-${n}`, label: `🗄️ 새 선반${n}` });
+            renderShelfManager();
+            const box = document.getElementById('shelf-manager-list');
+            if (box) box.scrollTop = box.scrollHeight;
+        }
+
+        async function saveShelfManager() {
+            // 이름이 빈 줄은 저장하지 않는다 (이름표가 없으면 목록에서 무엇인지 알 수 없다)
+            const cleaned = shelfDraft
+                .map(s => ({ key: s.key, label: String(s.label || '').trim() }))
+                .filter(s => s.label !== '');
+            if (cleaned.length !== shelfDraft.length) {
+                showToast("이름이 빈 선반은 저장하지 않습니다.");
+            }
+
+            // 지운 선반에 있던 상품을 '미지정'으로 옮긴다. shelfPrev 에 남은 값도 같이 지운다.
+            const removed = new Set(shelfDraftRemoved);
+            const movedProducts = [];
+            if (removed.size > 0 && Array.isArray(uploadProducts)) {
+                uploadProducts.forEach(p => {
+                    if (!p) return;
+                    if (removed.has(String(p.shelf || ''))) {
+                        p.shelf = SHELF_UNSET;
+                        p.updatedAt = Date.now();
+                        movedProducts.push(p);
+                    }
+                    if (removed.has(String(p.shelfPrev || ''))) delete p.shelfPrev;
+                });
+            }
+
+            const prevList = shelfList.map(s => ({ ...s }));
+            shelfList = cleaned;
+
+            showLoader("선반 저장 중...");
+            try {
+                const ok = await saveShelves();
+                if (!ok) throw new Error('선반 저장 실패');
+
+                if (movedProducts.length > 0) {
+                    const ok2 = await fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, uploadProducts);
+                    if (!ok2) throw new Error('상품 저장 실패');
+                    updatePublishedProductsTimestamp();
+                }
+
+                shelfDraftRemoved = [];
+                closeShelfManager();
+                showToast(movedProducts.length
+                    ? `선반 저장 완료 — 상품 ${movedProducts.length}개를 미지정으로 옮겼습니다`
+                    : "선반 저장 완료");
+            } catch (e) {
+                shelfList = prevList;   // 되돌린다. 상품 쪽은 다음 새로고침 때 서버 값으로 맞춰진다.
+                console.error('선반 저장 실패:', e);
+                showToast("선반 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+            } finally {
+                hideLoader();
+                buildSubTabs();
+                renderProductsList();
+            }
+        }
+
+        /* [신규] 재고관리 — '⛔ 품절 정리' 버튼.
+           품절된 상품의 선반을 실제로 '품절'로 옮기고, 다시 재고가 들어온 상품은 원래 자리로 되돌린다.
+           옮길 때 원래 선반을 shelfPrev 에 적어 두므로 되돌릴 자리를 잃지 않는다.
+           자동으로 돌지 않는다 — 사장님이 이 버튼을 누른 때에만 자료가 바뀐다. */
+        async function tidySoldOutShelf() {
+            if (!Array.isArray(uploadProducts) || uploadProducts.length === 0) {
+                showToast("상품 목록이 아직 준비되지 않았습니다.");
+                return;
+            }
+
+            const moved = [], restored = [];
+            uploadProducts.forEach(prod => {
+                if (!prod || prod.name === "배달비") return;
+                if (!gIsOnsiteStorageProduct(prod)) return;   // 상시판매(선반에 두는) 상품만 다룬다
+
+                const shelf = String(prod.shelf || '');
+                const soldOut = gIsProductSoldOut(prod);
+
+                if (soldOut && shelf !== SHELF_SOLDOUT) {
+                    prod.shelfPrev = shelf;            // 되돌릴 자리를 적어 둔다
+                    prod.shelf = SHELF_SOLDOUT;
+                    prod.updatedAt = Date.now();
+                    moved.push(prod);
+                } else if (!soldOut && shelf === SHELF_SOLDOUT) {
+                    prod.shelf = String(prod.shelfPrev || '');   // 적어 둔 자리가 없으면 미지정
+                    delete prod.shelfPrev;
+                    prod.updatedAt = Date.now();
+                    restored.push(prod);
+                }
+            });
+
+            if (moved.length === 0 && restored.length === 0) {
+                showToast("옮길 상품이 없습니다. 이미 정리되어 있습니다.");
+                return;
+            }
+
+            showLoader(`품절 정리 중... (옮김 ${moved.length}건 · 되돌림 ${restored.length}건)`);
+            try {
+                const ok = await fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, uploadProducts);
+                if (!ok) throw new Error('저장 실패');
+                updatePublishedProductsTimestamp();
+                const bits = [];
+                if (moved.length) bits.push(`품절로 ${moved.length}건`);
+                if (restored.length) bits.push(`원래 자리로 ${restored.length}건`);
+                showToast(`⛔ 품절 정리 완료 — ${bits.join(' · ')}`);
+            } catch (e) {
+                // 저장에 실패하면 화면의 값도 되돌린다. 안 그러면 화면과 서버가 어긋난다.
+                moved.forEach(p => { p.shelf = String(p.shelfPrev || ''); delete p.shelfPrev; });
+                restored.forEach(p => { p.shelfPrev = String(p.shelf || ''); p.shelf = SHELF_SOLDOUT; });
+                console.error('품절 정리 실패:', e);
+                showToast("품절 정리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+            } finally {
+                hideLoader();
+                buildSubTabs();
+                renderProductsList();
+            }
+        }
+
         // [신규] 재고관리 — 상품 선반 지정 저장
         async function assignShelf(index, shelfKey) {
             const prod = uploadProducts[index];
@@ -16145,8 +17037,8 @@
             const ok = await fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, uploadProducts);
             if (ok) {
                 updatePublishedProductsTimestamp();
-                const labels = { '': '미지정', 'shelf-1': '선반1', 'shelf-2': '선반2', 'shelf-3': '선반3', 'fridge-1': '냉장1', 'fridge-2': '냉장2', 'freezer-4': '냉동4', 'freezer-5': '냉동5', 'freezer-6': '냉동6', 'freezer-7': '냉동7', 'other': '기타' };
-                showToast(`'${prod.name}' → ${labels[shelfKey] || '미지정'}`);
+                // [수정] 이름표는 gShelfLabel 하나만 쓴다 (선반 이름을 고쳐도 토스트가 옛 이름으로 안 나오도록)
+                showToast(`'${prod.name}' → ${gShelfLabel(shelfKey)}`);
                 // 재고관리 화면은 선반별로 그룹핑되므로(전체 포함) 변경 즉시 재렌더해 상품을 새 선반 그룹으로 이동
                 if (uploadManageDeliveryType === 'inventory') {
                     renderProductsList();
@@ -17875,7 +18767,7 @@
             document.getElementById('purchase-form-title').innerText = "✏️ 발주 내역 수정";
             document.getElementById('purchase-edit-mode-badge').style.display = "inline-block";
             document.getElementById('btn-purchase-cancel').style.display = "inline-block";
-            document.getElementById('btn-purchase-submit').innerText = "💾 수정 완료";
+            document.getElementById('btn-purchase-submit').innerText = "💾 저장";
             
             switchPurchaseSubTab('register');
             onPurchaseCodeChange();
@@ -17898,7 +18790,7 @@
             document.getElementById('purchase-form-title').innerText = "🚚 발주 내역 등록";
             document.getElementById('purchase-edit-mode-badge').style.display = "none";
             document.getElementById('btn-purchase-cancel').style.display = "none";
-            document.getElementById('btn-purchase-submit').innerText = "💾 발주 내역 저장";
+            document.getElementById('btn-purchase-submit').innerText = "💾 저장";
             
             calcPurchaseTotal();
         }
@@ -17943,8 +18835,45 @@
         const PROFIT_BUY_FROM_MONTH = '2026-08';
 
         let profitRangeKind = '6m';
+        // [신규] '직접'으로 고른 기간 (YYYY-MM). 비어 있으면 자료에 있는 처음~끝.
+        let profitCustomFrom = '';
+        let profitCustomTo = '';
         let manualSales = {};            // { 'YYYY-MM-DD': { pos, transfer } }
         let manualSalesLoaded = false;
+
+        /* ===== [신규] 잔액 보정 =====
+           계산으로 나온 잔액(매출-매입)이 실제와 안 맞을 때, 달마다 차액을 적어 둔다.
+           예: 현금으로 산 물건, 반품·환불, 빠뜨린 발주 같은 것.
+           한 달에 한 줄만 둔다 — 여러 번 적을 일이면 합쳐서 한 값으로 두는 편이 나중에 보기 쉽다.
+           { 'YYYY-MM': { amount, memo, updatedAt } } — amount는 더할 값(마이너스도 된다) */
+        let profitAdjustments = {};
+        let profitAdjLoaded = false;
+
+        async function loadProfitAdjustments(force = false) {
+            if (profitAdjLoaded && !force) return;
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}profit_adjustments.json?t=${Date.now()}`);
+                if (!res.ok) throw new Error('불러오기 실패 ' + res.status);
+                profitAdjustments = (await res.json()) || {};
+                profitAdjLoaded = true;
+            } catch (e) {
+                console.error('잔액 보정 로드 실패:', e);
+                profitAdjustments = profitAdjustments || {};
+            }
+        }
+
+        // 그 달의 보정 금액 (없으면 0)
+        function gProfitAdjOf(month) {
+            const v = profitAdjustments[month];
+            return v ? (parseInt(v.amount) || 0) : 0;
+        }
+
+        /* 매출·매입은 renderProfitReport 안에서 계산된다. 보정 창에서도 '이 달 계산 잔액'을
+           보여 주려면 그 값이 필요해서, 마지막으로 계산한 것을 여기에 남겨 둔다. */
+        let _profitSaleByMonth = new Map();
+        let _profitBuyByMonth = new Map();
+        function gProfitSaleOfMonth(m) { return _profitSaleByMonth.get(m) || 0; }
+        function gProfitBuyOfMonth(m) { return _profitBuyByMonth.get(m) || 0; }
 
         async function loadManualSales(force = false) {
             if (manualSalesLoaded && !force) return;
@@ -17968,26 +18897,224 @@
             return '';
         }
 
+        /* [신규] 날짜 칸을 눌렀을 때 브라우저 달력을 띄운다.
+           숨겨 둔 input이 진짜 값을 들고 있고, 화면에는 월·일만 적는다. */
+        function openMsDatePicker() {
+            const el = document.getElementById('ms-date');
+            if (!el) return;
+            if (typeof el.showPicker === 'function') {
+                try { el.showPicker(); return; } catch (e) { /* 사용자 조작 없이 부르면 막힌다 */ }
+            }
+            // showPicker를 못 쓰면 칸을 잠깐 보여 주고 눌러서 고르게 한다
+            el.style.cssText = 'width:100%; height:100%; opacity:1; position:absolute; left:0; top:0; border:0; padding:8px 10px; font-size:13px; font-weight:700; box-sizing:border-box; background:#fff;';
+            el.focus();
+        }
+
+        // 화면에 적을 글자. 올해면 '08-12', 다른 해면 헷갈리지 않게 '25년 08-12'.
+        function gMsDateLabel(v) {
+            if (!fIsDayKey(v)) return '-';
+            const [y, m, d] = v.split('-');
+            const thisYear = String(new Date().getFullYear());
+            return (y === thisYear) ? `${m}-${d}` : `${y.slice(2)}년 ${m}-${d}`;
+        }
+
+        function onMsDateChange() {
+            const el = document.getElementById('ms-date');
+            const t = document.getElementById('ms-date-text');
+            if (t && el) t.innerText = gMsDateLabel(el.value);
+            // 잠깐 보여 줬던 칸은 도로 숨긴다
+            if (el) el.style.cssText = 'position:absolute; left:10px; bottom:0; width:1px; height:1px; opacity:0; border:0; padding:0; pointer-events:none;';
+        }
+
+
+        /* ===== [신규] 매출 직접 입력 — 월/일 고르기 =====
+           예전에는 월 단위로만 적을 수 있었다. 날짜로도 적을 수 있게 하되,
+           통계는 그대로 달 단위로 합친다(fToMonthKey가 둘 다 받는다). */
+        let msInputMode = 'month';   // 'month' | 'day'
+
+        function setManualSaleMode(mode) {
+            msInputMode = (mode === 'day') ? 'day' : 'month';
+            const mEl = document.getElementById('ms-month');
+            const dEl = document.getElementById('ms-date');
+            const dBox = document.getElementById('ms-date-box');   // 월·일만 보여 주는 겉칸
+            const label = document.getElementById('ms-date-label');
+            const hint = document.getElementById('ms-hint');
+            if (!mEl || !dEl) return;
+
+            const day = (msInputMode === 'day');
+            mEl.style.display = day ? 'none' : '';
+            if (dBox) dBox.style.display = day ? 'flex' : 'none';
+            if (label) label.innerText = day ? '날짜' : '월';
+            if (hint) hint.innerText = day ? '같은 날짜를 다시 저장하면 덮어씁니다.' : '같은 달을 다시 저장하면 덮어씁니다.';
+
+            // 비어 있으면 오늘로 채워 둔다 (빈 칸이면 무엇을 고르는 중인지 알기 어렵다)
+            const now = new Date();
+            const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            if (day && !dEl.value) dEl.value = todayISO;
+            if (!day && !mEl.value) mEl.value = todayISO.slice(0, 7);
+
+            const t = document.getElementById('ms-date-text');
+            if (t) t.innerText = gMsDateLabel(dEl.value);
+
+            document.getElementById('ms-mode-month')?.classList.toggle('active', !day);
+            document.getElementById('ms-mode-day')?.classList.toggle('active', day);
+        }
+
+        // 지금 고른 칸의 키 (월이면 YYYY-MM, 일이면 YYYY-MM-DD)
+        function gManualSaleKey() {
+            return (msInputMode === 'day')
+                ? String(document.getElementById('ms-date')?.value || '').trim()
+                : String(document.getElementById('ms-month')?.value || '').trim();
+        }
+
+        function fIsDayKey(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
+
+        /* ===== [신규] 매출 내역 달력 =====
+           날짜별로 적어 둔 포스·계좌이체를 한 달치 달력으로 한눈에 본다.
+           달에 통째로 적어 둔 값(YYYY-MM)은 날짜가 없으므로 달력 위에 따로 적는다. */
+        let msCalMonth = '';   // 보고 있는 달 (YYYY-MM)
+
+        async function openManualSaleCalendar() {
+            await loadManualSales();
+            if (!fIsMonthKey(msCalMonth)) {
+                const k = gManualSaleKey();
+                msCalMonth = fToMonthKey(k) || fProfitMonthKey(new Date());
+            }
+            renderManualSaleCalendar();
+            const box = document.getElementById('ms-cal-modal');
+            if (box) box.style.display = 'flex';
+        }
+
+        function closeManualSaleCalendar() {
+            const box = document.getElementById('ms-cal-modal');
+            if (box) box.style.display = 'none';
+        }
+
+        function moveManualSaleCalendar(delta) {
+            const [y, m] = msCalMonth.split('-').map(n => parseInt(n));
+            const d = new Date(y, (m - 1) + delta, 1);
+            msCalMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            renderManualSaleCalendar();
+        }
+
+        // 달력의 날짜 칸을 누르면 그 날짜를 입력칸에 올려 고쳐 넣게 한다
+        function pickManualSaleDay(dateKey) {
+            setManualSaleMode('day');
+            const dEl = document.getElementById('ms-date');
+            if (dEl) dEl.value = dateKey;
+            { const t = document.getElementById("ms-date-text"); if (t) t.innerText = gMsDateLabel(dateKey); }   // 겉칸 글자도 맞춘다
+            const v = manualSales[dateKey] || {};
+            document.getElementById('ms-pos').value = (v.pos != null ? v.pos : '');
+            document.getElementById('ms-transfer').value = (v.transfer != null ? v.transfer : '');
+            closeManualSaleCalendar();
+            document.getElementById('ms-pos')?.focus();
+        }
+
+        function renderManualSaleCalendar() {
+            const box = document.getElementById('ms-cal-body');
+            const title = document.getElementById('ms-cal-title');
+            if (!box) return;
+            if (title) title.innerText = msCalMonth.replace('-', '년 ') + '월';
+
+            const [y, m] = msCalMonth.split('-').map(n => parseInt(n));
+            const first = new Date(y, m - 1, 1);
+            const lastDay = new Date(y, m, 0).getDate();
+            const lead = first.getDay();   // 1일이 무슨 요일인지 (0=일)
+            const now = new Date();
+            const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            let html = `<div class="ms-cal-grid">`
+                + ['일', '월', '화', '수', '목', '금', '토'].map(w => `<div class="ms-cal-head">${w}</div>`).join('');
+
+            for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty"></div>`;
+
+            let sumPos = 0, sumTr = 0, days = 0;
+            for (let d = 1; d <= lastDay; d++) {
+                const key = `${msCalMonth}-${String(d).padStart(2, '0')}`;
+                const v = manualSales[key];
+                const pos = v ? (parseInt(v.pos) || 0) : 0;
+                const tr = v ? (parseInt(v.transfer) || 0) : 0;
+                const has = !!v && (pos > 0 || tr > 0);
+                if (has) { sumPos += pos; sumTr += tr; days++; }
+                const dow = (lead + d - 1) % 7;
+                const cls = `ms-cal-cell${has ? ' has' : ''}${key === todayISO ? ' today' : ''}`
+                    + (dow === 0 ? ' ms-cal-sun' : dow === 6 ? ' ms-cal-sat' : '');
+                html += `<div class="${cls}" onclick="pickManualSaleDay('${key}')" title="${key} — 눌러서 고치기">`
+                    + `<div class="ms-cal-day">${d}</div>`
+                    + (has
+                        ? `${pos ? `<div style="color:#0284c7;">${gShortWon(pos)}</div>` : ''}`
+                          + `${tr ? `<div style="color:#7c3aed;">${gShortWon(tr)}</div>` : ''}`
+                        : '')
+                    + `</div>`;
+            }
+            html += `</div>`;
+
+            // 그 달에 통째로 적어 둔 값 (날짜가 없어 달력에 못 놓는다)
+            const mv = manualSales[msCalMonth];
+            const mPos = mv ? (parseInt(mv.pos) || 0) : 0;
+            const mTr = mv ? (parseInt(mv.transfer) || 0) : 0;
+            const monthRow = (mPos || mTr)
+                ? `<div style="margin-top:10px; padding:9px 11px; background:#fff7ed; border:1px solid #fed7aa; border-radius:9px; font-size:12px; font-weight:800; color:#9a3412; cursor:pointer;" onclick="pickManualSaleMonth('${msCalMonth}')" title="눌러서 고치기">`
+                    + `📅 이 달 전체로 적어 둔 값 &nbsp; 💳 ${mPos.toLocaleString()}원 &nbsp; 🏦 ${mTr.toLocaleString()}원</div>`
+                : '';
+
+            const total = sumPos + sumTr + mPos + mTr;
+            box.innerHTML = html + monthRow
+                + `<div style="margin-top:10px; padding:10px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:9px; font-size:12px; font-weight:800; color:#334155;">`
+                + `이 달 합계 &nbsp; <b style="color:#0f172a;">${total.toLocaleString()}원</b>`
+                + `<div style="margin-top:4px; font-weight:700; color:#64748b;">💳 포스 ${(sumPos + mPos).toLocaleString()}원 &nbsp;·&nbsp; 🏦 계좌이체 ${(sumTr + mTr).toLocaleString()}원 &nbsp;·&nbsp; 적어 둔 날 ${days}일</div>`
+                + `</div>`;
+        }
+
+        // 달 전체로 적어 둔 값을 고치러 갈 때
+        function pickManualSaleMonth(monthKey) {
+            setManualSaleMode('month');
+            const mEl = document.getElementById('ms-month');
+            if (mEl) mEl.value = monthKey;
+            const v = manualSales[monthKey] || {};
+            document.getElementById('ms-pos').value = (v.pos != null ? v.pos : '');
+            document.getElementById('ms-transfer').value = (v.transfer != null ? v.transfer : '');
+            closeManualSaleCalendar();
+        }
+
+        // 달력 칸은 좁아서 12,000원을 '1.2만'처럼 줄여 적는다
+        function gShortWon(n) {
+            const v = parseInt(n) || 0;
+            if (v >= 10000) {
+                const man = v / 10000;
+                return (man >= 100 ? Math.round(man) : Math.round(man * 10) / 10) + '만';
+            }
+            if (v >= 1000) return Math.round(v / 1000) + '천';
+            return v.toLocaleString();
+        }
+
         async function saveManualSale() {
-            const month = String(document.getElementById('ms-month')?.value || '').trim();
+            // [수정] 월(YYYY-MM)만 받던 것을 날짜(YYYY-MM-DD)도 받게 했다. 지금 고른 모드의 칸을 본다.
+            const key = gManualSaleKey();
             const pos = parseInt(document.getElementById('ms-pos')?.value || 0) || 0;
             const transfer = parseInt(document.getElementById('ms-transfer')?.value || 0) || 0;
 
-            if (!fIsMonthKey(month)) { showToast("월을 골라 주세요."); return; }
+            if (!fIsMonthKey(key) && !fIsDayKey(key)) {
+                showToast(msInputMode === 'day' ? "날짜를 골라 주세요." : "월을 골라 주세요.");
+                return;
+            }
             if (pos <= 0 && transfer <= 0) { showToast("포스나 계좌이체 금액을 넣어 주세요."); return; }
 
             showLoader("매출 저장 중...");
             try {
                 const body = { pos, transfer, updatedAt: Date.now() };
-                const res = await fetch(`${FIREBASE_DB_URL}manual_sales/${month}.json`, {
+                const res = await fetch(`${FIREBASE_DB_URL}manual_sales/${key}.json`, {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
                 });
                 if (!res.ok) throw new Error('저장 실패 ' + res.status);
-                manualSales[month] = body;
+                manualSales[key] = body;
                 document.getElementById('ms-pos').value = '';
                 document.getElementById('ms-transfer').value = '';
-                showToast(`${month} 매출 ${(pos + transfer).toLocaleString()}원 저장`);
+                showToast(`${key} 매출 ${(pos + transfer).toLocaleString()}원 저장`);
                 renderProfitReport();
+                // 달력을 열어 둔 채로 저장했으면 그 자리도 바로 갱신한다
+                const cal = document.getElementById('ms-cal-modal');
+                if (cal && cal.style.display === 'flex') renderManualSaleCalendar();
             } catch (e) {
                 console.error(e);
                 showToast("저장 실패: " + e.message);
@@ -18033,6 +19160,151 @@
         }
 
         // 최근 입력한 것부터 보여 준다
+
+        /* ===== [신규] 잔액 보정 — 입력 창 / 내역 창 =====
+           prompt·confirm 창은 이 화면에서 막혀 있어(눌러도 아무 일이 없다) 쓰지 않는다.
+           칸에 직접 적고, 지울 때는 한 번 더 눌러 확인받는다. */
+
+        // 보정 입력 창. month를 주면 그 달 값을 올려 고치는 상태로 연다.
+        async function openProfitAdjust(month) {
+            await loadProfitAdjustments();
+            const m = month || fProfitMonthKey(new Date());
+            const cur = profitAdjustments[m] || {};
+            const box = document.getElementById('profit-adj-modal');
+            if (!box) return;
+            document.getElementById('padj-month').value = m;
+            document.getElementById('padj-amount').value = (cur.amount != null ? cur.amount : '');
+            document.getElementById('padj-memo').value = cur.memo || '';
+            box.style.display = 'flex';
+            renderProfitAdjHint();
+        }
+
+        function closeProfitAdjust() {
+            const box = document.getElementById('profit-adj-modal');
+            if (box) box.style.display = 'none';
+        }
+
+        /* 그 달의 계산값과 보정 뒤 값을 미리 보여 준다.
+           숫자만 적어 놓으면 얼마가 되는지 몰라 되레 헷갈린다. */
+        function renderProfitAdjHint() {
+            const el = document.getElementById('padj-hint');
+            if (!el) return;
+            const m = String(document.getElementById('padj-month')?.value || '');
+            const amt = parseInt(String(document.getElementById('padj-amount')?.value || '').replace(/[^\d-]/g, '')) || 0;
+            if (!fIsMonthKey(m)) { el.innerText = '월을 골라 주세요.'; return; }
+
+            const sale = gProfitSaleOfMonth(m), buy = gProfitBuyOfMonth(m);
+            const raw = sale - buy;
+            el.innerHTML = `${m.replace('-', '년 ')}월 &nbsp;계산 잔액 <b>${raw.toLocaleString()}원</b>`
+                + ` &nbsp;→&nbsp; 보정 뒤 <b style="color:${(raw + amt) >= 0 ? '#15803d' : '#dc2626'};">${(raw + amt).toLocaleString()}원</b>`;
+        }
+
+        async function saveProfitAdjust() {
+            const m = String(document.getElementById('padj-month')?.value || '').trim();
+            const raw = String(document.getElementById('padj-amount')?.value || '').trim();
+            const memo = String(document.getElementById('padj-memo')?.value || '').trim();
+
+            if (!fIsMonthKey(m)) { showToast("월을 골라 주세요."); return; }
+            const amount = parseInt(raw.replace(/[^\d-]/g, ''));
+            if (raw === '' || isNaN(amount)) { showToast("보정 금액을 넣어 주세요. (마이너스도 됩니다)"); return; }
+
+            showLoader("보정 저장 중...");
+            try {
+                if (amount === 0) {
+                    // 0원 보정은 남겨 둘 이유가 없다. 있던 것도 지운다.
+                    await fetch(`${FIREBASE_DB_URL}profit_adjustments/${m}.json`, { method: 'DELETE' });
+                    delete profitAdjustments[m];
+                    showToast(`${m} 보정을 지웠습니다. (0원)`);
+                } else {
+                    const body = { amount, memo, updatedAt: Date.now() };
+                    const res = await fetch(`${FIREBASE_DB_URL}profit_adjustments/${m}.json`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                    });
+                    if (!res.ok) throw new Error('저장 실패 ' + res.status);
+                    profitAdjustments[m] = body;
+                    showToast(`${m} 잔액 보정 ${amount > 0 ? '+' : ''}${amount.toLocaleString()}원 저장`);
+                }
+                closeProfitAdjust();
+                renderProfitReport();
+            } catch (e) {
+                console.error('보정 저장 실패:', e);
+                showToast("보정 저장 실패: " + e.message);
+            } finally { hideLoader(); }
+        }
+
+        // ── 보정 내역 창
+        async function openProfitAdjustList() {
+            await loadProfitAdjustments();
+            const box = document.getElementById('profit-adj-list-modal');
+            if (!box) return;
+            renderProfitAdjList();
+            box.style.display = 'flex';
+        }
+
+        function closeProfitAdjustList() {
+            const box = document.getElementById('profit-adj-list-modal');
+            if (box) box.style.display = 'none';
+        }
+
+        let padjDelArmed = '';
+        function askDeleteProfitAdjust(month) {
+            if (padjDelArmed !== month) {
+                padjDelArmed = month;
+                renderProfitAdjList();
+                setTimeout(() => { if (padjDelArmed === month) { padjDelArmed = ''; renderProfitAdjList(); } }, 6000);
+                return;
+            }
+            padjDelArmed = '';
+            deleteProfitAdjust(month);
+        }
+
+        async function deleteProfitAdjust(month) {
+            showLoader("삭제 중...");
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}profit_adjustments/${month}.json`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('삭제 실패 ' + res.status);
+                delete profitAdjustments[month];
+                showToast(`${month} 보정을 지웠습니다.`);
+                renderProfitAdjList();
+                renderProfitReport();
+            } catch (e) {
+                console.error('보정 삭제 실패:', e);
+                showToast("삭제 실패: " + e.message);
+            } finally { hideLoader(); }
+        }
+
+        // 내역 창에서 한 줄을 눌러 고치기 (입력 창을 그 달 값으로 연다)
+        function editProfitAdjust(month) {
+            closeProfitAdjustList();
+            openProfitAdjust(month);
+        }
+
+        function renderProfitAdjList() {
+            const box = document.getElementById('profit-adj-list');
+            if (!box) return;
+            const keys = Object.keys(profitAdjustments || {}).filter(k => fIsMonthKey(k)).sort((a, b) => b.localeCompare(a));
+            if (keys.length === 0) {
+                box.innerHTML = `<div style="padding:26px 0; text-align:center; color:#94a3b8; font-size:13px; font-weight:700;">보정한 내역이 없습니다.</div>`;
+                return;
+            }
+            box.innerHTML = keys.map(m => {
+                const v = profitAdjustments[m] || {};
+                const amt = parseInt(v.amount) || 0;
+                const armed = (padjDelArmed === m);
+                return `
+                <div style="display:flex; align-items:center; gap:8px; padding:9px 2px; border-bottom:1px solid #f1f5f9;">
+                    <div style="flex:1 1 0; min-width:0;">
+                        <div style="font-size:13px; font-weight:900; color:#0f172a;">${m.replace('-', '년 ')}월
+                            <span style="margin-left:6px; color:${amt >= 0 ? '#15803d' : '#dc2626'};">${amt > 0 ? '+' : ''}${amt.toLocaleString()}원</span>
+                        </div>
+                        ${v.memo ? `<div style="margin-top:3px; font-size:11.5px; font-weight:700; color:#64748b; word-break:break-all;">${gEscapeHtml(v.memo)}</div>` : ''}
+                    </div>
+                    <button type="button" onclick="editProfitAdjust('${m}')" style="flex:0 0 auto; padding:5px 10px; border:1px solid #bfdbfe; background:#eff6ff; color:#2563eb; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">수정</button>
+                    <button type="button" onclick="askDeleteProfitAdjust('${m}')" style="flex:0 0 auto; padding:5px 10px; border:1px solid ${armed ? '#dc2626' : '#fca5a5'}; background:${armed ? '#dc2626' : '#fef2f2'}; color:${armed ? '#fff' : '#ef4444'}; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${armed ? '한 번 더' : '삭제'}</button>
+                </div>`;
+            }).join('');
+        }
+
         function renderManualSalesList() {
             const box = document.getElementById('ms-list');
             if (!box) return;
@@ -18063,21 +19335,72 @@
 
         function setProfitRange(kind) {
             profitRangeKind = kind;
+
+            // [신규] '직접'을 골랐을 때만 달 고르는 칸이 아랫줄에 나온다
+            const row = document.getElementById('profit-custom-row');
+            if (row) row.style.display = (kind === 'custom') ? '' : 'none';
+
+            if (kind === 'custom') {
+                // 처음 누르면 빈 칸이라 무엇을 고르는 중인지 알기 어렵다. 이번 달로 채워 둔다.
+                const nowKey = fProfitMonthKey(new Date());
+                const f = document.getElementById('profit-from-month');
+                const t = document.getElementById('profit-to-month');
+                if (f && !f.value) f.value = profitCustomFrom || nowKey;
+                if (t && !t.value) t.value = profitCustomTo || nowKey;
+                profitCustomFrom = f ? String(f.value || '') : '';
+                profitCustomTo = t ? String(t.value || '') : '';
+            }
+
+            paintProfitRangeButtons();
             renderProfitReport();
+        }
+
+        // [신규] '직접'에서 달을 고쳤을 때. 거꾸로 골랐으면 말없이 바로잡는다.
+        function onProfitCustomMonthChange() {
+            const f = document.getElementById('profit-from-month');
+            const t = document.getElementById('profit-to-month');
+            profitCustomFrom = f ? String(f.value || '') : '';
+            profitCustomTo = t ? String(t.value || '') : '';
+
+            if (profitCustomFrom && profitCustomTo && profitCustomFrom > profitCustomTo) {
+                const tmp = profitCustomFrom; profitCustomFrom = profitCustomTo; profitCustomTo = tmp;
+                if (f) f.value = profitCustomFrom;
+                if (t) t.value = profitCustomTo;
+            }
+
+            profitRangeKind = 'custom';
+            paintProfitRangeButtons();
+            renderProfitReport();
+        }
+
+        // [신규] 지금 보고 있는 기간 버튼에 색을 넣는다 ('🔄 갱신'은 기간이 아니므로 뺀다)
+        function paintProfitRangeButtons() {
+            document.querySelectorAll('.profit-range-btn[data-range]').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-range') === profitRangeKind);
+            });
         }
 
         function fProfitMonthKey(d) {
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         }
 
-        // 고른 기간의 시작 달(YYYY-MM). 'all'이면 자료에 있는 가장 이른 달.
+        // 고른 기간의 시작 달(YYYY-MM).
         function getProfitFromMonth(allMonths) {
             const now = new Date();
+            if (profitRangeKind === 'custom') {
+                return profitCustomFrom || (allMonths.length ? allMonths[0] : fProfitMonthKey(now));
+            }
             if (profitRangeKind === 'year') return `${now.getFullYear()}-01`;
-            if (profitRangeKind === 'all') return allMonths.length ? allMonths[0] : fProfitMonthKey(now);
-            const n = profitRangeKind === '3m' ? 2 : profitRangeKind === '12m' ? 11 : 5;  // 이번 달 포함
+            if (profitRangeKind === 'month') return fProfitMonthKey(now);   // 이번 달만
+            const n = profitRangeKind === '3m' ? 2 : 5;   // 이번 달 포함해서 3개월 / 6개월
             const from = new Date(now.getFullYear(), now.getMonth() - n, 1);
             return fProfitMonthKey(from);
+        }
+
+        // [신규] 고른 기간의 끝 달. '직접'만 끝을 정하고, 나머지는 이번 달까지 다 본다.
+        function getProfitToMonth() {
+            if (profitRangeKind === 'custom' && profitCustomTo) return profitCustomTo;
+            return '9999-99';
         }
 
         async function renderProfitReport() {
@@ -18085,7 +19408,7 @@
             const sumBox = document.getElementById('profit-summary');
             if (!tbody || !sumBox) return;
 
-            tbody.innerHTML = `<tr><td colspan="7" style="padding:30px; text-align:center; color:#64748b; font-weight:700;">불러오는 중…</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="99" style="padding:30px; text-align:center; color:#64748b; font-weight:700;">불러오는 중…</td></tr>`;
 
             // [매입] 덩치가 큰 저장함(661건)은 IndexedDB 캐시에서만 읽는다. 서버 표식이 같으면 아예 안 받는다.
             //  최근 10일치는 몇 KB밖에 안 되므로 캐시 없이 그냥 받아 쓴다.
@@ -18096,12 +19419,15 @@
 
             // [매출] 사장님이 적은 포스·계좌이체만 센다 (주문서 안의 주문 자료는 쓰지 않는다)
             await loadManualSales();
+            await loadProfitAdjustments();   // [신규] 잔액 보정 값
             renderManualSalesList();
 
             // [신규] 입력칸의 월은 비어 있으면 이번 달로 채워 둔다 (대개 이번 달을 적으므로)
             {
                 const mEl = document.getElementById('ms-month');
                 if (mEl && !mEl.value) mEl.value = fProfitMonthKey(new Date());
+                // [신규] 월/일 버튼 상태를 화면에 반영한다 (처음 열 때는 월)
+                setManualSaleMode(msInputMode);
             }
 
             const posByMonth = new Map(), trByMonth = new Map();
@@ -18134,56 +19460,114 @@
             const allMonths = [...new Set([...saleByMonth.keys(), ...buyByMonth.keys()])]
                 .filter(m => m >= PROFIT_BUY_FROM_MONTH).sort();
             const fromM = getProfitFromMonth(allMonths);
-            const months = allMonths.filter(m => m >= fromM).sort((a, b) => b.localeCompare(a)); // 최근 달 먼저
+            const toM = getProfitToMonth();   // [신규] '직접'이면 끝 달까지만 센다
+            const months = allMonths.filter(m => m >= fromM && m <= toM).sort((a, b) => b.localeCompare(a)); // 최근 달 먼저
+
+            paintProfitRangeButtons();   // [신규] 지금 보고 있는 기간 버튼에 색
 
             const label = document.getElementById('profit-range-label');
             if (label) {
-                const kindLabel = { '3m': '최근 3개월', '6m': '최근 6개월', '12m': '최근 12개월', year: '올해', all: '전체' }[profitRangeKind] || '';
+                let kindLabel = { month: '이번 달', '3m': '3개월', '6m': '6개월', year: '올해', custom: '직접' }[profitRangeKind] || '';
+                // [신규] '직접'은 고른 기간을 그대로 보여 준다. 자료가 없을 때도 무엇을 골랐는지 남는다.
+                if (profitRangeKind === 'custom' && (profitCustomFrom || profitCustomTo)) {
+                    kindLabel = `직접 ${profitCustomFrom || '처음'} ~ ${profitCustomTo || '끝'}`;
+                }
                 label.innerText = months.length
                     ? `${kindLabel} · ${months[months.length - 1]} ~ ${months[0]} (${months.length}개월)`
                     : `${kindLabel} · 자료 없음`;
             }
 
-            let tSale = 0, tBuy = 0;
-            months.forEach(m => { tSale += (saleByMonth.get(m) || 0); tBuy += (buyByMonth.get(m) || 0); });
-            const tLeft = tSale - tBuy;
+            // [신규] 보정 창에서도 '이 달 계산 잔액'을 보여 줘야 해서 계산 결과를 남겨 둔다
+            _profitSaleByMonth = saleByMonth;
+            _profitBuyByMonth = buyByMonth;
+
+            let tSale = 0, tBuy = 0, tAdj = 0;
+            months.forEach(m => {
+                tSale += (saleByMonth.get(m) || 0);
+                tBuy += (buyByMonth.get(m) || 0);
+                tAdj += gProfitAdjOf(m);            // [신규] 손으로 적어 둔 잔액 보정
+            });
+            const tLeft = tSale - tBuy + tAdj;
             const tRate = tSale > 0 ? (tLeft / tSale * 100) : 0;
 
-            let tPos = 0, tTr = 0;
-            months.forEach(m => { tPos += (posByMonth.get(m) || 0); tTr += (trByMonth.get(m) || 0); });
+            /* [수정] 왼쪽 위부터 매입 → 매출 → 잔액 → 마진률 차례로 놓는다.
+               돈이 나가고(매입) 들어와(매출) 남는 순서라 눈으로 따라가기 쉽다.
+               [신규] 잔액 칸에는 ✏️(보정하기) · 📜(보정 내역) 버튼을 붙인다.
+               계산으로 나온 잔액이 실제와 안 맞을 때 차액을 적어 두는 자리다. */
+            const adjBtns = `<span style="display:inline-flex; gap:4px; margin-left:6px; vertical-align:middle;">`
+                + `<button type="button" onclick="openProfitAdjust()" title="잔액을 보정합니다" style="padding:2px 6px; border:1px solid #bfdbfe; background:#eff6ff; color:#2563eb; border-radius:6px; font-size:10.5px; font-weight:800; cursor:pointer; line-height:1.5;">✏️ 보정</button>`
+                + `<button type="button" onclick="openProfitAdjustList()" title="보정한 내역을 봅니다" style="padding:2px 6px; border:1px solid #e2e8f0; background:#f8fafc; color:#475569; border-radius:6px; font-size:10.5px; font-weight:800; cursor:pointer; line-height:1.5;">📜 내역</button>`
+                + `</span>`;
+            // 보정이 걸려 있으면 잔액 아래에 얼마가 더해졌는지 밝혀 둔다 (숫자가 왜 다른지 알 수 있게)
+            const adjNote = tAdj !== 0
+                ? `<div style="margin-top:3px; font-size:10.5px; font-weight:800; color:#7c3aed;">보정 ${tAdj > 0 ? '+' : ''}${tAdj.toLocaleString()}원 포함</div>`
+                : '';
 
             sumBox.innerHTML = [
-                { l: '매출 (포스+계좌)', v: tSale.toLocaleString() + '원', c: '#0284c7' },
-                { l: '매입 (발주금액)', v: tBuy.toLocaleString() + '원', c: '#d97706' },
-                { l: '남은 돈', v: tLeft.toLocaleString() + '원', c: tLeft >= 0 ? '#15803d' : '#dc2626' },
-                { l: '매출 대비 비율', v: (tSale > 0 ? tRate.toFixed(1) + '%' : '-'), c: tLeft >= 0 ? '#15803d' : '#dc2626' }
-            ].map(x => `<div class="po-calc-cell"><div class="po-calc-label">${x.l}</div><div class="po-calc-val" style="color:${x.c};">${x.v}</div></div>`).join('');
+                { l: '매입', v: tBuy.toLocaleString() + '원', c: '#d97706' },
+                { l: '매출 (계좌+포스)', v: tSale.toLocaleString() + '원', c: '#0284c7' },
+                { l: '잔액' + adjBtns, v: tLeft.toLocaleString() + '원', c: tLeft >= 0 ? '#15803d' : '#dc2626', note: adjNote },
+                { l: '마진률', v: (tSale > 0 ? tRate.toFixed(1) + '%' : '-'), c: tLeft >= 0 ? '#15803d' : '#dc2626' }
+            ].map(x => `<div class="po-calc-cell"><div class="po-calc-label" style="white-space:normal;">${x.l}</div><div class="po-calc-val" style="color:${x.c};">${x.v}</div>${x.note || ''}</div>`).join('');
 
+            // [수정] '💳 포스 0원 · 🏦 계좌이체 0원' 줄은 뺐다.
+            //  아래 월별 표에 달마다 계좌이체·포스가 따로 나오므로 같은 말이 두 번이었다.
             const bd = document.getElementById('profit-breakdown');
-            if (bd) bd.innerHTML = `💳 포스 <b style="color:#0284c7;">${tPos.toLocaleString()}원</b> &nbsp;·&nbsp; 🏦 계좌이체 <b style="color:#7c3aed;">${tTr.toLocaleString()}원</b>`
-                + `<div style="margin-top:5px; color:#94a3b8; font-weight:700;">${PROFIT_BUY_FROM_MONTH.replace('-', '년 ')}월부터 셉니다. 그 전 발주는 빠진 자료가 많아 제외했습니다.</div>`;
+            if (bd) bd.innerHTML = `${PROFIT_BUY_FROM_MONTH.replace('-', '년 ')}월부터 셉니다. 그 전 발주는 빠진 자료가 많아 제외했습니다.`;
 
             if (months.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="padding:30px; text-align:center; color:#94a3b8; font-weight:700;">이 기간에 자료가 없습니다.</td></tr>`;
+                // [수정] 표를 가로로 눕히면서 칸 수가 달 수에 따라 달라진다.
+                //  자료가 없으면 칸 이름줄도 비워야 '항목' 옆에 빈 달칸이 남지 않는다.
+                { const hr = document.getElementById('profit-thead-row'); if (hr) hr.innerHTML = ''; }
+                tbody.innerHTML = `<tr><td colspan="99" style="padding:30px; text-align:center; color:#94a3b8; font-weight:700;">이 기간에 자료가 없습니다.</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = months.map(m => {
-                const p = posByMonth.get(m) || 0;
-                const t = trByMonth.get(m) || 0;
-                const s = saleByMonth.get(m) || 0;
-                const b = buyByMonth.get(m) || 0;
-                const left = s - b;
-                const rate = s > 0 ? (left / s * 100) : 0;
+            /* [수정] 달을 세로로 쌓던 표를 가로로 눕혔다.
+               달이 늘수록 오른쪽으로 길어지므로 항목 이름칸(맨 왼쪽)은 가로로 밀어도
+               자리에 붙어 있게 고정한다(sticky). 그래야 어느 줄을 보고 있는지 안 잃는다.
+               테두리는 tr이 아니라 td에 준다 — border-collapse 표에서는 붙박이(sticky) 칸이
+               tr에 준 테두리를 덮어 버려 줄이 끊겨 보인다. */
+            const stickyHead = 'position:sticky; left:0; z-index:2; background:#f8fafc;';
+            const stickyCell = 'position:sticky; left:0; z-index:1; background:#fff;';
+            const cellLine = 'border-bottom:1px solid #f1f5f9;';
+
+            const headRow = document.getElementById('profit-thead-row');
+            if (headRow) {
+                headRow.innerHTML =
+                    `<th style="padding:9px 10px 9px 7px; white-space:nowrap; ${stickyHead}">항목</th>`
+                    + months.map(m => `<th style="padding:9px 10px; text-align:right; white-space:nowrap;">${m.replace('-', '년 ')}월</th>`).join('');
+            }
+
+            // 달마다 이 값이 얼마나 남았는지 (매출-매입). 잔액·마진률이 같이 쓴다.
+            // [수정] 잔액에 손으로 적어 둔 보정을 더한다 (요약칸과 같은 값이 나오도록)
+            const fLeftOf = m => (saleByMonth.get(m) || 0) - (buyByMonth.get(m) || 0) + gProfitAdjOf(m);
+
+            /* 세로줄로 세울 항목들. 값 뽑는 법(v)과 글자색(c)·굵기(w)를 함께 적어 둔다.
+               [수정] 매입 → 매출 → 잔액 → 마진률 차례. 위 요약칸과 순서를 맞췄다.
+               계좌이체·포스는 '매출 합계'를 쪼갠 것일 뿐이라 매출 바로 아래에
+               한 칸 들여써서 딸린 줄로 보이게 둔다 (sub: true). */
+            const rows = [
+                { l: '매입',           w: 800, c: () => '#d97706', v: m => (buyByMonth.get(m) || 0).toLocaleString() },
+                { l: '매출 합계',       w: 900, c: () => '#0f172a', v: m => (saleByMonth.get(m) || 0).toLocaleString() },
+                { l: '🏦 계좌이체',     w: 700, c: () => '#7c3aed', sub: true, v: m => (trByMonth.get(m) || 0).toLocaleString() },
+                { l: '💳 포스',        w: 700, c: () => '#0284c7', sub: true, v: m => (posByMonth.get(m) || 0).toLocaleString() },
+                { l: '보정',           w: 800, c: m => gProfitAdjOf(m) >= 0 ? '#7c3aed' : '#dc2626', sub: true, v: m => { const a = gProfitAdjOf(m); return a ? (a > 0 ? '+' : '') + a.toLocaleString() : '-'; } },
+                { l: '잔액',           w: 900, c: m => fLeftOf(m) >= 0 ? '#15803d' : '#dc2626', v: m => fLeftOf(m).toLocaleString() },
+                { l: '마진률',         w: 800, c: m => fLeftOf(m) >= 0 ? '#15803d' : '#dc2626',
+                  v: m => { const s = saleByMonth.get(m) || 0; return s > 0 ? (fLeftOf(m) / s * 100).toFixed(1) + '%' : '-'; } }
+            ];
+
+            tbody.innerHTML = rows.map(r => {
+                // 딸린 줄은 이름을 한 칸 들여쓰고 글씨를 흐리게 해서 위 줄에 속한 것임을 보인다
+                const nameStyle = r.sub
+                    ? `padding:8px 10px 8px 20px; font-weight:700; font-size:12px; color:#64748b;`
+                    : `padding:9px 10px 9px 7px; font-weight:800; color:#334155;`;
+                const valPad = r.sub ? 'padding:8px 10px; font-size:12px;' : 'padding:9px 10px;';
                 return `
-                <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:9px 7px; font-weight:800; color:#334155; white-space:nowrap;">${m.replace('-', '년 ')}월</td>
-                    <td style="padding:9px 7px; text-align:right; font-weight:700; color:#0284c7; white-space:nowrap;">${p.toLocaleString()}</td>
-                    <td style="padding:9px 7px; text-align:right; font-weight:700; color:#7c3aed; white-space:nowrap;">${t.toLocaleString()}</td>
-                    <td style="padding:9px 7px; text-align:right; font-weight:900; color:#0f172a; white-space:nowrap;">${s.toLocaleString()}</td>
-                    <td style="padding:9px 7px; text-align:right; font-weight:800; color:#d97706; white-space:nowrap;">${b.toLocaleString()}</td>
-                    <td style="padding:9px 7px; text-align:right; font-weight:900; color:${left >= 0 ? '#15803d' : '#dc2626'}; white-space:nowrap;">${left.toLocaleString()}</td>
-                    <td style="padding:9px 7px; text-align:right; font-weight:800; color:${left >= 0 ? '#15803d' : '#dc2626'}; white-space:nowrap;">${s > 0 ? rate.toFixed(1) + '%' : '-'}</td>
+                <tr>
+                    <td style="${nameStyle} white-space:nowrap; ${cellLine} ${stickyCell}">${r.sub ? '└ ' : ''}${r.l}</td>
+                    ${months.map(m => `<td style="${valPad} text-align:right; font-weight:${r.w}; color:${r.c(m)}; white-space:nowrap; ${cellLine}">${r.v(m)}</td>`).join('')}
                 </tr>`;
             }).join('');
 
@@ -18275,6 +19659,34 @@
             const po = found.item;
             if (txt) txt.innerText = `${po.productCode || ''} ${po.itemName || ''} · ${po.date || ''}`.trim();
             bar.classList.add('show');
+        }
+
+        /* [신규] 고른 발주를 그대로 베껴 '새 발주'로 적어 준다.
+           같은 상품을 또 들여올 때 업체·상품명·입수량·단가를 매번 다시 치지 않아도 된다.
+           수정과 다른 점은 editing-id 를 비워 둔다는 것 — 저장하면 원래 발주는 그대로 두고 한 건이 더 생긴다.
+           날짜만 오늘로 채운다. 베끼는 것은 대개 오늘 새로 넣는 발주다. */
+        function copySelectedPurchase() {
+            if (!selectedPurchaseId) return;
+            const found = findPurchaseById(selectedPurchaseId);
+            if (!found) { showToast("발주 내역을 찾지 못했습니다."); return; }
+            const item = found.item;
+
+            clearPurchaseSelection();
+            resetPurchaseOrderForm();   // 수정 모드였다면 풀고 새 발주 상태로 되돌린다 (날짜도 오늘로 채워진다)
+
+            { const el = document.getElementById('purchase-product-code'); if (el) el.value = item.productCode || ""; }
+            document.getElementById('purchase-supplier').value = item.supplier || "";
+            document.getElementById('purchase-item-name').value = item.itemName || "";
+            document.getElementById('purchase-qty').value = item.qty || "";
+            document.getElementById('purchase-items-per-box').value = item.itemsPerBox || 1;
+            document.getElementById('purchase-unit-price').value = item.unitPrice || 0;
+            document.getElementById('purchase-sale-price').value = item.salePrice || "";
+
+            switchPurchaseSubTab('register');
+            onPurchaseCodeChange();
+            calcPurchaseTotal();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            showToast(`📄 '${item.itemName || ''}' 을(를) 베꼈습니다. 수량·단가를 확인하고 저장하세요.`);
         }
 
         function editSelectedPurchase() {
@@ -18786,7 +20198,112 @@
         </div>
     </div>
 
+    <!-- [신규] 주문 변경 기록 — 날짜별로 그날 손댄 내용을 본다 -->
+    <div id="order-log-modal" class="no-print" style="display:none; position:fixed; z-index:10003; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;" onclick="if(event.target===this) closeOrderLogs()">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:480px; max-height:86vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
+            <div style="padding:13px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;">
+                <button type="button" onclick="moveOrderLogDay(-1)" style="flex:0 0 auto; width:32px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">‹</button>
+                <div style="flex:1; text-align:center;">
+                    <div style="font-size:14px; font-weight:900; color:#0f172a;">📜 변경 기록</div>
+                    <div id="order-log-title" style="font-size:11.5px; font-weight:800; color:#94a3b8;"></div>
+                </div>
+                <button type="button" onclick="moveOrderLogDay(1)" style="flex:0 0 auto; width:32px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">›</button>
+                <span onclick="closeOrderLogs()" style="flex:0 0 auto; font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+            </div>
+            <div style="padding:10px 14px; border-bottom:1px solid #f1f5f9;">
+                <input type="text" id="log-search" oninput="onOrderLogSearch(this.value)" placeholder="🔍 고객명·상품명으로 찾기"
+                    style="width:100%; box-sizing:border-box; height:36px; padding:7px 11px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:12.5px; font-weight:700;">
+                <div style="margin-top:6px; font-size:11px; font-weight:700; color:#94a3b8;">30일치까지 남습니다. 그 전 기록은 자동으로 지워집니다.</div>
+            </div>
+            <div id="order-log-body" style="overflow-y:auto; padding:10px 14px 14px; -webkit-overflow-scrolling:touch;"></div>
+        </div>
+    </div>
+
+    <!-- [신규] 매출 내역 달력 — 날짜별 포스·계좌이체를 한 달치로 본다 -->
+    <div id="ms-cal-modal" class="no-print" style="display:none; position:fixed; z-index:10002; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;" onclick="if(event.target===this) closeManualSaleCalendar()">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:460px; max-height:86vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
+            <div style="padding:13px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <button type="button" onclick="moveManualSaleCalendar(-1)" style="flex:0 0 auto; width:32px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">‹</button>
+                <div id="ms-cal-title" style="flex:1; text-align:center; font-size:15px; font-weight:900; color:#0f172a;"></div>
+                <button type="button" onclick="moveManualSaleCalendar(1)" style="flex:0 0 auto; width:32px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">›</button>
+                <span onclick="closeManualSaleCalendar()" style="flex:0 0 auto; font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1; margin-left:2px;">&times;</span>
+            </div>
+            <div style="padding:8px 14px 0; font-size:11px; font-weight:700; color:#94a3b8;">
+                💳 포스 · 🏦 계좌이체 &nbsp;/&nbsp; 날짜를 누르면 그 날 값을 고칠 수 있습니다.
+            </div>
+            <div id="ms-cal-body" style="overflow-y:auto; padding:10px 14px 14px; -webkit-overflow-scrolling:touch;"></div>
+        </div>
+    </div>
+
     <!-- [신규] 발주 등록 - 상품 찾기 창 -->
+    <!-- [신규] 잔액 보정 — 계산 잔액이 실제와 안 맞을 때 달마다 차액을 적어 둔다 -->
+    <div id="profit-adj-modal" class="no-print" style="display:none; position:fixed; z-index:10002; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;" onclick="if(event.target===this) closeProfitAdjust()">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:420px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
+            <div style="padding:14px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="font-size:15px; font-weight:900; color:#0f172a;">✏️ 잔액 보정</div>
+                <span onclick="closeProfitAdjust()" style="font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+            </div>
+            <div style="padding:12px 16px; font-size:11.5px; font-weight:700; color:#94a3b8; line-height:1.6; border-bottom:1px solid #f1f5f9;">
+                계산으로 나온 잔액에 <b>더할 금액</b>을 적습니다. 실제보다 적게 나왔으면 <b>+</b>, 많게 나왔으면 <b>-</b>로 적으세요.<br>
+                (예: 현금으로 산 물건, 반품·환불, 빠뜨린 발주)
+            </div>
+            <div style="padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+                <div>
+                    <label style="display:block; font-size:12px; font-weight:800; color:#475569; margin-bottom:5px;">📅 어느 달</label>
+                    <input type="month" id="padj-month" onchange="renderProfitAdjHint()" style="width:100%; box-sizing:border-box; height:42px; padding:8px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:14px; font-weight:800; background:#fff;">
+                </div>
+                <div>
+                    <label style="display:block; font-size:12px; font-weight:800; color:#475569; margin-bottom:5px;">💰 보정 금액 (원)</label>
+                    <input type="text" inputmode="text" id="padj-amount" oninput="renderProfitAdjHint()" placeholder="예: -50000 또는 30000" style="width:100%; box-sizing:border-box; height:42px; padding:8px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:14px; font-weight:800; background:#fff;">
+                </div>
+                <div>
+                    <label style="display:block; font-size:12px; font-weight:800; color:#475569; margin-bottom:5px;">📝 메모 (왜 보정했는지)</label>
+                    <input type="text" id="padj-memo" placeholder="예: 현금으로 산 야채값" style="width:100%; box-sizing:border-box; height:42px; padding:8px 11px; border:1.5px solid #cbd5e1; border-radius:10px; font-size:13px; font-weight:700; background:#fff;">
+                </div>
+                <div id="padj-hint" style="padding:9px 11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:9px; font-size:12px; font-weight:800; color:#475569;"></div>
+            </div>
+            <div style="padding:12px 16px; border-top:1px solid #e2e8f0; display:flex; gap:8px;">
+                <button type="button" onclick="closeProfitAdjust()" style="flex:1 1 0; min-width:0; padding:11px 8px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer;">취소</button>
+                <button type="button" onclick="saveProfitAdjust()" style="flex:1 1 0; min-width:0; padding:11px 8px; border:none; background:#10b981; color:#fff; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer;">💾 저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [신규] 보정 내역 -->
+    <div id="profit-adj-list-modal" class="no-print" style="display:none; position:fixed; z-index:10002; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;" onclick="if(event.target===this) closeProfitAdjustList()">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:440px; max-height:82vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
+            <div style="padding:14px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="font-size:15px; font-weight:900; color:#0f172a;">📜 잔액 보정 내역</div>
+                <span onclick="closeProfitAdjustList()" style="font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+            </div>
+            <div id="profit-adj-list" style="overflow-y:auto; padding:8px 14px; -webkit-overflow-scrolling:touch;"></div>
+            <div style="padding:12px 16px; border-top:1px solid #e2e8f0; display:flex; gap:8px;">
+                <button type="button" onclick="closeProfitAdjustList(); openProfitAdjust();" style="flex:1 1 0; min-width:0; padding:11px 8px; border:1.5px solid #bfdbfe; background:#eff6ff; color:#2563eb; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer;">＋ 보정 추가</button>
+                <button type="button" onclick="closeProfitAdjustList()" style="flex:1 1 0; min-width:0; padding:11px 8px; border:none; background:#475569; color:#fff; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer;">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [신규] 선반 관리 — 선반을 더하고, 이름을 고치고, 지운다.
+         '미지정'과 '품절'은 시스템이 쓰는 자리라 여기에 나오지 않는다. -->
+    <div id="shelf-manager-modal" class="no-print" style="display:none; position:fixed; z-index:10002; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;" onclick="if(event.target===this) closeShelfManager()">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:460px; max-height:84vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
+            <div style="padding:14px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="font-size:15px; font-weight:900; color:#0f172a;">⚙️ 선반 관리</div>
+                <span onclick="closeShelfManager()" style="font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+            </div>
+            <div style="padding:10px 16px; border-bottom:1px solid #f1f5f9; font-size:11.5px; font-weight:700; color:#94a3b8; line-height:1.6;">
+                이름을 눌러 고치고, ▲▼로 순서를 바꿉니다. 지우면 그 선반에 있던 상품은 <b>📦 미지정</b>으로 옮겨집니다.<br>
+                <b>📦 미지정</b>과 <b>⛔ 품절</b>은 시스템이 쓰는 자리라 여기서 바꿀 수 없습니다.
+            </div>
+            <div id="shelf-manager-list" style="overflow-y:auto; padding:10px 12px; -webkit-overflow-scrolling:touch;"></div>
+            <div style="padding:12px 16px; border-top:1px solid #e2e8f0; display:flex; gap:8px;">
+                <button type="button" onclick="addShelfRow()" style="flex:1 1 0; min-width:0; padding:11px 8px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer;">＋ 선반 추가</button>
+                <button type="button" onclick="saveShelfManager()" style="flex:1 1 0; min-width:0; padding:11px 8px; border:none; background:#10b981; color:#fff; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer;">💾 저장</button>
+            </div>
+        </div>
+    </div>
+
     <div id="product-picker-modal" class="no-print" style="display:none; position:fixed; z-index:10001; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;" onclick="if(event.target===this) closeProductPicker()">
         <div style="background:#fff; border-radius:16px; width:100%; max-width:560px; max-height:82vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
             <div style="padding:14px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
