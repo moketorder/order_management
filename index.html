@@ -8561,21 +8561,17 @@
             //  아파트명 + 동·호수만 한 줄로 보여 주고, 눌렀을 때만 전체 주소를 펼친다.
             const custAptName = custAddr ? extractApartmentName(custAddr) : '';
             const custAddrShort = [custAptName, custAddrDetail].filter(Boolean).join(' ') || custAddr;
-            // [신규] 공동현관 비번 — 배달기사가 적어 둔 값을 주소 밑에 함께 보여 준다.
-            //  전화로 "비번 뭐예요?" 물어볼 일을 줄인다. 없으면 줄 자체가 안 나온다.
-            const custPwd = custAddr ? gEntrancePwdFor(custAddr, custAddrDetail) : null;
-            const pwdChip = (label, val) => val
-                ? `<span style="display:inline-flex; align-items:center; gap:4px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:2px 7px; margin-right:4px;">`
-                  + `${label ? `<span style="font-size:10px; font-weight:800; color:#15803d;">${label}</span>` : ''}`
-                  + `<b style="font-size:12px; font-weight:900; color:#0f172a; letter-spacing:0.5px;">${gEscapeHtml(val)}</b></span>`
-                : '';
+            // [수정] 공동현관 비번 — 아파트 대표 비번이 아니라, 이 손님이 주문할 때
+            //  직접 적어 둔 값을 보여 준다. 같은 아파트라도 동·라인마다 달라서
+            //  대표 비번은 이 손님 집 앞에서 안 열리는 일이 잦았다. 없으면 줄이 안 나온다.
+            const custPwd = _pickRecent('entrance');
             const pwdHtml = custPwd ? `
-                <div style="margin-top:4px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; font-size:11.5px;">
+                <div style="margin-top:4px; display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:11.5px;">
                     <span style="flex:0 0 auto; color:#94a3b8;">🚪</span>
-                    ${custPwd.list.map(x => pwdChip(x.label, x.pwd)).join('')}
-                    <span style="font-size:10px; font-weight:700; color:#cbd5e1;">${gEscapeHtml(custPwd.apt)} ${gEscapeHtml(custPwd.dong)}</span>
+                    <span style="display:inline-flex; align-items:center; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:2px 8px;">
+                        <b style="font-size:12px; font-weight:900; color:#0f172a; letter-spacing:0.5px;">${gEscapeHtml(custPwd)}</b>
+                    </span>
                 </div>` : '';
-
             const addrHtml = (custAddr || custAddrDetail) ? `
                 <div style="margin-top:5px;">
                     <button type="button" class="cust-addr-btn" onclick="toggleCustAddrFull(this)" title="눌러서 전체 주소 보기">
@@ -8585,8 +8581,8 @@
                     </button>
                     <div id="cust-addr-full" style="display:none; margin-top:4px; font-size:11.5px; font-weight:700; color:#334155; line-height:1.5; word-break:break-all;">
                         ${gEscapeHtml(custAddr)}${custAddrDetail ? `<br>${gEscapeHtml(custAddrDetail)}` : ''}
+                        ${pwdHtml}
                     </div>
-                    ${pwdHtml}
                 </div>` : '';
 
             const topHtml = topItems.length ? topItems.map(([nm,v],i)=>`
@@ -8657,6 +8653,14 @@
                         </div>
                     </div>
                 </div>`;
+            // [수정] 아파트 동·호수 창(z-index 10050)에서 호수를 눌러 이 카드를 열면
+            //  카드가 뒤에 깔려 보이지 않았다. 지금 떠 있는 창보다 한 칸 위로 올린다.
+            //  (창을 닫으면 element 자체가 사라지므로, DOM에 남아 있는 것 = 열려 있는 것)
+            //  아파트 목록을 닫지 않고 위에 겹쳐 두어, 카드를 닫으면 보던 호수 자리로 돌아온다.
+            const _topZ = [...document.querySelectorAll('.summary-modal-overlay, .unpaid-modal-overlay')]
+                .filter(el => el !== modal)
+                .reduce((mx, el) => Math.max(mx, parseInt(getComputedStyle(el).zIndex, 10) || 0), 0);
+            if (_topZ >= 10000) modal.style.zIndex = String(_topZ + 10);
             document.body.appendChild(modal);
             renderCustTop();
             setTimeout(() => modal.classList.add('active'), 10);
@@ -9256,6 +9260,20 @@
         let uploadMaxAmount = 0;         // 최대금액 (0이면 상한 없음)
         let uploadProductOptions = [];   // 폼에 반영된 옵션 그룹 목록
         let uploadUseAgencyFee = false;  // 사다드림 대행료 사용 여부
+        /* [신규] 할인 — 판매가에서 몇 %를 깎아 팔지. 대행료 바로 아래 칸에서 켜고 끈다.
+           할인율만 저장하고 할인가는 그때그때 계산한다. 판매가를 고치면 할인가도 같이 따라가야 하는데,
+           할인가를 따로 저장해 두면 둘이 어긋나기 때문이다. */
+        let uploadUseDiscount = false;   // 할인 사용 여부
+        let uploadDiscountRate = 0;      // 할인율 (%, 1~100)
+
+        // 할인가 = 판매가에서 할인율만큼 뺀 값. 100원 단위로 버려서 끝자리를 깔끔하게 맞춘다.
+        //  (버림이라 손님이 내는 값은 항상 적어놓은 할인율 이상으로 깎인다)
+        function gDiscountedPrice(price, rate) {
+            const p = Math.max(0, parseInt(price) || 0);
+            const r = Math.min(100, Math.max(0, parseInt(rate) || 0));
+            if (p <= 0 || r <= 0) return p;
+            return Math.floor((p * (100 - r) / 100) / 100) * 100;
+        }
 
         /* [신규] 보관방법(냉동·냉장·상온). 상품 카드에 보관 뱃지로 나간다.
            ''이면 안 붙는다. 고른 버튼을 다시 누르면 해제된다. */
@@ -9375,6 +9393,9 @@
             uploadUsePersonLimit = false;
             uploadUseAmountLimit = false;
             uploadUseAgencyFee = false;
+            // [신규] 할인은 상품마다 다르므로 기본값으로 물려주지 않는다. 새 상품은 항상 꺼진 채로 시작.
+            uploadUseDiscount = false;
+            uploadDiscountRate = 0;
 
             uploadMaxPerPerson = parseInt(pl.max) || 0;
             uploadMinAmount = parseInt(al.min) || 0;
@@ -9463,11 +9484,13 @@
             // [수정] 대행료는 구간 개수가 아니라 규칙(기본료 또는 추가액)이 잡혀 있는지로 본다
             const _fr = gNormalizeAgencyRule(uploadAgencyFeeRule, uploadAgencyFeeTiers);
             const hasFeeRule = (_fr.baseFee > 0 || _fr.stepFee > 0);
-            const hasSetting = count > 0 || uploadUsePersonLimit || uploadUseAmountLimit || hasFeeRule;
+            const hasDiscount = (parseInt(uploadDiscountRate) || 0) > 0;
+            const hasSetting = count > 0 || uploadUsePersonLimit || uploadUseAmountLimit || hasFeeRule || hasDiscount;
             // '상세옵션 사용'이 꺼져 있으면 아래 기능이 전부 꺼진 것으로 본다
             const choiceOn = uploadUseChoiceOptions && count > 0;
             const isOn = uploadUseOptions
-                      && (choiceOn || uploadUsePersonLimit || uploadUseAmountLimit || (uploadUseAgencyFee && hasFeeRule));
+                      && (choiceOn || uploadUsePersonLimit || uploadUseAmountLimit || (uploadUseAgencyFee && hasFeeRule)
+                          || (uploadUseDiscount && hasDiscount));
 
             // [수정] 버튼 글자는 '상세옵션'으로 고정한다. 켜짐/꺼짐은 테두리·배경색으로 구분되므로
             //  'OFF' 같은 꼬리말을 붙이면 분류탭 버튼과 글자 수만 달라져 보기 어수선해진다.
@@ -9537,7 +9560,9 @@
                 maxAmount: uploadMaxAmount,
                 groups: JSON.parse(JSON.stringify(uploadProductOptions || [])),
                 useAgencyFee: uploadUseAgencyFee,
-                feeRule: gNormalizeAgencyRule(uploadAgencyFeeRule, uploadAgencyFeeTiers)
+                feeRule: gNormalizeAgencyRule(uploadAgencyFeeRule, uploadAgencyFeeTiers),
+                useDiscount: uploadUseDiscount,
+                discountRate: uploadDiscountRate
             };
 
             const old = document.getElementById('product-option-modal');
@@ -9619,6 +9644,13 @@
                 }
             }
 
+            // [신규] 할인을 켰는데 할인율이 비어 있으면 켠 의미가 없으므로 저장을 막는다
+            const draftRate = Math.min(100, Math.max(0, parseInt(optionModalDraft.discountRate) || 0));
+            if (optionModalDraft.useOptions && optionModalDraft.useDiscount && draftRate <= 0) {
+                showToast("할인율을 입력해 주세요.");
+                return;
+            }
+
             uploadUseOptions = !!optionModalDraft.useOptions;
             uploadUseChoiceOptions = !!optionModalDraft.useChoiceOptions;
             uploadUsePersonLimit = !!optionModalDraft.usePersonLimit;
@@ -9630,6 +9662,16 @@
             uploadUseAgencyFee = !!optionModalDraft.useAgencyFee;
             uploadAgencyFeeRule = feeRule;
             uploadAgencyFeeTiers = feeTiers;
+            uploadUseDiscount = !!optionModalDraft.useDiscount;
+            uploadDiscountRate = draftRate;
+
+            /* [신규] 할인 상품은 '오늘의 상품' 탭에만 걸리게 분류탭을 강제로 맞춘다.
+               특가는 그날 하루 미는 상품이라 다른 탭에 흩어져 있으면 눈에 안 띈다.
+               (끌 때는 되돌리지 않는다. 어디에 두고 싶은지는 사장님이 정할 몫이다.) */
+            if (uploadUseDiscount && uploadDiscountRate > 0 && uploadDisplayTab !== 'today-reserve') {
+                uploadDisplayTab = 'today-reserve';
+                if (typeof updateDisplayTabUI === 'function') updateDisplayTabUI();
+            }
 
             updateDetailOptionButtonUI();
             updatePriceFieldForAmountLimit();
@@ -9679,6 +9721,10 @@
                 else if (role === 'rule-step') optionModalDraft.feeRule.step = Math.max(1, v);
                 else if (role === 'rule-stepfee') optionModalDraft.feeRule.stepFee = v;
             });
+
+            // [신규] 할인율 (0~100 밖으로는 못 나가게 자른다)
+            const discEl = document.querySelector('#product-option-modal-body [data-discount-role="rate"]');
+            if (discEl) optionModalDraft.discountRate = Math.min(100, Math.max(0, parseInt(discEl.value) || 0));
         }
 
         function toggleDraftUseAgencyFee() {
@@ -9686,6 +9732,42 @@
             if (!optionModalDraft) return;
             optionModalDraft.useAgencyFee = !optionModalDraft.useAgencyFee;
             renderDetailOptionBody();
+        }
+
+        function toggleDraftUseDiscount() {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.useDiscount = !optionModalDraft.useDiscount;
+            renderDetailOptionBody();
+        }
+
+        // 할인율을 고치면 예상 가격을 다시 그린다
+        function refreshDiscountPreview() {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            const box = document.getElementById('discount-preview');
+            if (box) box.innerHTML = gDiscountPreviewHtml(optionModalDraft.discountRate);
+        }
+
+        /* 판매가 칸에 적힌 금액을 그대로 가져와 할인가를 보여준다.
+           금액 옵션을 켠 상품은 판매가 칸이 잠기고 0으로 저장되므로, 그때는 계산할 밑값이 없다고 알린다. */
+        function gDiscountPreviewHtml(rate) {
+            const r = Math.min(100, Math.max(0, parseInt(rate) || 0));
+            const dim = 'font-size:12px; font-weight:700; color:var(--text-sub); line-height:1.6;';
+            if (r <= 0) return `<div style="${dim}">할인율을 적으면 예상 가격이 여기에 나옵니다.</div>`;
+            if (uploadUseOptions && uploadUseAmountLimit) {
+                return `<div style="${dim}">금액 옵션을 쓰는 상품이라 판매가가 따로 없습니다.<br>주문자가 고른 옵션 합계에서 <b>${r}%</b>가 깎입니다.</div>`;
+            }
+            const price = parseInt((document.getElementById('productPrice') || {}).value) || 0;
+            if (price <= 0) return `<div style="${dim}">판매가를 먼저 적으면 <b>${r}%</b> 깎은 금액이 여기에 나옵니다.</div>`;
+            const now = gDiscountedPrice(price, r);
+            const cut = price - now;
+            return `<div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">`
+                + `<span style="font-size:13px; font-weight:700; color:#94a3b8; text-decoration:line-through;">${price.toLocaleString()}원</span>`
+                + `<span style="font-size:12px; font-weight:800; color:#94a3b8;">→</span>`
+                + `<b style="font-size:19px; font-weight:900; color:#dc2626;">${now.toLocaleString()}원</b>`
+                + `<span style="font-size:12px; font-weight:800; color:#dc2626;">(${cut.toLocaleString()}원 할인)</span>`
+                + `</div>`;
         }
 
         // 대행료 규칙을 고치면 미리보기를 다시 그린다
@@ -9795,6 +9877,7 @@
             const personOn = !!optionModalDraft.usePersonLimit;
             const minOn = !!optionModalDraft.useAmountLimit;
             const feeOn = !!optionModalDraft.useAgencyFee;
+            const discOn = !!optionModalDraft.useDiscount;
 
             // 1) 상세옵션 사용 여부 (끄면 아래 설정은 그대로 남기고 주문서에서만 옵션을 쓰지 않음)
             let html = `
@@ -9828,7 +9911,7 @@
                         <button type="button" onclick="toggleDraftUseChoiceOptions()" style="flex: 0 0 auto; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; border: 1.5px solid ${choiceOn ? '#7c3aed' : 'var(--border)'}; background: ${choiceOn ? '#7c3aed' : '#fff'}; color: ${choiceOn ? '#fff' : 'var(--text-sub)'};">${choiceOn ? 'ON' : 'OFF'}</button>
                     </div>
 
-                    <div style="margin-top: 12px; ${choiceOn ? '' : 'opacity: 0.45; pointer-events: none;'}">`;
+                    <div style="margin-top: 12px; display: ${choiceOn ? 'block' : 'none'};">`;
 
             // 2-1) 옵션 그룹 목록
             if (optionModalDraft.groups.length === 0) {
@@ -9970,7 +10053,7 @@
                         <button type="button" onclick="toggleDraftUseAgencyFee()" style="flex: 0 0 auto; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; border: 1.5px solid ${feeOn ? '#0284c7' : 'var(--border)'}; background: ${feeOn ? '#0284c7' : '#fff'}; color: ${feeOn ? '#fff' : 'var(--text-sub)'};">${feeOn ? 'ON' : 'OFF'}</button>
                     </div>
 
-                    <div style="margin-top: 12px; ${feeOn ? '' : 'opacity: 0.45; pointer-events: none;'}">`;
+                    <div style="margin-top: 12px; display: ${feeOn ? 'block' : 'none'};">`;
 
             // [수정] 구간을 하나씩 만들지 않고 '얼마 미만은 기본료 / 그 이상은 얼마당 얼마' 규칙으로 입력받는다
             const _r = gNormalizeAgencyRule(optionModalDraft.feeRule, null);
@@ -10005,6 +10088,40 @@
                         <div style="font-size: 11px; font-weight: 800; color: #0284c7; margin-bottom: 6px;">이렇게 붙습니다</div>
                         <div id="agency-fee-preview" style="font-size: 12px; font-weight: 700;">${gAgencyFeePreviewHtml(_r)}</div>
                     </div>
+                    </div>
+                </div>`;
+
+            // 5) 할인 (대행료 바로 아래. 판매가에서 %만큼 깎아 판다)
+            html += `
+                <div style="border: 1.5px solid ${discOn ? '#dc2626' : 'var(--border)'}; background: ${discOn ? '#fef2f2' : '#f8fafc'}; border-radius: var(--radius-sub); padding: 14px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <div style="min-width: 0;">
+                            <div style="font-size: 13px; font-weight: 800; color: var(--text-main);">할인</div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-sub); margin-top: 4px; line-height: 1.5;">
+                                ${discOn
+                                    ? '판매가에서 아래 할인율만큼 깎인 금액으로 팔립니다.'
+                                    : '<b>꺼져 있습니다.</b> 할인율은 그대로 보관되고, 판매가에서 깎이지 않습니다.'}
+                            </div>
+                        </div>
+                        <button type="button" onclick="toggleDraftUseDiscount()" style="flex: 0 0 auto; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; border: 1.5px solid ${discOn ? '#dc2626' : 'var(--border)'}; background: ${discOn ? '#dc2626' : '#fff'}; color: ${discOn ? '#fff' : 'var(--text-sub)'};">${discOn ? 'ON' : 'OFF'}</button>
+                    </div>
+
+                    <div style="margin-top: 12px; display: ${discOn ? 'block' : 'none'};">
+                        <div style="background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius-sub); padding: 12px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="flex: 0 0 auto; font-size: 12px; font-weight: 800; color: var(--text-sub);">할인율</span>
+                                <input type="number" data-discount-role="rate" value="${parseInt(optionModalDraft.discountRate) || 0}" min="0" max="100" step="1" placeholder="예: 10"
+                                    oninput="refreshDiscountPreview()"
+                                    style="flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; font-weight: 800; outline: none; text-align: right;">
+                                <span style="flex: 0 0 auto; font-size: 13px; font-weight: 800; color: var(--text-sub);">%</span>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius-sub); padding: 10px 12px;">
+                            <div style="font-size: 11px; font-weight: 800; color: #dc2626; margin-bottom: 6px;">예상 가격</div>
+                            <div id="discount-preview">${gDiscountPreviewHtml(optionModalDraft.discountRate)}</div>
+                        </div>
+                        <div style="font-size: 11px; font-weight: 600; color: var(--text-sub); margin-top: 8px; line-height: 1.5;">할인가는 100원 단위로 버립니다. (예: 9,537원 → 9,500원)</div>
                     </div>
                 </div>
 
@@ -16165,6 +16282,24 @@
                     // [신규] 보관방법 뱃지. 주문서 상품카드에 뜨는 것과 같은 색으로 맞춰 둔다.
                     const storageBadge = gListStorageBadge(prod);
 
+                    /* [신규] 할인중 뱃지 + 할인가 표기.
+                       손님 화면과 같은 값을 보여 줘야 하므로 계산도 같은 식(gDiscountedPrice)을 쓴다.
+                       '상세옵션 사용'이 꺼진 상품은 할인도 적용되지 않으므로 여기서도 뱃지를 달지 않는다. */
+                    const _listUseOpt = (prod.useOptions === undefined || prod.useOptions === null)
+                        ? true : (prod.useOptions === true || prod.useOptions === 'true');
+                    const _listDiscRate = (_listUseOpt && (prod.useDiscount === true || prod.useDiscount === 'true'))
+                        ? Math.min(100, Math.max(0, parseInt(prod.discountRate) || 0)) : 0;
+                    const _listBasePrice = parseInt(prod.price) || 0;
+                    const _listSalePrice = gDiscountedPrice(_listBasePrice, _listDiscRate);
+                    const discountBadge = _listDiscRate > 0
+                        ? `<span title="할인 중인 상품입니다" style="font-size: 10px; font-weight: 800; background: #ffe4e6; color: #e11d48; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🏷️ 할인중 ${_listDiscRate}%</span>`
+                        : '';
+                    // 할인 상품은 할인가를 빨간색으로, 그 앞에 원래 가격을 흐린 취소선으로 둔다
+                    const priceHtml = _listDiscRate > 0
+                        ? `<span style="color:#94a3b8; text-decoration:line-through;">${_listBasePrice.toLocaleString()}원</span>`
+                          + `<span style="color:#e11d48; font-weight:800;">${_listSalePrice.toLocaleString()}원</span>`
+                        : `<span>${_listBasePrice.toLocaleString()}원</span>`;
+
                     /* [신규] 선택옵션 뱃지 — 옵션이 있는 상품에만 붙는다.
                        평소에는 '🎛️ 옵션(3)'처럼 항목 수만 보여 주고, 누르면 그 상품의 옵션 줄이 펴진다.
                        수량이 정해진 항목이 다 팔렸으면 뱃지를 빨갛게 해서 목록을 훑을 때 바로 눈에 띄게 한다.
@@ -16255,9 +16390,9 @@
                             </div>
                             <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                 ${prod.productCode ? `<span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${prod.productCode}</span>` : ``}
-                                <span>${parseInt(prod.price).toLocaleString()}원</span>
+                                ${priceHtml}
                                 ${stockText ? `<span style="color: var(--text-sub);">|</span><span>${stockText}</span>` : ``}
-                                ${storageBadge}${statusBadge}${optionBadge}
+                                ${storageBadge}${statusBadge}${discountBadge}${optionBadge}
                             </div>
                             ${optionPanel}
                         </div>
@@ -16667,7 +16802,11 @@
                     showReserve: showReserve,
                     showWeekly: showWeekly,
                     // [신규] 주문서에서 이 상품이 들어갈 탭. 빈 값이면 기존 방식(이름·분류로 판단)을 그대로 쓴다.
-                    displayTab: uploadDisplayTab || "",
+                    // [수정] 할인(특가) 상품은 저장할 때 한 번 더 '오늘의 상품'으로 못박는다.
+                    //  상세옵션을 저장한 뒤 분류탭을 다시 바꿔 놓았더라도 특가는 이 탭에 있어야 한다.
+                    displayTab: (uploadUseDiscount && uploadDiscountRate > 0)
+                        ? 'today-reserve'
+                        : (uploadDisplayTab || ""),
                     // [신규] 사다드림 여부. 상품명 말머리 대신 이 값으로 판단한다.
                     isSada: _isSadaChecked,
                     // [신규] 신선식품 여부 (공동구매 칸에서 고른 값). 지금은 저장만 한다.
@@ -16687,6 +16826,9 @@
                     // [수정] 대행료는 규칙이 기준이고, 구간표는 예전 방식만 읽는 화면을 위해 함께 저장한다
                     agencyFeeRule: gNormalizeAgencyRule(uploadAgencyFeeRule, uploadAgencyFeeTiers),
                     agencyFeeTiers: uploadAgencyFeeTiers,
+                    // [신규] 할인 — 할인율만 저장하고 할인가는 보는 쪽에서 계산한다
+                    useDiscount: uploadUseDiscount,
+                    discountRate: uploadDiscountRate,
                     updatedAt: Date.now()
                 };
 
@@ -17361,6 +17503,9 @@
             // [수정] 규칙이 저장돼 있으면 그대로 쓰고, 예전 구간표만 있는 상품은 규칙으로 되돌려 읽는다
             uploadAgencyFeeRule = gNormalizeAgencyRule(prod.agencyFeeRule, prod.agencyFeeTiers);
             uploadAgencyFeeTiers = gAgencyRuleToTiers(uploadAgencyFeeRule);
+            // [신규] 할인
+            uploadUseDiscount = (prod.useDiscount === true || prod.useDiscount === 'true');
+            uploadDiscountRate = Math.min(100, Math.max(0, parseInt(prod.discountRate) || 0));
             // [신규] 보관방법 — 저장된 값이 없으면 분류(matchKey)에서 읽어 온다.
             //  예전 상품은 storage 없이 matchKey만 '냉동' 식으로 갖고 있어서, 그래야 버튼이 비어 보이지 않는다.
             uploadStorageType = (() => {
