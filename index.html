@@ -4378,6 +4378,81 @@
         //  { key: { name, roads:[], lots:[], keywords:[], aliases:[] } }
         let APARTMENT_EXTRA = [];
 
+        /* ===== [신규] 공동현관 비번 — 고객 카드에 함께 보여 준다 =====
+           배달기사 화면에서 적어 둔 값을 그대로 읽는다 (entrance_passwords).
+           [주의] 비번은 '배달기사 이름'(shortName)을 키로 저장돼 있다.
+           주문관리는 긴 이름(푸르지오2차)을 쓰므로, 짧은 이름(푸지2차)으로 바꿔서 찾아야 한다. */
+        let entrancePasswords = {};
+
+        async function loadEntrancePasswords() {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}entrance_passwords.json?t=${Date.now()}`);
+                entrancePasswords = (res.ok ? (await res.json()) : null) || {};
+            } catch (e) {
+                console.warn('공동현관 비번 로드 실패:', e);
+                entrancePasswords = entrancePasswords || {};
+            }
+        }
+
+        // 주문관리 이름 → 배달기사 이름 (없으면 그대로)
+        function gDriverAptName(aptName) {
+            const n = String(aptName || '');
+            const hit = (typeof gAptList === 'function' ? gAptList() : []).find(a => a && a.name === n);
+            return (hit && hit.shortName) ? hit.shortName : n;
+        }
+        /* 주소에서 동 키를 뽑는다.
+           [주의] 배달기사는 동 번호의 '끝 두 자리'로 묶어 저장한다 (701동·106동 → 01동·06동).
+           한 단지 안에서 앞자리는 구역 표시라 뒤 두 자리만 실제 동 번호이기 때문이다.
+           비번을 그 키로 저장하므로 여기서도 같은 규칙으로 만들어야 찾을 수 있다.
+           '802-301'처럼 하이픈으로 적은 것도 앞 숫자를 동으로 본다. */
+        function gDongKeysOf(addrDetail) {
+            const s = String(addrDetail || '').trim();
+            let num = null;
+            let m = s.match(/([0-9]+)\s*동/);
+            if (m) num = m[1];
+            if (num === null) { m = s.match(/([0-9]+)\s*-\s*[0-9]+/); if (m) num = m[1]; }
+            if (num === null) return [];
+
+            const lastTwo = String(num).slice(-2).padStart(2, '0') + '동';
+            const keys = [lastTwo, num + '동'];                       // 끝 두 자리 우선, 통째로도 한 번
+            const plain = String(parseInt(lastTwo)) + '동';           // 01동 → 1동 (옛 표기 대비)
+            keys.push(plain);
+            return [...new Set(keys)];
+        }
+
+        /* 그 손님 주소에 해당하는 비번을 찾는다. 못 찾으면 null.
+           [수정] 1·2 / 3·4 두 칸만 보던 것을, 배달기사에서 정한 호수 칸을 그대로 읽게 바꿨다.
+           손님 호수가 그 칸의 범위 안에 들면 그 비번을 고른다. (1~3호 칸이면 2호도 여기) */
+        function gEntrancePwdFor(address, addrDetail) {
+            const apt = gDriverAptName(extractApartmentName(address || ''));
+            const map = (entrancePasswords || {})[apt];
+            if (!map) return null;
+
+            // 손님 호수의 끝자리 (1102호 → 2). 라인은 호수 끝자리로 나뉜다.
+            const hoM = String(addrDetail || '').match(/(\d+)\s*호/) || String(addrDetail || '').match(/-\s*(\d+)\s*$/);
+            const hoLast = hoM ? parseInt(String(hoM[1]).slice(-1)) : null;
+
+            for (const dong of gDongKeysOf(addrDetail)) {
+                const slots = [];
+                Object.keys(map).forEach(k => {
+                    if (k === dong) { slots.push({ from: null, to: null, pwd: String(map[k] || '').trim() }); return; }
+                    const m = String(k).match(/^(.+)_(\d+)-(\d+)라인$/);
+                    if (m && m[1] === dong) slots.push({ from: parseInt(m[2]), to: parseInt(m[3]), pwd: String(map[k] || '').trim() });
+                });
+                const live = slots.filter(s => s.pwd);
+                if (live.length === 0) continue;
+
+                // 호수가 든 칸을 먼저 찾고, 없으면 있는 것을 전부 보여 준다
+                const fit = (hoLast != null) ? live.find(s => s.from != null && hoLast >= s.from && hoLast <= s.to) : null;
+                const list = fit ? [fit] : live;
+                return {
+                    apt, dong,
+                    list: list.map(s => ({ label: (s.from == null ? '' : (s.from === s.to ? `${s.from}호` : `${s.from}~${s.to}호`)), pwd: s.pwd }))
+                };
+            }
+            return null;
+        }
+
         async function loadApartmentExtra() {
             try {
                 const res = await fetch(`${FIREBASE_DB_URL}apartment_extra.json`);
@@ -8486,6 +8561,21 @@
             //  아파트명 + 동·호수만 한 줄로 보여 주고, 눌렀을 때만 전체 주소를 펼친다.
             const custAptName = custAddr ? extractApartmentName(custAddr) : '';
             const custAddrShort = [custAptName, custAddrDetail].filter(Boolean).join(' ') || custAddr;
+            // [신규] 공동현관 비번 — 배달기사가 적어 둔 값을 주소 밑에 함께 보여 준다.
+            //  전화로 "비번 뭐예요?" 물어볼 일을 줄인다. 없으면 줄 자체가 안 나온다.
+            const custPwd = custAddr ? gEntrancePwdFor(custAddr, custAddrDetail) : null;
+            const pwdChip = (label, val) => val
+                ? `<span style="display:inline-flex; align-items:center; gap:4px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:2px 7px; margin-right:4px;">`
+                  + `${label ? `<span style="font-size:10px; font-weight:800; color:#15803d;">${label}</span>` : ''}`
+                  + `<b style="font-size:12px; font-weight:900; color:#0f172a; letter-spacing:0.5px;">${gEscapeHtml(val)}</b></span>`
+                : '';
+            const pwdHtml = custPwd ? `
+                <div style="margin-top:4px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; font-size:11.5px;">
+                    <span style="flex:0 0 auto; color:#94a3b8;">🚪</span>
+                    ${custPwd.list.map(x => pwdChip(x.label, x.pwd)).join('')}
+                    <span style="font-size:10px; font-weight:700; color:#cbd5e1;">${gEscapeHtml(custPwd.apt)} ${gEscapeHtml(custPwd.dong)}</span>
+                </div>` : '';
+
             const addrHtml = (custAddr || custAddrDetail) ? `
                 <div style="margin-top:5px;">
                     <button type="button" class="cust-addr-btn" onclick="toggleCustAddrFull(this)" title="눌러서 전체 주소 보기">
@@ -8496,6 +8586,7 @@
                     <div id="cust-addr-full" style="display:none; margin-top:4px; font-size:11.5px; font-weight:700; color:#334155; line-height:1.5; word-break:break-all;">
                         ${gEscapeHtml(custAddr)}${custAddrDetail ? `<br>${gEscapeHtml(custAddrDetail)}` : ''}
                     </div>
+                    ${pwdHtml}
                 </div>` : '';
 
             const topHtml = topItems.length ? topItems.map(([nm,v],i)=>`
@@ -10637,7 +10728,7 @@
         }
 
         async function renderApartmentAdmin() {
-            await Promise.all([loadApartmentCustom(), loadApartmentAlias(), loadApartmentExtra(), loadApartmentTable()]);
+            await Promise.all([loadApartmentCustom(), loadApartmentAlias(), loadApartmentExtra(), loadApartmentTable(), loadEntrancePasswords()]);
             renderApartmentTest();
             buildApartPeriodTabs();
 
@@ -11027,10 +11118,21 @@
                 d.days.add(_k);
                 d.amount += _amt;
                 const hk = ho || '호수 모름';
-                if (!d.hos.has(hk)) d.hos.set(hk, { days: new Set(), amount: 0 });
+                if (!d.hos.has(hk)) d.hos.set(hk, { days: new Set(), amount: 0, who: new Map() });
                 const h = d.hos.get(hk);
                 h.days.add(_k);
                 h.amount += _amt;
+                /* [신규] 그 호수에 주문한 사람을 담아 둔다. 호수를 누르면 그 손님 카드를 연다.
+                   한 집에 여러 사람(가족 등)이 있을 수 있어 가장 최근에 주문한 사람을 대표로 쓴다. */
+                {
+                    const ph = String(o.firebasePhoneKey || o.phone || '').trim();
+                    if (ph) {
+                        const prev = h.who.get(ph);
+                        const _d = (typeof parseTimestampToDate === 'function') ? parseTimestampToDate(o.timestamp) : null;
+                        const t = (_d && !isNaN(_d.getTime())) ? _d.getTime() : 0;
+                        if (!prev || t > prev.t) h.who.set(ph, { name: o.name || '', t });
+                    }
+                }
             });
 
             const total = totalDays.size;
@@ -11077,7 +11179,16 @@
                             <div style="display:flex; flex-wrap:wrap; gap:4px;">
                                 ${list.map(([ho, v]) => {
                                     const c = v.days.size;
-                                    return `<span title="${v.amount.toLocaleString()}${salesMetricUnit()}" style="display:inline-flex; align-items:center; gap:3px; padding:3px 7px; border-radius:6px; font-size:11.5px; font-weight:700; color:#334155; background:#f1f5f9;">${ho}<b style="color:${c >= 5 ? '#c2410c' : '#64748b'};">${c}</b></span>`;
+                                    /* [신규] 호수를 누르면 그 집 주문자의 상세 카드를 연다.
+                                       누가 시켰는지 보려고 주문 목록을 뒤져 찾아야 했다. */
+                                    const _who = [...(v.who || new Map()).entries()].sort((a, b) => b[1].t - a[1].t)[0];
+                                    const _phone = _who ? _who[0] : '';
+                                    const _name = _who ? (_who[1].name || '') : '';
+                                    const _click = _phone
+                                        ? ` onclick="showCustomerCardModal('${encodeURIComponent(_phone)}','${encodeURIComponent(_name)}')"`
+                                        : '';
+                                    const _tip = `${v.amount.toLocaleString()}${salesMetricUnit()}${_name ? ` · ${_name} (눌러서 상세)` : ''}`;
+                                    return `<span title="${gEscapeHtml(_tip)}"${_click} style="display:inline-flex; align-items:center; gap:3px; padding:3px 7px; border-radius:6px; font-size:11.5px; font-weight:700; color:#334155; background:#f1f5f9;${_phone ? ' cursor:pointer;' : ''}">${ho}<b style="color:${c >= 5 ? '#c2410c' : '#64748b'};">${c}</b></span>`;
                                 }).join('')}
                             </div>
                         </div>`;
@@ -11380,6 +11491,28 @@
                     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
                 });
                 if (!res.ok) throw new Error('저장 실패 ' + res.status);
+
+                /* [신규] 공동현관 비번은 '배달기사 이름'을 키로 저장돼 있다.
+                   이름만 바꾸고 비번을 그대로 두면, 조회 창에 옛 이름과 새 이름이 따로 뜨고
+                   그 아파트 비번을 못 찾는다. 이름이 바뀌면 비번도 같이 옮긴다. */
+                const oldDriverName = _aptNameEdit.name;
+                const newDriverName = shortName || mainName;
+                if (oldDriverName && newDriverName && oldDriverName !== newDriverName) {
+                    try {
+                        const pRes = await fetch(`${FIREBASE_DB_URL}entrance_passwords.json?t=${Date.now()}`);
+                        const all = pRes.ok ? ((await pRes.json()) || {}) : {};
+                        const src = all[oldDriverName];
+                        if (src && Object.keys(src).length) {
+                            const merged = Object.assign({}, all[newDriverName] || {}, src);
+                            await fetch(`${FIREBASE_DB_URL}entrance_passwords/${encodeURIComponent(newDriverName)}.json`, {
+                                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(merged)
+                            });
+                            await fetch(`${FIREBASE_DB_URL}entrance_passwords/${encodeURIComponent(oldDriverName)}.json`, { method: 'DELETE' });
+                            if (typeof loadEntrancePasswords === 'function') await loadEntrancePasswords();
+                            showToast(`공동현관 비번 ${Object.keys(src).length}개도 함께 옮겼습니다.`);
+                        }
+                    } catch (e) { console.warn('비번 이전 실패:', e); }
+                }
 
                 showToast(`'${mainName}'으로 저장했습니다.` + (shortName ? ` (배달기사: ${shortName})` : ''));
                 closeApartmentRename();
@@ -17549,7 +17682,7 @@
         window.onload = function() {
             _relocatePurchaseAgg();          // [신규] 발주집계를 주문관리 하위로 이동 (판매관리에 안 보이게)
             // [신규] 사장님이 묶은 구역·명칭을 먼저 읽어 둔다 (카드·인쇄 표시와 검색에 바로 반영)
-            Promise.all([loadApartmentCustom(), loadApartmentAlias(), loadApartmentExtra(), loadApartmentTable()]).then(() => {
+            Promise.all([loadApartmentCustom(), loadApartmentAlias(), loadApartmentExtra(), loadApartmentTable(), loadEntrancePasswords()]).then(() => {
                 if (APARTMENT_CUSTOM.length > 0 && typeof renderFilteredOrders === 'function') renderFilteredOrders();
             });
             // [신규] 상시판매 분류(이름·추가분)을 서버에서 받아 온다. 실패하면 기본 목록으로 동작한다.
