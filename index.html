@@ -3402,7 +3402,9 @@
                          (칸이 좁으면 숫자가 눌려 읽기 어려워서). -->
                     <table style="width:100%; border-collapse:collapse; text-align:left;" id="profit-table">
                         <thead>
-                            <tr id="profit-thead-row" style="border-bottom:2px solid #e2e8f0; font-size:12px; font-weight:800; color:#475569; background:#f8fafc;"></tr>
+                            <tr id="profit-thead-row" style="font-size:12px; font-weight:800; color:#475569; background:#f8fafc;"></tr>
+                            <!-- [신규] 묶음을 펼쳤을 때만 쓰는 둘째 머리줄 (총금액·발주·직접 같은 하위 칸 이름) -->
+                            <tr id="profit-thead-row2" style="display:none; border-bottom:2px solid #e2e8f0; font-size:12px; font-weight:800; color:#475569; background:#f8fafc;"></tr>
                         </thead>
                         <tbody id="profit-tbody" style="font-size:13px; font-weight:700;"></tbody>
                     </table>
@@ -20525,43 +20527,72 @@
             const stickyCell = 'position:sticky; left:0; z-index:1; background:#fff;';
             const cellLine = 'border-bottom:1px solid #f1f5f9;';
 
-            /* [수정] 칸 이름을 누르면 그 칸 '옆에' 속내 칸이 끼어든다.
-               예: 매출을 누르면  … | 매출 | 🏦 계좌이체 | 💳 포스 | … 로 늘어난다.
-               한 번 더 누르면 접힌다. 총합은 앞의 셋으로 나온 값이라 펼칠 속내가 없다. */
-            const DETAIL_COLS = {
-                buy:     [['🚚 발주', '#d97706'], ['✍️ 직접', '#d97706']],
-                sale:    [['🏦 계좌이체', '#7c3aed'], ['💳 포스', '#0284c7']],
-                expense: [['🏠 고정비', '#dc2626'], ['🧾 그외', '#dc2626']]
-            };
+            /* [수정] 칸 이름을 누르면 그 칸이 '묶음'으로 펼쳐진다.
+               예: 매입을 누르면 머리가 두 줄이 되고
+                     매입  (✕)          ← 묶음 이름이 위에 걸친다
+                   총금액 | 발주 | 직접  ← 그 아래 세 칸
+               묶음 이름이 위에 걸쳐 있어 어느 항목에 딸린 칸인지 한눈에 보이고,
+               달마다 같은 칸에 놓이니 위아래로 견주기도 된다.
+               ✕(또는 이름을 다시 누르면) 접힌다. 총합은 앞의 셋으로 나온 값이라 펼칠 속내가 없다. */
             const openKind = _detailOpen.kind;   // '' | 'buy' | 'sale' | 'expense'
+            const GROUP_SUB = {
+                buy:     [['총금액', '#d97706'], ['🚚 발주', '#d97706'], ['✍️ 직접', '#d97706']],
+                sale:    [['총금액', '#0f172a'], ['🏦 계좌이체', '#7c3aed'], ['💳 포스', '#0284c7']],
+                expense: [['총금액', '#dc2626'], ['🏠 고정비', '#dc2626'], ['🧾 그외', '#dc2626']]
+            };
+            const GROUP_NAME = { buy: '매입', sale: '매출', expense: '지출' };
 
             const headRow = document.getElementById('profit-thead-row');
+            const headRow2 = document.getElementById('profit-thead-row2');
             if (headRow) {
+                // 펼치지 않은 칸 — 두 줄짜리 머리에서는 세로로 두 칸을 차지한다(rowspan)
                 const th = (label, key) => {
-                    const on = (openKind === key);
-                    return `<th onclick="toggleDetail('${key}')" title="눌러서 세부 내역 칸 펼치기"
-                        style="padding:9px 10px; text-align:right; white-space:nowrap; cursor:pointer; ${on ? 'background:#eef2ff; color:#4338ca;' : ''}">
-                        ${label} <span style="font-size:9px; color:#94a3b8;">${on ? '◂' : '▸'}</span></th>`;
+                    const span = openKind ? ' rowspan="2"' : '';
+                    return `<th${span} onclick="toggleDetail('${key}')" title="눌러서 세부 내역 펼치기"
+                        style="padding:9px 10px; text-align:right; white-space:nowrap; cursor:pointer; vertical-align:middle;">
+                        ${label} <span style="font-size:9px; color:#94a3b8;">▸</span></th>`;
                 };
-                const subTh = ([label, color]) =>
-                    `<th style="padding:9px 10px; text-align:right; white-space:nowrap; background:#f8fafc; color:${color}; font-size:11px;">${label}</th>`;
+                // 펼친 칸 — 묶음 이름이 위에 걸친다
+                const groupTh = (key) =>
+                    `<th colspan="3" onclick="toggleDetail('${key}')" title="접기"
+                        style="padding:7px 10px; text-align:center; white-space:nowrap; cursor:pointer; background:#eef2ff; color:#4338ca; border-bottom:1px solid #dbe1f5;">
+                        ${GROUP_NAME[key]} <span style="font-size:11px; color:#8b95c9;">✕</span></th>`;
+                const plainTh = (label) => {
+                    const span = openKind ? ' rowspan="2"' : '';
+                    return `<th${span} style="padding:9px 10px; text-align:right; white-space:nowrap; vertical-align:middle;">${label}</th>`;
+                };
 
                 headRow.innerHTML =
-                    `<th style="padding:9px 10px 9px 7px; white-space:nowrap; text-align:left; ${stickyHead}">월</th>`
-                    + th('매입', 'buy') + (openKind === 'buy' ? DETAIL_COLS.buy.map(subTh).join('') : '')
-                    + th('매출', 'sale') + (openKind === 'sale' ? DETAIL_COLS.sale.map(subTh).join('') : '')
-                    + th('지출', 'expense') + (openKind === 'expense' ? DETAIL_COLS.expense.map(subTh).join('') : '')
-                    + `<th style="padding:9px 10px; text-align:right; white-space:nowrap;">총합</th>`;
+                    `<th${openKind ? ' rowspan="2"' : ''} style="padding:9px 10px 9px 7px; white-space:nowrap; text-align:left; vertical-align:middle; ${stickyHead}">월</th>`
+                    + (openKind === 'buy' ? groupTh('buy') : th('매입', 'buy'))
+                    + (openKind === 'sale' ? groupTh('sale') : th('매출', 'sale'))
+                    + (openKind === 'expense' ? groupTh('expense') : th('지출', 'expense'))
+                    + plainTh('총합');
 
-                /* [신규] 칸을 똑같은 너비로 나눈다.
+                // 머리 밑줄은 '마지막으로 보이는 줄'에만 둔다 (두 줄일 때 줄이 겹쳐 보이지 않게)
+                headRow.style.borderBottom = openKind ? 'none' : '2px solid #e2e8f0';
+
+                // 둘째 줄 — 펼친 묶음의 하위 칸 이름만 놓는다
+                if (headRow2) {
+                    headRow2.innerHTML = openKind
+                        ? GROUP_SUB[openKind].map(([label, color]) =>
+                            `<th style="padding:7px 10px; text-align:right; white-space:nowrap; background:#f8fafc; color:${color}; font-size:11px;">${label}</th>`).join('')
+                        : '';
+                    headRow2.style.display = openKind ? '' : 'none';
+                }
+
+                /* 칸을 똑같은 너비로 나눈다.
                    table-layout:fixed 를 켜야 브라우저가 글자 길이를 재지 않고 정한 너비를 그대로 쓴다.
-                   칸 수는 세부 칸을 펼치면 달라지므로 그때그때 100 ÷ 칸수 로 다시 잡는다. */
+                   묶음을 펼치면 실제 칸 수가 늘어나므로(3칸짜리 묶음) 그것까지 세어 나눈다. */
                 const _tbl = document.getElementById('profit-table');
-                const _n = headRow.children.length;
-                if (_tbl && _n > 0) {
+                const _n = openKind ? 6 : 5;   // 월 + (묶음 3칸 또는 1칸) + 나머지 둘 + 총합
+                if (_tbl) {
                     _tbl.style.tableLayout = 'fixed';
                     const w = (100 / _n).toFixed(4) + '%';
-                    Array.prototype.forEach.call(headRow.children, el => { el.style.width = w; });
+                    Array.prototype.forEach.call(headRow.children, el => {
+                        el.style.width = (el.getAttribute('colspan') === '3')
+                            ? (100 / _n * 3).toFixed(4) + '%' : w;
+                    });
                 }
             }
 
@@ -20604,19 +20635,24 @@
                     `<td style="padding:11px 10px; text-align:right; font-weight:800; font-size:12px; color:${color}; white-space:nowrap; background:#fcfcfd; ${cellLine}">${v.toLocaleString()}</td>`;
 
                 const manualBuy = gExpenseSumOf(m, 'buy');
-                const buyCols = (openKind === 'buy')
-                    ? sub(f.buy - manualBuy, '#d97706') + sub(manualBuy, '#d97706') : '';
-                const saleCols = (openKind === 'sale')
-                    ? sub(f.tr, '#7c3aed') + sub(f.pos, '#0284c7') : '';
-                const expCols = (openKind === 'expense')
-                    ? sub(f.fixed, '#dc2626') + sub(f.etc, '#dc2626') : '';
+                /* [수정] 펼친 묶음은 '총금액 · 세부1 · 세부2' 세 칸으로 벌어진다.
+                   머리 위에 걸친 묶음 이름과 짝이 맞아, 어느 항목에 딸린 칸인지 바로 보인다. */
+                const subCell = (v, color) =>
+                    `<td style="padding:11px 10px; text-align:right; font-weight:800; font-size:12px; color:${color}; white-space:nowrap; background:#fcfcfd; ${cellLine}">${(v || 0).toLocaleString()}</td>`;
+
+                const groupCells = (kind) => {
+                    if (kind === 'buy')     return cell(f.buy.toLocaleString(), '#d97706') + subCell(f.buy - manualBuy, '#d97706') + subCell(manualBuy, '#d97706');
+                    if (kind === 'sale')    return cell(f.sale.toLocaleString(), '#0f172a') + subCell(f.tr, '#7c3aed') + subCell(f.pos, '#0284c7');
+                    if (kind === 'expense') return cell(f.exp.toLocaleString(), '#dc2626') + subCell(f.fixed, '#dc2626') + subCell(f.etc, '#dc2626');
+                    return '';
+                };
 
                 return `
                 <tr>
                     <td style="padding:11px 10px 11px 7px; font-weight:900; color:#334155; white-space:nowrap; ${cellLine} ${stickyCell}">${m.replace('-', '년 ')}월</td>
-                    ${cell(f.buy.toLocaleString(), '#d97706')}${buyCols}
-                    ${cell(f.sale.toLocaleString(), '#0f172a')}${saleCols}
-                    ${cell(f.exp.toLocaleString(), '#dc2626')}${expCols}
+                    ${openKind === 'buy' ? groupCells('buy') : cell(f.buy.toLocaleString(), '#d97706')}
+                    ${openKind === 'sale' ? groupCells('sale') : cell(f.sale.toLocaleString(), '#0f172a')}
+                    ${openKind === 'expense' ? groupCells('expense') : cell(f.exp.toLocaleString(), '#dc2626')}
                     <!-- [수정] 총합은 '숫자 + (마진률)'이라 칸을 똑같이 나누면 넘쳐서 잘렸다.
                          숫자는 안 쪼개지게 두고, 마진률만 자리가 모자라면 아랫줄로 내린다. -->
                     <td style="padding:11px 10px; text-align:right; font-weight:900; color:${leftColor(f.left)}; ${cellLine}">
