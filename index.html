@@ -9418,6 +9418,17 @@
         const CLOUDINARY_CLOUD_NAME = "q36jlrdf";        // Cloudinary Cloud name
         const CLOUDINARY_UPLOAD_PRESET = "moket_image";  // Unsigned 업로드 프리셋
 
+        /* [신규] imgbb — 사진 올리는 곳을 갈아 끼울 수 있게 해 둔다.
+           2026-08-28, Cloudinary 계정이 무료 한도를 넘겨 잠기면서 업로드까지 막혔다.
+           사진 업로드가 상품 저장의 첫 단계라, 여기서 걸리면 상품 등록 자체가 안 된다.
+           그래서 계정이 풀릴 때까지 쓸 임시 창구를 둔다.
+
+           · 아래 열쇠가 비어 있으면 예전처럼 Cloudinary로 올린다.
+           · 열쇠를 채우면 새로 올리는 사진만 imgbb로 간다.
+             기존 상품의 Cloudinary 주소는 그대로 남아, 계정이 풀리면 다시 보인다.
+           열쇠는 api.imgbb.com 에서 무료로 받는다. */
+        const IMGBB_API_KEY = "ce69feea77b295db879f747d76325220";   // imgbb 열쇠 (비우면 Cloudinary로 돌아간다)
+
         // [추가] 실시간 재고 매핑 헬퍼 함수 (상품 목록 렌더링 에러 해결)
         function fSafeKey(s) {
             // [버그수정] %, ? 는 주문 키가 URL 경로에 들어갈 때 깨져서 주문 저장이 실패하므로 함께 치환 (주문서.html과 동일해야 함)
@@ -13383,6 +13394,7 @@
                 _tpl.style.cursor = 'pointer';
                 _tpl.style.background = '#fffdf9';
                 _tpl.placeholder = '여기를 눌러 문구를 적어주세요.';
+
                 _tpl.onclick = openChurnSmsEditor;
                 _tpl.onfocus = openChurnSmsEditor;
             }
@@ -13394,6 +13406,23 @@
         const CHURN_SMS_KEY = 'moket_churn_sms_tpl';
         const CHURN_SMS_DEFAULT = '';   // 문구는 사장님이 직접 쓴다(빈 칸으로 시작)
 
+
+        /* [신규] 이미지 주소에 크기 조절을 끼워 넣는다.
+           Cloudinary는 주소 가운데 한 마디만 넣으면 알아서 줄여서 보낸다 (추가 비용 없음).
+             w_220    가로 220px로            c_limit  원본보다 크게 늘리지 않는다
+             f_auto   가벼운 형식(webp 등)으로  q_auto   눈에 안 띄는 선에서 화질을 낮춘다
+           예전에는 목록 섬네일에도 1,000px 원본이 그대로 나가서 전송량이 열 배 넘게 들었고,
+           그것이 이미지 저장소 무료 한도를 넘긴 원인이었다.
+           Cloudinary 주소가 아니면 손대지 않는다. */
+        function gCdnUrl(url, size) {
+            const str = String(url || '').trim();
+            if (!str || str.startsWith('data:') || str.startsWith('blob:')) return str;
+            const m = str.match(/^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.*)$/);
+            if (!m) return str;
+            const rest = m[2];
+            if (/^[a-z]{1,3}_[^/]*\//.test(rest)) return str;   // 이미 조절 값이 있으면 그대로
+            return `${m[1]}w_${size || 300},c_limit,f_auto,q_auto/${rest}`;
+        }
         function gEscapeHtml(s){
             return String(s == null ? '' : s)
                 .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -16061,7 +16090,7 @@
                 
                 let imgSrc = '';
                 if (item.isExisting && item.id) {
-                    imgSrc = (String(item.id).startsWith("data:") || String(item.id).startsWith("http")) ? item.id : `https://lh3.googleusercontent.com/d/${item.id}`;
+                    imgSrc = (String(item.id).startsWith("data:") || String(item.id).startsWith("http")) ? gCdnUrl(item.id, 300) : `https://lh3.googleusercontent.com/d/${item.id}`;
                 } else if (item.file) {
                     try {
                         imgSrc = URL.createObjectURL(item.file);
@@ -16640,7 +16669,7 @@
                     }
 
                     const hasImage = prod.images && prod.images.length > 0;
-                    const imgUrl = hasImage ? ((String(prod.images[0]).startsWith("data:") || String(prod.images[0]).startsWith("http")) ? prod.images[0] : `https://lh3.googleusercontent.com/d/${prod.images[0]}=s220`) : '';
+                    const imgUrl = hasImage ? ((String(prod.images[0]).startsWith("data:") || String(prod.images[0]).startsWith("http")) ? gCdnUrl(prod.images[0], 220) : `https://lh3.googleusercontent.com/d/${prod.images[0]}=s220`) : '';
 
                     const statusBadge = (!isVisible)
                         ? `<span style="font-size: 10px; font-weight: 800; background: #fee2e2; color: #ef4444; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🙈 숨김</span>`
@@ -17135,7 +17164,7 @@
 
                     showLoader(`📸 사진 업로드 중 (${i + 1}/${uploadSelectedFiles.length}): ${item.displayName}`);
                     const base64Data = await getCompressedBase64(item.file); // 클라이언트에서 리사이즈+압축 후 업로드
-                    item.id = await uploadToCloudinary(base64Data, item.displayName);
+                    item.id = await uploadImage(base64Data, item.displayName);   // [수정] Cloudinary·imgbb 중 설정된 곳으로 간다
                 }
 
                 // 2. uploadThumbnailIndex로 지정된 대표 섬네일을 0번 인덱스에 배치하여 finalImages 구성
@@ -18223,7 +18252,49 @@
             }
         }
 
-        // [신규] Cloudinary 직접 업로드 (unsigned). data URI 또는 File을 받아 CDN URL(secure_url) 반환. 재시도 포함.
+        /* [신규] 사진을 어디로 올릴지 고르는 문. 위 IMGBB_API_KEY가 채워져 있으면 imgbb,
+           비어 있으면 예전처럼 Cloudinary로 보낸다. 부르는 쪽은 이 함수만 알면 된다. */
+        async function uploadImage(fileOrDataUri, label) {
+            if (String(IMGBB_API_KEY || '').trim()) return uploadToImgbb(fileOrDataUri, label);
+            return uploadToCloudinary(fileOrDataUri, label);
+        }
+
+        /* [신규] imgbb 업로드. Cloudinary와 같은 모양으로 주소 한 줄을 돌려준다.
+           imgbb는 data URI의 머리말(data:image/jpeg;base64,)을 빼고 알맹이만 받는다. */
+        async function uploadToImgbb(fileOrDataUri, label) {
+            const key = String(IMGBB_API_KEY || '').trim();
+            if (!key) throw new Error('imgbb 열쇠가 아직 입력되지 않았습니다.');
+
+            const url = `https://api.imgbb.com/1/upload?key=${encodeURIComponent(key)}`;
+            let lastErr = null;
+            const MAX_TRY = 4;
+            for (let attempt = 1; attempt <= MAX_TRY; attempt++) {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 60000);
+                try {
+                    const form = new FormData();
+                    if (typeof fileOrDataUri === 'string') {
+                        // 머리말을 떼고 base64 알맹이만 보낸다
+                        form.append('image', fileOrDataUri.replace(/^data:[^;]+;base64,/, ''));
+                    } else {
+                        form.append('image', fileOrDataUri);
+                    }
+                    const res = await fetch(url, { method: 'POST', body: form, signal: controller.signal });
+                    const j = await res.json().catch(() => null);
+                    if (!res.ok) throw new Error((j && j.error && j.error.message) || ('HTTP ' + res.status));
+                    const link = j && j.data && (j.data.url || j.data.display_url);
+                    if (!link) throw new Error('imgbb 응답에 주소가 없습니다.');
+                    return link;
+                } catch (e) {
+                    lastErr = (e && e.name === 'AbortError') ? new Error('업로드 시간 초과(60초)') : e;
+                    console.warn(`imgbb 업로드 시도 ${attempt}/${MAX_TRY} 실패 (${label}):`, lastErr.message);
+                    if (attempt < MAX_TRY) await new Promise(r => setTimeout(r, Math.min(4000, 700 * attempt)));
+                } finally { clearTimeout(timer); }
+            }
+            throw new Error(`[${label}] 이미지 업로드가 ${MAX_TRY}회 재시도 후에도 실패했습니다.${lastErr ? ' (' + lastErr.message + ')' : ''}`);
+        }
+
+        // Cloudinary 직접 업로드 (unsigned). data URI 또는 File을 받아 CDN URL(secure_url) 반환. 재시도 포함.
         async function uploadToCloudinary(fileOrDataUri, label) {
             if (!CLOUDINARY_CLOUD_NAME || CLOUDINARY_CLOUD_NAME.indexOf('여기에') === 0 ||
                 !CLOUDINARY_UPLOAD_PRESET || CLOUDINARY_UPLOAD_PRESET.indexOf('여기에') === 0) {
