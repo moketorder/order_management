@@ -17505,7 +17505,11 @@
                     productCode: _productCode,
                     price: price,
                     stock: stock,
-                    desc: desc,
+                    /* [용량절감] 설명(desc)은 여기 넣지 않는다.
+                       손님이 상품 목록을 받을 때 260개 설명(199KB)이 통째로 딸려 와
+                       상품 자료의 절반을 차지했다. 아래에서 product_desc 서랍에 따로 적는다.
+                       예전에 저장돼 있던 값은 null 로 지운다. */
+                    desc: null,
                     date: date,
                     matchKey: matchKey,
                     images: finalImages,
@@ -17727,6 +17731,27 @@
                     : await fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, updatedProducts);
 
                 if (!_writeOk) throw new Error("Firebase 배포 실패");
+
+                /* [용량절감] 상품 설명은 product_desc 서랍에도 함께 적는다.
+                   손님 주문서는 목록에서 설명을 받지 않고, 상세를 열 때 이 서랍에서 하나만 받아 간다.
+                   상품 설명 199KB가 손님이 받는 상품 자료의 절반을 차지하고 있었다.
+                   옮기는 중이라 published_products 쪽에도 아직 남겨 둔다(양쪽이 같은 값이라 안전하다).
+                   이름을 바꿔 저장했으면 옛 이름으로 남은 설명은 지운다. */
+                try {
+                    const _dk = fSafeKey(name);
+                    if (_dk) {
+                        await fetch(`${FIREBASE_DB_URL}product_desc/${encodeURIComponent(_dk)}.json`, {
+                            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(String(desc || ''))
+                        });
+                    }
+                    const _oldName = _existingProd && _existingProd.name;
+                    const _oldKey = _oldName ? fSafeKey(_oldName) : '';
+                    if (_oldKey && _oldKey !== _dk) {
+                        await fetch(`${FIREBASE_DB_URL}product_desc/${encodeURIComponent(_oldKey)}.json`, { method: 'DELETE' });
+                    }
+                } catch (e) { console.error('상품 설명 저장 실패:', e); }
+
                 updatePublishedProductsTimestamp();
 
                 /* [신규] 노출 상태가 바뀌었으면 기록에 남긴다 (보는 화면은 없다).
@@ -18268,7 +18293,31 @@
             // 이전 상품에서 잠겨 있었을 수 있으므로 가격칸을 먼저 깨끗한 숫자칸으로 되돌린 뒤 값을 넣는다
             resetPriceField();
             document.getElementById('productPrice').value = prod.price || 0;
-            { const _d = document.getElementById('productDesc'); _d.value = prod.desc || ""; autoResizeTextarea(_d); } // [신규] 넣은 글 길이에 맞춰 칸 높이도 맞춰 준다
+            /* [용량절감] 상품 설명은 product_desc 서랍으로 옮기는 중이다.
+               상품 목록에 아직 남아 있으면 그것을 쓰고, 없으면 서랍에서 받아 채운다.
+               (이 대비가 없으면 서랍으로 옮긴 뒤 수정 화면이 빈 칸으로 열리고,
+                그대로 저장하면 설명이 지워진다) */
+            {
+                const _d = document.getElementById('productDesc');
+                _d.value = prod.desc || "";
+                autoResizeTextarea(_d);   // 넣은 글 길이에 맞춰 칸 높이도 맞춰 준다
+                if (!String(prod.desc || '').trim()) {
+                    const _dk = fSafeKey(prod.name);
+                    if (_dk) {
+                        fetch(`${FIREBASE_DB_URL}product_desc/${encodeURIComponent(_dk)}.json`)
+                            .then(r => r.ok ? r.json() : null)
+                            .then(v => {
+                                // 그 사이 다른 상품을 열었거나 사장님이 직접 적기 시작했으면 덮어쓰지 않는다
+                                if (typeof v !== 'string' || !v) return;
+                                if (_d.value.trim()) return;
+                                if (uploadEditProductKey !== index) return;
+                                _d.value = v;
+                                autoResizeTextarea(_d);
+                            })
+                            .catch(e => console.error('상품 설명 불러오기 실패:', e));
+                    }
+                }
+            }
             setupDescBox(true); // [신규] 수정 모드에서는 상세설명을 접어 둔다 (버튼을 눌러 편다)
 
             const rawStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null) ? 9999 : parseInt(prod.stock);
@@ -18415,8 +18464,27 @@
         }
 
         // [신규] 상품 목록 CSV 내보내기
-        function exportProductsToCSV() {
+        async function exportProductsToCSV() {
             if (!uploadProducts || uploadProducts.length === 0) { showToast("내보낼 상품이 없습니다."); return; }
+
+            /* [용량절감] 상품 설명은 이제 목록이 아니라 product_desc 서랍에 있다.
+               내보내기는 어쩌다 한 번 하는 일이라 여기서만 서랍을 통째로 받아 채운다.
+               (목록에 아직 설명이 남아 있는 상품은 그것을 그대로 쓴다) */
+            let _descMap = {};
+            try {
+                showLoader("상품 설명을 불러오는 중...");
+                const _r = await fetch(`${FIREBASE_DB_URL}product_desc.json?t=${Date.now()}`);
+                if (_r.ok) _descMap = (await _r.json()) || {};
+            } catch (e) { console.error('상품 설명 불러오기 실패:', e); }
+            finally { hideLoader(); }
+            const _descOf = p => {
+                const own = String((p && p.desc) || '');
+                if (own.trim()) return own;
+                const k = fSafeKey(p && p.name);
+                const v = k ? _descMap[k] : '';
+                return (typeof v === 'string') ? v : '';
+            };
+
             const headers = ["상품명", "가격", "재고", "분류(matchKey)", "날짜", "설명", "당일노출", "예약노출", "매주노출"];
             const bool = (v, def) => {
                 const on = (v === undefined || v === null) ? def : (v === true || v === 'true');
@@ -18432,7 +18500,7 @@
                     stockOut,
                     p.matchKey || "",
                     p.date || "",
-                    p.desc || "",
+                    _descOf(p),
                     bool(p.showToday, true),
                     bool(p.showReserve, true),
                     bool(p.showWeekly, false)
@@ -18530,6 +18598,16 @@
                 }
                 if (newList.length === 0) { showToast("불러올 상품이 없습니다."); return; }
 
+                /* [용량절감] 상품 설명은 목록이 아니라 product_desc 서랍에 넣는다.
+                   목록에 넣어 두면 손님이 상품 목록을 받을 때 설명까지 전부 딸려 와
+                   방문마다 199KB를 더 쓰게 된다. 여기서 설명만 따로 떼어 서랍에 쓴다. */
+                const _descPatch = {};
+                newList.forEach(p => {
+                    const k = fSafeKey(p.name);
+                    if (k) _descPatch[k] = String(p.desc || '');
+                    delete p.desc;   // 목록에는 넣지 않는다
+                });
+
                 if (!confirm(`CSV의 상품 ${newList.length}개로 전체 상품 목록을 교체합니다.\n(현재 ${uploadProducts.length}개 → ${newList.length}개)\n\n※ 이미지는 이름+분류가 같은 기존 상품에서 자동으로 이어받습니다. 매칭 안 되는 상품은 이미지가 비어있게 됩니다.\n※ 되돌릴 수 없으니, 먼저 '목록 CSV'로 백업해 두는 걸 권장합니다.\n\n진행할까요?`)) return;
 
                 showLoader(`📥 상품 ${newList.length}개 업로드 중...`);
@@ -18537,6 +18615,12 @@
                     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newList)
                 });
                 if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                // 설명 서랍도 CSV 내용으로 맞춘다 (PATCH라 CSV에 없는 상품 설명은 그대로 남는다)
+                try {
+                    await fetch(`${FIREBASE_DB_URL}product_desc.json`, {
+                        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_descPatch)
+                    });
+                } catch (e) { console.error('상품 설명 저장 실패:', e); }
                 updatePublishedProductsTimestamp();
                 uploadProducts = newList;
                 hideLoader();
