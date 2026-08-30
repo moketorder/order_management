@@ -22075,6 +22075,37 @@
             paintPurchaseRangeButtons();
             renderPurchaseOrdersList();
         }
+
+        /* [신규] 검색창 한/영 상태 유지
+           한글로 검색한 뒤 지우기(×)를 누르면 포커스가 × 버튼으로 넘어가면서
+           입력창의 한/영 상태가 풀린다. 다시 입력창을 누르면 영문으로 시작돼,
+           검색어를 바꿔 칠 때마다 한/영을 또 눌러야 했다.
+           → × 버튼이 포커스를 가져가지 못하게 막아 커서를 입력창에 붙잡아 둔다.
+             포커스가 떠나지 않으면 한글 상태도 그대로 남는다.
+           (윈도우 한/영 상태는 웹에서 직접 바꿀 수 없어, 잃지 않게 지키는 방식으로 해결) */
+        (function keepSearchImeState() {
+            const CLEAR_BTNS = '.clear-search-btn, #btn-clear-product-search';
+
+            // 짝이 되는 입력창 찾기 (× 버튼과 같은 칸 안에 있다)
+            function inputOf(btn) {
+                const box = btn.parentElement;
+                return box ? box.querySelector('input[type="text"], input[type="search"]') : null;
+            }
+
+            // 1) 누를 때 포커스가 넘어가지 않게 막는다. click 은 그대로 실행된다.
+            document.addEventListener('mousedown', function (ev) {
+                const btn = ev.target.closest ? ev.target.closest(CLEAR_BTNS) : null;
+                if (btn && inputOf(btn)) ev.preventDefault();
+            }, true);
+
+            // 2) 지운 뒤에도 커서는 입력창에 남겨 둔다. (이미 있으면 건드리지 않는다)
+            document.addEventListener('click', function (ev) {
+                const btn = ev.target.closest ? ev.target.closest(CLEAR_BTNS) : null;
+                if (!btn) return;
+                const input = inputOf(btn);
+                if (input && document.activeElement !== input) input.focus();
+            });
+        })();
     </script>
 
     <!-- 배달 사진 모달 -->
