@@ -3501,10 +3501,17 @@
                          예전에는 단추 옆에 설명이 붙어 줄이 길어지고 단추 너비도 제각각이었다. -->
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:11px;">
                         <button type="button" id="ms-save-btn" onclick="saveManualEntry()" style="width:100%; padding:9px 0; background:#10b981; color:#fff; border:none; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">💾 저장</button>
-                        <button type="button" onclick="openManualSaleCalendar()" style="width:100%; padding:9px 0; background:#eef2ff; color:#4338ca; border:1.5px solid #c7d2fe; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">📅 내역</button>
+                        <!-- [수정] '직접 입력' 창에서는 달력이 아래에 늘 펼쳐져 있으므로 이 단추를 숨긴다.
+                             (창 밖에서 이 칸을 쓸 때를 대비해 단추 자체는 남겨 둔다) -->
+                        <button type="button" id="ms-cal-open-btn" onclick="openManualSaleCalendar()" style="width:100%; padding:9px 0; background:#eef2ff; color:#4338ca; border:1.5px solid #c7d2fe; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">📅 내역</button>
                     </div>
                     <button type="button" id="ms-cancel-edit" onclick="cancelExpenseEdit()" style="display:none; width:100%; margin-top:7px; padding:9px 0; background:#fff; color:#64748b; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">✕ 수정 취소</button>
-                    <div id="ms-hint" style="margin-top:7px; font-size:11.5px; font-weight:700; color:#94a3b8;">같은 날짜를 다시 저장하면 덮어씁니다.</div>
+                    <div id="ms-hint" style="margin-top:7px; font-size:11.5px; font-weight:700; color:#94a3b8;">적어 넣은 칸만 덮어씁니다. 비워 두면 그 칸은 그대로 둡니다.</div>
+
+                    <!-- [신규] 매입·매출·지출 달력 자리.
+                         '직접 입력' 창이 열리면 달력 패널(ms-cal-panel)이 여기로 옮겨 붙어
+                         적으면서 바로 그 달 내역을 함께 본다. 닫으면 원래 자리로 돌아간다. -->
+                    <div id="ms-cal-inline" style="margin-top:13px;"></div>
                 </div>
 
             </div>
@@ -17529,9 +17536,13 @@
                     maxAmount: uploadMaxAmount,
                     options: uploadProductOptions,
                     useAgencyFee: uploadUseAgencyFee,
-                    // [수정] 대행료는 규칙이 기준이고, 구간표는 예전 방식만 읽는 화면을 위해 함께 저장한다
+                    /* [용량절감] 대행료는 규칙(agencyFeeRule) 네 숫자가 기준이다.
+                       구간표(agencyFeeTiers)는 그 규칙에서 그대로 만들어지는 값이라 저장하지 않는다.
+                       상품마다 같은 내용을 7배 크기로 중복 저장하던 것으로,
+                       손님이 받는 상품 자료 507KB 중 89KB(17.6%)를 차지했다.
+                       보는 쪽(주문서)에서 규칙으로 같은 안내를 만들어 낸다. */
                     agencyFeeRule: gNormalizeAgencyRule(uploadAgencyFeeRule, uploadAgencyFeeTiers),
-                    agencyFeeTiers: uploadAgencyFeeTiers,
+                    agencyFeeTiers: null,   // 예전에 저장돼 있던 값을 지운다
                     // [신규] 할인 — 할인율만 저장하고 할인가는 보는 쪽에서 계산한다
                     useDiscount: uploadUseDiscount,
                     discountRate: uploadDiscountRate,
@@ -19629,7 +19640,21 @@
         async function loadPurchaseArchiveIfNeeded() {
             if (isPurchaseArchiveLoaded) return;
             await hydratePurchaseArchiveFromCache();
-            if (isPurchaseArchiveLoaded) return;
+
+            /* [버그수정] 예전에는 캐시가 있으면 그대로 쓰고 끝냈다(서버와 대조하지 않았다).
+               그래서 다른 기기에서 저장함으로 옮겨 둔 발주가 이 기기에는 영영 안 들어왔고,
+               그만큼 매입이 적게 잡혔다. (8월 저장함 발주 5,156,832원 중 504,875원만 잡히던 상태)
+               캐시를 썼더라도 서버 표식과 다르면 낡은 것이므로 다시 받는다. */
+            if (isPurchaseArchiveLoaded) {
+                let serverMark = null, localMark = null;
+                try { serverMark = await gFetchPurchaseArchiveMark(); } catch (e) { return; }
+                try { localMark = localStorage.getItem(PURCHASE_ARCHIVE_MARK_KEY); } catch (e) {}
+                // 표식을 못 읽으면 판단할 수 없으니 캐시라도 그대로 쓴다 (오프라인 대비)
+                if (!serverMark) return;
+                if (String(serverMark) === String(localMark)) return;   // 캐시가 최신
+                isPurchaseArchiveLoaded = false;                        // 낡았다 -> 아래에서 다시 받는다
+            }
+
             showLoader("📁 발주 저장함을 불러오는 중...");
             try { await refreshPurchaseArchive(); }
             finally { hideLoader(); }
@@ -20117,9 +20142,86 @@
            달에 통째로 적어 둔 값(YYYY-MM)은 날짜가 없으므로 달력 위에 따로 적는다. */
         let msCalMonth = '';   // 보고 있는 달 (YYYY-MM)
 
+        /* ===== [신규] 달력을 '직접 입력' 창 아래에 펼쳐 두기 =====
+           예전에는 '📅 내역' 단추를 눌러야 달력이 따로 떴다. 적는 칸과 달력이 다른 창이라
+           "이 날 이미 뭘 적어 뒀는지" 보려면 창을 열었다 닫았다 해야 했다.
+           이제 창을 열면 달력이 아래에 함께 펼쳐진다. 매출·매입·지출 셋이 한 칸에 색으로 같이 보인다.
+           달력 패널은 하나만 만들어 옮겨 쓰므로, 달 넘기기·하루 속내·수정·삭제 코드는 그대로 쓴다. */
+        function msCalIsInline() {
+            const p = document.getElementById('ms-cal-panel');
+            return !!(p && p.parentElement && p.parentElement.id === 'ms-cal-inline');
+        }
+
+        async function msCalMountInline() {
+            const panel = document.getElementById('ms-cal-panel');
+            const slot = document.getElementById('ms-cal-inline');
+            if (!panel || !slot || msCalIsInline()) return;
+
+            // 달력 팝업이 떠 있는 채로 열었다면 먼저 닫는다 (안 닫으면 알맹이 빠진 빈 창만 남는다)
+            closeManualSaleCalendar();
+
+            // 팝업용 껍데기(최대너비·높이제한·그림자)를 벗고 창 폭에 맞춘다
+            panel.style.maxWidth = 'none';
+            panel.style.maxHeight = 'none';
+            panel.style.boxShadow = 'none';
+            panel.style.border = '1px solid var(--border)';
+            slot.appendChild(panel);
+
+            // 닫을 창이 아니므로 × 를 감추고, 늘 보이니 '내역' 단추도 감춘다 (저장 단추가 한 줄을 다 쓴다)
+            const x = document.getElementById('ms-cal-x');
+            if (x) x.style.display = 'none';
+            const openBtn = document.getElementById('ms-cal-open-btn');
+            if (openBtn) openBtn.style.display = 'none';
+            const saveBtn = document.getElementById('ms-save-btn');
+            if (saveBtn && saveBtn.parentElement) saveBtn.parentElement.style.gridTemplateColumns = '1fr';
+
+            await loadManualSales();
+            await loadManualExpenses();
+            msCalDetailDay = '';   // 늘 달력부터 보여 준다
+            await msEnsurePurchaseLoaded();
+            if (!fIsMonthKey(msCalMonth)) {
+                msCalMonth = fToMonthKey(gManualSaleKey()) || fProfitMonthKey(new Date());
+            }
+            renderManualSaleCalendar();
+        }
+
+        function msCalUnmountInline() {
+            const panel = document.getElementById('ms-cal-panel');
+            const home = document.getElementById('ms-cal-home');
+            if (panel && home && home.parentNode && msCalIsInline()) {
+                panel.style.maxWidth = '460px';
+                panel.style.maxHeight = '86vh';
+                panel.style.boxShadow = '0 20px 50px rgba(0,0,0,0.25)';
+                panel.style.border = '';
+                home.parentNode.insertBefore(panel, home.nextSibling);
+            }
+            const x = document.getElementById('ms-cal-x');
+            if (x) x.style.display = '';
+            const openBtn = document.getElementById('ms-cal-open-btn');
+            if (openBtn) openBtn.style.display = '';
+            const saveBtn = document.getElementById('ms-save-btn');
+            if (saveBtn && saveBtn.parentElement) saveBtn.parentElement.style.gridTemplateColumns = '1fr 1fr';
+        }
+
+        // 달력이 이미 아래에 펼쳐져 있으면 창을 또 띄우지 않고 그 자리만 다시 그린다
+        function msCalRefresh() {
+            if (!document.getElementById('ms-cal-body')) return;
+            const cal = document.getElementById('ms-cal-modal');
+            if (msCalIsInline() || (cal && cal.style.display === 'flex')) renderManualSaleCalendar();
+        }
+
         async function openManualSaleCalendar() {
+            if (msCalIsInline()) {   // 아래에 이미 펼쳐져 있다
+                msCalDetailDay = '';
+                await loadManualSales();
+                await loadManualExpenses();
+                await msEnsurePurchaseLoaded();
+                renderManualSaleCalendar();
+                return;
+            }
             await loadManualSales();
             await loadManualExpenses();   // 달력에 매입·지출도 놓으므로 함께 받아 둔다
+            await msEnsurePurchaseLoaded();   // 매입에 발주금액도 함께 세므로 발주 자료도 받아 둔다
             msCalDetailDay = '';          // 늘 달력부터 보여 준다 (지난번 보던 하루가 남지 않게)
             if (!fIsMonthKey(msCalMonth)) {
                 const k = gManualSaleKey();
@@ -20152,6 +20254,21 @@
             renderManualSaleCalendar();
         }
 
+        /* [수정] ‹ › 는 보고 있는 화면에 맞춰 움직인다.
+           예전에는 늘 달을 넘겨서, 하루 내역(8월 6일)을 보는 중에 눌러도 날짜가 그대로였다.
+             · 달력 보는 중  -> 지난달 / 다음달
+             · 하루 내역 보는 중 -> 전날 / 다음날 (달을 넘어가면 달력의 달도 따라간다) */
+        function msCalMove(delta) {
+            if (!msCalDetailDay) return moveManualSaleCalendar(delta);
+
+            const [y, m, d] = msCalDetailDay.split('-').map(n => parseInt(n));
+            const nd = new Date(y, m - 1, d + delta);
+            const p2 = n => String(n).padStart(2, '0');
+            msCalDetailDay = `${nd.getFullYear()}-${p2(nd.getMonth() + 1)}-${p2(nd.getDate())}`;
+            msCalMonth = msCalDetailDay.slice(0, 7);
+            renderManualSaleCalendar();
+        }
+
         // 달력의 날짜 칸을 누르면 그 날짜를 입력칸에 올려 고쳐 넣게 한다
         function pickManualSaleDay(dateKey) {
             setManualSaleMode('day');
@@ -20172,6 +20289,56 @@
         let msCalDetailDay = '';   // '' 이면 달력, 날짜(YYYY-MM-DD)면 그 날 속내
 
         // 그 날짜에 손으로 적어 둔 것들 (매입·지출). 고정비는 적어 둔 그 날짜에 놓는다.
+        /* [신규] 발주(purchase_orders)도 달력에 함께 놓는다.
+           위 요약칸의 매입은 '발주금액 + 직접 적은 매입'인데 달력은 직접 적은 것만 세어,
+           같은 달인데 매입 숫자가 서로 달랐다. 같은 잣대로 세도록 발주를 더한다.
+           PROFIT_BUY_FROM_MONTH 이전 발주는 빠진 자료가 많아 통계에서 빼므로 여기서도 뺀다. */
+        function gPurchaseOrdersOf(day) {
+            if (!fIsPurchaseDate(day) || String(day).slice(0, 7) < PROFIT_BUY_FROM_MONTH) return [];
+            return (purchaseOrders || []).concat(purchaseArchive || [])
+                .filter(po => po && String(po.date || '') === day);
+        }
+
+        /* 달력에 쓸 발주 자료를 채워 둔다.
+           loadPurchaseOrders() 는 목록 다시 그리기와 '10일 지난 건 저장함으로 옮기기'(쓰기)까지 하는
+           무거운 함수라, 달력을 열 때 부르기엔 부담스럽다. 여기서는 읽기만 한다.
+           저장함(옛 발주)은 같은 달 앞쪽 날짜가 들어 있을 수 있어 함께 받아 둔다. */
+        async function msEnsurePurchaseLoaded() {
+            if (!Array.isArray(purchaseOrders) || purchaseOrders.length === 0) {
+                try {
+                    const res = await fetch(`${FIREBASE_DB_URL}purchase_orders.json?t=${Date.now()}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const list = [];
+                        if (data) for (const id in data) list.push({ id, ...data[id] });
+                        purchaseOrders = list;
+                    }
+                } catch (e) { console.error('달력용 발주 불러오기 실패:', e); }
+            }
+            try { await loadPurchaseArchiveIfNeeded(); } catch (e) { console.error('발주 저장함 불러오기 실패:', e); }
+
+            /* [수정] 위 요약칸을 언제나 다시 센다.
+               요약칸은 화면을 열 때 한 번만 그려진다. 그때 발주 저장함이 아직 안 와 있으면
+               저장함에 든 발주(10일 지난 것)가 통째로 빠진 값이 화면에 그대로 남는다.
+               '새로 받아온 게 있을 때만' 다시 세게 했더니, 이미 받아 둔 세션에서는
+               옛 숫자가 그대로 남았다. 조건 없이 다시 센다. */
+            if (typeof renderProfitReport === 'function') {
+                try { renderProfitReport(); } catch (e) { console.error(e); }
+            }
+        }
+
+        // 한 달치를 날짜별 발주금액 합계로 미리 모아 둔다 (달력 칸마다 훑지 않도록)
+        function gPurchaseByDay(monthKey) {
+            const out = {};
+            if (String(monthKey) < PROFIT_BUY_FROM_MONTH) return out;
+            (purchaseOrders || []).concat(purchaseArchive || []).forEach(po => {
+                const ds = String((po && po.date) || '');
+                if (!fIsPurchaseDate(ds) || ds.slice(0, 7) !== monthKey) return;
+                out[ds] = (out[ds] || 0) + (parseInt(po.totalPrice || 0) || 0);
+            });
+            return out;
+        }
+
         function gManualEntriesOf(day) {
             return Object.keys(manualExpenses || {})
                 .map(id => ({ id, ...(manualExpenses[id] || {}) }))
@@ -20218,9 +20385,21 @@
                     if (tr) html += row('🏦 계좌이체', '#7c3aed', tr, editBtn(`pickManualSaleDay('${day}')`));
                 }
 
+                /* [신규] 발주도 매입에 함께 보여 준다.
+                   발주는 '발주 등록' 화면에서 관리하므로 여기서는 보여만 주고 수정·삭제 단추는 두지 않는다.
+                   (여기서 지우면 발주 자료와 어긋난다) */
+                const pos_orders = gPurchaseOrdersOf(day);
                 const buys = entries.filter(e => e.kind === 'buy');
-                if (buys.length) {
+                if (buys.length || pos_orders.length) {
                     html += `<div style="font-size:11.5px; font-weight:800; color:#d97706; margin:10px 0 6px;">🧺 매입</div>`;
+                    pos_orders.forEach(po => {
+                        const sup = gEscapeHtml(String(po.supplier || '').trim());
+                        const nm = gEscapeHtml(String(po.itemName || '(품목 없음)').trim());
+                        const q = parseInt(po.qty) || 0;
+                        const label = `🧾 ${sup ? sup + ' · ' : ''}${nm}${q > 1 ? ` <span style="color:#94a3b8;">×${q}</span>` : ''}`;
+                        html += row(label, '#d97706', parseInt(po.totalPrice) || 0,
+                            `<span style="flex:0 0 auto; padding:4px 8px; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; border-radius:6px; font-size:10.5px; font-weight:800; white-space:nowrap;">발주</span>`);
+                    });
                     buys.forEach(e => { html += row(gEscapeHtml(String(e.title || '(제목 없음)')), '#d97706', parseInt(e.amount) || 0, editBtn(`editExpense('${e.id}'); closeManualSaleCalendar();`) + delBtn(e.id)); });
                 }
 
@@ -20233,7 +20412,7 @@
                     });
                 }
 
-                if (!pos && !tr && !entries.length) {
+                if (!pos && !tr && !entries.length && !pos_orders.length) {
                     html += `<div style="padding:20px 0; text-align:center; font-size:12.5px; font-weight:700; color:#cbd5e1;">이 날 적어 둔 것이 없습니다.</div>`;
                 }
 
@@ -20267,6 +20446,9 @@
 
             for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty"></div>`;
 
+            // 발주도 날짜별로 미리 모아 둔다 (매입에 함께 센다)
+            const poByDay = gPurchaseByDay(msCalMonth);
+
             let sumPos = 0, sumTr = 0, sumBuy = 0, sumExp = 0, days = 0;
             for (let d = 1; d <= lastDay; d++) {
                 const key = `${msCalMonth}-${String(d).padStart(2, '0')}`;
@@ -20274,9 +20456,11 @@
                 const pos = v ? (parseInt(v.pos) || 0) : 0;
                 const tr = v ? (parseInt(v.transfer) || 0) : 0;
                 const eb = expByDay[key] || { buy: 0, exp: 0 };
+                // [수정] 매입 = 발주금액 + 직접 적은 매입 (위 요약칸과 같은 잣대)
+                const buySum = eb.buy + (poByDay[key] || 0);
                 const saleSum = pos + tr;
-                const has = (saleSum > 0 || eb.buy > 0 || eb.exp > 0);
-                if (has) { sumPos += pos; sumTr += tr; sumBuy += eb.buy; sumExp += eb.exp; days++; }
+                const has = (saleSum > 0 || buySum > 0 || eb.exp > 0);
+                if (has) { sumPos += pos; sumTr += tr; sumBuy += buySum; sumExp += eb.exp; days++; }
                 const dow = (lead + d - 1) % 7;
                 const cls = `ms-cal-cell${has ? ' has' : ''}${key === todayISO ? ' today' : ''}`
                     + (dow === 0 ? ' ms-cal-sun' : dow === 6 ? ' ms-cal-sat' : '');
@@ -20286,7 +20470,7 @@
                 html += `<div class="${cls}" onclick="${click}" title="${tip}">`
                     + `<div class="ms-cal-day">${d}</div>`
                     + (saleSum ? `<div style="color:#0284c7;">${gShortWon(saleSum)}</div>` : '')
-                    + (eb.buy ? `<div style="color:#d97706;">${gShortWon(eb.buy)}</div>` : '')
+                    + (buySum ? `<div style="color:#d97706;">${gShortWon(buySum)}</div>` : '')
                     + (eb.exp ? `<div style="color:#dc2626;">${gShortWon(eb.exp)}</div>` : '')
                     + `</div>`;
             }
@@ -20343,30 +20527,44 @@
         async function saveManualSale() {
             // [수정] 월(YYYY-MM)만 받던 것을 날짜(YYYY-MM-DD)도 받게 했다. 지금 고른 모드의 칸을 본다.
             const key = gManualSaleKey();
-            const pos = parseInt(document.getElementById('ms-pos')?.value || 0) || 0;
-            const transfer = parseInt(document.getElementById('ms-transfer')?.value || 0) || 0;
+
+            /* [수정] 적어 넣은 칸만 저장한다.
+               예전에는 PUT으로 {pos, transfer}를 통째로 덮어써서, 포스만 적고 저장하면
+               비워 둔 계좌이체가 0으로 지워졌다. 따로따로 적어 넣을 수가 없었다.
+               이제 빈 칸은 손대지 않고(PATCH), 적어 넣은 칸만 바꾼다.
+               0을 적는 것은 '0으로 고치겠다'는 뜻이므로 그대로 0을 넣는다. */
+            const rawPos = String(document.getElementById('ms-pos')?.value ?? '').trim();
+            const rawTr = String(document.getElementById('ms-transfer')?.value ?? '').trim();
+            const hasPos = rawPos !== '';
+            const hasTr = rawTr !== '';
+            const pos = parseInt(rawPos) || 0;
+            const transfer = parseInt(rawTr) || 0;
 
             if (!fIsMonthKey(key) && !fIsDayKey(key)) {
                 showToast(msInputMode === 'day' ? "날짜를 골라 주세요." : "월을 골라 주세요.");
                 return;
             }
-            if (pos <= 0 && transfer <= 0) { showToast("포스나 계좌이체 금액을 넣어 주세요."); return; }
+            if (!hasPos && !hasTr) { showToast("포스나 계좌이체 금액을 넣어 주세요."); return; }
 
             showLoader("매출 저장 중...");
             try {
-                const body = { pos, transfer, updatedAt: Date.now() };
+                const body = { updatedAt: Date.now() };
+                if (hasPos) body.pos = pos;
+                if (hasTr) body.transfer = transfer;
                 const res = await fetch(`${FIREBASE_DB_URL}manual_sales/${key}.json`, {
-                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
                 });
                 if (!res.ok) throw new Error('저장 실패 ' + res.status);
-                manualSales[key] = body;
+                manualSales[key] = { ...(manualSales[key] || {}), ...body };   // 안 건드린 칸은 그대로 둔다
                 document.getElementById('ms-pos').value = '';
                 document.getElementById('ms-transfer').value = '';
-                showToast(`${key} 매출 ${(pos + transfer).toLocaleString()}원 저장`);
+                // 적어 넣은 칸만 알려 준다 (건드리지 않은 칸을 저장했다고 하면 헷갈린다)
+                const saved = [hasPos ? `💳 ${pos.toLocaleString()}` : '', hasTr ? `🏦 ${transfer.toLocaleString()}` : '']
+                    .filter(Boolean).join(' · ');
+                showToast(`${key} 매출 저장 — ${saved}`);
                 renderProfitReport();
-                // 달력을 열어 둔 채로 저장했으면 그 자리도 바로 갱신한다
-                const cal = document.getElementById('ms-cal-modal');
-                if (cal && cal.style.display === 'flex') renderManualSaleCalendar();
+                // 달력을 열어 둔 채로(또는 아래에 펼쳐 둔 채로) 저장했으면 그 자리도 바로 갱신한다
+                msCalRefresh();
             } catch (e) {
                 console.error(e);
                 showToast("저장 실패: " + e.message);
@@ -20428,7 +20626,7 @@
             const hint = document.getElementById('ms-hint');
             if (hint && !_expEditId) {
                 hint.innerText = isSale
-                    ? '같은 날짜를 다시 저장하면 덮어씁니다.'
+                    ? '적어 넣은 칸만 덮어씁니다. 비워 두면 그 칸은 그대로 둡니다.'
                     : (msEntryKind === 'expense' && msExpenseKind === 'fixed'
                         ? '고정비는 적은 달부터 매달 이어집니다.'
                         : '적을 때마다 한 줄씩 쌓입니다.');
@@ -20511,9 +20709,14 @@
             // 어느 칸에서 눌렀는지에 따라 매입·매출·지출을 미리 골라 둔다
             if (kind && typeof setManualEntryKind === 'function') setManualEntryKind(kind);
             setTimeout(() => modal.classList.add('active'), 10);
+            // 달력을 창 아래에 함께 펼쳐 둔다 (매출·매입·지출 셋 다 보인다)
+            msCalMountInline();
         }
 
         function closeDirectInput() {
+            // 달력 패널을 먼저 제자리로 돌려놓는다.
+            // (ms-cal-inline 이 ms-card 안에 있어, 카드를 먼저 옮기면 달력이 딸려간다)
+            msCalUnmountInline();
             const modal = document.getElementById('direct-input-modal');
             const card = document.getElementById('ms-card');
             const home = document.getElementById('ms-card-home');
@@ -21156,9 +21359,11 @@
                다시 골라야 했다. 여기서 누르면 그 종류가 이미 골라진 채로 열린다. */
             const inputBtn = (kind) => `<button type="button" onclick="openDirectInput('${kind}')" title="직접 입력" style="margin-left:5px; padding:2px 6px; border:1px solid #e2e8f0; background:#f8fafc; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; line-height:1.5; vertical-align:middle;">✍️</button>`;
 
+            // [수정] 칸 차례를 매출 → 매입 → 지출 → 잔액으로 둔다.
+            //  번 돈이 먼저 오고, 거기서 빠지는 것(매입·지출)이 뒤따르고, 남은 돈으로 끝난다.
             sumBox.innerHTML = [
-                { l: '매입' + inputBtn('buy'), v: tBuy.toLocaleString() + '원', c: '#d97706' },
                 { l: '매출 (계좌+포스)' + inputBtn('sale'), v: tSale.toLocaleString() + '원', c: '#0284c7' },
+                { l: '매입' + inputBtn('buy'), v: tBuy.toLocaleString() + '원', c: '#d97706' },
                 { l: '지출 (고정비+그외)' + inputBtn('expense'), v: tExp.toLocaleString() + '원', c: '#dc2626' },
                 /* [수정] 마진률을 따로 두던 칸을 없애고 잔액 뒤 괄호 안에 붙였다.
                    둘은 같은 이야기(얼마 남았나)라 나란히 봐야 뜻이 통한다. */
@@ -21241,8 +21446,9 @@
 
                 headRow.innerHTML =
                     `<th${anyOpen ? ' rowspan="2"' : ''} style="padding:9px 10px 9px 7px; white-space:nowrap; text-align:left; vertical-align:middle; ${stickyHead}">월</th>`
-                    + (isOpenKind('buy') ? groupTh('buy') : th('매입', 'buy'))
+                    // [수정] 요약칸과 같이 매출 → 매입 → 지출 → 총합 차례로 둔다
                     + (isOpenKind('sale') ? groupTh('sale') : th('매출', 'sale'))
+                    + (isOpenKind('buy') ? groupTh('buy') : th('매입', 'buy'))
                     + (isOpenKind('expense') ? groupTh('expense') : th('지출', 'expense'))
                     + plainTh('총합');
 
@@ -21253,7 +21459,7 @@
                    (접힌 칸은 위에서 rowspan=2로 두 줄을 차지하므로 여기에 자리를 잡지 않는다) */
                 if (headRow2) {
                     headRow2.innerHTML = !anyOpen ? '' :
-                        ['buy', 'sale', 'expense'].filter(isOpenKind).map(k =>
+                        ['sale', 'buy', 'expense'].filter(isOpenKind).map(k =>
                             // 첫 칸(총금액)은 합계라 조금 크고 진하게 — 속내 두 칸과 구분되게
                             // 묶음이 시작되는 칸에는 진한 줄, 그 안쪽 칸에는 옅은 줄
                             GROUP_SUB[k].map(([label, color], i) =>
@@ -21354,8 +21560,8 @@
                 return `
                 <tr>
                     <td style="padding:11px 10px 11px 7px; font-weight:900; color:#334155; white-space:nowrap; ${cellLine} ${stickyCell}">${m.replace('-', '년 ')}월</td>
-                    ${isOpenKind('buy') ? groupCells('buy') : cell(f.buy.toLocaleString(), '#d97706')}
                     ${isOpenKind('sale') ? groupCells('sale') : cell(f.sale.toLocaleString(), '#0f172a')}
+                    ${isOpenKind('buy') ? groupCells('buy') : cell(f.buy.toLocaleString(), '#d97706')}
                     ${isOpenKind('expense') ? groupCells('expense') : cell(f.exp.toLocaleString(), '#dc2626')}
                     <!-- [수정] 총합은 '숫자 + (마진률)'이라 칸을 똑같이 나누면 넘쳐서 잘렸다.
                          숫자는 안 쪼개지게 두고, 마진률만 자리가 모자라면 아랫줄로 내린다. -->
@@ -21385,8 +21591,8 @@
                     return `
                     <div style="border:1px solid var(--border); border-radius:12px; padding:11px 13px; margin-bottom:9px; background:#fff;">
                         <div style="font-size:13.5px; font-weight:900; color:#0f172a; padding-bottom:7px;">${m.replace('-', '년 ')}월</div>
-                        ${line('buy', '매입', f.buy.toLocaleString() + '원', '#d97706')}
                         ${line('sale', '매출', f.sale.toLocaleString() + '원', '#0f172a', 15)}
+                        ${line('buy', '매입', f.buy.toLocaleString() + '원', '#d97706')}
                         ${line('expense', '지출', f.exp.toLocaleString() + '원', '#dc2626')}
                         <!-- 총합은 앞의 셋으로 나온 값이라 펼칠 속내가 없다 -->
                         <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid #f1f5f9;">
@@ -22160,15 +22366,19 @@
 
     <!-- [신규] 매출 내역 달력 — 날짜별 포스·계좌이체를 한 달치로 본다 -->
     <div id="ms-cal-modal" class="no-print" style="display:none; position:fixed; z-index:10002; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;" onclick="if(event.target===this) closeManualSaleCalendar()">
-        <div style="background:#fff; border-radius:16px; width:100%; max-width:460px; max-height:86vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
+        <!-- [수정] 이 패널은 '직접 입력' 창이 열리면 그 창 아래쪽(ms-cal-inline)으로 옮겨 붙는다.
+             칸을 두 벌 만들면 id가 겹쳐 달력 코드가 엉키므로 하나를 옮겨 쓴다.
+             ms-cal-home 은 창을 닫을 때 되돌려 놓을 자리 표시다. -->
+        <div id="ms-cal-home"></div>
+        <div id="ms-cal-panel" style="background:#fff; border-radius:16px; width:100%; max-width:460px; max-height:86vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
             <div style="padding:13px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                <button type="button" onclick="moveManualSaleCalendar(-1)" style="flex:0 0 auto; width:32px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">‹</button>
+                <button type="button" onclick="msCalMove(-1)" style="flex:0 0 auto; width:32px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">‹</button>
                 <div id="ms-cal-title" style="flex:1; text-align:center; font-size:15px; font-weight:900; color:#0f172a;"></div>
-                <button type="button" onclick="moveManualSaleCalendar(1)" style="flex:0 0 auto; width:32px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">›</button>
-                <span onclick="closeManualSaleCalendar()" style="flex:0 0 auto; font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1; margin-left:2px;">&times;</span>
+                <button type="button" onclick="msCalMove(1)" style="flex:0 0 auto; width:32px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">›</button>
+                <span id="ms-cal-x" onclick="closeManualSaleCalendar()" style="flex:0 0 auto; font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1; margin-left:2px;">&times;</span>
             </div>
             <div id="ms-cal-legend" style="padding:8px 14px 0; font-size:11px; font-weight:700; color:#94a3b8;">
-                <span style="color:#0284c7;">■ 매출</span> &nbsp; <span style="color:#d97706;">■ 매입</span> &nbsp; <span style="color:#dc2626;">■ 지출</span>
+                <span style="color:#0284c7;">■ 매출</span> &nbsp; <span style="color:#d97706;">■ 매입(발주 포함)</span> &nbsp; <span style="color:#dc2626;">■ 지출</span>
                 &nbsp;/&nbsp; 금액이 적힌 날을 누르면 무엇으로 이뤄졌는지 볼 수 있습니다.
             </div>
             <div id="ms-cal-body" style="overflow-y:auto; padding:10px 14px 14px; -webkit-overflow-scrolling:touch;"></div>
