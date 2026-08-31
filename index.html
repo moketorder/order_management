@@ -5636,7 +5636,26 @@
                     const isDelivery = customer.shippingMethod === '배달주문';
                     const shippingClass = isDelivery ? 'card-delivery' : 'card-pickup';
 
+                    /* [신규] 같은 손님이 같은 날 픽업·배달을 함께 시켰는지.
+                       드물지만(전체의 1.1%) 모르고 나가면 손님이 헛걸음하거나,
+                       배달 나가는 김에 같이 실어 줄 것을 놓친다. 서로를 가리키는 딱지를 붙인다. */
+                    const _pairPhone = String(customer.phone || '').replace(/\D/g, '');
+                    const _pairSide = isDelivery ? '매장픽업' : '배달주문';
+                    const pairKey = `pc_${_pairPhone}_${customer.dateStr}_${isDelivery ? 'P' : 'D'}`;
+                    const cardKey = `pc_${_pairPhone}_${customer.dateStr}_${isDelivery ? 'D' : 'P'}`;
+                    const pairCount = (!_pairPhone || !customer.dateStr || customer.dateStr === '기타') ? 0
+                        : (rawOrders || []).filter(it => {
+                            if (!it) return false;
+                            if (it.canceled === true || it.canceled === "true" || String(it.canceled).toUpperCase() === "TRUE") return false;
+                            if (String(it.phone || '').replace(/\D/g, '') !== _pairPhone) return false;
+                            if (getOrderDateInfo(it).dateStr !== customer.dateStr) return false;
+                            if (gIsFeeRow(it)) return false;
+                            const asm = (it.shippingMethod === '배달주문' || (it.shippingMethod !== '매장픽업' && it.address && String(it.address).trim() !== '')) ? '배달주문' : '매장픽업';
+                            return asm === _pairSide;
+                        }).length;
+
                     const card = document.createElement('div');
+                    card.id = cardKey;   // 짝 카드가 이 이름으로 찾아온다
                     card.className = `customer-card ${shippingClass} ${anySelected ? 'has-selection' : ''}`;
 
                     // 상품목록 로드 (데스크톱 및 모바일 테이블/카드 템플릿)
@@ -5786,12 +5805,22 @@
                                         <!-- [신규] 지난 날짜에 아직 안 찾아간 것이 있으면 알려 준다.
                                              오늘 물건을 건네면서 지난 것도 함께 챙겨 줄 수 있다.
                                              오른쪽 끝으로 밀어 두어 이름·연락처와 섞이지 않게 한다. -->
-                                        ${unpickedCount > 0 ? `
-                                            <button type="button" class="no-print"
-                                                onclick="openUnpickedModal('${encodeURIComponent(customer.phone || '')}','${encodeURIComponent(customer.name || '')}')"
-                                                title="지난 미픽업 내역 보기"
-                                                style="margin-left:auto; flex-shrink:0; font-size:11px; font-weight:800; padding:3px 8px; border-radius:5px; border:1.5px solid #fca5a5; background:#fef2f2; color:#b91c1c; cursor:pointer; white-space:nowrap;">⚠️ 미픽업 ${unpickedCount}건</button>
-                                        ` : ''}
+                                        <span style="margin-left:auto; display:inline-flex; gap:5px; align-items:center; flex-shrink:0;">
+                                            ${unpickedCount > 0 ? `
+                                                <button type="button" class="no-print"
+                                                    onclick="openUnpickedModal('${encodeURIComponent(customer.phone || '')}','${encodeURIComponent(customer.name || '')}')"
+                                                    title="지난 미픽업 내역 보기"
+                                                    style="flex-shrink:0; font-size:11px; font-weight:800; padding:3px 8px; border-radius:5px; border:1.5px solid #fca5a5; background:#fef2f2; color:#b91c1c; cursor:pointer; white-space:nowrap;">⚠️ 미픽업 ${unpickedCount}건</button>
+                                            ` : ''}
+                                            <!-- [신규] 같은 손님이 같은 날 픽업·배달을 함께 시킨 경우 서로를 가리켜 준다.
+                                                 드물지만(1.1%) 모르고 나가면 손님이 헛걸음하거나, 같이 실어 갈 것을 놓친다.
+                                                 눌러 짝 카드로 옮겨 간다. 인쇄에도 남겨 배달기사가 챙길 수 있게 한다. -->
+                                            ${pairCount > 0 ? `
+                                                <button type="button" onclick="gotoPairCard('${pairKey}')"
+                                                    title="같은 날 ${isDelivery ? '픽업' : '배달'} 건도 있습니다 — 눌러서 보기"
+                                                    style="flex-shrink:0; font-size:11px; font-weight:800; padding:3px 8px; border-radius:5px; border:1.5px solid #a5b4fc; background:#eef2ff; color:#4338ca; cursor:pointer; white-space:nowrap;">🔗 외 ${isDelivery ? '픽업' : '배달'} ${pairCount}건</button>
+                                            ` : ''}
+                                        </span>
                                     </div>
                                     
                                     <!-- 둘째줄: 카톡이름, 주문횟수, 배달사진버튼 -->
@@ -14937,6 +14966,18 @@
            지난 픽업·배달일이 지났는데 아직 넘겨주지도 취소되지도 않은 줄이 있으면,
            오늘 물건을 건네면서 지난 것도 함께 챙겨 줄 수 있다.
            (배달비 줄은 물건이 아니라 세지 않는다) */
+        /* [신규] 짝 카드(같은 손님·같은 날의 반대편 수령방법)로 옮겨 간다.
+           같은 날짜라 늘 같은 화면에 있으므로, 창을 띄우지 않고 그 자리로 내려가 잠깐 반짝인다. */
+        function gotoPairCard(key) {
+            const el = document.getElementById(key);
+            if (!el) { showToast("짝이 되는 카드를 찾지 못했습니다. (다른 날짜에 있을 수 있습니다)"); return; }
+            el.scrollIntoView({ block: 'center' });
+            const prev = el.style.boxShadow;
+            el.style.transition = 'box-shadow 0.25s';
+            el.style.boxShadow = '0 0 0 4px #a5b4fc';
+            setTimeout(() => { el.style.boxShadow = prev || ''; }, 1600);
+        }
+
         function gTodayKey() {
             const d = new Date();
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -16908,8 +16949,11 @@
 
                 // 숨김 상품은 밑으로 정렬하고, 노출 여부가 같으면 가나다순으로 정렬
                 grouped[mKey].sort((a, b) => {
-                    // [신규] 재고관리: 각 선반 그룹 '안에서만' 품절 상품을 뒤로 (그룹/카테고리 순서는 유지)
-                    if (isInventoryView) {
+                    /* [신규] 재고관리·예약판매: 그 묶음 '안에서만' 품절 상품을 뒤로 보낸다.
+                       (묶음·날짜 차례는 그대로 둔다)
+                       [수정] 예약판매도 같이 넣었다. 그 날짜에 파는 것 중 아직 살 수 있는 것이
+                       위로 와야 손대기 쉬운데, 품절이 섞여 있어 매번 눈으로 걸러야 했다. */
+                    if (isInventoryView || isReserveView) {
                         const soA = isProductSoldOut(a.prod), soB = isProductSoldOut(b.prod);
                         if (soA !== soB) return soA ? 1 : -1;
                     }
