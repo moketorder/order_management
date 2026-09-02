@@ -1091,7 +1091,7 @@
             gap: 8px;
             opacity: 0;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
-            z-index: 10000;
+            z-index: 10200; /* [수정] 팝업창(최대 10100)보다 위여야 안내 글이 흐린 화면에 가리지 않는다 */
             white-space: nowrap;
             max-width: 92vw;
             overflow-x: auto;
@@ -3521,7 +3521,13 @@
             <!-- 아파트 관리 -->
             <div id="data-sub-apart" style="display:none;">
                 <div class="card" style="padding: 12px;">
-                    <div class="card-title" style="margin:0 0 4px; font-size:14px;">🏢 아파트 자료</div>
+                    <!-- [수정] 전단지 기록은 늘 펼쳐 두지 않는다. 이 화면이 이미 길어서
+                         맨 위 단추로 띄운다 (내용은 팝업 안에서 그대로 쓴다). -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                        <div class="card-title" style="margin:0; font-size:14px;">🏢 아파트 자료</div>
+                        <button type="button" onclick="openFlyerModal()"
+                            style="flex:0 0 auto; padding:8px 14px; background:#10b981; color:#fff; border:none; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap;">🧾 전단지</button>
+                    </div>
                     <div style="font-size:11.5px; color:var(--text-sub); font-weight:700; line-height:1.6; margin-bottom:12px; word-break:keep-all;">
                         배달 주소에서 아파트를 알아보는 기준입니다. <b>① 도로명주소</b>를 먼저 보고, 없으면 <b>② 지번</b>, 그다음 <b>③ 이름(키워드)</b>을 긴 것부터, 마지막으로 <b>④ 내가 묶은 구역</b> 순으로 맞춰 봅니다.
                         별칭은 주문 검색창에서 그 단어로 찾을 수 있게 해 줍니다.
@@ -4508,7 +4514,7 @@
             // 도로명주소도 지번도 아직 모르고 이름(키워드)으로만 찾는 곳
             { name: "e편한세상",   roads: [], lots: [], keywords: ["e편한", "이편한"], aliases: ["e편한세상", "e편한", "이편한"] },
             { name: "서희스타힐스", roads: [], lots: [], keywords: ["서희스타힐스"], aliases: ["서희스타힐스", "스타힐스"] },
-            { name: "힐스테이트",  roads: [], lots: [], keywords: ["힐스테이트"], aliases: ["힐스테이트"] },
+            { name: "힐스테이트",  roads: ["아리수로93다길80"], lots: [], keywords: ["힐스테이트"], aliases: ["힐스테이트"] },
             { name: "신안인스빌",  roads: [], lots: [], keywords: ["신안인스빌"], aliases: ["신안인스빌", "인스빌"] },
             { name: "루나리움",    roads: [], lots: [], keywords: ["루나리움"], aliases: ["루나리움"] },
             { name: "디에트르",    roads: [], lots: [], keywords: ["디에트르"], aliases: ["디에트르"] },
@@ -4585,10 +4591,11 @@
         async function loadEntrancePasswords() {
             try {
                 const res = await fetch(`${FIREBASE_DB_URL}entrance_passwords.json?t=${Date.now()}`);
-                entrancePasswords = (res.ok ? (await res.json()) : null) || {};
+                entrancePasswordsRaw = (res.ok ? (await res.json()) : null) || {};
+                gRebuildAptKeyViews();
             } catch (e) {
                 console.warn('공동현관 비번 로드 실패:', e);
-                entrancePasswords = entrancePasswords || {};
+                entrancePasswordsRaw = entrancePasswordsRaw || {};
             }
         }
 
@@ -4597,6 +4604,206 @@
             const n = String(aptName || '');
             const hit = (typeof gAptList === 'function' ? gAptList() : []).find(a => a && a.name === n);
             return (hit && hit.shortName) ? hit.shortName : n;
+        }
+
+        /* ===== [신규] 도로명주소를 아파트 '열쇠'로 쓴다 (2026-09-02) =====
+           여태 공동현관 비번·전단지 기록을 아파트 '이름'으로 저장했다.
+           그런데 이름은 주문관리(푸르지오2차)와 배달기사(푸지2차)가 서로 달라서,
+           한쪽에서 이름을 고치면 다른 쪽이 그 자료를 못 찾는 일이 생겼다.
+           도로명주소는 한 건물에 하나뿐이라 어긋날 일이 없으므로 이것을 열쇠로 삼는다.
+
+           · 서버에 저장할 때  → 도로명주소 (미사강변한강로60)
+           · 화면에 보일 때    → 지금 쓰던 이름 그대로 (푸르지오2차)
+
+           도로명주소가 아직 없는 아파트는 예전처럼 이름을 열쇠로 쓴다.
+           주문이 한 건이라도 들어오면 gAutoFillAptRoads가 알아서 채운다. */
+
+        // 아파트 이름 → 서버에 쓸 열쇠 (도로명주소, 없으면 이름 그대로)
+        function gAptRoadKey(aptName) {
+            const n = String(aptName || '').trim();
+            if (!n) return '';
+            const list = (typeof gAptList === 'function') ? gAptList() : [];
+            const hit = list.find(a => a && (String(a.name) === n || String(a.shortName || '') === n));
+            const road = hit && (hit.roads || [])[0];
+            return road ? String(road).trim() : n;
+        }
+
+        // 서버 열쇠 → 화면에 보여 줄 아파트 이름 (도로명주소도, 예전 짧은 이름도 받아 준다)
+        function gAptNameOfKey(key) {
+            const k = String(key || '').trim();
+            if (!k) return '';
+            const list = (typeof gAptList === 'function') ? gAptList() : [];
+            const byRoad = list.find(a => a && (a.roads || []).includes(k));
+            if (byRoad) return String(byRoad.name);
+            const byName = list.find(a => a && (String(a.name) === k || String(a.shortName || '') === k));
+            return byName ? String(byName.name) : k;
+        }
+
+        /* 서버에서 받은 그대로(도로명 열쇠)와, 화면에서 쓰는 벌(이름 열쇠)을 따로 둔다.
+           아파트 표가 비번보다 늦게 도착할 수 있어, 표가 도착하면 다시 만든다.
+           (여러 번 불러도 결과가 같도록 늘 '받은 그대로'에서 새로 만든다) */
+        let entrancePasswordsRaw = {};
+        let flyerLogsRaw = {};
+        /* [신규] 아파트 하나에 하나뿐인 '공용 비번'.
+           동마다 다른 곳은 위 칸별 비번을 쓰고, 단지 전체가 한 비번인 곳은 여기에 적는다.
+           저장 자리: entrance_common/{도로명주소} = "비번" */
+        let entranceCommon = {};
+        let entranceCommonRaw = {};
+
+        async function loadEntranceCommon() {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}entrance_common.json?t=${Date.now()}`);
+                entranceCommonRaw = (res.ok ? (await res.json()) : null) || {};
+            } catch (e) { console.warn('공용 비번 불러오기 실패:', e); entranceCommonRaw = entranceCommonRaw || {}; }
+            gRebuildAptKeyViews();
+            return entranceCommon;
+        }
+
+        const gCommonPwdOf = (aptName) => String((entranceCommon || {})[aptName] || '').trim();
+
+        // 공용 비번을 저장한다 (빈 값이면 지운다)
+        async function gCommonPwdWrite(aptName, value) {
+            const rk = gAptRoadKey(aptName);
+            if (!rk) throw new Error('아파트를 알 수 없습니다.');
+            const v = String(value || '').trim();
+            const res = await fetch(`${FIREBASE_DB_URL}entrance_common/${encodeURIComponent(rk)}.json`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v || null)
+            });
+            if (!res.ok) throw new Error('서버 응답 ' + res.status);
+            if (v) { entranceCommonRaw[rk] = v; entranceCommon[aptName] = v; }
+            else { delete entranceCommonRaw[rk]; delete entranceCommon[aptName]; }
+        }
+
+        function gRebuildAptKeyViews() {
+            const remap = (raw) => {
+                const out = {};
+                Object.keys(raw || {}).forEach(k => {
+                    const name = gAptNameOfKey(k);
+                    out[name] = Object.assign(out[name] || {}, raw[k] || {});
+                });
+                return out;
+            };
+            entrancePasswords = remap(entrancePasswordsRaw);
+            flyerLogs = remap(flyerLogsRaw);
+            entranceCommon = {};
+            Object.keys(entranceCommonRaw || {}).forEach(k => {
+                const v = String(entranceCommonRaw[k] || '').trim();
+                if (v) entranceCommon[gAptNameOfKey(k)] = v;
+            });
+        }
+
+        // 비번 칸 하나를 저장/삭제한다. value가 null이면 지운다.
+        async function gPwdWrite(aptName, slotKey, value) {
+            const rk = gAptRoadKey(aptName);
+            if (!rk || !slotKey) throw new Error('아파트나 칸 이름이 비었습니다.');
+            const url = `${FIREBASE_DB_URL}entrance_passwords/${encodeURIComponent(rk)}/${encodeURIComponent(slotKey)}.json`;
+            const res = await fetch(url, value === null
+                ? { method: 'DELETE' }
+                : { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(String(value)) });
+            if (!res.ok) throw new Error('서버 응답 ' + res.status);
+            if (!entrancePasswordsRaw[rk]) entrancePasswordsRaw[rk] = {};
+            if (!entrancePasswords[aptName]) entrancePasswords[aptName] = {};
+            if (value === null) { delete entrancePasswordsRaw[rk][slotKey]; delete entrancePasswords[aptName][slotKey]; }
+            else { entrancePasswordsRaw[rk][slotKey] = String(value); entrancePasswords[aptName][slotKey] = String(value); }
+        }
+
+        // 전단지 기록 한 칸을 저장/삭제한다. dates가 null이면 지운다.
+        async function gFlyerWrite(aptName, slotKey, dates) {
+            const rk = gAptRoadKey(aptName);
+            if (!rk || !slotKey) throw new Error('아파트나 칸 이름이 비었습니다.');
+            const url = `${FIREBASE_DB_URL}flyer_logs/${encodeURIComponent(rk)}/${encodeURIComponent(slotKey)}.json`;
+            const body = (dates && dates.length) ? { dates: dates } : null;
+            const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (!res.ok) throw new Error('서버 응답 ' + res.status);
+            if (!flyerLogsRaw[rk]) flyerLogsRaw[rk] = {};
+            if (!flyerLogs[aptName]) flyerLogs[aptName] = {};
+            if (body) { flyerLogsRaw[rk][slotKey] = body; flyerLogs[aptName][slotKey] = body; }
+            else { delete flyerLogsRaw[rk][slotKey]; delete flyerLogs[aptName][slotKey]; }
+        }
+
+        // 아파트 한 곳을 통째로 지운다 (비번 + 전단지 기록)
+        async function gAptWipe(aptName) {
+            const keys = [...new Set([gAptRoadKey(aptName), aptName])].filter(Boolean);
+            for (const k of keys) {
+                await fetch(`${FIREBASE_DB_URL}entrance_passwords/${encodeURIComponent(k)}.json`, { method: 'DELETE' });
+                await fetch(`${FIREBASE_DB_URL}flyer_logs/${encodeURIComponent(k)}.json`, { method: 'DELETE' });
+                await fetch(`${FIREBASE_DB_URL}entrance_common/${encodeURIComponent(k)}.json`, { method: 'DELETE' });
+                delete entrancePasswordsRaw[k]; delete flyerLogsRaw[k]; delete entranceCommonRaw[k];
+            }
+            delete entrancePasswords[aptName]; delete flyerLogs[aptName]; delete entranceCommon[aptName];
+        }
+
+        /* [신규] 도로명주소 자동 채우기.
+           도로명이 안 적힌 아파트라도, 손님이 지번이나 이름으로 주문하면 주소 어딘가에
+           도로명이 함께 적혀 있는 일이 많다. 그걸 주워서 표에 채워 둔다.
+           한 번 채워 두면 그 뒤로는 도로명만으로 아파트를 찾을 수 있다.
+           [주의] 서로 다른 도로명이 섞여 있으면 어느 쪽이 맞는지 알 수 없으므로 건너뛴다. */
+        let _roadFillDone = false;
+        async function gAutoFillAptRoads() {
+            if (_roadFillDone) return;
+            const orders = (typeof rawOrders !== 'undefined' && Array.isArray(rawOrders)) ? rawOrders : [];
+            if (!orders.length || !gAptList().length) return;
+            _roadFillDone = true;
+
+            // 도로명이 비어 있는 아파트만 본다
+            const blanks = gAptList().filter(a => a && a.name && !(a.roads || []).length);
+            if (!blanks.length) return;
+            const want = new Map(blanks.map(a => [a.name, {}]));
+
+            orders.forEach(o => {
+                const full = `${(o && o.address) || ''} ${(o && o.addressDetail) || ''}`.trim();
+                if (!full) return;
+                const apt = gFindApartment(full);
+                if (!apt || !want.has(apt.name)) return;
+                // 주문서가 따로 실어 보낸 도로명주소가 가장 정확하다. 없으면 주소 글에서 뽑는다.
+                const road = gRoadKey((o && o.roadAddress) || '') || gRoadKey(full);
+                if (!road) return;
+                const bag = want.get(apt.name);
+                bag[road] = (bag[road] || 0) + 1;
+            });
+
+            const filled = [];
+            for (const [name, bag] of want) {
+                const found = Object.keys(bag);
+                if (found.length !== 1) continue;          // 없거나, 두 가지 이상 섞였으면 손대지 않는다
+                const road = found[0];
+                try {
+                    if (await gSaveAptRoad(name, road)) filled.push(`${name} → ${road}`);
+                } catch (e) { console.warn('도로명 채우기 실패:', name, e); }
+            }
+            if (filled.length) {
+                gRebuildAptKeyViews();
+                console.log('[도로명 자동 채움]', filled);
+                if (typeof showToast === 'function') showToast(`🏠 도로명주소를 채웠습니다 — ${filled.join(', ')}`);
+            }
+        }
+
+        // 아파트 한 곳의 도로명주소를 표(apartment_extra 또는 apartment_table)에 적어 둔다
+        async function gSaveAptRoad(aptName, road) {
+            const target = String(aptName || '').trim(), r = String(road || '').trim();
+            if (!target || !r) return false;
+            for (const node of ['apartment_extra', 'apartment_table']) {
+                const res = await fetch(`${FIREBASE_DB_URL}${node}.json?t=${Date.now()}`);
+                if (!res.ok) continue;
+                const raw = await res.json();
+                if (!raw) continue;
+                const entries = Array.isArray(raw) ? raw.map((v, i) => [String(i), v]) : Object.entries(raw);
+                const hit = entries.find(([, v]) => v && (String(v.name || '') === target || String(v.shortName || '') === target));
+                if (!hit) continue;
+                const cur = Array.isArray(hit[1].roads) ? hit[1].roads : [];
+                if (cur.includes(r)) return false;
+                const next = cur.concat([r]);
+                const put = await fetch(`${FIREBASE_DB_URL}${node}/${encodeURIComponent(hit[0])}/roads.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next)
+                });
+                if (!put.ok) throw new Error('서버 응답 ' + put.status);
+                // 화면에 들고 있는 표에도 바로 반영
+                const mem = gAptList().find(a => a && (String(a.name) === target || String(a.shortName || '') === target));
+                if (mem) mem.roads = next;
+                try { localStorage.removeItem(APT_TABLE_KEY); } catch (e) {}
+                return true;
+            }
+            return false;
         }
         /* 주소에서 동 키를 뽑는다.
            [주의] 배달기사는 동 번호의 '끝 두 자리'로 묶어 저장한다 (701동·106동 → 01동·06동).
@@ -4622,7 +4829,8 @@
            [수정] 1·2 / 3·4 두 칸만 보던 것을, 배달기사에서 정한 호수 칸을 그대로 읽게 바꿨다.
            손님 호수가 그 칸의 범위 안에 들면 그 비번을 고른다. (1~3호 칸이면 2호도 여기) */
         function gEntrancePwdFor(address, addrDetail) {
-            const apt = gDriverAptName(extractApartmentName(address || ''));
+            // [수정] 화면에서 쓰는 벌은 주문관리 이름으로 맞춰 두었으므로 짧은 이름으로 바꿀 필요가 없다
+            const apt = extractApartmentName(address || '');
             const map = (entrancePasswords || {})[apt];
             if (!map) return null;
 
@@ -4651,6 +4859,853 @@
             return null;
         }
 
+
+        /* ===== [신규] 전단지 돌린 곳 기록 =====
+           아파트 → 동 → 라인(1~2호·3~4호) 차례로 펼쳐 놓고, 라인을 누르면 그날 날짜가 남는다.
+           라인 구분은 공동현관 비번에 적어 둔 호수 칸(entrance_passwords)을 그대로 쓴다.
+           비번을 안 적어 둔 동은 '전체' 한 칸으로만 나온다.
+
+           저장 자리: flyer_logs/{도로명주소}/{칸이름} = { dates: ["2026-09-01", ...] }
+           날짜는 새 것이 앞에 오게 쌓고 열 개까지만 둔다 (오래된 것은 볼 일이 없다). */
+        let flyerLogs = {};
+        let _flyerApt = '';    // 지금 펼쳐 둔 아파트 ('' 이면 아파트 고르는 화면)
+
+        async function loadFlyerLogs() {
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}flyer_logs.json?t=${Date.now()}`);
+                flyerLogsRaw = (res.ok ? (await res.json()) : null) || {};
+                gRebuildAptKeyViews();
+            } catch (e) {
+                console.warn('전단지 기록 불러오기 실패:', e);
+                flyerLogsRaw = flyerLogsRaw || {};
+            }
+            return flyerLogs;
+        }
+
+        // 그 아파트에서 전단지를 돌릴 수 있는 칸 목록 (동 → 라인들)
+        function gFlyerSlotsOf(aptName) {
+            const map = (entrancePasswords || {})[aptName] || {};
+            const byDong = new Map();
+            Object.keys(map).forEach(k => {
+                const m = String(k).match(/^(.+)_(\d+)-(\d+)라인$/);
+                const dong = m ? m[1] : String(k);
+                const from = m ? parseInt(m[2]) : null;
+                const to = m ? parseInt(m[3]) : null;
+                if (!byDong.has(dong)) byDong.set(dong, []);
+                byDong.get(dong).push({ key: k, from, to });
+            });
+            // 동 이름 순, 동 안에서는 호수 범위 순 ('전체' 칸은 맨 뒤)
+            return [...byDong.entries()]
+                .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'ko'))
+                .map(([dong, slots]) => ({
+                    dong,
+                    slots: slots.sort((a, b) => {
+                        if (a.from === null) return 1;
+                        if (b.from === null) return -1;
+                        return a.from - b.from || a.to - b.to;
+                    })
+                }));
+        }
+
+        const gFlyerSlotLabel = (s) => (s.from == null) ? '전체' : (s.from === s.to ? `${s.from}호` : `${s.from}~${s.to}호`);
+        const gFlyerDates = (apt, key) => ((flyerLogs[apt] || {})[key] || {}).dates || [];
+
+        // '3일 전'처럼 얼마나 지났는지
+        function gDaysAgoText(ds) {
+            const p = String(ds || '').split('-');
+            if (p.length !== 3) return '';
+            const d = new Date(+p[0], +p[1] - 1, +p[2]);
+            const t = new Date(); t.setHours(0, 0, 0, 0);
+            const n = Math.round((t - d) / 86400000);
+            if (n <= 0) return '오늘';
+            if (n === 1) return '어제';
+            return `${n}일 전`;
+        }
+
+        /* 라인 하나를 눌렀을 때.
+           오늘 이미 찍혀 있으면 빼고(잘못 눌렀을 때), 아니면 오늘 날짜를 앞에 넣는다. */
+        async function toggleFlyer(aptEnc, keyEnc) {
+            const apt = decodeURIComponent(aptEnc || '');
+            const key = decodeURIComponent(keyEnc || '');
+            if (!apt || !key) return;
+
+            const today = gTodayKey();
+            const cur = gFlyerDates(apt, key).slice();
+            const at = cur.indexOf(today);
+            if (at >= 0) cur.splice(at, 1);
+            else cur.unshift(today);
+            const next = cur.slice(0, 10);
+
+            // 화면을 먼저 바꿔 두면 누른 느낌이 바로 온다 (실패하면 되돌린다)
+            const before = JSON.parse(JSON.stringify(flyerLogs));
+            if (!flyerLogs[apt]) flyerLogs[apt] = {};
+            flyerLogs[apt][key] = { dates: next };
+            renderFlyerBoard();
+
+            try {
+                // [수정] 서버에는 도로명주소를 열쇠로 적는다 (이름은 화면에서만 쓴다)
+                await gFlyerWrite(apt, key, next);
+                showToast(at >= 0 ? '오늘 기록을 지웠습니다.' : `${apt} ${key.replace('_', ' ')} — 오늘 돌린 것으로 기록했습니다.`);
+            } catch (e) {
+                flyerLogs = before;
+                renderFlyerBoard();
+                showToast('저장 실패: ' + e.message);
+            }
+        }
+
+        /* [신규] 전단지 기록 팝업.
+           아파트 관리 화면이 이미 길어, 늘 펼쳐 두지 않고 맨 위 단추로 띄운다. */
+        /* 보던 자리를 싹 지운다. 열 때와 닫을 때 둘 다 부른다 —
+           닫을 때만 지우면 다른 곳에서 창을 없앴을 때 지난 상태가 남는다. */
+        function gResetFlyerView() {
+            _flyerApt = '';
+            _flyerEdit = false;
+            _flyerAddOpen = false;
+            _flyerDelArmed = '';
+            _flyerNewApt = '';
+            _flyerNewForm = { road: '', name: '', short: '' };
+        }
+
+        function openFlyerModal() {
+            const old = document.getElementById('flyer-modal');
+            if (old) old.remove();          // 닫는 중이던 창이 남아 있으면 치우고 새로 연다
+            gResetFlyerView();              // 늘 아파트 고르는 화면부터
+            const modal = document.createElement('div');
+            modal.id = 'flyer-modal';
+            modal.className = 'summary-modal-overlay';
+            modal.style.zIndex = '10060';
+            modal.onclick = (e) => { if (e.target === modal) closeFlyerModal(); };
+            modal.innerHTML = `<div class="summary-modal-content" style="max-width:520px; max-height:88vh;">
+                <div class="summary-modal-header">
+                    <div style="min-width:0;">
+                        <h2 style="margin:0;">🧾 전단지</h2>
+                        <div style="font-size:12px; font-weight:700; color:var(--text-sub); margin-top:3px;">라인을 누르면 오늘 날짜로 기록됩니다</div>
+                    </div>
+                    <button type="button" class="summary-modal-close" onclick="closeFlyerModal()">&times;</button>
+                </div>
+                <div class="summary-modal-body"><div id="flyer-wrap"></div></div>
+            </div>`;
+            document.body.appendChild(modal);
+            requestAnimationFrame(() => modal.classList.add('active'));
+
+            // 아파트 칸 목록·기록을 받아 온 뒤 그린다
+            Promise.all([
+                (Object.keys(entrancePasswords || {}).length ? Promise.resolve() : loadEntrancePasswords()),
+                loadFlyerLogs(),
+                loadEntranceCommon()
+            ]).then(() => renderFlyerBoard()).catch(() => renderFlyerBoard());
+        }
+
+        function closeFlyerModal() {
+            const m = document.getElementById('flyer-modal');
+            if (m) { m.classList.remove('active'); setTimeout(() => m.remove(), 200); }
+            gResetFlyerView();
+        }
+
+        // [신규] 아파트 카드의 '자세히'를 폈다 접었다 한다 (도로명·지번·인식어·검색별칭)
+        function toggleApartDetail(el) {
+            const card = el.closest('div').parentElement;
+            const box = card ? card.querySelector('.apart-detail') : null;
+            if (!box) return;
+            const on = (box.style.display === 'none');
+            box.style.display = on ? '' : 'none';
+            el.innerText = on ? '▴ 접기' : '▾ 자세히';
+        }
+
+        function pickFlyerApt(aptEnc) { _flyerApt = decodeURIComponent(aptEnc || ''); renderFlyerBoard(); }
+        function backFlyerApt() { _flyerApt = ''; renderFlyerBoard(); }
+
+        /* ===== [신규] 전단지 화면에서 아파트·동·라인을 직접 늘리고 지우기 =====
+           칸 목록은 공동현관 비번(entrance_passwords)과 같은 자리를 쓴다.
+           여기서 라인을 만들면 비번은 빈 칸으로 생기고, 비번은 배달기사 화면에서 적으면 된다.
+           지우면 그 칸의 비번도 함께 사라지므로 두 번 눌러 확인받는다.
+           (이 화면에서는 confirm 창이 안 뜨기 때문에 단추 글씨를 바꿔 되묻는다) */
+        let _flyerNewApt = '';      // 아직 칸이 없어 서버에 없는, 방금 만든 아파트 이름
+        let _flyerDelArmed = '';    // 두 번 눌러 확인받는 중인 대상
+
+        function armFlyerDelete(token) {
+            _flyerDelArmed = (_flyerDelArmed === token) ? '' : token;
+            renderFlyerBoard();
+            if (_flyerDelArmed) setTimeout(() => {
+                if (_flyerDelArmed === token) { _flyerDelArmed = ''; renderFlyerBoard(); }
+            }, 6000);
+        }
+
+        /* 비번 칸 하나를 만든다 (비번은 빈 칸). 전단지 칸도 이걸로 생긴다.
+           [버그수정 2026-09-02] 같은 호수 칸을 다시 만들면 빈 비번으로 덮어써서
+           적어 둔 비번이 사라졌다. 이미 있으면 아무것도 하지 않고 알린다. */
+        async function flyerAddSlot(apt, dong, from, to) {
+            const key = (from == null || to == null) ? dong : `${dong}_${from}-${to}라인`;
+            if (((entrancePasswords[apt] || {})[key]) !== undefined) {
+                throw new Error(`${dong} ${from == null ? '전체' : from + '~' + to + '호'} 칸은 이미 있습니다.`);
+            }
+            await gPwdWrite(apt, key, '');
+            return key;
+        }
+
+        // 비번 칸 하나를 지운다. 그 칸의 전단지 기록도 함께 지운다.
+        async function flyerRemoveSlot(apt, key) {
+            await gPwdWrite(apt, key, null);
+            await gFlyerWrite(apt, key, null);
+        }
+
+        /* ===== 새 아파트 넣기 =====
+           도로명주소는 검색으로만 채운다 (손으로 적으면 띄어쓰기·오타로 열쇠가 어긋난다).
+           이름은 두 가지를 받는다 — 주문서에 쓸 이름과 배달기사 화면에 쓸 짧은 이름.
+           배달기사 화면은 단추가 좁아 4~6글자가 알맞다 (푸르지오2차 → 푸지2차). */
+        let _flyerAddOpen = false;
+        let _flyerNewForm = { road: '', name: '', short: '' };
+        /* 동·라인을 더하고 지우는 단추는 평소에 감춰 둔다.
+           전단지를 돌리며 체크할 때는 지우기 단추가 옆에 있으면 잘못 누르기 쉽고 어수선하다.
+           틀을 고칠 때만 '✏️ 고치기'를 눌러 꺼낸다. */
+        let _flyerEdit = false;
+        /* [신규] 고치는 동안에는 서버에 아무것도 쓰지 않는다.
+           예전에는 '＋ 라인'을 누르는 순간 서버에 빈 칸이 생겨서,
+           같은 호수를 잘못 눌렀을 때 적어 둔 비번이 지워지는 일이 있었다.
+           이제 화면에서만 고쳐 두었다가 '저장하기'를 누를 때 한꺼번에 보낸다.
+           '취소'를 누르면 서버는 손도 대지 않은 채로 남는다. */
+        let _flyerDraft = null;   // { apt, rows: [{key, dong, from, to, pwd}], common }
+
+        function gStartFlyerDraft(apt) {
+            const map = entrancePasswords[apt] || {};
+            const rows = [];
+            gFlyerSlotsOf(apt).forEach(g => g.slots.forEach(sl => {
+                rows.push({ key: sl.key, dong: g.dong, from: sl.from, to: sl.to, pwd: String(map[sl.key] || '') });
+            }));
+            _flyerDraft = { apt, rows, common: gCommonPwdOf(apt) };
+        }
+
+        // 고치는 중에 그릴 목록 (동별로 묶고 호수 순으로. 화면 칸 이름에 쓸 번호도 함께)
+        function gDraftGroups() {
+            const by = new Map();
+            ((_flyerDraft && _flyerDraft.rows) || []).forEach((r, idx) => {
+                if (!by.has(r.dong)) by.set(r.dong, []);
+                by.get(r.dong).push(Object.assign({ idx }, r));
+            });
+            return [...by.entries()]
+                .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'ko'))
+                .map(([dong, slots]) => ({
+                    dong,
+                    slots: slots.sort((a, b) => (a.from == null) ? 1 : (b.from == null) ? -1 : (a.from - b.from || a.to - b.to))
+                }));
+        }
+
+        function flyerDraftSet(idx, field, v) {
+            if (!_flyerDraft || !_flyerDraft.rows[idx]) return;
+            if (field === 'pwd') _flyerDraft.rows[idx].pwd = String(v == null ? '' : v);
+            else _flyerDraft.rows[idx][field] = (v === '' ? null : parseInt(v));
+        }
+        function flyerDraftCommon(v) { if (_flyerDraft) _flyerDraft.common = String(v == null ? '' : v); }
+
+        // 라인 한 칸 더 — 비어 있는 호수를 알아서 고른다
+        function flyerDraftAddLine(dongEnc) {
+            const dong = decodeURIComponent(dongEnc || '');
+            if (!_flyerDraft) return;
+            const used = _flyerDraft.rows.filter(r => r.dong === dong);
+            const 후보 = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 9]];
+            const 빈자리 = 후보.find(([a, b]) => !used.some(r => r.from === a && r.to === b));
+            if (!빈자리) { showToast(`${dong}은 넣을 자리가 다 찼습니다.`); return; }
+            _flyerDraft.rows.push({ key: null, dong, from: 빈자리[0], to: 빈자리[1], pwd: '' });
+            renderFlyerBoard();
+        }
+
+        // 고른 동까지 한꺼번에 (01동부터). 이미 있는 동은 건너뛴다.
+        function flyerDraftAddDong() {
+            if (!_flyerDraft) return;
+            const dong = String((document.getElementById('flyer-new-dong') || {}).value || '').trim();
+            if (!dong) { showToast('동을 골라 주세요.'); return; }
+            const maxN = parseInt(dong);
+            if (!maxN || maxN < 1) { showToast('동을 다시 골라 주세요.'); return; }
+            const have = new Set(_flyerDraft.rows.map(r => r.dong));
+            const made = [];
+            for (let i = 1; i <= maxN; i++) {
+                const d = String(i).padStart(2, '0') + '동';
+                if (have.has(d)) continue;
+                _flyerDraft.rows.push({ key: null, dong: d, from: 1, to: 2, pwd: '' });
+                made.push(d);
+            }
+            if (!made.length) { showToast(`01동~${dong}은 이미 다 있습니다.`); return; }
+            showToast(made.length === 1 ? `${made[0]}을 넣었습니다 — 저장하기를 눌러야 남습니다.`
+                : `${made[0]}~${made[made.length - 1]} ${made.length}개 동을 넣었습니다 — 저장하기를 눌러야 남습니다.`);
+            renderFlyerBoard();
+        }
+
+        function flyerDraftDelLine(idx) {
+            if (!_flyerDraft) return;
+            _flyerDraft.rows.splice(idx, 1);
+            _flyerDelArmed = ''; renderFlyerBoard();
+        }
+        function flyerDraftDelDong(dongEnc) {
+            const dong = decodeURIComponent(dongEnc || '');
+            if (!_flyerDraft) return;
+            _flyerDraft.rows = _flyerDraft.rows.filter(r => r.dong !== dong);
+            _flyerDelArmed = ''; renderFlyerBoard();
+        }
+
+        function toggleFlyerEdit() {
+            _flyerEdit = !_flyerEdit;
+            _flyerDelArmed = '';
+            if (_flyerEdit) gStartFlyerDraft(_flyerApt); else _flyerDraft = null;
+            renderFlyerBoard();
+        }
+
+        function toggleFlyerAdd() {
+            _flyerAddOpen = !_flyerAddOpen;
+            if (!_flyerAddOpen) _flyerNewForm = { road: '', name: '', short: '' };
+            else _flyerApt = '';   // 아파트를 펼쳐 보던 중이라도 목록 화면으로 돌아와서 보여 준다
+            renderFlyerBoard();
+        }
+        // 다시 그려도 적던 값이 날아가지 않게 그때그때 담아 둔다
+        function flyerFormSet(field, v) { _flyerNewForm[field] = String(v == null ? '' : v); }
+
+        async function flyerCreateApt() {
+            const name = String(_flyerNewForm.name || '').trim();
+            const short = String(_flyerNewForm.short || '').trim();
+            const road = String(_flyerNewForm.road || '').trim();
+            if (!name) { showToast('주문서 이름을 적어 주세요.'); return; }
+
+            const known = gAptList().find(a => a && (String(a.name) === name || String(a.shortName || '') === name));
+            const rk = gRoadKey(road);
+
+            // 같은 도로명을 이미 다른 아파트가 쓰고 있으면 막는다 (열쇠가 겹치면 자료가 섞인다)
+            if (rk) {
+                const clash = gAptList().find(a => a && (a.roads || []).includes(rk) && String(a.name) !== (known ? String(known.name) : name));
+                if (clash) { showToast(`이 주소는 이미 '${clash.name}'에 등록돼 있습니다.`); return; }
+            }
+
+            if (!known) {
+                if (!rk) { showToast('🔍 주소 검색을 눌러 도로명주소를 골라 주세요.'); return; }
+                showLoader('아파트를 등록하는 중...');
+                try {
+                    await gCreateAptExtra(name, rk, short);
+                    showToast(`${name}${short ? ' (배달기사: ' + short + ')' : ''} — ${rk} 로 등록했습니다.`);
+                } catch (e) { hideLoader(); showToast('등록 실패: ' + e.message); return; }
+                finally { hideLoader(); }
+            } else {
+                // 이미 있는 아파트 — 비어 있는 것만 채워 준다
+                showLoader('저장하는 중...');
+                try {
+                    if (rk && !(known.roads || []).length) await gSaveAptRoad(known.name, rk);
+                    if (short && String(known.shortName || '') !== short) await gSaveAptShortName(known.name, short);
+                    gRebuildAptKeyViews();
+                    showToast(`이미 있는 아파트입니다 — '${known.name}'로 들어갑니다.`);
+                } catch (e) { showToast('저장 실패: ' + e.message); }
+                finally { hideLoader(); }
+            }
+
+            const goName = known ? String(known.name) : name;
+            _flyerNewApt = goName;
+            _flyerApt = goName;
+            _flyerEdit = !known;   // 갓 만든 아파트는 동을 넣어야 하니 고치기 모드로 연다
+            _flyerAddOpen = false;
+            _flyerNewForm = { road: '', name: '', short: '' };
+            renderFlyerBoard();
+        }
+
+        // 배달기사 화면에 쓸 짧은 이름을 표에 적어 둔다
+        async function gSaveAptShortName(aptName, short) {
+            const target = String(aptName || '').trim();
+            if (!target) return false;
+            for (const node of ['apartment_extra', 'apartment_table']) {
+                const res = await fetch(`${FIREBASE_DB_URL}${node}.json?t=${Date.now()}`);
+                if (!res.ok) continue;
+                const raw = await res.json();
+                if (!raw) continue;
+                const entries = Array.isArray(raw) ? raw.map((v, i) => [String(i), v]) : Object.entries(raw);
+                const hit = entries.find(([, v]) => v && String(v.name || '') === target);
+                if (!hit) continue;
+                const put = await fetch(`${FIREBASE_DB_URL}${node}/${encodeURIComponent(hit[0])}/shortName.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(String(short))
+                });
+                if (!put.ok) throw new Error('서버 응답 ' + put.status);
+                const mem = gAptList().find(a => a && String(a.name) === target);
+                if (mem) mem.shortName = String(short);
+                try { localStorage.removeItem(APT_TABLE_KEY); } catch (e) {}
+                return true;
+            }
+            return false;
+        }
+
+        /* [신규] 도로명주소는 손으로 적으면 띄어쓰기·오타·'로/길' 혼동으로 열쇠가 어긋난다.
+           다음 우편번호 창에서 고르게 해서 늘 같은 표기가 들어오게 한다.
+           주문관리는 평소 이 창을 쓸 일이 없으므로, 누를 때 한 번만 불러온다. */
+        function gLoadPostcode() {
+            return new Promise((resolve, reject) => {
+                if (window.daum && window.daum.Postcode) return resolve();
+                const s = document.createElement('script');
+                s.src = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+                s.onload = () => resolve();
+                s.onerror = () => reject(new Error('주소 검색을 불러오지 못했습니다. 인터넷을 확인해 주세요.'));
+                document.head.appendChild(s);
+            });
+        }
+
+        async function flyerSearchRoad() {
+            try { await gLoadPostcode(); } catch (e) { showToast(e.message); return; }
+            new daum.Postcode({
+                oncomplete: function (data) {
+                    const road = String(data.roadAddress || '');
+                    _flyerNewForm.road = road;
+                    const el = document.getElementById('flyer-new-road');
+                    if (el) el.value = road;
+                    // 이름이 비어 있으면 건물 이름을 넣어 준다 (마음에 안 들면 고치면 된다)
+                    const nameEl = document.getElementById('flyer-new-apt');
+                    if (nameEl && !String(nameEl.value || '').trim() && data.buildingName) {
+                        nameEl.value = String(data.buildingName);
+                        _flyerNewForm.name = String(data.buildingName);
+                    }
+                    const rk = gRoadKey(road);
+                    showToast(rk ? ('도로명주소를 넣었습니다 — ' + road) : '이 주소에서는 도로명을 찾지 못했습니다.');
+                }
+            }).open();
+        }
+
+        // 아파트 한 곳을 표(apartment_extra)에 새로 넣는다
+        async function gCreateAptExtra(name, roadKey, shortName) {
+            const key = 'apt_' + Date.now();
+            const row = { name: String(name), shortName: String(shortName || ''), roads: [String(roadKey)], lots: [], keywords: [String(name)], aliases: [String(name)] };
+            const res = await fetch(`${FIREBASE_DB_URL}apartment_extra/${key}.json`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(row)
+            });
+            if (!res.ok) throw new Error('서버 응답 ' + res.status);
+            await loadApartmentExtra();
+            gRebuildAptKeyViews();
+            return key;
+        }
+
+        /* [신규] 아파트 삭제는 되돌릴 수 없다 (비번·전단지 기록이 통째로 없어진다).
+           단추를 두 번 누르는 방식은 잘못 눌러도 넘어가 버려서, 무엇이 지워지는지
+           숫자로 보여 주고 한 번 더 묻는 창을 띄운다. */
+        function askDeleteApt(aptEnc) {
+            const apt = decodeURIComponent(aptEnc || '');
+            const groups = gFlyerSlotsOf(apt);
+            const 동수 = groups.length;
+            const 칸수 = groups.reduce((a, g) => a + g.slots.length, 0);
+            const 비번수 = Object.values(entrancePasswords[apt] || {}).filter(v => String(v || '').trim()).length;
+            const 기록수 = Object.values(flyerLogs[apt] || {}).filter(v => ((v || {}).dates || []).length).length;
+            const com = gCommonPwdOf(apt);
+
+            const old = document.getElementById('flyer-del-modal'); if (old) old.remove();
+            const m = document.createElement('div');
+            m.id = 'flyer-del-modal';
+            m.style.cssText = 'position:fixed; inset:0; z-index:10080; background:rgba(15,23,42,0.6); display:flex; align-items:center; justify-content:center; padding:16px;';
+            m.onclick = (e) => { if (e.target === m) m.remove(); };
+            m.innerHTML = `<div style="background:#fff; border-radius:14px; max-width:360px; width:92%; overflow:hidden; box-shadow:0 18px 45px rgba(0,0,0,0.25);">
+                <div style="padding:16px 18px 12px;">
+                    <div style="font-size:15.5px; font-weight:900; color:#b91c1c; margin-bottom:8px;">🗑 '${gEscapeHtml(apt)}'를 지울까요?</div>
+                    <div style="font-size:12.5px; font-weight:700; color:#475569; line-height:1.7;">
+                        아래 자료가 <b style="color:#b91c1c;">모두 없어집니다.</b> 되돌릴 수 없습니다.
+                        <div style="margin-top:9px; padding:10px 12px; background:#fef2f2; border:1px solid #fecaca; border-radius:9px; color:#7f1d1d;">
+                            · 동 <b>${동수}</b>개 · 호수 칸 <b>${칸수}</b>개<br>
+                            · 적어 둔 공동현관 비번 <b>${비번수}</b>개${com ? ' (공용 비번 포함)' : ''}<br>
+                            · 전단지 기록 <b>${기록수}</b>칸
+                        </div>
+                        <div style="margin-top:9px; color:#94a3b8; font-size:11.5px;">배달기사 화면에서도 이 아파트 비번이 사라집니다.</div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; padding:12px 18px 16px;">
+                    <button type="button" onclick="document.getElementById('flyer-del-modal').remove()"
+                        style="flex:1.4; height:44px; border:1.5px solid var(--border); background:#fff; color:#475569; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">그대로 두기</button>
+                    <button type="button" onclick="document.getElementById('flyer-del-modal').remove(); flyerDeleteApt('${aptEnc}')"
+                        style="flex:1; height:44px; border:none; background:#dc2626; color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">지우기</button>
+                </div></div>`;
+            document.body.appendChild(m);
+        }
+
+        async function flyerDeleteApt(aptEnc) {
+            const apt = decodeURIComponent(aptEnc || '');
+            _flyerDelArmed = '';
+            showLoader('지우는 중...');
+            try {
+                await gAptWipe(apt);
+                _flyerApt = '';
+                showToast(`${apt}를 지웠습니다.`);
+            } catch (e) { showToast('삭제 실패: ' + e.message); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+
+        async function flyerDeleteDong(aptEnc, dongEnc) {
+            const apt = decodeURIComponent(aptEnc || ''), dong = decodeURIComponent(dongEnc || '');
+            _flyerDelArmed = '';
+            showLoader('지우는 중...');
+            try {
+                const keys = Object.keys((entrancePasswords || {})[apt] || {})
+                    .filter(k => k === dong || String(k).startsWith(dong + '_'));
+                for (const k of keys) await flyerRemoveSlot(apt, k);
+                showToast(`${dong}을(를) 지웠습니다.`);
+            } catch (e) { showToast('삭제 실패: ' + e.message); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+
+        async function flyerDeleteLine(aptEnc, keyEnc) {
+            const apt = decodeURIComponent(aptEnc || ''), key = decodeURIComponent(keyEnc || '');
+            _flyerDelArmed = '';
+            showLoader('지우는 중...');
+            try { await flyerRemoveSlot(apt, key); showToast('라인을 지웠습니다.'); }
+            catch (e) { showToast('삭제 실패: ' + e.message); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+
+        /* 동을 만든다. 고른 동이 '마지막 동'이라, 1동부터 그 동까지 한꺼번에 만든다.
+           (08동을 고르면 01동~08동이 생긴다. 아파트는 동 번호가 이어져 있어 하나씩 넣을 일이 없다)
+           이미 있는 동은 건너뛴다 — 이미 넣어 둔 호수 범위와 비번을 건드리지 않기 위해서다. */
+        async function flyerAddDong(aptEnc) {
+            const apt = decodeURIComponent(aptEnc || '');
+            const dong = String((document.getElementById('flyer-new-dong') || {}).value || '').trim();
+            if (!dong) { showToast('동을 골라 주세요.'); return; }
+            // 동을 만들 때는 호수를 묻지 않는다. 1~2호로 만들어 두고, 다르면 뒤에 고치면 된다.
+            const from = 1, to = 2;
+
+            const maxN = parseInt(dong);
+            if (!maxN || maxN < 1) { showToast('동을 다시 골라 주세요.'); return; }
+            // 이미 있는 동은 손대지 않는다
+            const have = new Set(gFlyerSlotsOf(apt).map(g => g.dong));
+            const targets = [];
+            for (let i = 1; i <= maxN; i++) {
+                const d = String(i).padStart(2, '0') + '동';
+                if (!have.has(d)) targets.push(d);
+            }
+            if (!targets.length) { showToast(`01동~${dong}은 이미 다 있습니다.`); return; }
+
+            showLoader(`${targets.length}개 동을 만드는 중...`);
+            const made = [];
+            try {
+                for (const d of targets) { await flyerAddSlot(apt, d, from, to); made.push(d); }
+                _flyerNewApt = '';
+                { const e = document.getElementById('flyer-new-dong'); if (e) e.value = ''; }
+                const hoText = (from == null ? '전체' : from + '~' + to + '호');
+                showToast(made.length === 1
+                    ? `${made[0]} ${hoText} 칸을 만들었습니다.`
+                    : `${made[0]}~${made[made.length - 1]} ${made.length}개 동을 ${hoText}로 만들었습니다.` + (have.size ? ` (이미 있던 ${have.size}개 동은 그대로 뒀습니다)` : ''));
+            } catch (e) { showToast(`만들기 실패: ${e.message}` + (made.length ? ` — ${made.length}개까지는 만들었습니다.` : '')); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+
+        /* [신규] 한 칸의 호수 범위와 공동현관 비번을 한 번에 저장한다.
+           칸 이름이 곧 호수 범위라(03동_1-2라인), 범위를 고치는 것은 이름을 바꾸는 일이다.
+           범위가 바뀌면 비번과 전단지 기록을 새 이름으로 옮긴 뒤 옛 이름을 지운다. */
+        async function flyerRenameLine(aptEnc, keyEnc, dongEnc, gi, si) {
+            const apt = decodeURIComponent(aptEnc || ''), oldKey = decodeURIComponent(keyEnc || ''), dong = decodeURIComponent(dongEnc || '');
+            const f = String((document.getElementById(`flyer-ed-from-${gi}-${si}`) || {}).value || '');
+            const t = String((document.getElementById(`flyer-ed-to-${gi}-${si}`) || {}).value || '');
+            const pwdEl = document.getElementById(`flyer-ed-pwd-${gi}-${si}`);
+            const newPwd = String((pwdEl && pwdEl.value) || '').trim();
+            const oldPwd = String(((entrancePasswords[apt] || {})[oldKey]) || '').trim();
+
+            if ((f === '') !== (t === '')) { showToast('호수를 둘 다 고르거나 둘 다 전체로 두세요.'); return; }
+            const from = f === '' ? null : parseInt(f), to = t === '' ? null : parseInt(t);
+            if (from != null && from > to) { showToast('앞 숫자가 뒤 숫자보다 큽니다.'); return; }
+            const newKey = (from == null) ? dong : `${dong}_${from}-${to}라인`;
+
+            if (newKey === oldKey && newPwd === oldPwd) { showToast('바뀐 것이 없습니다.'); return; }
+            if (newKey !== oldKey && ((entrancePasswords[apt] || {})[newKey]) !== undefined) { showToast('그 호수 칸이 이미 있습니다.'); return; }
+
+            showLoader('저장하는 중...');
+            try {
+                if (newKey === oldKey) {
+                    await gPwdWrite(apt, oldKey, newPwd);
+                    showToast(newPwd ? `비번을 ${newPwd} 로 바꿨습니다.` : '비번을 비웠습니다.');
+                } else {
+                    const dates = gFlyerDates(apt, oldKey);
+                    await gPwdWrite(apt, newKey, newPwd);                 // 새 이름에 먼저 넣고
+                    if (dates.length) await gFlyerWrite(apt, newKey, dates);
+                    await gPwdWrite(apt, oldKey, null);                   // 그 다음 옛 이름을 지운다
+                    if (dates.length) await gFlyerWrite(apt, oldKey, null);
+                    showToast(`${dong} ${from == null ? '전체' : from + '~' + to + '호'}${newPwd !== oldPwd ? ' · 비번도 함께' : ''} 바꿨습니다.`);
+                }
+            } catch (e) { showToast('저장 실패: ' + e.message); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+
+        /* [수정] 줄마다 저장 단추를 두었더니, 몇 군데 고치려면 그만큼 눌러야 했다.
+           이제 고칠 것을 다 고치고 '저장하기'를 한 번만 누른다.
+           (동·라인을 더하고 지우는 것은 그 자리에서 바로 반영된다 — 되돌릴 일이 드물어서다) */
+        async function flyerSaveAll(aptEnc) {
+            const apt = decodeURIComponent(aptEnc || '');
+            if (!_flyerDraft || _flyerDraft.apt !== apt) { showToast('고치던 내용이 없습니다.'); return; }
+            const rows = _flyerDraft.rows;
+
+            // ① 확인 — 호수가 겹치면 어느 비번을 써야 할지 알 수 없다
+            const perDong = new Map();
+            for (const r of rows) {
+                if ((r.from == null) !== (r.to == null)) { showToast(`${r.dong} — 호수를 둘 다 고르거나 둘 다 전체로 두세요.`); return; }
+                if (r.from != null && r.from > r.to) { showToast(`${r.dong} — 앞 숫자가 뒤 숫자보다 큽니다.`); return; }
+                const list = perDong.get(r.dong) || [];
+                for (const o of list) {
+                    if (r.from == null || o.from == null || (r.from <= o.to && o.from <= r.to)) {
+                        showToast(`${r.dong} — 호수가 겹칩니다 (${gFlyerSlotLabel(o)} · ${gFlyerSlotLabel(r)})`); return;
+                    }
+                }
+                list.push(r); perDong.set(r.dong, list);
+            }
+
+            const keyOf = (r) => (r.from == null) ? r.dong : `${r.dong}_${r.from}-${r.to}라인`;
+            const finalKeys = new Set(rows.map(keyOf));
+            const oldMap = entrancePasswords[apt] || {};
+            const com = String(_flyerDraft.common || '').trim();
+            const comChanged = (com !== gCommonPwdOf(apt));
+            const writes = rows.filter(r => String(oldMap[keyOf(r)] === undefined ? '\u0000' : oldMap[keyOf(r)]) !== String(r.pwd || '').trim());
+            const dels = Object.keys(oldMap).filter(k => !finalKeys.has(k));
+            if (!writes.length && !dels.length && !comChanged) { showToast('바뀐 것이 없습니다.'); toggleFlyerEdit(); return; }
+
+            showLoader('저장하는 중...');
+            try {
+                // ② 새 이름부터 적는다 (호수를 서로 맞바꿔도 자료가 안 사라지게)
+                for (const r of writes) {
+                    const k = keyOf(r);
+                    await gPwdWrite(apt, k, String(r.pwd || '').trim());
+                    if (r.key && r.key !== k) { const d = gFlyerDates(apt, r.key); if (d.length) await gFlyerWrite(apt, k, d); }
+                }
+                // ③ 이제 아무도 안 쓰는 옛 이름을 지운다
+                for (const k of dels) { await gPwdWrite(apt, k, null); await gFlyerWrite(apt, k, null); }
+                if (comChanged) await gCommonPwdWrite(apt, com);
+
+                const parts = [];
+                if (writes.length) parts.push(`${writes.length}칸 고침`);
+                if (dels.length) parts.push(`${dels.length}칸 지움`);
+                if (comChanged) parts.push('공용 비번');
+                showToast(`저장했습니다 — ${parts.join(' · ')}`);
+                _flyerEdit = false; _flyerDraft = null;
+            } catch (e) { showToast('저장 실패: ' + e.message); }
+            finally { hideLoader(); _flyerDelArmed = ''; renderFlyerBoard(); }
+        }
+
+        // 아파트 공용 비번을 저장한다
+        async function saveFlyerCommonPwd(aptEnc) {
+            const apt = decodeURIComponent(aptEnc || '');
+            const el = document.getElementById('flyer-common-pwd');
+            const v = String((el && el.value) || '').trim();
+            showLoader('저장하는 중...');
+            try {
+                await gCommonPwdWrite(apt, v);
+                showToast(v ? `공용 비번을 ${v} 로 저장했습니다.` : '공용 비번을 지웠습니다.');
+            } catch (e) { showToast('저장 실패: ' + e.message); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+
+        /* 이미 있는 동에 라인 한 칸 더.
+           호수를 묻지 않고 비어 있는 자리를 알아서 고른다 —
+           라인은 1~2호 · 3~4호처럼 두 집씩 묶이는 게 보통이라 고를 것이 사실상 정해져 있다.
+           다르면 만든 뒤에 호수를 바꾸면 된다. */
+        async function flyerAddLine(aptEnc, dongEnc) {
+            const apt = decodeURIComponent(aptEnc || ''), dong = decodeURIComponent(dongEnc || '');
+            const map = entrancePasswords[apt] || {};
+            const 후보 = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 9]];
+            const 빈자리 = 후보.find(([a, b]) => map[`${dong}_${a}-${b}라인`] === undefined);
+            if (!빈자리) { showToast(`${dong}은 넣을 자리가 다 찼습니다.`); return; }
+            const [from, to] = 빈자리;
+            showLoader('만드는 중...');
+            try { await flyerAddSlot(apt, dong, from, to); showToast(`${dong} ${from}~${to}호 칸을 만들었습니다.`); }
+            catch (e) { showToast('만들기 실패: ' + e.message); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+
+        /* [신규] 동·호수는 손으로 적지 않고 고르게 한다.
+           '05동'을 '5동'이나 '05'로 잘못 적으면 다른 칸이 하나 더 생겨 버려서,
+           배달기사 비번과도 어긋난다. 고르게 하면 표기가 늘 같다. */
+        function gDongOptions(have) {
+            const owned = new Set(have || []);
+            let out = '<option value="">마지막 동 고르기</option>';
+            for (let i = 1; i <= 30; i++) {
+                const v = String(i).padStart(2, '0') + '동';
+                out += `<option value="${v}">${v}${owned.has(v) ? ' (있음)' : ''}</option>`;
+            }
+            return out;
+        }
+        function gHoOptions(sel) {
+            let out = '<option value="">전체</option>';
+            for (let i = 1; i <= 9; i++) out += `<option value="${i}"${String(sel) === String(i) ? ' selected' : ''}>${i}호</option>`;
+            return out;
+        }
+
+        // 작은 입력칸 · 단추 모양을 한곳에서 (줄마다 같은 크기로 보이게)
+        const _fIn = 'height:32px; padding:5px 8px; border:1.5px solid #cbd5e1; border-radius:7px; font-size:12px; font-weight:700; box-sizing:border-box; min-width:0;';
+        const _fBtn = 'height:32px; padding:0 11px; border-radius:7px; font-size:11.5px; font-weight:800; cursor:pointer; white-space:nowrap;';
+
+        function renderFlyerBoard() {
+            const box = document.getElementById('flyer-wrap');
+            if (!box) return;
+
+            // ── 아파트 고르기 ──
+            if (!_flyerApt) {
+                const names = [...new Set(Object.keys(entrancePasswords || {}))]
+                    .sort((a, b) => a.localeCompare(b, 'ko'));
+                const today = gTodayKey();
+
+                const chips = names.map(n => {
+                    const dongCount = gFlyerSlotsOf(n).length;   // [수정] 칸(라인) 수보다 동 수가 한눈에 들어온다
+                    /* [수정] 칸을 지웠는데 그 칸의 기록이 남아 있으면 '오늘 N'만 올라가고
+                       눌러 봐도 해당하는 줄이 없어 헷갈린다. 지금 있는 칸만 센다. */
+                    const liveKeys = new Set(Object.keys(entrancePasswords[n] || {}));
+                    const doneToday = Object.entries((flyerLogs[n] || {}))
+                        .filter(([k, v]) => liveKeys.has(k) && ((v || {}).dates || [])[0] === today).length;
+                    return `<button type="button" onclick="pickFlyerApt('${encodeURIComponent(n)}')"
+                        title="${gEscapeHtml(n)}"
+                        style="display:flex; align-items:center; gap:6px; width:100%; box-sizing:border-box; height:38px; padding:0 11px;
+                               border:1.5px solid ${doneToday ? '#86efac' : 'var(--border)'}; background:${doneToday ? '#f0fdf4' : '#fff'};
+                               color:#334155; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer; text-align:left;">
+                        <span style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gEscapeHtml(n)}</span>
+                        <span style="flex:0 0 auto; font-weight:700; color:#94a3b8;">${dongCount}동</span>${doneToday ? `<span style="flex:0 0 auto; color:#16a34a;">·${doneToday}</span>` : ''}</button>`;
+                }).join('');
+
+                box.innerHTML =
+                    (names.length ? `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(148px, 1fr)); gap:6px; margin-bottom:10px;">${chips}</div>`
+                        : `<div style="padding:12px 0; font-size:12.5px; font-weight:700; color:#cbd5e1;">아직 아파트가 없습니다. 아래에서 새로 만들어 주세요.</div>`)
+                    ;
+
+                // 새 아파트 넣는 칸은 평소에 감춰 둔다 (팝업 머리의 '＋ 아파트'를 눌러야 나온다)
+                const addPanel = !_flyerAddOpen ? '' :
+                        `<div style="border:1.5px solid #c7d2fe; background:#f8fafc; border-radius:10px; padding:10px; margin-top:4px;">
+                            <div style="display:flex; gap:5px; margin-bottom:6px;">
+                                <input id="flyer-new-road" readonly value="${gEscapeHtml(_flyerNewForm.road)}" placeholder="도로명주소 — 오른쪽 검색으로 고릅니다"
+                                    style="${_fIn} flex:1 1 0; background:#eef2f7; color:#475569; cursor:default;">
+                                <button type="button" onclick="flyerSearchRoad()" style="${_fBtn} border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca;">🔍 주소 검색</button>
+                            </div>
+                            <div style="display:flex; gap:5px; margin-bottom:8px;">
+                                <input id="flyer-new-apt" value="${gEscapeHtml(_flyerNewForm.name)}" oninput="flyerFormSet('name', this.value)"
+                                    placeholder="주문서 이름 (예: 푸르지오2차)" style="${_fIn} flex:1 1 0;">
+                                <input id="flyer-new-short" value="${gEscapeHtml(_flyerNewForm.short)}" oninput="flyerFormSet('short', this.value)"
+                                    placeholder="배달기사 이름 (예: 푸지2차)" style="${_fIn} flex:1 1 0;">
+                            </div>
+                            <div style="display:flex; gap:5px;">
+                                <button type="button" onclick="toggleFlyerAdd()" style="${_fBtn} flex:1; border:1.5px solid var(--border); background:#fff; color:#64748b;">취소</button>
+                                <button type="button" onclick="flyerCreateApt()" style="${_fBtn} flex:1; border:1.5px solid #86efac; background:#f0fdf4; color:#16a34a;">＋ 등록</button>
+                            </div>
+                            <div style="margin-top:8px; font-size:11px; font-weight:700; color:#94a3b8; line-height:1.6;">
+                                도로명주소가 <b>아파트를 가리는 열쇠</b>라 검색으로만 넣습니다. 이걸 넣어야 배달기사 비번·주문 주소와 이어집니다.<br>
+                                배달기사 이름은 단추가 좁아 <b>4~6글자</b>가 알맞습니다 (비우면 주문서 이름을 그대로 씁니다).
+                            </div>
+                        </div>`;
+                // [수정] 새 아파트 넣는 자리는 목록 맨 밑에 둔다 (머리에 두었더니 ✕ 옆이라 눌리기 쉬웠다)
+                box.innerHTML += _flyerAddOpen ? addPanel
+                    : `<div style="padding-top:10px; border-top:1px dashed #e2e8f0;">
+                        <button type="button" onclick="toggleFlyerAdd()"
+                            style="width:100%; height:40px; border:1.5px dashed #86efac; background:#f0fdf4; color:#16a34a; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer;">＋ 아파트 추가하기</button>
+                       </div>`;
+                return;
+            }
+
+            // ── 고른 아파트의 동·라인 ──
+            const apt = _flyerApt;
+            // 고치는 중에는 서버 자료가 아니라 화면에만 있는 '초안'을 그린다
+            const groups = _flyerEdit ? gDraftGroups() : gFlyerSlotsOf(apt);
+            const today = gTodayKey();
+            const aptEnc = encodeURIComponent(apt);
+            const aptDelArmed = (_flyerDelArmed === 'apt|' + apt);
+
+            let html = `<div style="display:flex; align-items:center; gap:6px; margin-bottom:10px; flex-wrap:wrap;">`
+                + (_flyerEdit ? '' : `<button type="button" onclick="backFlyerApt()" style="${_fBtn} border:1.5px solid var(--border); background:#fff; color:#475569;">‹ 아파트</button>`)
+                + `<b style="font-size:13.5px; color:#0f172a;">${gEscapeHtml(apt)}</b>`
+                + (!_flyerEdit
+                    ? `<button type="button" onclick="toggleFlyerEdit()" title="동·라인을 더하거나 지웁니다"
+                        style="${_fBtn} margin-left:auto; border:1.5px solid var(--border); background:#fff; color:#64748b;">✏️ 고치기</button>`
+                    : `<button type="button" onclick="askDeleteApt('${aptEnc}')"
+                        title="이 아파트의 모든 동·라인과 기록을 지웁니다"
+                        style="${_fBtn} margin-left:auto; border:1.5px solid #fecaca; background:#fff; color:#dc2626;">🗑 아파트 삭제</button>
+                       <button type="button" onclick="toggleFlyerEdit()"
+                        style="${_fBtn} border:1.5px solid var(--border); background:#fff; color:#64748b;">취소</button>
+                       <button type="button" onclick="flyerSaveAll('${aptEnc}')"
+                        style="${_fBtn} border:none; background:#16a34a; color:#fff;">💾 저장하기</button>`)
+                + `</div>`;
+
+            /* [신규] 단지 전체가 한 비번인 곳을 위한 '공용 비번'.
+               동마다 다르면 아래 칸별 비번을 쓰고, 하나로 통하면 여기 적어 두면 된다. */
+            const commonPwd = _flyerEdit ? String((_flyerDraft && _flyerDraft.common) || '') : gCommonPwdOf(apt);
+            html += _flyerEdit
+                ? `<div style="display:flex; gap:5px; align-items:center; margin-bottom:10px; padding:8px 9px; border:1.5px solid #e0e7ff; background:#f8fafc; border-radius:9px;">
+                    <span style="flex:0 0 auto; font-size:11.5px; font-weight:900; color:#4338ca;">🔑 공용 비번</span>
+                    <input id="flyer-common-pwd" value="${gEscapeHtml(commonPwd)}" oninput="flyerDraftCommon(this.value)"
+                        placeholder="단지 전체가 한 비번일 때만 (예: 1234#5678)" style="${_fIn} flex:1 1 0;">
+                   </div>`
+                : (commonPwd
+                    ? `<div style="display:flex; gap:6px; align-items:center; margin-bottom:10px; padding:7px 10px; border:1.5px solid #c7d2fe; background:#eef2ff; border-radius:9px;">
+                        <span style="flex:0 0 auto; font-size:11.5px; font-weight:900; color:#4338ca;">🔑 공용 비번</span>
+                        <span style="flex:1; min-width:0; font-size:13px; font-weight:900; color:#312e81; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gEscapeHtml(commonPwd)}</span>
+                       </div>`
+                    : '');
+
+            if (groups.length === 0) {
+                html += _flyerEdit
+                    ? `<div style="padding:12px 0; font-size:12.5px; font-weight:700; color:#cbd5e1;">아직 동이 없습니다. 아래에서 하나 만들어 주세요.</div>`
+                    : `<div style="padding:12px 0; font-size:12.5px; font-weight:700; color:#cbd5e1;">아직 동이 없습니다. '✏️ 고치기'를 눌러 만들어 주세요.</div>`;
+            }
+
+            html += groups.map((g, gi) => {
+                const dongEnc = encodeURIComponent(g.dong);
+                const dongArmed = (_flyerDelArmed === 'dong|' + apt + '|' + g.dong);
+                const rows = g.slots.map((s, si) => {
+                    const dates = gFlyerDates(apt, s.key);
+                    const last = dates[0] || '';
+                    const isToday = (last === today);
+                    const face = last ? `${fmtMD(last)} · ${gDaysAgoText(last)}` : '안 돌림';
+                    const lineArmed = (_flyerDelArmed === 'line|' + apt + '|' + s.key);
+                    // [신규] 그 칸의 공동현관 비번. 전단지를 돌리려면 어차피 문을 열어야 해서 옆에 같이 둔다.
+                    const pwd = _flyerEdit ? String(s.pwd || '') : String(((entrancePasswords[apt] || {})[s.key]) || '').trim();
+                    if (_flyerEdit) {
+                        const armed = (_flyerDelArmed === 'line|' + s.idx);
+                        return `<div style="display:flex; gap:5px; align-items:center; margin-bottom:5px;">
+                        <select onchange="flyerDraftSet(${s.idx},'from',this.value)" style="${_fIn} flex:0 0 68px;">${gHoOptions(s.from)}</select>
+                        <span style="font-size:11.5px; font-weight:800; color:#94a3b8;">~</span>
+                        <select onchange="flyerDraftSet(${s.idx},'to',this.value)" style="${_fIn} flex:0 0 68px;">${gHoOptions(s.to)}</select>
+                        <input value="${gEscapeHtml(pwd)}" oninput="flyerDraftSet(${s.idx},'pwd',this.value)" placeholder="🔑 비번 (예: 1002#0009)"
+                            title="공동현관 비번" style="${_fIn} flex:1 1 0; color:#4338ca;">
+                        ${g.slots.length <= 1 ? '' : `<button type="button" onclick="${armed ? `flyerDraftDelLine(${s.idx})` : `armFlyerDelete('line|${s.idx}')`}"
+                            title="이 라인을 뺍니다 (저장하기를 눌러야 서버에서도 지워집니다)"
+                            style="${_fBtn} margin-left:auto; flex:0 0 auto; border:1.5px solid ${armed ? '#dc2626' : '#fecaca'}; background:${armed ? '#dc2626' : '#fef2f2'}; color:${armed ? '#fff' : '#ef4444'};">${armed ? '한 번 더' : '✕'}</button>`}
+                    </div>`;
+                    }
+
+                    return `<div style="display:flex; gap:5px; align-items:stretch; margin-bottom:5px;">
+                        <button type="button" ${_flyerEdit ? '' : `onclick="toggleFlyer('${aptEnc}','${encodeURIComponent(s.key)}')"`}
+                            title="${dates.length ? '지난 기록: ' + dates.map(d => fmtMD(d)).join(', ') : '눌러서 오늘 돌린 것으로 기록'}"
+                            style="flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 11px;
+                                   border:1.5px solid ${isToday ? '#16a34a' : (last ? '#e2e8f0' : '#f1f5f9')};
+                                   background:${isToday ? '#f0fdf4' : '#fff'}; border-radius:9px; cursor:${_flyerEdit ? 'default' : 'pointer'}; text-align:left;">
+                            <span style="flex:0 0 auto; font-size:12.5px; font-weight:800; color:#334155;">${gEscapeHtml(gFlyerSlotLabel(s))}</span>
+                            ${pwd ? `<span title="공동현관 비번" style="flex:0 1 auto; min-width:0; font-size:11.5px; font-weight:800; color:#4338ca; background:#eef2ff; border-radius:6px; padding:2px 7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🔑 ${gEscapeHtml(pwd)}</span>` : ''}
+                            <span style="margin-left:auto; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border-radius:8px;
+                                   border:1px solid ${isToday ? '#86efac' : (last ? '#e2e8f0' : '#eef2f7')};
+                                   background:${isToday ? '#dcfce7' : (last ? '#fff' : '#f8fafc')};">
+                                ${_flyerEdit ? '' : `<span style="font-size:12px; line-height:1;">${isToday ? '✅' : (last ? '☑️' : '⬜')}</span>`}
+                                <span style="font-size:11.5px; font-weight:800; color:${isToday ? '#16a34a' : (last ? '#64748b' : '#cbd5e1')}; white-space:nowrap;">${face}${dates.length > 1 ? ` <span style="color:#cbd5e1;">(${dates.length}회)</span>` : ''}</span>
+                            </span>
+                        </button>`
+                        + (!_flyerEdit ? '' : `<button type="button" onclick="${lineArmed ? `flyerDeleteLine('${aptEnc}','${encodeURIComponent(s.key)}')` : `armFlyerDelete('line|${gEscapeHtml(apt)}|${gEscapeHtml(s.key)}')`}"
+                            title="이 라인과 그 기록을 지웁니다 (공동현관 비번도 함께 지워집니다)"
+                            style="${_fBtn} flex:0 0 auto; height:auto; border:1.5px solid ${lineArmed ? '#dc2626' : '#fecaca'}; background:${lineArmed ? '#dc2626' : '#fef2f2'}; color:${lineArmed ? '#fff' : '#ef4444'};">${lineArmed ? '한 번 더' : '✕'}</button>`)
+                        + `</div>`;
+                }).join('');
+
+                return `<div style="margin-bottom:${_flyerEdit ? 14 : 10}px;">
+                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                        <span style="font-size:12.5px; font-weight:900; color:#0f172a;">🏢 ${gEscapeHtml(g.dong)}</span>`
+                        + (!_flyerEdit ? '' : `<button type="button" onclick="${dongArmed ? `flyerDraftDelDong('${dongEnc}')` : `armFlyerDelete('dong|${gEscapeHtml(apt)}|${gEscapeHtml(g.dong)}')`}"
+                            title="이 동을 뺍니다 (저장하기를 눌러야 서버에서도 지워집니다)"
+                            style="${_fBtn} margin-left:auto; height:26px; padding:0 9px; border:1.5px solid ${dongArmed ? '#dc2626' : '#fecaca'}; background:${dongArmed ? '#dc2626' : '#fff'}; color:${dongArmed ? '#fff' : '#dc2626'};">${dongArmed ? '정말 지울까요?' : '동 삭제'}</button>`)
+                        + `</div>
+                    ${rows}`
+                    + (!_flyerEdit ? '' : `<div style="margin-top:4px;">
+                        <button type="button" onclick="flyerDraftAddLine('${dongEnc}')" title="비어 있는 호수 칸을 하나 더합니다"
+                            style="${_fBtn} border:1.5px dashed #c7d2fe; background:#eef2ff; color:#4338ca;">＋ 라인</button>
+                    </div>`)
+                    + `</div>`;
+            }).join('');
+
+            // 동 새로 만들기 — 고치기 모드에서만 보여 준다
+            if (_flyerEdit) html += `<div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap; padding-top:9px; border-top:1px dashed #e2e8f0;">
+                <select id="flyer-new-dong" style="${_fIn} flex:1 1 0;">${gDongOptions(groups.map(g => g.dong))}</select>
+                <button type="button" onclick="flyerDraftAddDong()" style="${_fBtn} flex:0 0 auto; border:1.5px solid #86efac; background:#f0fdf4; color:#16a34a;">＋ 동</button>
+                <span style="font-size:11px; font-weight:700; color:#94a3b8; flex:1 1 100%; line-height:1.6;"><b>마지막 동</b>을 고르면 1동부터 거기까지 한꺼번에 만들어집니다 (08동 → 01동~08동). 이미 있는 동은 그대로 둡니다.<br>호수는 <b>1~2호</b>로 만들어지고, 뒤에 '호수 바꾸기'나 '＋ 라인'으로 손보면 됩니다. <b>저장하기를 눌러야 서버에 남습니다.</b></span>
+            </div>`;
+
+            // 목록이 길어 위 단추가 안 보일 수 있어 맨 아래에도 하나 둔다
+            if (_flyerEdit) html += `<div style="display:flex; gap:6px; margin-top:12px;">
+                <button type="button" onclick="toggleFlyerEdit()" style="${_fBtn} flex:1; height:42px; border:1.5px solid var(--border); background:#fff; color:#64748b; font-size:13px;">취소</button>
+                <button type="button" onclick="flyerSaveAll('${aptEnc}')" style="${_fBtn} flex:1.6; height:42px; border:none; background:#16a34a; color:#fff; font-size:13px;">💾 저장하기</button>
+            </div>`;
+
+            box.innerHTML = html;
+        }
         async function loadApartmentExtra() {
             try {
                 const res = await fetch(`${FIREBASE_DB_URL}apartment_extra.json`);
@@ -4666,6 +5721,7 @@
                     aliases: (v && v.aliases) || [],
                     __extra: true
                 })).filter(a => a.name);
+                if (typeof gRebuildAptKeyViews === 'function') gRebuildAptKeyViews();
             } catch (e) {
                 console.warn("등록 아파트 불러오기 실패:", e);
             }
@@ -4697,6 +5753,8 @@
             if (!mapped.length) return false;
             APARTMENT_DATA.length = 0;         // 순서가 판정에 영향을 주므로 통째로 갈아끼운다
             mapped.forEach(m => APARTMENT_DATA.push(m));
+            // [신규] 아파트 표가 비번보다 늦게 올 수 있다. 표가 바뀌면 열쇠→이름 맞춤을 다시 한다.
+            if (typeof gRebuildAptKeyViews === 'function') gRebuildAptKeyViews();
             return true;
         }
 
@@ -5347,6 +6405,8 @@
         function renderFilteredOrders() {
             // [신규] 렌더 직전 보관함 병합(멱등) — 과거 달/직접 기간 선택 시 목록이 비지 않도록
             if (typeof mergeArchiveIntoRawOrders === 'function') mergeArchiveIntoRawOrders();
+            // [신규] 도로명주소가 비어 있는 아파트를 주문 주소로 채운다 (한 번만 돈다)
+            if (typeof gAutoFillAptRoads === 'function') gAutoFillAptRoads();
             window.deliveryPhotos = {};
             try {
                 const search = document.getElementById('searchInput').value.toLowerCase().trim();
@@ -11216,6 +12276,7 @@
                 const btn = document.getElementById('btn-data-sub-' + k);
                 if (btn) btn.classList.toggle('active', k === which);
             });
+            // [수정] 전단지 기록은 맨 위 '🧾 전단지 기록' 단추를 눌렀을 때만 띄운다 (openFlyerModal)
             if (which === 'apart') renderApartmentAdmin();
             else if (which === 'profit') renderProfitReport();
         }
@@ -11446,7 +12507,13 @@
                         <span onclick="openApartmentRename('${escapeArg(apt.name)}')" title="이름 고치기 (주문관리 · 배달기사)" style="font-size:10px; font-weight:800; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:2px 7px; cursor:pointer;">✏️ 이름</span>
                         ${apt.shortName ? `<span title="배달기사 화면에 나오는 이름" style="font-size:10px; font-weight:800; color:#0f766e; background:#ecfeff; border:1px solid #99f6e4; border-radius:6px; padding:2px 7px;">🚚 ${apt.shortName}</span>` : ''}
                         <span style="margin-left:auto; font-size:11.5px; font-weight:800; color:${n > 0 ? '#166534' : '#cbd5e1'}; white-space:nowrap;">${n > 0 ? `${n}건 · ${amt.toLocaleString()}원` : '주문 없음'}</span>
+                        <!-- [신규] 도로명·지번·인식어·검색별칭은 접어 둔다.
+                             한 아파트가 대여섯 줄을 차지해 목록을 훑기 어려웠다.
+                             평소에는 한 줄만 두고, 고칠 일이 있을 때만 펼친다. -->
+                        <span onclick="toggleApartDetail(this)" title="자세히 보기 (도로명·지번·인식어·별칭)"
+                            style="flex:0 0 auto; cursor:pointer; font-size:10px; font-weight:800; color:#64748b; background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:2px 7px; white-space:nowrap;">▾ 자세히</span>
                     </div>
+                    <div class="apart-detail" style="display:none;">
                     ${line('도로명', (roads.length ? roads.map(([r]) => chip(r, '#0369a1', '#f0f9ff')) : (apt.roads || []).map(r => chip(r, '#0369a1', '#f0f9ff'))).join(''))}
                     ${line('지번', (apt.lots || []).map(l => chip(l, '#0f766e', '#ecfeff')).join(''))}
                     ${line('인식어', (apt.keywords || []).map(k => chip(k, '#475569', '#f1f5f9')).join(''))}
@@ -11456,6 +12523,7 @@
                         mine.map(k => `<span onclick="openApartmentAliasTool('${escapeArg(apt.name)}')" style="cursor:pointer; display:inline-block; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:800; color:#be123c; background:#fff1f2; border:1px solid #fecdd3;">${k}</span>`).join('') +
                         `<span onclick="openApartmentAliasTool('${escapeArg(apt.name)}')" title="검색 별칭 넣기" style="cursor:pointer; display:inline-block; padding:2px 8px; border-radius:5px; font-size:11px; font-weight:800; color:var(--primary); background:#fff; border:1px dashed var(--primary);">＋ 별칭</span>`
                     )}
+                    </div>
                 </div>`;
             }).join('');
 
@@ -12072,27 +13140,9 @@
                 });
                 if (!res.ok) throw new Error('저장 실패 ' + res.status);
 
-                /* [신규] 공동현관 비번은 '배달기사 이름'을 키로 저장돼 있다.
-                   이름만 바꾸고 비번을 그대로 두면, 조회 창에 옛 이름과 새 이름이 따로 뜨고
-                   그 아파트 비번을 못 찾는다. 이름이 바뀌면 비번도 같이 옮긴다. */
-                const oldDriverName = _aptNameEdit.name;
-                const newDriverName = shortName || mainName;
-                if (oldDriverName && newDriverName && oldDriverName !== newDriverName) {
-                    try {
-                        const pRes = await fetch(`${FIREBASE_DB_URL}entrance_passwords.json?t=${Date.now()}`);
-                        const all = pRes.ok ? ((await pRes.json()) || {}) : {};
-                        const src = all[oldDriverName];
-                        if (src && Object.keys(src).length) {
-                            const merged = Object.assign({}, all[newDriverName] || {}, src);
-                            await fetch(`${FIREBASE_DB_URL}entrance_passwords/${encodeURIComponent(newDriverName)}.json`, {
-                                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(merged)
-                            });
-                            await fetch(`${FIREBASE_DB_URL}entrance_passwords/${encodeURIComponent(oldDriverName)}.json`, { method: 'DELETE' });
-                            if (typeof loadEntrancePasswords === 'function') await loadEntrancePasswords();
-                            showToast(`공동현관 비번 ${Object.keys(src).length}개도 함께 옮겼습니다.`);
-                        }
-                    } catch (e) { console.warn('비번 이전 실패:', e); }
-                }
+                /* [2026-09-02 삭제] 예전에는 공동현관 비번이 '배달기사 이름'을 열쇠로 저장돼 있어,
+                   이름을 고치면 비번도 함께 옮겨야 했다. 이제 열쇠가 도로명주소라 이름과 상관없다.
+                   이름은 마음대로 고쳐도 비번·전단지 기록은 그대로 붙어 있는다. */
 
                 showToast(`'${mainName}'으로 저장했습니다.` + (shortName ? ` (배달기사: ${shortName})` : ''));
                 closeApartmentRename();
