@@ -4825,6 +4825,37 @@
             return [...new Set(keys)];
         }
 
+        /* [신규] 상세주소에서 '그 층에서의 호수'를 뽑는다.
+           손님이 적는 꼴이 제각각이라 '1102호'만 찾아서는 절반을 놓쳤다 —
+           '102-704', '104동2504', '106/2904', '106.1603' 같은 것도 다 호수를 적은 것이다.
+           뒤 두 자리를 그 층에서의 호수로 본다 (1102 → 02, 1110 → 10). 못 읽으면 null. */
+        // 손님이 적은 그대로의 호수 (1302, 704 …). 못 읽으면 null.
+        function gHoRawOf(addrDetail) {
+            const s = String(addrDetail || '').trim();
+            if (!s) return null;
+            const m = s.match(/(\d+)\s*호/)              // 1102호
+                || s.match(/동\s*(\d+)\s*$/)             // 104동2504
+                || s.match(/[-\/.\s]\s*(\d{3,})\s*$/)    // 102-704 · 106/2904 · 106.1603
+                || s.match(/^\s*(\d{3,})\s*$/);          // 704
+            return m ? String(m[1]) : null;
+        }
+
+        // 그 층에서의 호수 (라인을 가릴 때 쓴다). 1102 → 2, 1110 → 10.
+        function gHoOf(addrDetail) {
+            const raw = gHoRawOf(addrDetail);
+            if (raw == null) return null;
+            const n = parseInt(raw.slice(-2), 10);
+            return isNaN(n) ? null : n;
+        }
+
+        // 적힌 호수에서 그 층 호수를 뽑는다 (1302호 → 2)
+        function gHoLine(hoText) {
+            const d = String(hoText || '').replace(/\D/g, '');
+            if (!d) return null;
+            const n = parseInt(d.slice(-2), 10);
+            return isNaN(n) ? null : n;
+        }
+
         /* 그 손님 주소에 해당하는 비번을 찾는다. 못 찾으면 null.
            [수정] 1·2 / 3·4 두 칸만 보던 것을, 배달기사에서 정한 호수 칸을 그대로 읽게 바꿨다.
            손님 호수가 그 칸의 범위 안에 들면 그 비번을 고른다. (1~3호 칸이면 2호도 여기) */
@@ -4835,10 +4866,7 @@
             if (!map) return null;
 
             // 손님 호수의 끝자리 (1102호 → 2). 라인은 호수 끝자리로 나뉜다.
-            const hoM = String(addrDetail || '').match(/(\d+)\s*호/) || String(addrDetail || '').match(/-\s*(\d+)\s*$/);
-            /* [수정] 끝 한 자리만 보다가, 한 층에 열 집 넘는 곳(10호·12호)을 못 맞췄다.
-               뒤 두 자리를 그 층에서의 호수로 본다 — 1102호 → 02호, 1110호 → 10호. */
-            const hoLast = hoM ? parseInt(String(hoM[1]).slice(-2), 10) : null;
+            const hoLast = gHoOf(addrDetail);
 
             for (const dong of gDongKeysOf(addrDetail)) {
                 const slots = [];
@@ -4911,6 +4939,50 @@
 
         const gFlyerSlotLabel = (s) => (s.from == null) ? '전체' : (s.from === s.to ? `${s.from}호` : `${s.from}~${s.to}호`);
         const gFlyerDates = (apt, key) => ((flyerLogs[apt] || {})[key] || {}).dates || [];
+
+        /* [신규] 최근 석 달 안에 돌린 라인이 몇 곳인지 / 그 아파트에 라인이 모두 몇 곳인지.
+           '오늘 몇 곳 돌렸나'보다, '아직 안 간 데가 얼마나 남았나'가 알고 싶은 것이라 이렇게 센다.
+           지금 있는 칸만 센다 — 칸을 지웠는데 기록만 남아 있으면 숫자가 부풀기 때문이다. */
+        /* 전단지 화면은 칸이 좁아 긴 이름이 잘린다. 배달기사 이름(짧은 이름)이 있으면 그것을 쓴다.
+           (자료를 찾는 열쇠는 그대로 도로명주소이고, 이건 눈에 보이는 글자만 바꾸는 것이다) */
+        /* [신규] 표시가 무슨 뜻인지 적어 둔다. 색과 마크만 보고는 알 수 없어서다. */
+        const _fLegend = 'display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center; font-size:10.5px; font-weight:700; color:#94a3b8; line-height:1.6;';
+        const _fDot = (c, b) => `display:inline-block; width:9px; height:9px; border-radius:3px; border:1.5px solid ${c}; background:${b}; vertical-align:-1px; margin-right:3px;`;
+
+        function gFlyerAptLegend() {
+            return `<div style="${_fLegend} padding:8px 2px 0;">
+                <span><b style="color:#64748b;">( )</b> 최근 석 달 안에 돌린 라인 / 그 아파트 라인 모두</span>
+                <span><i style="${_fDot('#86efac', '#f0fdf4')}"></i>다 돎</span>
+                <span><i style="${_fDot('#fde68a', '#fffbeb')}"></i>반 이상</span>
+                <span><i style="${_fDot('#e2e8f0', '#fff')}"></i>그 밖</span>
+            </div>`;
+        }
+
+        function gFlyerLineLegend() {
+            return `<div style="${_fLegend} margin-bottom:9px; padding:7px 10px; background:#f8fafc; border:1px solid var(--border); border-radius:8px;">
+                <span>✅ 오늘 돌림</span>
+                <span>☑️ 전에 돌림</span>
+                <span>⬜ 안 돌림</span>
+                <span style="color:#cbd5e1;">줄을 누르면 오늘 날짜로 기록 · 한 번 더 누르면 지워짐</span>
+            </div>`;
+        }
+
+        function gFlyerShortName(aptName) {
+            const n = String(aptName || '');
+            const hit = (typeof gAptList === 'function' ? gAptList() : []).find(a => a && String(a.name) === n);
+            return (hit && hit.shortName) ? String(hit.shortName) : n;
+        }
+
+        function gFlyerRecentStat(aptName) {
+            const d = new Date(); d.setMonth(d.getMonth() - 3);
+            const 자른날 = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const 칸들 = gFlyerSlotsOf(aptName).flatMap(g => g.slots);
+            const 돌림 = 칸들.filter(s => {
+                const last = (gFlyerDates(aptName, s.key) || [])[0];
+                return last && last >= 자른날;
+            }).length;
+            return { done: 돌림, total: 칸들.length };
+        }
 
         // '3일 전'처럼 얼마나 지났는지
         function gDaysAgoText(ds) {
@@ -5004,14 +5076,283 @@
             gResetFlyerView();
         }
 
-        // [신규] 아파트 카드의 '자세히'를 폈다 접었다 한다 (도로명·지번·인식어·검색별칭)
+
+        /* ===== [신규] 아파트 자료 고치기 (2026-09-02) =====
+           이름·인식어·검색별칭을 한 창에서 고친다.
+
+           [고칠 수 없는 것] 도로명주소와 지번.
+           공동현관 비번·전단지 기록을 도로명주소로 묶어 두었고, 주소를 어느 아파트로 볼지도
+           이 둘로 가린다. 바뀌면 그 자료를 못 찾으므로 보여만 주고 잠가 둔다.
+           (도로명이 비어 있는 곳은 주문이 들어오면 저절로 채워진다)
+
+           인식어·검색별칭은 쉼표로 적게 했더니 어디를 고쳐야 할지 알기 어려웠다.
+           낱말 하나가 딱지 하나이고, ✕로 빼고 칸에 적어 넣는 식으로 바꿨다. */
+        let _aptEdit = { name: '', where: '', key: '', row: null, keywords: [], aliases: [] };
+
+        async function openApartmentEdit(aptName) {
+            const target = String(aptName || '');
+            if (!target) return;
+            showLoader('아파트 자료를 읽는 중...');
+            let where = '', key = '', row = null;
+            try {
+                for (const node of ['apartment_extra', 'apartment_table']) {
+                    const res = await fetch(`${FIREBASE_DB_URL}${node}.json?t=${Date.now()}`);
+                    if (!res.ok) continue;
+                    const raw = await res.json();
+                    if (!raw) continue;
+                    const entries = Array.isArray(raw) ? raw.map((v, i) => [String(i), v]) : Object.entries(raw);
+                    const hit = entries.find(([, v]) => v && (String(v.name || '') === target || String(v.shortName || '') === target));
+                    if (hit) { where = node; key = hit[0]; row = hit[1]; break; }
+                }
+            } catch (e) { console.error('아파트 찾기 실패:', e); }
+            finally { hideLoader(); }
+
+            if (!row) { showToast(`'${target}'은(는) 표에서 찾지 못했습니다.`); return; }
+            _aptEdit = {
+                name: target, where, key, row,
+                keywords: (Array.isArray(row.keywords) ? row.keywords : []).slice(),
+                aliases: (Array.isArray(row.aliases) ? row.aliases : []).slice()
+            };
+
+            const roads = (Array.isArray(row.roads) ? row.roads : []).join(' · ');
+            const lots = (Array.isArray(row.lots) ? row.lots : []).join(' · ');
+            const _in = 'width:100%; box-sizing:border-box; height:40px; padding:8px 11px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13.5px; font-weight:800;';
+            const _lb = 'font-size:11px; font-weight:800; color:#94a3b8; margin:13px 0 4px;';
+            const 잠금줄 = (라벨, 값) =>
+                `<div style="display:flex; align-items:baseline; gap:8px; padding:5px 0;">` +
+                `<span style="flex:0 0 66px; font-size:11px; font-weight:800; color:#94a3b8;">${라벨}</span>` +
+                `<span style="flex:1; min-width:0; font-size:13px; font-weight:900; color:#475569; word-break:break-all;">` +
+                (값 ? gEscapeHtml(값) : `<span style="font-weight:700; color:#cbd5e1;">없음</span>`) + `</span></div>`;
+
+            const old = document.getElementById('apt-edit-modal'); if (old) old.remove();
+            const m = document.createElement('div');
+            m.id = 'apt-edit-modal';
+            m.className = 'summary-modal-overlay';
+            m.style.zIndex = '10060';
+            m.onclick = (e) => { if (e.target === m) closeApartmentEdit(); };
+            m.innerHTML =
+                `<div class="summary-modal-content" style="max-width:440px; width:94%; max-height:88vh;">` +
+                `<div style="padding:15px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">✏️ ${gEscapeHtml(target)} 자료 고치기</div>` +
+                `<span onclick="closeApartmentEdit()" style="font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span></div>` +
+
+                `<div style="padding:4px 18px 14px; overflow:auto;">` +
+
+                // ── 주소 (잠김) ──
+                `<div style="${_lb}">🔒 주소 <span style="font-weight:700; color:#cbd5e1;">— 아파트를 가리는 기준이라 고칠 수 없습니다</span></div>` +
+                `<div style="padding:8px 12px; background:#f1f5f9; border:1.5px solid #e2e8f0; border-radius:9px;">` +
+                잠금줄('도로명주소', roads) + 잠금줄('지번', lots) +
+                (roads ? '' : `<div style="font-size:11px; font-weight:700; color:#94a3b8; padding-top:4px;">이 아파트로 주문이 들어오면 도로명주소가 저절로 채워집니다.</div>`) +
+                `</div>` +
+
+                // ── 이름 ──
+                `<div style="${_lb}">주문서 이름 <span style="font-weight:700; color:#cbd5e1;">— 주문 카드·인쇄·검색</span></div>` +
+                `<input type="text" id="apt-ed-name" value="${gEscapeHtml(row.name || target)}" placeholder="예: 푸르지오2차" style="${_in}">` +
+
+                `<div style="${_lb}">배달기사 이름 <span style="font-weight:700; color:#cbd5e1;">— 단추가 좁아 4~6글자가 알맞습니다</span></div>` +
+                `<input type="text" id="apt-ed-short" value="${gEscapeHtml(row.shortName || '')}" placeholder="비우면 위 이름을 그대로 씁니다" style="${_in}">` +
+
+                // ── 인식어 ──
+                `<div style="${_lb}">인식어 <span style="font-weight:700; color:#cbd5e1;">— 주소에 이 말이 있으면 이 아파트로 봅니다</span></div>` +
+                `<div id="apt-ed-keywords-box"></div>` +
+                gAptTagAdder('keywords', '예: 2차푸르지오') +
+
+                // ── 검색별칭 ──
+                `<div style="${_lb}">검색별칭 <span style="font-weight:700; color:#cbd5e1;">— 주문 검색창에서 이 말로도 찾힙니다</span></div>` +
+                `<div id="apt-ed-aliases-box"></div>` +
+                gAptTagAdder('aliases', '예: 푸르지오') +
+
+                `<div style="margin-top:13px; font-size:11.5px; font-weight:700; color:var(--text-sub); line-height:1.6; background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:9px 11px;">` +
+                `이름을 바꿔도 <b>공동현관 비번과 전단지 기록은 그대로 따라옵니다</b> (도로명주소로 묶어 두었기 때문입니다).<br>` +
+                `인식어는 <b>긴 것이 먼저</b> 잡힙니다 — 짧은 '자이'가 '리버뷰자이'를 가로채지 않게 하려는 것입니다.</div>` +
+
+                (where === 'apartment_extra'
+                    ? `<button type="button" onclick="closeApartmentEdit(); deleteApartmentExtra('${escapeArg(key)}', '${escapeArg(target)}')"
+                        style="width:100%; margin-top:10px; height:40px; border:1.5px solid #ef4444; background:#fff; color:#ef4444; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer;">🗑 이 아파트 등록 지우기</button>`
+                    : '') +
+
+                `</div>` +
+                `<div style="padding:14px 18px; border-top:1px solid var(--border); display:flex; gap:8px;">` +
+                `<button type="button" onclick="closeApartmentEdit()" style="flex:1; height:44px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">취소</button>` +
+                `<button type="button" onclick="saveApartmentEdit()" style="flex:1.4; height:44px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">💾 저장</button>` +
+                `</div></div>`;
+            document.body.appendChild(m);
+            requestAnimationFrame(() => m.classList.add('active'));
+            gPaintAptTags('keywords');
+            gPaintAptTags('aliases');
+        }
+
+        // 낱말을 넣는 줄 (칸 + ＋ 단추). 엔터로도 넣을 수 있다.
+        function gAptTagAdder(kind, ph) {
+            return `<div style="display:flex; gap:5px; margin-top:5px;">` +
+                `<input type="text" id="apt-ed-add-${kind}" placeholder="${ph}" onkeydown="if(event.key==='Enter'){event.preventDefault();gAptTagAdd('${kind}');}"` +
+                ` style="flex:1; min-width:0; box-sizing:border-box; height:36px; padding:6px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:800;">` +
+                `<button type="button" onclick="gAptTagAdd('${kind}')" style="flex:0 0 auto; height:36px; padding:0 14px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">＋ 넣기</button>` +
+                `</div>`;
+        }
+
+        function gPaintAptTags(kind) {
+            const box = document.getElementById(`apt-ed-${kind}-box`);
+            if (!box) return;
+            const list = _aptEdit[kind] || [];
+            box.innerHTML = list.length === 0
+                ? `<div style="font-size:11.5px; font-weight:700; color:#cbd5e1; padding:3px 0;">아직 없습니다.</div>`
+                : `<div style="display:flex; flex-wrap:wrap; gap:5px;">` + list.map((w, i) =>
+                    `<span style="display:inline-flex; align-items:center; gap:5px; padding:4px 6px 4px 9px; border-radius:7px; font-size:12px; font-weight:800;
+                            color:${kind === 'keywords' ? '#475569' : '#7c3aed'}; background:${kind === 'keywords' ? '#f1f5f9' : '#f5f3ff'};
+                            border:1px solid ${kind === 'keywords' ? '#e2e8f0' : '#ddd6fe'};">
+                        ${gEscapeHtml(w)}
+                        <span onclick="gAptTagDel('${kind}',${i})" title="빼기" style="cursor:pointer; color:#ef4444; font-weight:900; line-height:1;">✕</span>
+                    </span>`).join('') + `</div>`;
+        }
+
+        function gAptTagAdd(kind) {
+            const el = document.getElementById(`apt-ed-add-${kind}`);
+            const v = String((el && el.value) || '').trim();
+            if (!v) return;
+            if ((_aptEdit[kind] || []).includes(v)) { showToast('이미 있는 말입니다.'); return; }
+            _aptEdit[kind] = (_aptEdit[kind] || []).concat([v]);
+            if (el) el.value = '';
+            gPaintAptTags(kind);
+            if (el) el.focus();
+        }
+
+        function gAptTagDel(kind, i) {
+            _aptEdit[kind] = (_aptEdit[kind] || []).filter((_, n) => n !== i);
+            gPaintAptTags(kind);
+        }
+
+        function closeApartmentEdit() {
+            const m = document.getElementById('apt-edit-modal');
+            if (m) m.remove();
+        }
+
+        async function saveApartmentEdit() {
+            const { where, key, row, name: oldName } = _aptEdit;
+            if (!where || !key) { showToast('저장할 자리를 찾지 못했습니다.'); return; }
+            const v = (id) => String((document.getElementById(id) || {}).value || '').trim();
+
+            const mainName = v('apt-ed-name');
+            if (!mainName) { showToast('주문서 이름을 적어 주세요.'); return; }
+
+            const body = {
+                name: mainName,
+                shortName: v('apt-ed-short'),
+                keywords: (_aptEdit.keywords || []).slice(),
+                aliases: (_aptEdit.aliases || []).slice()
+            };
+            // 도로명주소와 지번은 손대지 않는다 (주소를 가리는 기준이라 있던 그대로 둔다)
+
+            showLoader('저장하는 중...');
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}${where}/${encodeURIComponent(key)}.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                });
+                if (!res.ok) throw new Error('서버 응답 ' + res.status);
+
+                // 이름을 바꿨으면 검색 별칭도 새 이름으로 옮긴다 (별칭은 이름을 열쇠로 담겨 있다)
+                const 옛이름 = String(row.name || oldName);
+                if (옛이름 !== mainName && (APARTMENT_ALIAS[옛이름] || []).length) {
+                    const mine = APARTMENT_ALIAS[옛이름];
+                    await fetch(`${FIREBASE_DB_URL}apartment_alias/${encodeURIComponent(mainName)}.json`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mine)
+                    });
+                    await fetch(`${FIREBASE_DB_URL}apartment_alias/${encodeURIComponent(옛이름)}.json`, { method: 'DELETE' });
+                }
+
+                try { localStorage.removeItem(APT_TABLE_KEY); } catch (e) {}
+                await loadApartmentTable();
+                await loadApartmentExtra();
+                await loadApartmentAlias();
+                gRebuildAptKeyViews();
+                closeApartmentEdit();
+                showToast(`'${mainName}' 자료를 저장했습니다.`);
+                if (typeof renderApartmentAdmin === 'function') renderApartmentAdmin();
+                if (typeof renderFilteredOrders === 'function') renderFilteredOrders();
+            } catch (e) { showToast('저장 실패: ' + e.message); }
+            finally { hideLoader(); }
+        }
+
+
+        /* [신규] 전단지 라인 하나를 눌렀을 때 — 그 라인에 사는 집을 늘어놓는다.
+           호수를 누르면 '동·호수별 주문' 창에서와 똑같이 그 손님 카드가 열린다.
+           숫자는 아파트 관리 화면을 그릴 때 모아 둔 것을 그대로 쓴다 (다시 세지 않는다). */
+        let _apartUnitStats = {};
+
+        function showLineUnits(aptEnc, dongEnc, from, to, etc) {
+            const apt = decodeURIComponent(aptEnc || ''), dong = decodeURIComponent(dongEnc || '');
+            const hos = ((_apartUnitStats[apt] || {})[dong]) || {};
+
+            // 그 라인에 드는 집만 고른다. '그 외'는 어느 칸에도 안 드는 집들이다.
+            const 칸들 = (typeof gFlyerSlotsOf === 'function' ? gFlyerSlotsOf(apt) : [])
+                .filter(g => g.dong === dong).flatMap(g => g.slots);
+            const 든다 = (n) => (from == null) ? true : (n != null && n >= from && n <= to);
+            const 어디든 = (n) => (n != null) && 칸들.some(c => c.from == null || (n >= c.from && n <= c.to));
+
+            const list = Object.keys(hos).map(h => ({ ho: h, n: gHoLine(h), v: hos[h] })).filter(x => etc ? !어디든(x.n) : 든다(x.n))
+              .sort((a, b) => b.v.days.size - a.v.days.size
+                  || (parseInt(String(a.ho).replace(/\D/g, ''), 10) || 0) - (parseInt(String(b.ho).replace(/\D/g, ''), 10) || 0));
+
+            const 건수 = list.reduce((a, x) => a + x.v.days.size, 0);
+            const 금액 = list.reduce((a, x) => a + x.v.amount, 0);
+            const 이름 = etc ? '그 외' : (from == null ? '전체' : (from === to ? `${from}호` : `${from}~${to}호`));
+
+            const body = list.length === 0
+                ? `<div style="font-size:12.5px; font-weight:700; color:var(--text-sub); padding:12px 0;">이 라인에 주문한 집이 없습니다.</div>`
+                : `<div style="display:flex; flex-wrap:wrap; gap:5px;">` + list.map(x => {
+                    const who = [...((x.v.who) || new Map()).entries()].sort((a, b) => b[1].t - a[1].t)[0];
+                    const phone = who ? who[0] : '';
+                    const name = who ? (who[1].name || '') : '';
+                    const click = phone
+                        ? ` onclick="showCustomerCardModal('${encodeURIComponent(phone)}','${encodeURIComponent(name)}')"`
+                        : '';
+                    const tip = `${x.v.amount.toLocaleString()}원${name ? ` · ${name} (눌러서 상세)` : ''}`;
+                    const c = x.v.days.size;
+                    return `<span title="${gEscapeHtml(tip)}"${click}
+                        style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border-radius:7px; font-size:12px; font-weight:800;
+                               color:#334155; background:#f1f5f9; border:1px solid var(--border);${phone ? ' cursor:pointer;' : ''}">
+                        ${gEscapeHtml(x.ho)}<b style="color:${c >= 5 ? '#c2410c' : '#64748b'};">${c}</b></span>`;
+                }).join('') + `</div>`;
+
+            const old = document.getElementById('line-units-modal'); if (old) old.remove();
+            const m = document.createElement('div');
+            m.id = 'line-units-modal';
+            m.className = 'summary-modal-overlay';
+            m.style.zIndex = '10055';
+            m.onclick = (e) => { if (e.target === m) closeLineUnits(); };
+            m.innerHTML =
+                `<div class="summary-modal-content" style="max-width:420px; width:92%; max-height:86vh; padding:0; overflow:hidden; display:flex; flex-direction:column;">` +
+                `<div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:8px;">` +
+                `<div style="min-width:0;">` +
+                `<div style="font-size:15px; font-weight:900; color:var(--text-main);">🏢 ${gEscapeHtml(apt)} ${gEscapeHtml(dong)} ${gEscapeHtml(이름)}</div>` +
+                `<div style="font-size:11.5px; font-weight:700; color:var(--text-sub); margin-top:3px;">${list.length}집 · ${건수}건 · ${금액.toLocaleString()}원 · 호수를 누르면 주문자가 열립니다</div>` +
+                `</div>` +
+                `<span onclick="closeLineUnits()" style="flex:0 0 auto; font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="flex:1; overflow-y:auto; padding:12px 16px;">${body}</div>` +
+                `<div style="padding:12px 16px; border-top:1px solid var(--border);">` +
+                `<button type="button" onclick="closeLineUnits()" style="width:100%; height:44px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">닫기</button>` +
+                `</div></div>`;
+            document.body.appendChild(m);
+            requestAnimationFrame(() => m.classList.add('active'));
+        }
+
+        function closeLineUnits() {
+            const m = document.getElementById('line-units-modal');
+            if (m) m.remove();
+        }
+
+        // [신규] 아파트 카드의 '자세히'를 폈다 접었다 한다 (동·호수별 주문)
+        /* [수정] '자세히' 단추를 따로 두지 않고 카드 줄 아무 데나 눌러 펴고 접는다.
+           단추가 하나 줄고, 누를 곳이 넓어져 손가락으로도 편하다. */
         function toggleApartDetail(el) {
-            const card = el.closest('div').parentElement;
+            const card = el.parentElement;
             const box = card ? card.querySelector('.apart-detail') : null;
             if (!box) return;
             const on = (box.style.display === 'none');
             box.style.display = on ? '' : 'none';
-            el.innerText = on ? '▴ 접기' : '▾ 자세히';
+            const caret = el.querySelector('.apart-caret');
+            if (caret) caret.innerText = on ? '▴' : '▾';
         }
 
         function pickFlyerApt(aptEnc) { _flyerApt = decodeURIComponent(aptEnc || ''); renderFlyerBoard(); }
@@ -5553,20 +5894,26 @@
                     const dongCount = gFlyerSlotsOf(n).length;   // [수정] 칸(라인) 수보다 동 수가 한눈에 들어온다
                     /* [수정] 칸을 지웠는데 그 칸의 기록이 남아 있으면 '오늘 N'만 올라가고
                        눌러 봐도 해당하는 줄이 없어 헷갈린다. 지금 있는 칸만 센다. */
-                    const liveKeys = new Set(Object.keys(entrancePasswords[n] || {}));
-                    const doneToday = Object.entries((flyerLogs[n] || {}))
-                        .filter(([k, v]) => liveKeys.has(k) && ((v || {}).dates || [])[0] === today).length;
+                    /* 최근 석 달 안에 돌린 라인 / 그 아파트 라인 모두.
+                       다 돌았으면 초록, 반 넘게 돌았으면 노랑, 아니면 그대로 둔다. */
+                    const st = gFlyerRecentStat(n);
+                    const 다돌음 = (st.total > 0 && st.done >= st.total);
+                    const 반넘음 = (st.total > 0 && !다돌음 && st.done * 2 >= st.total);
+                    const 테두리 = 다돌음 ? '#86efac' : (반넘음 ? '#fde68a' : 'var(--border)');
+                    const 바탕 = 다돌음 ? '#f0fdf4' : (반넘음 ? '#fffbeb' : '#fff');
+                    const 숫자색 = 다돌음 ? '#16a34a' : (반넘음 ? '#b45309' : '#94a3b8');
                     return `<button type="button" onclick="pickFlyerApt('${encodeURIComponent(n)}')"
-                        title="${gEscapeHtml(n)}"
+                        title="${gEscapeHtml(n)} — 최근 석 달 안에 돌린 라인 ${st.done}곳 / 모두 ${st.total}곳"
                         style="display:flex; align-items:center; gap:6px; width:100%; box-sizing:border-box; height:38px; padding:0 11px;
-                               border:1.5px solid ${doneToday ? '#86efac' : 'var(--border)'}; background:${doneToday ? '#f0fdf4' : '#fff'};
+                               border:1.5px solid ${테두리}; background:${바탕};
                                color:#334155; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer; text-align:left;">
-                        <span style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gEscapeHtml(n)}</span>
-                        <span style="flex:0 0 auto; font-weight:700; color:#94a3b8;">${dongCount}동</span>${doneToday ? `<span style="flex:0 0 auto; color:#16a34a;">·${doneToday}</span>` : ''}</button>`;
+                        <span style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gEscapeHtml(gFlyerShortName(n))}
+                            <span style="font-weight:800; color:${숫자색}; font-variant-numeric:tabular-nums;">(${st.done}/${st.total})</span></span>
+                        <span style="flex:0 0 auto; font-weight:700; color:#cbd5e1; white-space:nowrap;">${dongCount}동</span></button>`;
                 }).join('');
 
                 box.innerHTML =
-                    (names.length ? `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(148px, 1fr)); gap:6px; margin-bottom:10px;">${chips}</div>`
+                    (names.length ? `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(148px, 1fr)); gap:6px;">${chips}</div>` + gFlyerAptLegend()
                         : `<div style="padding:12px 0; font-size:12.5px; font-weight:700; color:#cbd5e1;">아직 아파트가 없습니다. 아래에서 새로 만들어 주세요.</div>`)
                     ;
 
@@ -5612,7 +5959,7 @@
 
             let html = `<div style="display:flex; align-items:center; gap:6px; margin-bottom:10px; flex-wrap:wrap;">`
                 + (_flyerEdit ? '' : `<button type="button" onclick="backFlyerApt()" style="${_fBtn} border:1.5px solid var(--border); background:#fff; color:#475569;">‹ 아파트</button>`)
-                + `<b style="font-size:13.5px; color:#0f172a;">${gEscapeHtml(apt)}</b>`
+                + `<b style="font-size:13.5px; color:#0f172a;">${gEscapeHtml(gFlyerShortName(apt))}</b>`
                 + (!_flyerEdit
                     ? `<button type="button" onclick="toggleFlyerEdit()" title="동·라인을 더하거나 지웁니다"
                         style="${_fBtn} margin-left:auto; border:1.5px solid var(--border); background:#fff; color:#64748b;">✏️ 고치기</button>`
@@ -5640,6 +5987,8 @@
                         <span style="flex:1; min-width:0; font-size:13px; font-weight:900; color:#312e81; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gEscapeHtml(commonPwd)}</span>
                        </div>`
                     : '');
+
+            if (!_flyerEdit && groups.length > 0) html += gFlyerLineLegend();
 
             if (groups.length === 0) {
                 html += _flyerEdit
@@ -12405,6 +12754,7 @@
 
             // 지금 들어와 있는 배달 주문을 아파트별로 세어 본다 (취소 건 제외)
             const counts = {};
+            const unitStats = {}; // 아파트 → 동 → 호수 → { days, amount }
             const roadHits = {};  // 아파트 → { 도로명: 건수 }  (실제 주문에서 뽑는다)
             const unmatched = {}; // 정규화 주소 → { display, raw, count }
             (rawOrders || []).forEach(o => {
@@ -12417,6 +12767,30 @@
                 if (apt) {
                     counts[apt.name] = (counts[apt.name] || 0) + 1;
                     bump(apt.name, o);
+                    /* [신규] '자세히'에서 동·호수별로 보여 주려고 함께 모은다.
+                       건수는 카드와 같은 규칙(같은 사람이 같은 날 시킨 것은 한 건)으로 센다. */
+                    {
+                        const dk = (gDongKeysOf(o.addressDetail) || [])[0] || '(동 없음)';
+                        const hoRaw = gHoRawOf(o.addressDetail);
+                        const ho = (hoRaw == null) ? '(호수 없음)' : (hoRaw + '호');
+                        if (!unitStats[apt.name]) unitStats[apt.name] = {};
+                        if (!unitStats[apt.name][dk]) unitStats[apt.name][dk] = {};
+                        if (!unitStats[apt.name][dk][ho]) unitStats[apt.name][dk][ho] = { days: new Set(), amount: 0, who: new Map() };
+                        const u = unitStats[apt.name][dk][ho];
+                        u.days.add(gOrderDayKey(o));
+                        u.amount += parseInt(o.total || 0) || 0;
+                        /* 그 집에 주문한 사람을 담아 둔다 — 호수를 누르면 그 손님 카드를 연다.
+                           한 집에 여럿(가족 등)일 수 있어 가장 최근에 주문한 사람을 대표로 쓴다. */
+                        {
+                            const ph = String(o.firebasePhoneKey || o.phone || '').trim();
+                            if (ph) {
+                                const prev = u.who.get(ph);
+                                const _d = (typeof parseTimestampToDate === 'function') ? parseTimestampToDate(o.timestamp) : null;
+                                const t = (_d && !isNaN(_d.getTime())) ? _d.getTime() : 0;
+                                if (!prev || t > prev.t) u.who.set(ph, { name: o.name || '', t });
+                            }
+                        }
+                    }
                     const road = gExtractRoad(o.address || full);
                     if (road) {
                         if (!roadHits[apt.name]) roadHits[apt.name] = {};
@@ -12431,6 +12805,76 @@
                     unmatched[key].days.add(gOrderDayKey(o));
                 }
             });
+
+
+            /* [신규] '자세히'를 펴면 그 아파트의 동·라인별 건수·금액을 보여 준다.
+               라인은 공동현관 비번에 적어 둔 호수 칸(1~2호·3~4호)을 그대로 쓴다 —
+               전단지를 어디에 더 돌릴지, 어느 라인이 잘 되는지 같은 눈으로 보게 하려는 것이다.
+               칸을 안 적어 둔 동은 나눌 기준이 없으므로 동 합계만 보여 준다.
+               위 기간 탭에 맞춰 세므로 카드에 적힌 숫자와 합이 맞는다. */
+            _apartUnitStats = unitStats;   // 라인 창에서 그대로 읽어 쓴다
+
+            // 그 아파트에서 주문한 집(동+호수)이 몇 곳인지
+            const homeCount = (name) => Object.values(unitStats[name] || {})
+                .reduce((a, hos) => a + Object.keys(hos).length, 0);
+
+            const unitHtml = (name) => {
+                const dongs = unitStats[name];
+                if (!dongs) return `<div style="padding:8px 0 2px; font-size:11.5px; font-weight:700; color:#cbd5e1;">이 기간에 주문이 없습니다.</div>`;
+
+                const 칸표 = new Map();
+                (typeof gFlyerSlotsOf === 'function' ? gFlyerSlotsOf(name) : []).forEach(g => 칸표.set(g.dong, g.slots));
+
+                const 동순 = Object.keys(dongs).sort((a, b) =>
+                    (parseInt(a) || 9999) - (parseInt(b) || 9999) || a.localeCompare(b));
+
+                return `<div style="margin-top:8px; border-top:1px dashed #e2e8f0; padding-top:9px;">`
+                    + `<div style="display:grid; grid-template-columns:1fr 42px 44px 84px 10px; gap:6px; padding:0 10px 5px; font-size:10px; font-weight:800; color:#cbd5e1;">`
+                    + `<span>동 · 라인</span><span style="text-align:right;">집</span><span style="text-align:right;">건</span><span style="text-align:right;">금액</span><span></span></div>`
+                    + 동순.map(d => {
+                    const hos = dongs[d];
+                    const 칸들 = (칸표.get(d) || []).map(s => ({
+                        label: gFlyerSlotLabel(s), from: s.from, to: s.to, days: new Set(), amount: 0, homes: 0
+                    }));
+                    const 그외 = { label: 칸들.length ? '그 외' : '전체', from: null, to: null, days: new Set(), amount: 0, homes: 0 };
+
+                    let dn = 0, da = 0;
+                    Object.keys(hos).forEach(h => {
+                        const u = hos[h];
+                        const n = gHoLine(h);
+                        const 담을곳 = (n == null) ? 그외
+                            : (칸들.find(c => c.from == null || (n >= c.from && n <= c.to)) || 그외);
+                        u.days.forEach(k => 담을곳.days.add(k));
+                        담을곳.amount += u.amount;
+                        담을곳.homes += 1;
+                        dn += u.days.size; da += u.amount;
+                    });
+
+                    const 줄들 = 칸들.concat([그외]).filter(c => c.days.size > 0);
+                    /* 숫자가 줄줄이 붙어 있으면 눈이 아프다. 집·건·금액을 각자 칸에 넣고
+                       오른쪽으로 맞춰, 위아래 자릿수가 세로로 딱 떨어지게 한다. */
+                    const 격자 = 'display:grid; grid-template-columns:1fr 42px 44px 84px 10px; align-items:center; gap:6px;';
+                    const 숫자칸 = 'text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;';
+                    return `<div style="border:1px solid var(--border); border-radius:9px; padding:7px 9px; margin-bottom:6px; background:#fff;">
+                        <div style="${격자} padding:1px 1px 5px; border-bottom:1px solid #f1f5f9;">
+                            <b style="font-size:12px; color:#0f172a;">🏢 ${d}</b>
+                            <span style="${숫자칸} font-size:11px; font-weight:800; color:#64748b;">${Object.keys(hos).length}집</span>
+                            <span style="${숫자칸} font-size:11px; font-weight:900; color:#166534;">${dn}건</span>
+                            <span style="${숫자칸} font-size:11px; font-weight:800; color:#0f172a;">${da.toLocaleString()}</span>
+                            <span></span>
+                        </div>`
+                        + (줄들.length === 0 ? '' : 줄들.map(c => `<div onclick="showLineUnits('${escapeArg(name)}','${escapeArg(d)}',${c.from == null ? 'null' : c.from},${c.to == null ? 'null' : c.to},${c.label === '그 외' ? 'true' : 'false'})"
+                                title="눌러서 이 라인의 집을 봅니다"
+                                style="${격자} padding:6px 1px; border-bottom:1px solid #f8fafc; cursor:pointer;">
+                                <span style="min-width:0; font-size:11.5px; font-weight:800; color:#4338ca; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(c.label)}</span>
+                                <span style="${숫자칸} font-size:11px; font-weight:700; color:#94a3b8;">${c.homes}집</span>
+                                <span style="${숫자칸} font-size:11px; font-weight:800; color:#166534;">${c.days.size}건</span>
+                                <span style="${숫자칸} font-size:11px; font-weight:700; color:#64748b;">${c.amount.toLocaleString()}</span>
+                                <span style="color:#cbd5e1; font-size:12px; text-align:right;">›</span>
+                            </div>`).join(''))
+                        + `</div>`;
+                }).join('') + `</div>`;
+            };
 
             // 아파트·구역 전체의 주문 일수·금액 (같은 사람이 같은 날 시킨 건 한 건)
             const allDays = new Set();
@@ -12515,32 +12959,19 @@
                 const roads = Object.entries(roadHits[apt.name] || {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
 
                 return `<div style="border:1px solid var(--border); border-radius:10px; padding:10px 11px; margin-bottom:7px; background:#fff;">
-                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                        <span onclick="showApartmentUnits('${escapeArg(apt.name)}')" title="동·호수별 주문 보기" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:pointer;">
-                            <b style="font-size:13.5px; color:var(--text-main);">${apt.name}</b>
-                            ${n > 0 ? `<span style="font-size:10px; font-weight:800; color:var(--primary);">▶ 동·호수</span>` : ''}
-                        </span>
-                        <!-- [신규] 주문관리 이름·배달기사 이름을 여기서 고친다 -->
-                        <span onclick="openApartmentRename('${escapeArg(apt.name)}')" title="이름 고치기 (주문관리 · 배달기사)" style="font-size:10px; font-weight:800; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:2px 7px; cursor:pointer;">✏️ 이름</span>
+                    <div onclick="toggleApartDetail(this)" title="눌러서 동·라인별 주문 보기"
+                        style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:pointer;">
+                        <b style="font-size:13.5px; color:var(--text-main);">${apt.name}</b>
                         ${apt.shortName ? `<span title="배달기사 화면에 나오는 이름" style="font-size:10px; font-weight:800; color:#0f766e; background:#ecfeff; border:1px solid #99f6e4; border-radius:6px; padding:2px 7px;">🚚 ${apt.shortName}</span>` : ''}
-                        <span style="margin-left:auto; font-size:11.5px; font-weight:800; color:${n > 0 ? '#166534' : '#cbd5e1'}; white-space:nowrap;">${n > 0 ? `${n}건 · ${amt.toLocaleString()}원` : '주문 없음'}</span>
+                        <span style="margin-left:auto; font-size:11.5px; font-weight:800; color:${n > 0 ? '#166534' : '#cbd5e1'}; white-space:nowrap;">${n > 0 ? `${homeCount(apt.name)}집 · ${n}건 · ${amt.toLocaleString()}원` : '주문 없음'}</span>
                         <!-- [신규] 도로명·지번·인식어·검색별칭은 접어 둔다.
                              한 아파트가 대여섯 줄을 차지해 목록을 훑기 어려웠다.
                              평소에는 한 줄만 두고, 고칠 일이 있을 때만 펼친다. -->
-                        <span onclick="toggleApartDetail(this)" title="자세히 보기 (도로명·지번·인식어·별칭)"
-                            style="flex:0 0 auto; cursor:pointer; font-size:10px; font-weight:800; color:#64748b; background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:2px 7px; white-space:nowrap;">▾ 자세히</span>
+                        <span onclick="event.stopPropagation(); openApartmentEdit('${escapeArg(apt.name)}')" title="이름·인식어·별칭 고치기"
+                            style="flex:0 0 auto; cursor:pointer; font-size:10px; font-weight:800; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:2px 7px; white-space:nowrap;">✏️ 수정</span>
+                        <span class="apart-caret" style="flex:0 0 auto; font-size:11px; font-weight:800; color:#cbd5e1;">▾</span>
                     </div>
-                    <div class="apart-detail" style="display:none;">
-                    ${line('도로명', (roads.length ? roads.map(([r]) => chip(r, '#0369a1', '#f0f9ff')) : (apt.roads || []).map(r => chip(r, '#0369a1', '#f0f9ff'))).join(''))}
-                    ${line('지번', (apt.lots || []).map(l => chip(l, '#0f766e', '#ecfeff')).join(''))}
-                    ${line('인식어', (apt.keywords || []).map(k => chip(k, '#475569', '#f1f5f9')).join(''))}
-                    ${apt.__extra ? `<div style="margin-top:6px;"><span style="font-size:10px; font-weight:800; color:#0891b2; background:#ecfeff; padding:2px 7px; border-radius:5px;">직접 등록</span> <button type="button" onclick="deleteApartmentExtra('${escapeArg(apt.key)}', '${escapeArg(apt.name)}')" style="margin-left:4px; padding:3px 8px; border:1.5px solid #ef4444; background:#fff; color:#ef4444; border-radius:6px; font-size:10.5px; font-weight:800; cursor:pointer;">등록 지우기</button></div>` : ''}
-                    ${line('검색별칭',
-                        (apt.aliases || []).map(k => chip(k, '#7c3aed', '#f5f3ff')).join('') +
-                        mine.map(k => `<span onclick="openApartmentAliasTool('${escapeArg(apt.name)}')" style="cursor:pointer; display:inline-block; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:800; color:#be123c; background:#fff1f2; border:1px solid #fecdd3;">${k}</span>`).join('') +
-                        `<span onclick="openApartmentAliasTool('${escapeArg(apt.name)}')" title="검색 별칭 넣기" style="cursor:pointer; display:inline-block; padding:2px 8px; border-radius:5px; font-size:11px; font-weight:800; color:var(--primary); background:#fff; border:1px dashed var(--primary);">＋ 별칭</span>`
-                    )}
-                    </div>
+                    <div class="apart-detail" style="display:none;">${unitHtml(apt.name)}</div>
                 </div>`;
             }).join('');
 
