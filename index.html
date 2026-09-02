@@ -4960,8 +4960,9 @@
 
         function gFlyerLineLegend() {
             return `<div style="${_fLegend} margin-bottom:9px; padding:7px 10px; background:#f8fafc; border:1px solid var(--border); border-radius:8px;">
-                <span>✅ 오늘 돌림</span>
-                <span>☑️ 전에 돌림</span>
+                <span>✅ 30일 이내</span>
+                <span>🟣 6개월 이내</span>
+                <span>☑️ 6개월 지남</span>
                 <span>⬜ 안 돌림</span>
                 <span style="color:#cbd5e1;">줄을 누르면 오늘 날짜로 기록 · 한 번 더 누르면 지워짐</span>
             </div>`;
@@ -4982,6 +4983,16 @@
                 return last && last >= 자른날;
             }).length;
             return { done: 돌림, total: 칸들.length };
+        }
+
+        // 그 날짜에서 오늘까지 며칠 지났는지 (못 읽으면 null)
+        function gDaysSince(ds) {
+            const p = String(ds || '').split('-');
+            if (p.length !== 3) return null;
+            const d = new Date(+p[0], +p[1] - 1, +p[2]);
+            if (isNaN(d.getTime())) return null;
+            const t = new Date(); t.setHours(0, 0, 0, 0);
+            return Math.round((t - d) / 86400000);
         }
 
         // '3일 전'처럼 얼마나 지났는지
@@ -5220,6 +5231,206 @@
         function gAptTagDel(kind, i) {
             _aptEdit[kind] = (_aptEdit[kind] || []).filter((_, n) => n !== i);
             gPaintAptTags(kind);
+        }
+
+
+
+        /* [신규] 구역 주소 하나를 눌렀을 때 — 그 주소에 사는 집(상세주소)을 늘어놓는다.
+           상세주소를 누르면 그 손님 카드가 열린다. */
+        let _zoneUnitStats = {};
+
+        function showZoneUnits(zoneEnc, addrEnc) {
+            const zone = decodeURIComponent(zoneEnc || ''), addr = decodeURIComponent(addrEnc || '');
+            const dets = ((_zoneUnitStats[zone] || {})[addr]) || {};
+            const list = Object.keys(dets).map(d => ({ det: d, v: dets[d] }))
+                .sort((a, b) => b.v.days.size - a.v.days.size || a.det.localeCompare(b.det, 'ko'));
+            const 건수 = list.reduce((a, x) => a + x.v.days.size, 0);
+            const 금액 = list.reduce((a, x) => a + x.v.amount, 0);
+
+            const body = list.length === 0
+                ? `<div style="font-size:12.5px; font-weight:700; color:var(--text-sub); padding:12px 0;">주문한 집이 없습니다.</div>`
+                : `<div style="display:flex; flex-wrap:wrap; gap:5px;">` + list.map(x => {
+                    const who = [...((x.v.who) || new Map()).entries()].sort((a, b) => b[1].t - a[1].t)[0];
+                    const phone = who ? who[0] : '';
+                    const name = who ? (who[1].name || '') : '';
+                    const click = phone ? ` onclick="showCustomerCardModal('${encodeURIComponent(phone)}','${encodeURIComponent(name)}')"` : '';
+                    const tip = `${x.v.amount.toLocaleString()}원${name ? ` · ${name} (눌러서 상세)` : ''}`;
+                    const c = x.v.days.size;
+                    return `<span title="${gEscapeHtml(tip)}"${click}
+                        style="display:inline-flex; align-items:center; gap:4px; padding:5px 9px; border-radius:7px; font-size:12px; font-weight:800;
+                               color:#334155; background:#f1f5f9; border:1px solid var(--border);${phone ? ' cursor:pointer;' : ''}">
+                        ${gEscapeHtml(x.det)}<b style="color:${c >= 5 ? '#c2410c' : '#64748b'};">${c}</b></span>`;
+                }).join('') + `</div>`;
+
+            const old = document.getElementById('zone-units-modal'); if (old) old.remove();
+            const m = document.createElement('div');
+            m.id = 'zone-units-modal';
+            m.className = 'summary-modal-overlay';
+            m.style.zIndex = '10055';
+            m.onclick = (e) => { if (e.target === m) closeZoneUnits(); };
+            m.innerHTML =
+                `<div class="summary-modal-content" style="max-width:420px; width:92%; max-height:86vh; padding:0; overflow:hidden; display:flex; flex-direction:column;">` +
+                `<div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:8px;">` +
+                `<div style="min-width:0;">` +
+                `<div style="font-size:14px; font-weight:900; color:#5b21b6; word-break:break-all;">📍 ${gEscapeHtml(addr)}</div>` +
+                `<div style="font-size:11.5px; font-weight:700; color:var(--text-sub); margin-top:3px;">${gEscapeHtml(zone)} · ${list.length}집 · ${건수}건 · ${금액.toLocaleString()}원</div>` +
+                `</div>` +
+                `<span onclick="closeZoneUnits()" style="flex:0 0 auto; font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
+                `</div>` +
+                `<div style="flex:1; overflow-y:auto; padding:12px 16px;">${body}</div>` +
+                `<div style="padding:12px 16px; border-top:1px solid var(--border);">` +
+                `<button type="button" onclick="closeZoneUnits()" style="width:100%; height:44px; border:none; background:#7c3aed; color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">닫기</button>` +
+                `</div></div>`;
+            document.body.appendChild(m);
+            requestAnimationFrame(() => m.classList.add('active'));
+        }
+
+        function closeZoneUnits() {
+            const m = document.getElementById('zone-units-modal');
+            if (m) m.remove();
+        }
+
+        /* ===== [신규] 내가 묶은 구역 고치기 (2026-09-02) =====
+           아파트 카드와 같은 모양으로 맞춘다 — 줄을 누르면 주소별 내역이 펴지고,
+           '✏️ 수정'을 누르면 이름·주소·검색별칭을 한 창에서 고친다.
+           구역은 빌라·다세대라 도로명주소가 제각각이므로, 아파트와 달리 주소를 손으로 넣고 뺀다. */
+        let _zoneEdit = { key: '', name: '', matches: [], aliases: [] };
+
+        async function openZoneEdit(key, name) {
+            const k = String(key || ''), nm = String(name || '');
+            if (!k) return;
+            const g = (APARTMENT_CUSTOM || []).find(x => x.key === k);
+            _zoneEdit = {
+                key: k, name: nm,
+                matches: ((g && g.matches) || []).slice(),
+                aliases: ((APARTMENT_ALIAS || {})[nm] || []).slice()
+            };
+
+            const _in = 'width:100%; box-sizing:border-box; height:40px; padding:8px 11px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13.5px; font-weight:800;';
+            const _lb = 'font-size:11px; font-weight:800; color:#94a3b8; margin:13px 0 4px;';
+
+            const old = document.getElementById('zone-edit-modal'); if (old) old.remove();
+            const m = document.createElement('div');
+            m.id = 'zone-edit-modal';
+            m.className = 'summary-modal-overlay';
+            m.style.zIndex = '10060';
+            m.onclick = (e) => { if (e.target === m) closeZoneEdit(); };
+            m.innerHTML =
+                `<div class="summary-modal-content" style="max-width:440px; width:94%; max-height:88vh;">` +
+                `<div style="padding:15px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">` +
+                `<div style="font-size:15px; font-weight:900; color:#5b21b6;">✏️ ${gEscapeHtml(nm)} 구역 고치기</div>` +
+                `<span onclick="closeZoneEdit()" style="font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span></div>` +
+
+                `<div style="padding:4px 18px 14px; overflow:auto;">` +
+
+                `<div style="${_lb}">구역 이름 <span style="font-weight:700; color:#cbd5e1;">— 주문 카드·인쇄·검색에 이 이름이 나옵니다</span></div>` +
+                `<input type="text" id="zone-ed-name" value="${gEscapeHtml(nm)}" placeholder="예: 구산성지2" style="${_in}">` +
+
+                `<div style="${_lb}">묶은 주소 <span style="font-weight:700; color:#cbd5e1;">— 이 주소로 오는 주문을 이 구역으로 봅니다</span></div>` +
+                `<div id="zone-ed-matches-box"></div>` +
+                `<div style="display:flex; gap:5px; margin-top:5px;">` +
+                `<input type="text" id="zone-ed-add-match" placeholder="예: 미사강변북로85번길38-2" onkeydown="if(event.key==='Enter'){event.preventDefault();gZoneTagAdd('matches');}"` +
+                ` style="flex:1; min-width:0; box-sizing:border-box; height:36px; padding:6px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:800;">` +
+                `<button type="button" onclick="gZoneTagAdd('matches')" style="flex:0 0 auto; height:36px; padding:0 14px; border:1.5px solid #7c3aed; background:#fff; color:#7c3aed; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">＋ 넣기</button>` +
+                `</div>` +
+
+                `<div style="${_lb}">검색별칭 <span style="font-weight:700; color:#cbd5e1;">— 주문 검색창에서 이 말로도 찾힙니다</span></div>` +
+                `<div id="zone-ed-aliases-box"></div>` +
+                `<div style="display:flex; gap:5px; margin-top:5px;">` +
+                `<input type="text" id="zone-ed-add-alias" placeholder="예: 구산성지" onkeydown="if(event.key==='Enter'){event.preventDefault();gZoneTagAdd('aliases');}"` +
+                ` style="flex:1; min-width:0; box-sizing:border-box; height:36px; padding:6px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:800;">` +
+                `<button type="button" onclick="gZoneTagAdd('aliases')" style="flex:0 0 auto; height:36px; padding:0 14px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">＋ 넣기</button>` +
+                `</div>` +
+
+                `<div style="margin-top:13px; font-size:11.5px; font-weight:700; color:var(--text-sub); line-height:1.6; background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:9px 11px;">` +
+                `구역은 <b>맨 마지막에</b> 맞춰 봅니다 — 도로명주소·지번·이름으로 아파트를 못 찾은 주소만 여기로 옵니다.<br>` +
+                `주소는 <b>일부만 적어도</b> 됩니다. 그 글자가 들어간 주소를 모두 이 구역으로 봅니다.</div>` +
+
+                `<button type="button" onclick="closeZoneEdit(); deleteApartmentName('${escapeArg(k)}', '${escapeArg(nm)}')"
+                    style="width:100%; margin-top:10px; height:40px; border:1.5px solid #ef4444; background:#fff; color:#ef4444; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer;">🗑 이 구역 지우기</button>` +
+
+                `</div>` +
+                `<div style="padding:14px 18px; border-top:1px solid var(--border); display:flex; gap:8px;">` +
+                `<button type="button" onclick="closeZoneEdit()" style="flex:1; height:44px; border:1.5px solid var(--border); background:#fff; color:var(--text-sub); border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">취소</button>` +
+                `<button type="button" onclick="saveZoneEdit()" style="flex:1.4; height:44px; border:none; background:#7c3aed; color:#fff; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">💾 저장</button>` +
+                `</div></div>`;
+            document.body.appendChild(m);
+            requestAnimationFrame(() => m.classList.add('active'));
+            gPaintZoneTags('matches');
+            gPaintZoneTags('aliases');
+        }
+
+        function gPaintZoneTags(kind) {
+            const box = document.getElementById(`zone-ed-${kind}-box`);
+            if (!box) return;
+            const list = _zoneEdit[kind] || [];
+            const 보라 = (kind === 'matches');
+            box.innerHTML = list.length === 0
+                ? `<div style="font-size:11.5px; font-weight:700; color:#cbd5e1; padding:3px 0;">아직 없습니다.</div>`
+                : `<div style="display:flex; flex-wrap:wrap; gap:5px;">` + list.map((w, i) =>
+                    `<span style="display:inline-flex; align-items:center; gap:5px; padding:4px 6px 4px 9px; border-radius:7px; font-size:12px; font-weight:800; word-break:break-all;
+                            color:${보라 ? '#6d28d9' : '#be123c'}; background:${보라 ? '#f5f3ff' : '#fff1f2'};
+                            border:1px solid ${보라 ? '#ddd6fe' : '#fecdd3'};">
+                        ${gEscapeHtml(w)}
+                        <span onclick="gZoneTagDel('${kind}',${i})" title="빼기" style="cursor:pointer; color:#ef4444; font-weight:900; line-height:1;">✕</span>
+                    </span>`).join('') + `</div>`;
+        }
+
+        function gZoneTagAdd(kind) {
+            const id = (kind === 'matches') ? 'zone-ed-add-match' : 'zone-ed-add-alias';
+            const el = document.getElementById(id);
+            const v = String((el && el.value) || '').trim();
+            if (!v) return;
+            if ((_zoneEdit[kind] || []).includes(v)) { showToast('이미 있는 말입니다.'); return; }
+            _zoneEdit[kind] = (_zoneEdit[kind] || []).concat([v]);
+            if (el) el.value = '';
+            gPaintZoneTags(kind);
+            if (el) el.focus();
+        }
+
+        function gZoneTagDel(kind, i) {
+            _zoneEdit[kind] = (_zoneEdit[kind] || []).filter((_, n) => n !== i);
+            gPaintZoneTags(kind);
+        }
+
+        function closeZoneEdit() {
+            const m = document.getElementById('zone-edit-modal');
+            if (m) m.remove();
+        }
+
+        async function saveZoneEdit() {
+            const { key, name: oldName } = _zoneEdit;
+            if (!key) { showToast('저장할 자리를 찾지 못했습니다.'); return; }
+            const newName = String((document.getElementById('zone-ed-name') || {}).value || '').trim();
+            if (!newName) { showToast('구역 이름을 적어 주세요.'); return; }
+            if (!(_zoneEdit.matches || []).length) { showToast('묶을 주소를 하나 이상 넣어 주세요.'); return; }
+
+            showLoader('저장하는 중...');
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}apartment_custom/${encodeURIComponent(key)}.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName, matches: _zoneEdit.matches })
+                });
+                if (!res.ok) throw new Error('서버 응답 ' + res.status);
+
+                // 검색별칭은 이름을 열쇠로 담겨 있다. 이름이 바뀌었으면 옛 자리를 지운다.
+                const al = _zoneEdit.aliases || [];
+                await fetch(`${FIREBASE_DB_URL}apartment_alias/${encodeURIComponent(newName)}.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(al.length ? al : null)
+                });
+                if (oldName && oldName !== newName) {
+                    await fetch(`${FIREBASE_DB_URL}apartment_alias/${encodeURIComponent(oldName)}.json`, { method: 'DELETE' });
+                }
+
+                await loadApartmentCustom();
+                await loadApartmentAlias();
+                closeZoneEdit();
+                showToast(`'${newName}' 구역을 저장했습니다.`);
+                if (typeof renderApartmentAdmin === 'function') renderApartmentAdmin();
+                if (typeof renderFilteredOrders === 'function') renderFilteredOrders();
+            } catch (e) { showToast('저장 실패: ' + e.message); }
+            finally { hideLoader(); }
         }
 
         function closeApartmentEdit() {
@@ -6003,6 +6214,19 @@
                     const dates = gFlyerDates(apt, s.key);
                     const last = dates[0] || '';
                     const isToday = (last === today);
+                    /* [수정] '오늘 돌렸나'만 보던 것을 '얼마나 됐나'로 바꿨다.
+                       전단지는 한 번 돌리면 한동안 효과가 남으므로, 오늘인지보다
+                       '언제 갔었나'가 다음에 어디를 갈지 정하는 데 쓸모 있다.
+                         · 30일 이내  → 초록 (최근에 갔음)
+                         · 6개월 이내 → 보라 (갔지만 오래됨)
+                         · 그 밖·안 돌림 → 회색 */
+                    const _age = last ? gDaysSince(last) : null;
+                    const 최근 = (_age != null && _age <= 30);
+                    const 오래 = (_age != null && _age > 30 && _age <= 182);
+                    const 색 = 최근 ? { 선: '#16a34a', 칸선: '#86efac', 칸바탕: '#dcfce7', 바탕: '#f0fdf4', 글: '#16a34a', 마크: '✅' }
+                        : 오래 ? { 선: '#c4b5fd', 칸선: '#ddd6fe', 칸바탕: '#f5f3ff', 바탕: '#faf9ff', 글: '#7c3aed', 마크: '🟣' }
+                        : last ? { 선: '#e2e8f0', 칸선: '#e2e8f0', 칸바탕: '#fff', 바탕: '#fff', 글: '#64748b', 마크: '☑️' }
+                        : { 선: '#f1f5f9', 칸선: '#eef2f7', 칸바탕: '#f8fafc', 바탕: '#fff', 글: '#cbd5e1', 마크: '⬜' };
                     const face = last ? `${fmtMD(last)} · ${gDaysAgoText(last)}` : '안 돌림';
                     const lineArmed = (_flyerDelArmed === 'line|' + apt + '|' + s.key);
                     // [신규] 그 칸의 공동현관 비번. 전단지를 돌리려면 어차피 문을 열어야 해서 옆에 같이 둔다.
@@ -6025,15 +6249,15 @@
                         <button type="button" ${_flyerEdit ? '' : `onclick="toggleFlyer('${aptEnc}','${encodeURIComponent(s.key)}')"`}
                             title="${dates.length ? '지난 기록: ' + dates.map(d => fmtMD(d)).join(', ') : '눌러서 오늘 돌린 것으로 기록'}"
                             style="flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 11px;
-                                   border:1.5px solid ${isToday ? '#16a34a' : (last ? '#e2e8f0' : '#f1f5f9')};
-                                   background:${isToday ? '#f0fdf4' : '#fff'}; border-radius:9px; cursor:${_flyerEdit ? 'default' : 'pointer'}; text-align:left;">
+                                   border:1.5px solid ${색.선};
+                                   background:${색.바탕}; border-radius:9px; cursor:${_flyerEdit ? 'default' : 'pointer'}; text-align:left;">
                             <span style="flex:0 0 auto; font-size:12.5px; font-weight:800; color:#334155;">${gEscapeHtml(gFlyerSlotLabel(s))}</span>
                             ${pwd ? `<span title="공동현관 비번" style="flex:0 1 auto; min-width:0; font-size:11.5px; font-weight:800; color:#4338ca; background:#eef2ff; border-radius:6px; padding:2px 7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🔑 ${gEscapeHtml(pwd)}</span>` : ''}
                             <span style="margin-left:auto; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border-radius:8px;
-                                   border:1px solid ${isToday ? '#86efac' : (last ? '#e2e8f0' : '#eef2f7')};
-                                   background:${isToday ? '#dcfce7' : (last ? '#fff' : '#f8fafc')};">
-                                ${_flyerEdit ? '' : `<span style="font-size:12px; line-height:1;">${isToday ? '✅' : (last ? '☑️' : '⬜')}</span>`}
-                                <span style="font-size:11.5px; font-weight:800; color:${isToday ? '#16a34a' : (last ? '#64748b' : '#cbd5e1')}; white-space:nowrap;">${face}${dates.length > 1 ? ` <span style="color:#cbd5e1;">(${dates.length}회)</span>` : ''}</span>
+                                   border:1px solid ${색.칸선};
+                                   background:${색.칸바탕};">
+                                ${_flyerEdit ? '' : `<span style="font-size:12px; line-height:1;">${색.마크}</span>`}
+                                <span style="font-size:11.5px; font-weight:800; color:${색.글}; white-space:nowrap;">${face}${dates.length > 1 ? ` <span style="color:#cbd5e1;">(${dates.length}회)</span>` : ''}</span>
                             </span>
                         </button>`
                         + (!_flyerEdit ? '' : `<button type="button" onclick="${lineArmed ? `flyerDeleteLine('${aptEnc}','${encodeURIComponent(s.key)}')` : `armFlyerDelete('line|${gEscapeHtml(apt)}|${gEscapeHtml(s.key)}')`}"
@@ -12755,6 +12979,7 @@
             // 지금 들어와 있는 배달 주문을 아파트별로 세어 본다 (취소 건 제외)
             const counts = {};
             const unitStats = {}; // 아파트 → 동 → 호수 → { days, amount }
+            const zoneStats = {}; // 구역 → 주소 → { days, amount, who }
             const roadHits = {};  // 아파트 → { 도로명: 건수 }  (실제 주문에서 뽑는다)
             const unmatched = {}; // 정규화 주소 → { display, raw, count }
             (rawOrders || []).forEach(o => {
@@ -12767,6 +12992,25 @@
                 if (apt) {
                     counts[apt.name] = (counts[apt.name] || 0) + 1;
                     bump(apt.name, o);
+                    /* [신규] 구역(빌라·다세대 묶음)은 동·호수가 없는 곳이 많다.
+                       그래서 '어느 주소에서 나왔는지'로 모아 둔다. */
+                    if (apt.__custom) {
+                        const ad = formatShortAddress(o.address || '') || String(o.address || '').trim() || '(주소 없음)';
+                        const det = String(o.addressDetail || '').trim() || '(상세 없음)';
+                        if (!zoneStats[apt.name]) zoneStats[apt.name] = {};
+                        if (!zoneStats[apt.name][ad]) zoneStats[apt.name][ad] = {};
+                        if (!zoneStats[apt.name][ad][det]) zoneStats[apt.name][ad][det] = { days: new Set(), amount: 0, who: new Map() };
+                        const z = zoneStats[apt.name][ad][det];
+                        z.days.add(gOrderDayKey(o));
+                        z.amount += parseInt(o.total || 0) || 0;
+                        const zp = String(o.firebasePhoneKey || o.phone || '').trim();
+                        if (zp) {
+                            const _pv = z.who.get(zp);
+                            const _dt = (typeof parseTimestampToDate === 'function') ? parseTimestampToDate(o.timestamp) : null;
+                            const _t = (_dt && !isNaN(_dt.getTime())) ? _dt.getTime() : 0;
+                            if (!_pv || _t > _pv.t) z.who.set(zp, { name: o.name || '', t: _t });
+                        }
+                    }
                     /* [신규] '자세히'에서 동·호수별로 보여 주려고 함께 모은다.
                        건수는 카드와 같은 규칙(같은 사람이 같은 날 시킨 것은 한 건)으로 센다. */
                     {
@@ -12813,6 +13057,37 @@
                칸을 안 적어 둔 동은 나눌 기준이 없으므로 동 합계만 보여 준다.
                위 기간 탭에 맞춰 세므로 카드에 적힌 숫자와 합이 맞는다. */
             _apartUnitStats = unitStats;   // 라인 창에서 그대로 읽어 쓴다
+            _zoneUnitStats = zoneStats;    // 구역 주소 창도 마찬가지
+
+            /* 구역은 빌라·다세대라 동·호수가 없는 곳이 많다. 주소별로 늘어놓는다. */
+            const zoneHtml = (name) => {
+                const addrs = zoneStats[name];
+                if (!addrs) return `<div style="padding:8px 0 2px; font-size:11.5px; font-weight:700; color:#cbd5e1;">이 기간에 주문이 없습니다.</div>`;
+                const 격자 = 'display:grid; grid-template-columns:1fr 42px 44px 84px 10px; align-items:center; gap:6px;';
+                const 숫자칸 = 'text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;';
+                const 줄 = Object.keys(addrs).map(ad => {
+                    const dets = addrs[ad];
+                    const days = new Set(); let amt = 0;
+                    Object.values(dets).forEach(v => { v.days.forEach(k => days.add(k)); amt += v.amount; });
+                    return { ad, homes: Object.keys(dets).length, cnt: days.size, amt };
+                }).sort((a, b) => b.cnt - a.cnt || a.ad.localeCompare(b.ad, 'ko'));
+                return `<div style="margin-top:8px; border-top:1px dashed #e2e8f0; padding-top:9px;">`
+                    + `<div style="${격자} padding:0 10px 5px; font-size:10px; font-weight:800; color:#cbd5e1;">`
+                    + `<span>주소</span><span style="text-align:right;">집</span><span style="text-align:right;">건</span><span style="text-align:right;">금액</span><span></span></div>`
+                    + 줄.map(r => `<div onclick="showZoneUnits('${escapeArg(name)}','${escapeArg(r.ad)}')" title="눌러서 이 주소의 집을 봅니다"
+                        style="${격자} padding:7px 10px; border:1px solid var(--border); border-radius:8px; margin-bottom:5px; background:#fff; cursor:pointer;">
+                        <span style="min-width:0; font-size:11.5px; font-weight:800; color:#6d28d9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(r.ad)}</span>
+                        <span style="${숫자칸} font-size:11px; font-weight:700; color:#94a3b8;">${r.homes}집</span>
+                        <span style="${숫자칸} font-size:11px; font-weight:800; color:#166534;">${r.cnt}건</span>
+                        <span style="${숫자칸} font-size:11px; font-weight:700; color:#64748b;">${r.amt.toLocaleString()}</span>
+                        <span style="color:#cbd5e1; font-size:12px; text-align:right;">›</span>
+                    </div>`).join('')
+                    + `</div>`;
+            };
+
+            // 그 구역에서 주문한 집(주소+상세)이 몇 곳인지
+            const zoneHomeCount = (name) => Object.values(zoneStats[name] || {})
+                .reduce((a, dets) => a + Object.keys(dets).length, 0);
 
             // 그 아파트에서 주문한 집(동+호수)이 몇 곳인지
             const homeCount = (name) => Object.values(unitStats[name] || {})
@@ -12900,6 +13175,25 @@
                         </div>`).join('')}
                 </div>`;
 
+            /* [신규] 집·건·금액을 카드마다 같은 자리에 놓아 세로로 줄을 맞춘다.
+               숫자가 들쭉날쭉하면 어느 아파트가 많은지 훑기 어렵다.
+               칸 사이에 얇은 세로선을 넣어 어디까지가 무엇인지 보이게 한다. */
+            const _colH = 'flex:0 0 36px;', _colN = 'flex:0 0 40px;', _colA = 'flex:0 0 80px;';
+            const _colBase = 'box-sizing:border-box; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums;'
+                + ' font-size:11.5px; font-weight:800; border-left:1px solid #eef2f7; padding-left:6px;';
+            const _colEdit = 'flex:0 0 34px;', _colCaret = 'flex:0 0 10px;';
+            const 줄머리 = (첫칸) => `<div style="display:flex; align-items:center; gap:6px; padding:0 11px 5px; font-size:10px; font-weight:800; color:#cbd5e1;">`
+                + `<span style="flex:1; min-width:0;">${첫칸}</span>`
+                + `<span style="${_colH} text-align:right;">집</span>`
+                + `<span style="${_colN} text-align:right;">건</span>`
+                + `<span style="${_colA} text-align:right;">금액</span>`
+                + `<span style="${_colEdit}"></span><span style="${_colCaret}"></span></div>`;
+            const 숫자칸들 = (집, 건, 금액) => 건 > 0
+                ? `<span style="${_colH} ${_colBase} color:#94a3b8;">${집}</span>`
+                + `<span style="${_colN} ${_colBase} color:#166534;">${건}</span>`
+                + `<span style="${_colA} ${_colBase} color:#0f172a;">${금액.toLocaleString()}</span>`
+                : `<span style="flex:0 0 168px; box-sizing:border-box; text-align:right; white-space:nowrap; font-size:11px; font-weight:800; color:#cbd5e1; border-left:1px solid #eef2f7; padding-left:6px;">주문 없음</span>`;
+
             // 내가 묶은 구역 목록 (이름 바꾸기 · 주소 빼기 · 구역 지우기)
             const line = (label, html) => html
                 ? `<div style="display:flex; gap:6px; align-items:flex-start; margin-top:5px;">
@@ -12910,7 +13204,7 @@
 
             // [수정] 내가 묶은 구역도 위 아파트 카드와 같은 모양으로 보여준다.
             //  (주문 건수 · 눌러서 동·호수별 보기 · 명칭 · 검색 별칭까지 아파트와 똑같이 쓸 수 있다)
-            document.getElementById('apart-custom-list').innerHTML = APARTMENT_CUSTOM.length === 0
+            document.getElementById('apart-custom-list').innerHTML = (APARTMENT_CUSTOM.length ? 줄머리('구역') : '') + (APARTMENT_CUSTOM.length === 0
                 ? `<div style="font-size:12px; font-weight:700; color:var(--text-sub); background:#f8fafc; border-radius:8px; padding:10px 12px; line-height:1.6; word-break:keep-all;">
                        묶어 놓은 구역이 아직 없습니다. 아래 '등록 안 된 주소'에서 <b>구역에 넣기</b>를 눌러 보세요.<br>
                        빌라처럼 주소가 제각각이어도 한 이름으로 묶을 수 있습니다.
@@ -12921,23 +13215,17 @@
                     const mine = APARTMENT_ALIAS[g.name] || [];
 
                     return `<div style="background:#faf9ff; border:1px solid #ddd6fe; border-radius:10px; padding:10px 11px; margin-bottom:7px;">
-                        <div onclick="showZoneAddresses('${escapeArg(g.name)}')" title="주소별 주문 보기" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:pointer;">
-                            <b style="font-size:13.5px; color:#5b21b6;">${g.name}</b>
-                            ${n > 0 ? `<span style="font-size:10px; font-weight:800; color:#7c3aed;">▶ 주소별</span>` : ''}
-                            <span style="margin-left:auto; font-size:11.5px; font-weight:800; color:${n > 0 ? '#166534' : '#cbd5e1'}; white-space:nowrap;">주문 ${n}건${amt ? ` · ${amt.toLocaleString()}원` : ''}</span>
+                        <div onclick="toggleApartDetail(this)" title="눌러서 주소별 주문 보기"
+                            style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                            <b style="flex:1; min-width:0; font-size:13.5px; color:#5b21b6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${g.name}</b>
+                            ${숫자칸들(zoneHomeCount(g.name), n, amt)}
+                            <span onclick="event.stopPropagation(); openZoneEdit('${escapeArg(g.key)}', '${escapeArg(g.name)}')" title="이름·주소·별칭 고치기"
+                                style="${_colEdit} box-sizing:border-box; text-align:center; cursor:pointer; font-size:10px; font-weight:800; color:#6d28d9; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:6px; padding:2px 3px; white-space:nowrap;">수정</span>
+                            <span class="apart-caret" style="${_colCaret} text-align:right; font-size:11px; font-weight:800; color:#cbd5e1;">▾</span>
                         </div>
-                        ${line('주소', g.matches.map(m => `<span style="display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:5px; font-size:11px; font-weight:700; color:#6d28d9; background:#fff; border:1px solid #ede9fe; word-break:break-all;">${m}<span onclick="event.stopPropagation(); removeApartmentMatch('${escapeArg(g.key)}', '${escapeArg(m)}')" title="이 주소를 구역에서 빼기" style="flex-shrink:0; font-size:13px; font-weight:800; color:#c4b5fd; cursor:pointer; line-height:1;">&times;</span></span>`).join(''))}
-                        ${line('검색별칭',
-                            chip(g.name, '#7c3aed', '#f5f3ff') +
-                            mine.map(k => `<span onclick="openApartmentAliasTool('${escapeArg(g.name)}')" style="cursor:pointer; display:inline-block; padding:2px 7px; border-radius:5px; font-size:11px; font-weight:800; color:#be123c; background:#fff1f2; border:1px solid #fecdd3;">${k}</span>`).join('') +
-                            `<span onclick="openApartmentAliasTool('${escapeArg(g.name)}')" title="검색 별칭 넣기" style="cursor:pointer; display:inline-block; padding:2px 8px; border-radius:5px; font-size:11px; font-weight:800; color:var(--primary); background:#fff; border:1px dashed var(--primary);">＋ 별칭</span>`
-                        )}
-                        <div style="display:flex; gap:6px; margin-top:8px;">
-                            <button type="button" onclick="openApartmentGroupRename('${escapeArg(g.key)}', '${escapeArg(g.name)}')" style="flex:1; padding:6px 9px; border:1.5px solid #7c3aed; background:#fff; color:#7c3aed; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">이름 바꾸기</button>
-                            <button type="button" onclick="deleteApartmentName('${escapeArg(g.key)}', '${escapeArg(g.name)}')" style="flex:0 0 78px; padding:6px 9px; border:1.5px solid #ef4444; background:#fff; color:#ef4444; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">삭제</button>
-                        </div>
+                        <div class="apart-detail" style="display:none;">${zoneHtml(g.name)}</div>
                     </div>`;
-                }).join('');
+                }).join(''));
 
             // 주문이 많은 곳부터 (같으면 이름순)
             const sortedApts = gAptList().slice().sort((a, b) => {
@@ -12960,22 +13248,20 @@
 
                 return `<div style="border:1px solid var(--border); border-radius:10px; padding:10px 11px; margin-bottom:7px; background:#fff;">
                     <div onclick="toggleApartDetail(this)" title="눌러서 동·라인별 주문 보기"
-                        style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; cursor:pointer;">
-                        <b style="font-size:13.5px; color:var(--text-main);">${apt.name}</b>
-                        ${apt.shortName ? `<span title="배달기사 화면에 나오는 이름" style="font-size:10px; font-weight:800; color:#0f766e; background:#ecfeff; border:1px solid #99f6e4; border-radius:6px; padding:2px 7px;">🚚 ${apt.shortName}</span>` : ''}
-                        <span style="margin-left:auto; font-size:11.5px; font-weight:800; color:${n > 0 ? '#166534' : '#cbd5e1'}; white-space:nowrap;">${n > 0 ? `${homeCount(apt.name)}집 · ${n}건 · ${amt.toLocaleString()}원` : '주문 없음'}</span>
-                        <!-- [신규] 도로명·지번·인식어·검색별칭은 접어 둔다.
-                             한 아파트가 대여섯 줄을 차지해 목록을 훑기 어려웠다.
-                             평소에는 한 줄만 두고, 고칠 일이 있을 때만 펼친다. -->
+                        style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                        <b style="flex:1; min-width:0; font-size:13.5px; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${apt.name}</b>
+                        ${숫자칸들(homeCount(apt.name), n, amt)}
                         <span onclick="event.stopPropagation(); openApartmentEdit('${escapeArg(apt.name)}')" title="이름·인식어·별칭 고치기"
-                            style="flex:0 0 auto; cursor:pointer; font-size:10px; font-weight:800; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:2px 7px; white-space:nowrap;">✏️ 수정</span>
-                        <span class="apart-caret" style="flex:0 0 auto; font-size:11px; font-weight:800; color:#cbd5e1;">▾</span>
+                            style="${_colEdit} box-sizing:border-box; text-align:center; cursor:pointer; font-size:10px; font-weight:800; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:2px 3px; white-space:nowrap;">수정</span>
+                        <span class="apart-caret" style="${_colCaret} text-align:right; font-size:11px; font-weight:800; color:#cbd5e1;">▾</span>
+                        <!-- [수정] 배달기사 이름은 카드에서 뺐다. 목록을 훑을 때는 필요 없고 줄만 늘어난다.
+                             '✏️ 수정'을 누르면 거기서 보고 고칠 수 있다. -->
                     </div>
                     <div class="apart-detail" style="display:none;">${unitHtml(apt.name)}</div>
                 </div>`;
             }).join('');
 
-            document.getElementById('apart-table-wrap').innerHTML = cards + (hiddenCount > 0
+            document.getElementById('apart-table-wrap').innerHTML = 줄머리('아파트') + cards + (hiddenCount > 0
                 ? `<button type="button" onclick="toggleApartEmpty()" style="width:100%; margin-top:2px; padding:9px; border:1.5px dashed var(--border); background:#fff; color:var(--text-sub); border-radius:9px; font-size:12px; font-weight:800; cursor:pointer;">
                        ${_apartShowEmpty ? `주문 없는 곳 ${hiddenCount}곳 접기` : `주문 없는 곳 ${hiddenCount}곳 보기`}
                    </button>`
