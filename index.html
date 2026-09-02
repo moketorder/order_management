@@ -4836,7 +4836,9 @@
 
             // 손님 호수의 끝자리 (1102호 → 2). 라인은 호수 끝자리로 나뉜다.
             const hoM = String(addrDetail || '').match(/(\d+)\s*호/) || String(addrDetail || '').match(/-\s*(\d+)\s*$/);
-            const hoLast = hoM ? parseInt(String(hoM[1]).slice(-1)) : null;
+            /* [수정] 끝 한 자리만 보다가, 한 층에 열 집 넘는 곳(10호·12호)을 못 맞췄다.
+               뒤 두 자리를 그 층에서의 호수로 본다 — 1102호 → 02호, 1110호 → 10호. */
+            const hoLast = hoM ? parseInt(String(hoM[1]).slice(-2), 10) : null;
 
             for (const dong of gDongKeysOf(addrDetail)) {
                 const slots = [];
@@ -5097,13 +5099,26 @@
         }
         function flyerDraftCommon(v) { if (_flyerDraft) _flyerDraft.common = String(v == null ? '' : v); }
 
-        // 라인 한 칸 더 — 비어 있는 호수를 알아서 고른다
+        /* 라인 한 칸 더 — 이미 쓰고 있는 호수를 뺀 뒤 남은 첫 자리부터 두 집을 잡는다.
+           1~2호가 있으면 3~4호, 1~3호가 있으면 4~5호가 나온다. */
+        function gFreeHoRange(slots) {
+            const 쓰는중 = new Set();
+            (slots || []).forEach(s => {
+                if (s.from == null) return;
+                for (let i = s.from; i <= s.to; i++) 쓰는중.add(i);
+            });
+            for (let a = 1; a <= 99; a++) {
+                if (쓰는중.has(a)) continue;
+                const b = (a < 99 && !쓰는중.has(a + 1)) ? a + 1 : a;
+                return [a, b];
+            }
+            return null;
+        }
+
         function flyerDraftAddLine(dongEnc) {
             const dong = decodeURIComponent(dongEnc || '');
             if (!_flyerDraft) return;
-            const used = _flyerDraft.rows.filter(r => r.dong === dong);
-            const 후보 = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 9]];
-            const 빈자리 = 후보.find(([a, b]) => !used.some(r => r.from === a && r.to === b));
+            const 빈자리 = gFreeHoRange(_flyerDraft.rows.filter(r => r.dong === dong));
             if (!빈자리) { showToast(`${dong}은 넣을 자리가 다 찼습니다.`); return; }
             _flyerDraft.rows.push({ key: null, dong, from: 빈자리[0], to: 빈자리[1], pwd: '' });
             renderFlyerBoard();
@@ -5512,9 +5527,11 @@
             }
             return out;
         }
+        /* 호수 고르는 칸. 한 층에 열 집 넘는 곳이 있어 99호까지 둔다.
+           (1102호처럼 층이 붙은 호수는 뒤 두 자리를 그 층에서의 호수로 본다 → 02호) */
         function gHoOptions(sel) {
             let out = '<option value="">전체</option>';
-            for (let i = 1; i <= 9; i++) out += `<option value="${i}"${String(sel) === String(i) ? ' selected' : ''}>${i}호</option>`;
+            for (let i = 1; i <= 99; i++) out += `<option value="${i}"${String(sel) === String(i) ? ' selected' : ''}>${i}호</option>`;
             return out;
         }
 
