@@ -2539,7 +2539,7 @@
                     <button class="btn-batch type-pickup" onclick="handleBatchUpdate('픽업')">🟣 픽업완료</button>
                     <button class="btn-batch type-delivery" onclick="handleBatchUpdate('배달완료')">🟢 배달완료</button>
                     <button class="btn-batch type-photo" onclick="handleBatchDeliveryPhoto()" style="border-color: #0284c7; color: #0284c7; background: white;">📸 완료사진</button>
-                    <button class="btn-batch type-paid" onclick="handleBatchPaidUpdate()">💵 입금완료</button>
+                    <button class="btn-batch type-paid" onclick="handleBatchPaidUpdate()" title="고른 것이 모두 입금완료면 한 번 더 눌러 풉니다">💵 입금완료</button>
                     <button class="btn-batch type-print" onclick="printSelectedCards()">🖨️ 인쇄</button>
                 </div>
             </div>
@@ -7088,6 +7088,7 @@
                         // [수정] 배달 주문을 매장에서 내주거나(픽업완료), 픽업 주문을 배달해 준 경우(배달완료)도 완료로 본다
                         if (statusFilter === '미픽업') return (actualShippingMethod === '매장픽업') && !canceled && !gIsHandedOver(status);
                         if (statusFilter === '미배달') return (actualShippingMethod === '배달주문') && !canceled && !gIsHandedOver(status);
+                        // [수정] 배달비와 배달비 차감을 늘 두 줄로 보여 주기로 했으므로 여기서도 빼지 않는다
                         if (statusFilter === '배달미입금') return (actualShippingMethod === '배달주문') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && !gIsHandedOver(status);
                         if (statusFilter === '픽업미입금') return (actualShippingMethod === '매장픽업') && String(item.item || '').trim().startsWith('[사다드림]') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && !gIsHandedOver(status);
                         if (statusFilter === '입금완료') return (item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true");
@@ -7127,15 +7128,27 @@
                     }
                 });
 
-                // [신규] 배달비와 배달비 차감을 상쇄시켜 최종으로 남는 것만 카드에 보여준다.
+                /* [수정 2026-09-03] 배달비와 배달비 차감을 서로 지워 안 보이게 했었다.
+                   합계는 맞았지만 '3,000원을 받았다가 돌려줬다'는 사실이 화면에서 사라져,
+                   입금받은 배달비가 있었는지조차 알 수 없었다. 이제 두 줄 다 보여 준다.
+                   (합계는 +3,000과 −3,000이 더해져 어차피 0원으로 맞는다)
+                   손님에게 나가는 인쇄물에서는 지금처럼 상쇄해 깔끔하게 둔다.
+
+                   배달비 줄은 상품이 아니므로 맨 뒤로 보낸다. 상품 사이에 끼어 있으면
+                   무엇을 시켰는지 훑기 어렵다. 뒤에서도 '배달비 → 배달비 차감' 차례로 둔다. */
                 Object.values(grouped).forEach(card => {
-                    const netItems = gOffsetFeeRows(card.items);
-                    if (netItems === card.items) return;
-                    card.items = netItems;
-                    card.totalPrice = netItems.reduce((a, it) => {
-                        const isCanceled = (it.canceled === true || it.canceled === "true");
-                        return a + (isCanceled ? 0 : (parseInt(it.total) || 0));
-                    }, 0);
+                    /* [수정 2026-09-03] 입금 여부에 따라 모양을 바꾸던 것을 없앴다.
+                       입금 표시를 껐다 켤 때마다 '취소'로 보였다 말았다 해서 놀라기 쉬웠고,
+                       '입금 표시를 되돌린 것'과 '애초에 안 받은 것'을 가릴 방법도 없다.
+                       이제 배달비와 배달비 차감은 늘 두 줄 그대로 보여 준다 — 자료 그대로다.
+                       (합계는 +3,000과 −3,000이 더해져 어차피 0원으로 맞는다)
+
+                       배달비 줄은 상품이 아니므로 맨 뒤로. 뒤에서도 '배달비 → 배달비 차감' 차례. */
+                    const 뒤로 = (it) => {
+                        const nm = gFeeRowName(it);
+                        return nm === '배달비' ? 1 : (nm === FEE_REFUND_NAME ? 2 : 0);
+                    };
+                    if (card.items.some(뒤로)) card.items.sort((a, b) => 뒤로(a) - 뒤로(b));
                 });
 
                 const isCardFullyCanceled = (card) => {
@@ -7517,8 +7530,12 @@
                                     
                                     <!-- 그다음 배달일때는 주소 (탭하면 수정 가능) -->
                                     ${isDelivery ? `
-                                        <div class="address-box" style="margin-top: 2px; cursor: pointer;" onclick="editCustomerAddress('${customer.phone}', '${orderKeysStr}', '${escapeArg(customer.address)}', '${escapeArg(customer.addressDetail)}', '${escapeArg(customer.entrance)}')" title="탭하여 주소 수정">
-                                            <div><strong>🏡 주소:</strong> ${formatShortAddress(customer.address)} <span style="color:#94a3b8; font-size:11px;">✏️</span></div>
+                                        <!-- [수정 2026-09-03] 주문 카드에서 주소를 고치던 것을 뺐다.
+                                             목록을 훑다가 잘못 눌러 주소 창이 뜨는 일이 잦았고,
+                                             주소는 그 날 주문 한 묶음이 아니라 손님에게 딸린 것이라
+                                             손님 카드(이름 누르면 나오는 창)에서 고치는 것이 맞다. -->
+                                        <div class="address-box" style="margin-top: 2px;">
+                                            <div><strong>🏡 주소:</strong> ${formatShortAddress(customer.address)}</div>
                                             <div><strong>🏢 상세주소:</strong> ${customer.addressDetail}</div>
                                             ${customer.entrance ? `<div><strong>🚪 공동현관:</strong> ${customer.entrance}</div>` : ''}
                                         </div>
@@ -8539,7 +8556,64 @@
 
         // [신규] 고객 배달일/픽업일 일괄 변경 기능 (동일 수령일의 취소 건 등 누락 방지 완벽 처리)
         // [신규] 배송 주소 수정 모달
-        function editCustomerAddress(phone, orderKeysStr, currentAddress, currentAddressDetail, currentEntrance) {
+        /* [신규] 주소는 손으로 적으면 띄어쓰기·오타로 아파트를 못 찾는다.
+           다음 우편번호 창에서 고르게 하고, 그때 받은 도로명주소도 함께 담아 둔다. */
+        let _pickedOrderAddr = { full: '', road: '' };
+        async function gSearchOrderAddress() {
+            try { await gLoadPostcode(); } catch (e) { showToast(e.message); return; }
+            new daum.Postcode({
+                oncomplete: function (data) {
+                    let addr = (data.userSelectedType === 'R') ? data.roadAddress : data.jibunAddress;
+                    let extra = '';
+                    if (data.userSelectedType === 'R') {
+                        if (data.bname && /[동|로|가]$/.test(data.bname)) extra += data.bname;
+                        if (data.buildingName && data.apartment === 'Y') extra += (extra ? ', ' + data.buildingName : data.buildingName);
+                        if (extra) extra = ' (' + extra + ')';
+                    }
+                    const full = addr + extra;
+                    _pickedOrderAddr = { full: full, road: String(data.roadAddress || '') };
+                    const el = document.getElementById('modal-address-input');
+                    if (el) el.value = full;
+                    const det = document.getElementById('modal-address-detail-input');
+                    if (det) det.focus();
+                    showToast('주소를 넣었습니다 — ' + full);
+                }
+            }).open();
+        }
+
+        /* [신규] 손님 카드에서 주소 고치기.
+           주소는 그 날 주문 한 묶음이 아니라 손님에게 딸린 것이라, 아직 안 나간 배달 주문에
+           한꺼번에 반영한다. 이미 배달·픽업이 끝난 주문은 그때 실제로 간 주소라 손대지 않는다. */
+        function editCustomerAddressAll(phoneEnc) {
+            const phone = decodeURIComponent(phoneEnc || '');
+            const key = String(phone).replace(/\D/g, '');
+            if (!key) return;
+            let list = (rawOrders || []).filter(o => o
+                && String(o.firebasePhoneKey || o.phone || '').replace(/\D/g, '') === key
+                && !(o.canceled === true || o.canceled === 'true')
+                && !gIsHandedOver(o.status)
+                && String(o.shippingMethod || '').includes('배달'));
+            /* 아직 안 나간 주문이 하나도 없으면(다 배달했으면) 가장 최근 배달 주문 하나만 고친다.
+               지난 주문 주소를 통째로 바꾸면 그때 실제로 간 곳과 달라지므로 최소한만 손댄다. */
+            let 몇건 = list.length;
+            if (!list.length) {
+                const 배달 = (rawOrders || []).filter(o => o
+                    && String(o.firebasePhoneKey || o.phone || '').replace(/\D/g, '') === key
+                    && !(o.canceled === true || o.canceled === 'true')
+                    && String(o.shippingMethod || '').includes('배달')
+                    && String(o.address || '').trim());
+                if (!배달.length) { showToast('배달 주문이 없어 고칠 주소가 없습니다.'); return; }
+                배달.sort((x, y) => String(y.timestamp || '').localeCompare(String(x.timestamp || '')));
+                list = [배달[0]];
+                몇건 = 0;   // 0이면 '가장 최근 배달 주문 1건'으로 안내한다
+            }
+            const a = list[0];
+            _pickedOrderAddr = { full: '', road: '' };
+            editCustomerAddress(a.phone, list.map(o => o.orderKey).join('|@@|'),
+                a.address || '', a.addressDetail || '', a.entrance || '', 몇건);
+        }
+
+        function editCustomerAddress(phone, orderKeysStr, currentAddress, currentAddressDetail, currentEntrance, howMany) {
             const existing = document.getElementById('custom-address-edit-modal');
             if (existing) existing.remove();
 
@@ -8553,11 +8627,17 @@
 
             modal.innerHTML = `
                 <div style="background: white; padding: 20px; border-radius: 16px; width: calc(100% - 32px); max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); box-sizing: border-box; margin: 16px;">
-                    <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 800; color: #1f2937; text-align: center;">🏡 배송 주소 수정</h3>
+                    <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 800; color: #1f2937; text-align: center;">🏡 배송 주소 수정</h3>
+                    <div style="margin:0 0 14px; font-size:11.5px; font-weight:700; color:#94a3b8; text-align:center;">${howMany === undefined ? '이 주문 묶음에 반영됩니다'
+                        : (howMany > 0 ? `아직 안 나간 배달 주문 ${howMany}건에 함께 반영됩니다`
+                        : '안 나간 주문이 없어 가장 최근 배달 주문 1건만 고칩니다')}</div>
                     <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
                         <div>
-                            <label style="display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:4px;">주소</label>
-                            <input type="text" id="modal-address-input" value="${(currentAddress || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d1d5db; border-radius:8px; font-size:14px; font-weight:600; outline:none;">
+                            <label style="display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:4px;">주소 <span style="font-weight:600; color:#cbd5e1;">— 검색해서 고르면 도로명주소까지 함께 저장됩니다</span></label>
+                            <div style="display:flex; gap:6px;">
+                                <input type="text" id="modal-address-input" value="${(currentAddress || '').replace(/"/g, '&quot;')}" style="flex:1; min-width:0; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d1d5db; border-radius:8px; font-size:14px; font-weight:600; outline:none;">
+                                <button type="button" onclick="gSearchOrderAddress()" style="flex:0 0 auto; padding:0 12px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap;">🔍 검색</button>
+                            </div>
                         </div>
                         <div>
                             <label style="display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:4px;">상세주소</label>
@@ -8587,15 +8667,17 @@
                 const newAddress = document.getElementById('modal-address-input').value.trim();
                 const newAddressDetail = document.getElementById('modal-address-detail-input').value.trim();
                 const newEntrance = document.getElementById('modal-entrance-input').value.trim();
+                // 검색으로 고른 주소 그대로일 때만 도로명주소를 같이 담는다 (손으로 고쳤으면 장담할 수 없다)
+                const newRoad = (_pickedOrderAddr.full && newAddress === _pickedOrderAddr.full) ? _pickedOrderAddr.road : null;
                 modal.remove();
-                await saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance);
+                await saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance, newRoad);
             };
 
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
         }
 
         // [신규] 배송 주소 저장 (해당 고객의 이 주문 묶음 전체 항목에 동일하게 반영)
-        async function saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance) {
+        async function saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance, newRoad) {
             const cleanPhone = String(phone || "").replace(/\D/g, "");
             const orderKeys = (orderKeysStr || "").split("|@@|").map(k => k.trim()).filter(Boolean);
             if (orderKeys.length === 0) return;
@@ -8603,6 +8685,8 @@
             showLoader("🏡 배송 주소 저장 중...");
             try {
                 const updatePayload = { address: newAddress, addressDetail: newAddressDetail, entrance: newEntrance };
+                // 검색으로 고른 주소면 도로명주소도 같이 적어 둔다 (아파트를 가리는 열쇠)
+                if (newRoad) updatePayload.roadAddress = newRoad;
                 const promises = [];
 
                 orderKeys.forEach(orderKey => {
@@ -8754,10 +8838,8 @@
 
                     // 날짜 변경 후 이전 날짜 및 새 날짜에 대해 배달비 자동 부과/제거 로직 호출
                     await checkAndApplyDeliveryFeeAfterCancellation(phone, targetDateStr);
-                    await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, targetDateStr);
 
                     await checkAndApplyDeliveryFeeAfterCancellation(phone, savedDate);
-                    await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, savedDate);
                 } catch (e) {
                     console.error(e);
                     showToast("날짜 변경 중 오류가 발생했습니다: " + e.toString());
@@ -8998,9 +9080,13 @@
         }
 
         // 부분 취소 시 배달비 조건 체크 및 부과 처리 함수 (자동 부과 로직 비활성화)
+        /* [수정 2026-09-03] 취소했을 때도 배달비를 다시 맞춘다.
+           예전에 자동 부과가 말썽이라 통째로 꺼 두었는데, 그러다 보니
+           상품을 취소해 15,000원 아래로 내려가도 배달비가 안 붙었다.
+           지금은 아래 함수가 '있어야 할 배달비'와 '붙어 있는 배달비'를 견줘
+           모자란 만큼만 새 줄로 적으므로 그대로 맡겨도 된다. */
         async function checkAndApplyDeliveryFeeAfterCancellation(phone, pickupDate) {
-            // [요청 반영] 고객 카드에 자동으로 배달비 부과되는 로직 비활성화
-            return;
+            return await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, pickupDate);
         }
 
         // [신규] 그 고객·그 날짜의 배달비를 다시 맞춘다. (주문서의 주문·취소 때와 똑같은 규칙)
@@ -9296,10 +9382,13 @@
 
                 renderFilteredOrders();
 
-                if (newStatus === '취소' && target) {
+                /* [수정 2026-09-03] 배달비를 다시 맞추는 것은 '취소'와 '배달일 변경'일 때만 한다.
+                   대기·입고·픽업완료·배달완료는 금액이 그대로라 배달비가 달라질 일이 없는데,
+                   그때마다 계산을 돌리면 일부만 배달완료로 찍었을 때 남은 금액이 줄어
+                   엉뚱하게 배달비가 붙는 일이 생긴다.
+                   배달비·배달비 차감 줄 자체를 취소한 것도 다시 계산하지 않는다. */
+                if (newStatus === '취소' && target && !gIsFeeRow(target.item)) {
                     await checkAndApplyDeliveryFeeAfterCancellation(phone, target.pickupDate);
-                } else if (target) {
-                    await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, target.pickupDate);
                 }
             } catch (e) {
                 console.error(e);
@@ -9354,11 +9443,6 @@
                     const firstItem = customerItems[0];
                     if (firstItem && firstItem.pickupDate) {
                         await checkAndApplyDeliveryFeeAfterCancellation(phone, firstItem.pickupDate);
-                    }
-                } else {
-                    const firstItem = customerItems[0];
-                    if (firstItem && firstItem.pickupDate) {
-                        await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, firstItem.pickupDate);
                     }
                 }
             } catch (e) {
@@ -9448,22 +9532,13 @@
                 if (newStatus === '취소') {
                     const uniqueGroups = new Map();
                     itemsToProcess.forEach(({ phone, target }) => {
-                        if (target && target.pickupDate) {
+                        // 배달비·배달비 차감 줄을 취소한 것은 다시 계산할 거리가 아니다
+                        if (target && target.pickupDate && !gIsFeeRow(target.item)) {
                             uniqueGroups.set(`${phone}|${target.pickupDate}`, { phone, pickupDate: target.pickupDate });
                         }
                     });
                     for (const { phone, pickupDate } of uniqueGroups.values()) {
                         await checkAndApplyDeliveryFeeAfterCancellation(phone, pickupDate);
-                    }
-                } else {
-                    const uniqueGroups = new Map();
-                    itemsToProcess.forEach(({ phone, target }) => {
-                        if (target && target.pickupDate) {
-                            uniqueGroups.set(`${phone}|${target.pickupDate}`, { phone, pickupDate: target.pickupDate });
-                        }
-                    });
-                    for (const { phone, pickupDate } of uniqueGroups.values()) {
-                        await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, pickupDate);
                     }
                 }
             } catch (e) {
@@ -9492,14 +9567,21 @@
             });
 
             if (itemsToProcess.length === 0) {
-                showToast("선택된 항목 중 입금완료 처리할 수 있는 주문이 없습니다. (취소된 주문 제외)");
+                showToast("선택된 항목 중 입금 표시를 바꿀 수 있는 주문이 없습니다. (취소된 주문 제외)");
                 return;
             }
 
-            showLoader("선택 항목 [입금완료] 일괄 처리 중...");
+            /* [신규] 한 번 더 누르면 입금완료가 풀린다.
+               잘못 찍었을 때 되돌릴 길이 없어 손댈 방법이 없었다.
+               고른 것이 '모두 입금완료'면 푸는 것으로, 하나라도 아니면 찍는 것으로 본다. */
+            const 이미입금 = (t) => !!(t && (t.paid === true || t.paid === "true"));
+            const 모두입금 = itemsToProcess.every(({ target }) => 이미입금(target));
+            const 새값 = !모두입금;
+
+            showLoader(새값 ? "선택 항목 [입금완료] 일괄 처리 중..." : "선택 항목 [입금완료] 푸는 중...");
             
             try {
-                const patchBody = { paid: true };
+                const patchBody = { paid: 새값 };
                 const promises = [];
                 itemsToProcess.forEach(({ phone, orderKey, target }) => {
                     const cleanPhone = String(phone || "").replace(/\D/g, "");
@@ -9511,11 +9593,11 @@
                     // [신규] 입금완료도 기록으로 남긴다
                     const p = gPatchOrder(phoneKey, orderKeyForPath, patchBody, [{
                         phone: phoneKey, name: (target && target.name) || "", item: (target && target.item) || "",
-                        what: "입금", from: (target && target.paid) ? "입금완료" : "미입금", to: "입금완료"
+                        what: "입금", from: 이미입금(target) ? "입금완료" : "미입금", to: 새값 ? "입금완료" : "미입금"
                     }]).then(res => {
                         if (res.ok) {
                             if (target) {
-                                target.paid = true;
+                                target.paid = 새값;
                             }
                         }
                     });
@@ -9524,7 +9606,9 @@
                 
                 await Promise.all(promises);
                 
-                showToast(`${itemsToProcess.length}개 주문 항목의 입금을 확인했습니다.`);
+                showToast(새값
+                    ? `${itemsToProcess.length}개 주문 항목의 입금을 확인했습니다.`
+                    : `${itemsToProcess.length}개 주문 항목의 입금완료를 풀었습니다.`);
                 selectedItems.clear();
                 updateSelectionCountText();
                 gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
@@ -10631,11 +10715,15 @@
                 </div>` : '';
             const addrHtml = (custAddr || custAddrDetail) ? `
                 <div style="margin-top:5px;">
-                    <button type="button" class="cust-addr-btn" onclick="toggleCustAddrFull(this)" title="눌러서 전체 주소 보기">
-                        <span style="flex:0 0 auto;">🏡</span>
-                        <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(custAddrShort)}</span>
-                        <span data-addr-caret style="flex:0 0 auto; color:#94a3b8; font-size:9px;">▶</span>
-                    </button>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <button type="button" class="cust-addr-btn" onclick="toggleCustAddrFull(this)" title="눌러서 전체 주소 보기" style="flex:1; min-width:0;">
+                            <span style="flex:0 0 auto;">🏡</span>
+                            <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(custAddrShort)}</span>
+                            <span data-addr-caret style="flex:0 0 auto; color:#94a3b8; font-size:9px;">▶</span>
+                        </button>
+                        <button type="button" onclick="editCustomerAddressAll('${encodeURIComponent(phone)}')" title="주소 고치기"
+                            style="flex:0 0 auto; padding:4px 9px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">✏️ 수정</button>
+                    </div>
                     <div id="cust-addr-full" style="display:none; margin-top:4px; font-size:11.5px; font-weight:700; color:#334155; line-height:1.5; word-break:break-all;">
                         ${gEscapeHtml(custAddr)}${custAddrDetail ? `<br>${gEscapeHtml(custAddrDetail)}` : ''}
                         ${pwdHtml}
