@@ -2434,12 +2434,31 @@
     <div id="tab-admin-orders" class="admin-tab-content">
         <div class="container">
             <!-- [신규] 하위 탭: 주문 내역 / 발주 내역(집계) -->
-            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:10px;">
+            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:10px;">
                 <div class="segment-btn orders-sub-btn active" id="btn-orders-sub-list" onclick="switchOrderSubTab('list')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📋 주문 내역</div>
                 <div class="segment-btn orders-sub-btn" id="btn-orders-sub-purchase" onclick="switchOrderSubTab('purchase')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 주문 집계</div>
+                <div class="segment-btn orders-sub-btn" id="btn-orders-sub-calendar" onclick="switchOrderSubTab('calendar')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📅 주문 달력</div>
             </div>
             <!-- [신규] 발주 내역(집계) — 판매관리에서 이동. JS로 sales-sub-purchase를 여기로 옮김 -->
             <div id="orders-sub-purchase" style="display:none;"></div>
+            <!-- [신규] 주문 달력 — 예정일/주문일을 한 달치 달력으로 본다 -->
+            <div id="orders-sub-calendar" style="display:none;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                    <button onclick="calMoveMonth(-1)" style="height:34px; width:34px; border:1px solid var(--border); background:#fff; border-radius:8px; font-size:15px; font-weight:900; cursor:pointer;">‹</button>
+                    <b id="orders-cal-title" style="font-size:15px; min-width:110px; text-align:center;"></b>
+                    <button onclick="calMoveMonth(1)" style="height:34px; width:34px; border:1px solid var(--border); background:#fff; border-radius:8px; font-size:15px; font-weight:900; cursor:pointer;">›</button>
+                    <button onclick="calGoToday()" style="height:34px; padding:0 12px; border:1px solid var(--border); background:#fff; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">오늘</button>
+                    <!-- [수정] 보기 전환은 이 탭에서 가장 크게 갈리는 단추다.
+                         작은 단추 하나로는 눈에 안 띄어, 하위 탭과 같은 모양의 두 칸짜리로 바꿨다. -->
+                    <div style="margin-left:auto; display:flex; gap:3px; background:#e2e8f0; padding:3px; border-radius:10px;">
+                        <button class="cal-mode-btn" data-mode="people" onclick="calSetCellMode('people')"
+                            style="height:30px; padding:0 14px; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">👥 인원</button>
+                        <button class="cal-mode-btn" data-mode="kinds" onclick="calSetCellMode('kinds')"
+                            style="height:30px; padding:0 14px; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">📦 물건</button>
+                    </div>
+                </div>
+                <div id="orders-cal-body"></div>
+            </div>
             <div id="orders-sub-list">
             <!-- 컨트롤 필터 바 (버튼 + 로직용 숨김 필터) -->
             <!-- [숨김] 날짜범위: 검색은 전체 기준 / 상태: 상태 탭이 값을 설정 -->
@@ -3314,6 +3333,8 @@
         .sales-sub-btn { color:var(--text-sub); }
         .sales-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
         .orders-sub-btn { color:var(--text-sub); }
+        /* 좁은 화면에서는 달력 칸에 건수만 남긴다 (금액까지 넣으면 칸이 터진다) */
+        @media (max-width: 560px) { .cal-amt { display:none; } }
         .orders-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
         /* [신규] 자료 정리 하위탭(판매 통계 / 아파트 관리) — 위 탭들과 같은 선택 표시 */
         .data-sub-btn { color:var(--text-sub); }
@@ -9437,6 +9458,7 @@
                 }
 
                 renderFilteredOrders();
+                if (typeof calRefreshIfOpen === 'function') calRefreshIfOpen();   // [신규] 달력이 열려 있으면 같이 새로 그린다
 
                 /* [수정 2026-09-03] 배달비를 다시 맞추는 것은 '취소'와 '배달일 변경'일 때만 한다.
                    대기·입고·픽업완료·배달완료는 금액이 그대로라 배달비가 달라질 일이 없는데,
@@ -12969,6 +12991,7 @@
                 clearProductSearch();
             }
             
+            if (tabName !== 'orders') { const _s = document.getElementById('cal-action-sheet'); if (_s) { _s.remove(); document.body.style.paddingBottom = ''; } }
             ordersTab.style.display = tabName === 'orders' ? 'block' : 'none';
             uploadTab.style.display = tabName === 'product-upload' ? 'block' : 'none';
             listTab.style.display = tabName === 'product-list' ? 'block' : 'none';
@@ -16762,6 +16785,825 @@
             if (src && dst && src.parentElement !== dst){ src.style.display = 'block'; dst.appendChild(src); }
         }
         // [신규] 주문관리 하위탭: 주문 내역 / 발주 내역(집계)
+
+        /* ===== [신규] 주문 달력 =====
+           한 달치를 달력으로 펼쳐, 어느 날 무엇이 얼마나 나가는지 한눈에 본다.
+           보는 눈은 두 가지다.
+             · 픽업/배달 예정일 — 앞으로 나갈 물건. 오늘 이후가 곧 '미래 주문'이다.
+             · 주문 받은 날     — 언제 주문이 몰렸는지.
+           날짜를 누르면 그날 주문이 손님별로 아래에 펼쳐진다. */
+        let calYear = new Date().getFullYear();
+        let calMonth = new Date().getMonth();       // 0~11
+        let calPickedDay = '';                      // 'YYYY-MM-DD'
+
+        const calPad = n => String(n).padStart(2, '0');
+        const calKey = (y, m, d) => `${y}-${calPad(m + 1)}-${calPad(d)}`;
+        const calTodayKey = () => { const t = new Date(); return calKey(t.getFullYear(), t.getMonth(), t.getDate()); };
+
+        // 주문 한 줄이 어느 날에 속하는지 — 픽업/배달 예정일 기준
+        function calDayOf(o) {
+            const info = getOrderDateInfo(o);
+            return (info.dateStr && info.dateStr !== '기타') ? info.dateStr : '';
+        }
+
+        const calAmount = o => Math.abs(parseInt(String(o.total !== undefined ? o.total : (o.price || 0)).replace(/,/g, '')) || 0)
+            * (String(o.total || '').trim().startsWith('-') ? -1 : 1);
+        const calIsDone = o => { const s = String(o.status || ''); return s === '픽업' || s === '배달완료'; };
+
+        /* 달력에 쓸 날짜별 묶음을 만든다. 취소된 줄은 세지 않는다. */
+        function calBuild() {
+            const map = new Map();   // 'YYYY-MM-DD' → { rows, qty, amount, done, todo }
+            (getSalesSourceOrders() || []).forEach(o => {
+                if (isSalesCanceled(o)) return;
+                if (String(o.status || '') === '취소') return;
+                if (/\[취소\]/.test(String(o.item || ''))) return;
+                const day = calDayOf(o);
+                if (!day) return;
+                if (!map.has(day)) map.set(day, { rows: [], qty: 0, amount: 0, done: 0, todo: 0, people: new Set(), kinds: new Set() });
+                const g = map.get(day);
+                g.rows.push(o);
+                g.people.add((o.name || '무명') + '_' + String(o.phone || ''));   // 그날 몇 분인지
+                g.amount += calAmount(o);
+                if (!gIsFeeRow(o)) {                 // 배달비 줄은 물건이 아니라 건수에서 뺀다
+                    g.qty += parseInt(o.qty || 0) || 0;
+                    g.kinds.add(String(o.item || '').trim());   // 그날 몇 종류가 나가는지
+                    if (calIsDone(o)) g.done++; else g.todo++;
+                }
+            });
+            return map;
+        }
+
+        function calMoveMonth(step) {
+            calMonth += step;
+            while (calMonth < 0) { calMonth += 12; calYear--; }
+            while (calMonth > 11) { calMonth -= 12; calYear++; }
+            calPickedDay = '';
+            renderOrderCalendar();
+        }
+
+        function calGoToday() {
+            const t = new Date();
+            calYear = t.getFullYear();
+            calMonth = t.getMonth();
+            calPickedDay = calTodayKey();
+            renderOrderCalendar();
+        }
+
+        function calPickDay(day) {
+            calSelected.clear(); calSelItems.clear(); calItemMode = false; calOpenCards.clear();   // 날을 옮기면 골라 둔 것과 펼친 것을 푼다
+            calPickedDay = (calPickedDay === day) ? '' : day;
+            renderOrderCalendar();
+        }
+
+        function renderOrderCalendar() {
+            const box = document.getElementById('orders-cal-body');
+            if (!box) return;
+
+            const data = calBuild();
+            const todayKey = calTodayKey();
+            const first = new Date(calYear, calMonth, 1);
+            const lastDay = new Date(calYear, calMonth + 1, 0).getDate();
+            const lead = first.getDay();                       // 1일이 무슨 요일인지 (일=0)
+            const monthPrefix = `${calYear}-${calPad(calMonth + 1)}-`;
+
+            // 이 달 요약
+            let mRows = 0, mQty = 0, mAmount = 0, mTodo = 0;
+            data.forEach((g, day) => {
+                if (!day.startsWith(monthPrefix)) return;
+                mRows += g.rows.filter(o => !gIsFeeRow(o)).length;
+                mQty += g.qty; mAmount += g.amount; mTodo += g.todo;
+            });
+
+            // 오늘 이후로 남은 것 (달을 넘어가도 다 센다) — '미래 주문'
+            let fRows = 0, fAmount = 0, fDays = 0;
+            data.forEach((g, day) => {
+                if (day < todayKey) return;
+                fDays++;
+                fRows += g.rows.filter(o => !gIsFeeRow(o)).length;
+                fAmount += g.amount;
+            });
+
+            /* [수정] 딱지 여섯 장이 두 줄로 접혀 정신없었다.
+               한 줄짜리 띠로 모아, 이 달 · 남은 것 · 앞으로 것 셋만 보이게 했다. */
+            const head = `
+                <div style="display:flex; gap:6px 14px; flex-wrap:wrap; align-items:baseline; margin-bottom:10px;
+                            padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:10px;
+                            font-size:12px; font-weight:700;">
+                    <span><b style="font-size:13px; color:var(--text-main);">${calMonth + 1}월</b>
+                        <span style="color:var(--text-sub);">${mRows.toLocaleString()}건 · ${mQty.toLocaleString()}개 · ${mAmount.toLocaleString()}원</span></span>
+                    <span style="color:${mTodo ? '#d97706' : '#059669'};">${mTodo ? `남은 ${mTodo.toLocaleString()}건` : '이 달 다 끝냄'}</span>
+                    <span style="margin-left:auto; color:#2563eb;">오늘 이후 ${fRows.toLocaleString()}건 · ${fAmount.toLocaleString()}원
+                        <span style="color:var(--text-sub); font-weight:600;">(${fDays}일)</span></span>
+                </div>`;
+
+            // 요일 머리
+            const dows = ['일', '월', '화', '수', '목', '금', '토'];
+            let grid = `<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:4px;">`
+                + dows.map((w, i) => `<div style="text-align:center; font-size:11px; font-weight:800; padding:4px 0; color:${i === 0 ? '#dc2626' : i === 6 ? '#2563eb' : 'var(--text-sub)'};">${w}</div>`).join('')
+                + `</div><div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px;">`;
+
+            for (let i = 0; i < lead; i++) grid += `<div></div>`;
+
+            for (let d = 1; d <= lastDay; d++) {
+                const day = calKey(calYear, calMonth, d);
+                const g = data.get(day);
+                const isToday = (day === todayKey);
+                const isPicked = (day === calPickedDay);
+                const isPast = (day < todayKey);
+                const dow = new Date(calYear, calMonth, d).getDay();
+
+                // 지난 날인데 아직 안 넘긴 것이 남아 있으면 빨갛게 세운다
+                const overdue = g && isPast && g.todo > 0;
+
+                let border = '1px solid var(--border)';
+                let bg = '#fff';
+                if (overdue) border = '1.5px solid #dc2626';
+                if (isToday) { border = '2px solid var(--primary)'; bg = 'var(--primary-light)'; }
+                // 고른 날은 파랑으로 (고른 카드와 같은 결). 검정 테두리는 눈에 안 띄어 바꿨다
+                if (isPicked) { border = '2.5px solid #2563eb'; bg = '#dbeafe'; }
+
+                const numColor = dow === 0 ? '#dc2626' : dow === 6 ? '#2563eb' : 'var(--text-main)';
+                const rows = g ? g.rows.filter(o => !gIsFeeRow(o)).length : 0;
+
+                grid += `<div onclick="calPickDay('${day}')" title="${day}"
+                    style="min-height:62px; border:${border}; background:${bg}; border-radius:8px; padding:4px 5px; cursor:pointer; overflow:hidden;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:12px; font-weight:800; color:${numColor};">${d}</span>
+                        ${overdue ? `<span style="font-size:9px; font-weight:900; color:#dc2626;">미완료</span>` : ''}
+                    </div>
+                    ${rows ? `
+                        <div style="margin-top:2px; font-size:11px; font-weight:900; color:var(--text-main);">${calCellMode === "kinds" ? `${g.kinds.size}종류` : `${g.people.size}명`} ${g.qty}개</div>
+                        <div class="cal-amt" style="font-size:10px; font-weight:700; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${g.amount.toLocaleString()}원</div>
+                        ${g.todo ? `<div style="font-size:9px; font-weight:800; color:#d97706;">남은 ${g.todo}</div>` : ''}
+                    ` : ''}
+                </div>`;
+            }
+            grid += `</div>`;
+
+            box.innerHTML = head + grid + calDayDetailHtml(data);
+
+            const title = document.getElementById('orders-cal-title');
+            if (title) title.innerText = `${calYear}년 ${calMonth + 1}월`;
+            document.querySelectorAll('.cal-mode-btn').forEach(b => {
+                const on = (b.dataset.mode === calCellMode);
+                b.style.background = on ? '#fff' : 'transparent';
+                b.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
+                b.style.boxShadow = on ? '0 1px 3px rgba(0,0,0,0.12)' : 'none';
+            });
+            calPaintActionSheet();   // 고른 것이 있으면 아래 띠를 띄운다
+        }
+
+        /* 고른 날 하나를 손님별로 펼친다. */
+        function calDayDetailHtml(data) {
+            if (!calPickedDay) {
+                return `<div style="margin-top:12px; padding:14px; text-align:center; color:var(--text-sub); font-size:12px; border:1px dashed var(--border); border-radius:10px;">
+                    날짜를 누르면 그날 주문이 손님별로 여기에 펼쳐집니다.
+                </div>`;
+            }
+            const g = data.get(calPickedDay);
+            const label = `${fmtMD(calPickedDay)} 픽업/배달`;
+            if (!g || !g.rows.length) {
+                return `<div style="margin-top:12px; padding:14px; text-align:center; color:var(--text-sub); font-size:12px; border:1px solid var(--border); border-radius:10px;">
+                    <b>${label}</b> — 주문이 없습니다.
+                </div>`;
+            }
+
+            /* 카드를 무엇으로 묶을지는 달력 위 '👥 인원 / 📦 물건' 단추가 정한다.
+               인원 보기 : 손님 하나가 카드 하나 (줄은 상품)
+               물건 보기 : 상품 하나가 카드 하나 (줄은 손님) */
+            const byKind = (calCellMode === 'kinds');
+            const groups = new Map();
+            g.rows.forEach(o => {
+                const k = calCardKeyOfRow(o);
+                if (!groups.has(k)) {
+                    groups.set(k, byKind
+                        ? { key: k, name: String(o.item || '상품명 없음').trim(), phone: '', items: [], amount: 0, latest: 0, qty: 0, people: new Set() }
+                        : { key: k, name: o.name || '무명', phone: String(o.phone || ''), items: [], amount: 0, latest: 0, qty: 0, people: new Set() });
+                }
+                const c = groups.get(k);
+                c.items.push(o);
+                c.amount += calAmount(o);
+                c.qty += parseInt(o.qty || 0) || 0;
+                c.people.add((o.name || '무명') + '_' + String(o.phone || ''));
+                // 카드별로 가장 나중에 들어온 주문 시각을 기억해 둔다
+                const t = parseTimestampToDate(o.timestamp).getTime();
+                if (!isNaN(t) && t > c.latest) c.latest = t;
+            });
+            /* 순서 : 아직 할 일이 남은 것이 위, 다 마친 것은 맨 아래.
+               가운데에 수령방법 정렬(calWaySort)이 끼어들 수 있다.
+               인원 보기는 늦게 주문한 손님이 위로, 물건 보기는 많이 나가는 상품이 위로. */
+            const doneOf = c => c.items.every(calIsDone) ? 1 : 0;
+            const delOf = c => c.items.some(o => String(o.shippingMethod || '').includes('배달')) ? 1 : 0;
+            const wayOf = c => calWaySort === 'del' ? (1 - delOf(c))
+                : calWaySort === 'pick' ? delOf(c) : 0;
+            const arr = [...groups.values()].sort((a, b) =>
+                (doneOf(a) - doneOf(b)) || (wayOf(a) - wayOf(b))
+                || (byKind ? (b.qty - a.qty) : (b.latest - a.latest)) || (b.amount - a.amount));
+            // 카드 안에서도 끝난 줄은 아래로, 나머지는 늦게 들어온 줄이 위로
+            arr.forEach(c => c.items.sort((x, y) =>
+                ((calIsDone(x) ? 1 : 0) - (calIsDone(y) ? 1 : 0))
+                || (parseTimestampToDate(y.timestamp) - parseTimestampToDate(x.timestamp))));
+
+            /* [신규] 손님 카드에 '지난 미픽업'을 알려 준다.
+               오늘 물건을 건네면서 지난 것도 함께 챙겨 줄 수 있다.
+               주문 내역과 같은 잣대(gPastUnpickedOf)를 쓰고, 딱지를 누르면 같은 창이 뜬다.
+               카드마다 rawOrders 를 훑으면 느려서, 여기서 한 번만 세어 표로 만든다.
+               지금 보고 있는 날은 빼야 '지난 것'이라는 말이 맞다. */
+            const unpickedMap = new Map();
+            if (!byKind) {
+                const tKey = gTodayKey();
+                (rawOrders || []).forEach(it => {
+                    if (!it) return;
+                    const ph = String(it.phone || '').replace(/\D/g, '');
+                    if (!ph) return;
+                    if (it.canceled === true || it.canceled === 'true' || String(it.canceled).toUpperCase() === 'TRUE') return;
+                    if (gIsHandedOver(it.status)) return;
+                    if (gIsFeeRow(it)) return;
+                    const ds = getOrderDateInfo(it).dateStr;
+                    if (!ds || ds === '기타' || ds >= tKey || ds === calPickedDay) return;
+                    unpickedMap.set(ph, (unpickedMap.get(ph) || 0) + 1);
+                });
+            }
+            const cards = arr.map(c => {
+                const lines = c.items.map(o => {
+                    const st = String(o.status || '대기');
+                    const stColor = calIsDone(o) ? '#059669' : (st === '입고' ? '#d97706' : '#64748b');
+                    const qty = parseInt(o.qty || 0) || 0;
+                    /* 미입금은 '미리 받아야 하는데 아직 안 받은 것'에만 붙인다.
+                       · 그냥 픽업 : 물건을 건네면서 받으므로 미입금이 예삿일이라 안 붙인다
+                       · 배달·사다드림 : 미리 받아야 하니 픽업이라도 붙인다
+                       · 픽업을 이미 마친 것 : 가게에서 받았을 가능성이 크므로 안 붙인다
+                       물건 보기에서는 챙길 때 볼 것이 아니라 아예 안 붙인다. */
+                    const pickedUp = (st === '픽업' || st === '픽업완료');
+                    const needPay = !pickedUp && (String(o.shippingMethod || '').includes('배달') || isSadaOrderRow(o));
+                    const payTag = byKind ? ''
+                        : isSalesPaid(o) ? '<b style="color:#059669;">입금</b>'
+                            : (needPay ? '<b style="color:#dc2626;">미입금</b>' : '');
+                    // 카드에서는 짧게 — 배달완료→배달, 픽업완료→픽업
+                    const stShort = (st === '배달완료') ? '배달' : (st === '픽업완료' ? '픽업' : st);
+                    const stTag = `<b style="color:${stColor};">${stShort}</b>`;
+                    /* 세부 선택 모드에서는 줄마다 네모를 붙여 하나씩 고른다.
+                       다만 '고른 카드'의 줄만 만질 수 있다. 나머지 카드는 그냥 보이기만 한다.
+                       카드 클릭과 겹치지 않게 event.stopPropagation() 을 건다. */
+                    const inPickedCard = calSelected.has(c.key);
+                    const lineOn = calItemMode && inPickedCard && calSelItems.has(o.orderKey);
+                    const lineCanPick = calItemMode && inPickedCard && calCanEditStatus(o);
+                    const lineClick = lineCanPick
+                        ? ` onclick="event.stopPropagation(); calToggleItem('${escapeArg(o.orderKey)}')"`
+                        : '';
+                    // 인원 보기의 줄은 '상품', 물건 보기의 줄은 '손님'
+                    const lineLabel = byKind
+                        ? `${o.name || '무명'} <span style="font-size:10.5px; color:var(--text-sub); font-weight:600;">${String(o.phone || '')}</span>`
+                        : `${o.item || '상품명 없음'}`;
+                    return `<div${lineClick} style="display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:3px 0; border-top:1px dashed #f1f5f9;${lineCanPick ? ' cursor:pointer;' : ''}${lineOn ? ' background:#eff6ff;' : ''}">
+                        <span style="word-break:break-all;">${(calItemMode && inPickedCard) ? `<span style="color:${lineOn ? "#2563eb" : "#cbd5e1"}; margin-right:3px;">${lineOn ? "☑" : "☐"}</span>` : ""}${lineLabel}${qty ? ` <b>×${qty}</b>` : ''}${gOptionLines(o.optionText, { style: 'font-size:11px; font-weight:700; color:#c2610a;' })}</span>
+                        <span style="flex-shrink:0; white-space:nowrap; color:var(--text-sub);">
+                            ${calAmount(o).toLocaleString()}원${payTag ? ` · ${payTag}` : ''} · ${stTag}
+                        </span>
+                    </div>`;
+                }).join('');
+                /* 카드를 누르면 골라진다. 여럿 골라 놓고 아래 띠에서 한꺼번에 바꾼다.
+                   보관함에만 있는 옛 주문뿐인 카드는 고칠 수 없어 안 눌리게 둔다. */
+                const canEdit = c.items.some(calCanEditStatus);
+                const on = calSelected.has(c.key);
+                const cardClick = (canEdit && !calItemMode) ? ` onclick="calToggleCard('${escapeArg(c.key)}')" title="눌러서 고르기"` : '';
+                /* 수령방법은 왼쪽 색 띠로만 드러낸다 — 배달은 파랑, 픽업은 초록, 섞이면 회색.
+                   글자 딱지는 눈에 시끄러워 뺐다. */
+                const hasDel = c.items.some(o => String(o.shippingMethod || '').includes('배달'));
+                const hasPick = c.items.some(o => !String(o.shippingMethod || '').includes('배달'));
+                /* 다 끝낸 것은 연한 초록 바탕으로 '끝났다' 느낌을 준다.
+                   회색으로 죽이면 안 한 것처럼 보여서, 초록쪽으로 두었다. */
+                const cardDone = c.items.every(calIsDone);
+                const cardStyle = on
+                    ? 'border:2px solid #2563eb; background:#eff6ff;'   // 고른 것은 파랑 (완료 초록과 헷갈리지 않게)
+                    : cardDone ? 'border:1px solid #bbf7d0; background:#f0fdf4;'
+                        : 'border:1px solid var(--border); background:#fff;';
+                // 물건 보기에서는 배달·픽업이 중요하지 않다. 띠를 없애면 카드가 들썩이므로 회색으로 통일한다
+                const leftBar = byKind ? ' border-left:4px solid #cbd5e1;'
+                    : (hasDel && hasPick) ? ' border-left:4px solid #94a3b8;'
+                    : hasDel ? ' border-left:4px solid #0284c7;'
+                        : ' border-left:4px solid #059669;';
+                const box = (canEdit && !calItemMode)
+                    ? `<span style="color:${on ? '#2563eb' : '#cbd5e1'}; margin-right:2px;">${on ? '☑' : '☐'}</span>` : '';
+
+                /* 물건 보기의 카드 머리는 '무엇을 몇 개 챙기나'가 먼저다.
+                   수량을 크게 놓고, 아직 안 나간 개수를 곁들이고, 금액은 작게 뒤로 뺀다.
+                   누가 시켰는지는 챙길 때 볼 것이 아니라 접어 둔다 — 'N명 ▾' 를 눌러 편다.
+                   (세부 선택 중인 카드는 줄을 골라야 하므로 저절로 펴진다) */
+                if (byKind) {
+                    const todoQty = c.items.filter(o => !calIsDone(o)).reduce((a, o) => a + (parseInt(o.qty || 0) || 0), 0);
+                    const open = calOpenCards.has(c.key) || (calItemMode && calSelected.has(c.key));
+                    return `<div${cardClick} style="${cardStyle}${leftBar} border-radius:8px; padding:8px 10px; margin-bottom:6px;${canEdit ? ' cursor:pointer;' : ''}">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <div style="font-weight:800; font-size:13px; word-break:break-all;">
+                                ${box}${c.name}
+                                <button type="button" onclick="event.stopPropagation(); calToggleCardOpen('${escapeArg(c.key)}')"
+                                    title="누가 시켰는지 보기"
+                                    style="margin-left:2px; padding:1px 6px; border:1px solid var(--border); background:${open ? '#eff6ff' : '#fff'};
+                                           color:${open ? '#2563eb' : 'var(--text-sub)'}; border-radius:20px; font-size:11px; font-weight:700; cursor:pointer;">${c.people.size}명 ${open ? '▴' : '▾'}</button>
+                            </div>
+                            <div style="flex-shrink:0; text-align:right; line-height:1.15;">
+                                <div style="font-size:14px; font-weight:900; color:var(--text-main);">
+                                    ${todoQty ? `<span style="font-size:11px; font-weight:800; color:#d97706;">${todoQty}개 남음</span>`
+                                            : `<span style="font-size:11px; font-weight:800; color:#059669;">완료</span>`}
+                                    ${c.qty}개
+                                </div>
+                                <div style="font-size:11px; color:var(--text-sub); font-weight:700;">${c.amount.toLocaleString()}원</div>
+                            </div>
+                        </div>
+                        ${open ? lines : ''}
+                    </div>`;
+                }
+
+                // 지난 미픽업이 있으면 이름 옆에 조용히 알린다. 자세한 날짜는 카드를 고르면 아래 띠에 나온다
+                const overdueN = unpickedMap.get(String(c.phone || '').replace(/\D/g, '')) || 0;
+                // 메모가 있는지만 표시한다. 내용은 카드를 고르면 아래 띠에 나온다
+                const memoKeyBase = String(c.phone || '').replace(/\D/g, '') || ((c.name || '무명').trim() + '_비인증');
+                const hasMemo = !!(String(fixedMemos[memoKeyBase] || '').trim()
+                    || String(printFixedMemos[memoKeyBase] || '').trim()
+                    || c.items.some(o => String(customerMemos[memoKeyBase + '_' + String(o.timestamp).replace(/\s+/g, '')] || '').trim()));
+                return `<div${cardClick} style="${cardStyle}${leftBar} border-radius:8px; padding:8px 10px; margin-bottom:6px;${canEdit ? ' cursor:pointer;' : ''}">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <div style="font-weight:800; font-size:13px;">
+                            ${box}${c.name}
+                            <span style="font-size:11px; color:var(--text-sub); font-weight:600;">${c.phone}</span>
+                            ${overdueN ? `<span title="지난 미완료 ${overdueN}건 — 카드를 고르면 아래에 날짜가 나옵니다"
+                                style="margin-left:3px; padding:1px 6px; border-radius:20px; border:1px solid #fca5a5; background:#fef2f2; color:#b91c1c; font-size:10.5px; font-weight:800;">⚠️ 미완료 ${overdueN}건</span>` : ""}
+                            ${hasMemo ? `<span title="메모 있음 — 카드를 고르면 아래에 나옵니다" style="margin-left:3px; font-size:12px;">📝</span>` : ""}
+                        </div>
+                        <div style="font-size:12px; font-weight:900;">${c.amount.toLocaleString()}원</div>
+                    </div>
+                    ${lines}
+                </div>`;
+            }).join('');
+
+            // 고른 손님이 있으면 상태 바꾸기 띠는 화면 아래에 따로 뜬다 (calPaintActionSheet)
+            const selKeys = arr.filter(c => c.items.some(calCanEditStatus)).map(c => c.key);
+            const keysJson = encodeURIComponent(JSON.stringify(selKeys));
+            const allOn = selKeys.length > 0 && selKeys.every(k => calSelected.has(k));
+            // 정렬 단추에 '아직 안 끝난 손님'이 픽업·배달 각각 몇 명인지 적는다
+            const todoCards = arr.filter(c => !c.items.every(calIsDone));
+            const delTodo = todoCards.filter(c => c.items.some(o => String(o.shippingMethod || '').includes('배달'))).length;
+            const pickTodo = todoCards.length - delTodo;
+
+            return `<div style="margin-top:12px;">
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+                    <b style="font-size:14px;">${label}</b>
+                    <span style="font-size:12px; color:var(--text-sub); font-weight:700;">${byKind ? `${arr.length}종류` : `손님 ${arr.length}명`} · ${g.rows.filter(o => !gIsFeeRow(o)).length}건 · ${g.qty}개 · ${g.amount.toLocaleString()}원</span>
+                    ${byKind ? '' : `<button type="button" onclick="calCycleWaySort()" title="눌러서 배달·픽업 순서 바꾸기"
+                        style="height:22px; padding:0 8px; border:1px solid ${calWaySort ? (calWaySort === 'del' ? '#0284c7' : '#059669') : 'var(--border)'};
+                               background:${calWaySort === 'del' ? '#e0f2fe' : calWaySort === 'pick' ? '#ecfdf5' : '#fff'};
+                               color:${calWaySort === 'del' ? '#0369a1' : calWaySort === 'pick' ? '#047857' : '#475569'};
+                               border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${calWaySort === 'del' ? `🛵 배달 ${delTodo}` : calWaySort === 'pick' ? `🏠 픽업 ${pickTodo}` : '↕ 기본순'}</button>`}
+                    <span style="margin-left:auto; font-size:12px; font-weight:800; color:${g.todo ? '#d97706' : '#059669'}; white-space:nowrap;">${g.todo ? `남은 ${g.todo}건` : '다 끝냄'}</span>
+                    ${selKeys.length ? `<button type="button" onclick="calToggleAllCards('${keysJson}')"
+                        style="flex-shrink:0; height:22px; padding:0 8px; border:1px solid ${allOn ? 'var(--primary)' : 'var(--border)'};
+                               background:${allOn ? 'var(--primary-light)' : '#fff'}; color:${allOn ? 'var(--primary)' : '#475569'};
+                               border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${allOn ? '☑ 전체 선택' : '☐ 전체 선택'}</button>` : ''}
+                </div>
+                ${cards}
+            </div>`;
+        }
+
+        async function initOrderCalendarTab() {
+            const box = document.getElementById('orders-cal-body');
+            if (box && !box.innerHTML.trim()) {
+                box.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-sub); font-size:13px;">불러오는 중...</div>`;
+            }
+            try { loadSalesArchiveFromCache(); } catch (e) { }
+            if (!calPickedDay) calPickedDay = calTodayKey();
+            renderOrderCalendar();
+        }
+
+        /* ===== [신규] 달력에서 손님 카드를 골라 상태 바꾸기 =====
+           카드를 누르면 골라지고(여럿 고를 수 있다), 위에 뜨는 '상태 변경'으로
+           고른 손님들의 '그날' 줄을 한꺼번에 바꾼다.
+           (주문 내역의 updateCustomerAllItems 는 그 손님의 모든 날짜를 건드리므로 여기서는 안 쓴다) */
+        let calSelected = new Set();      // 골라 둔 손님 카드 열쇠
+        let calWaySort = '';              // '' 기본 · 'del' 배달 먼저 · 'pick' 픽업 먼저
+        let calCellMode = 'people';       // 달력 칸 보기 — 'people' 손님 수 · 'kinds' 상품 종류 수
+        let calOpenCards = new Set();     // 물건 보기에서 손님 줄을 펼쳐 둔 카드
+
+        // 물건 카드에서 '누가 시켰는지' 줄을 폈다 접었다 한다
+        function calToggleCardOpen(key) {
+            if (calOpenCards.has(key)) calOpenCards.delete(key);
+            else calOpenCards.add(key);
+            renderOrderCalendar();
+        }
+
+        /* 달력 칸과 아래 카드를 '손님 기준'으로 볼지 '상품 기준'으로 볼지 고른다.
+           카드 열쇠 체계가 달라지므로 고른 것과 펼친 것은 푼다.
+           물건 보기에서는 한 카드에 배달·픽업이 섞여 수령방법 정렬이 뜻을 잃으므로 기본순으로 되돌린다. */
+        function calSetCellMode(mode) {
+            if (calCellMode === mode) return;
+            calCellMode = mode;
+            calSelected.clear(); calSelItems.clear(); calItemMode = false; calOpenCards.clear();
+            if (mode === 'kinds') calWaySort = '';
+            renderOrderCalendar();
+        }
+        // 수령방법 정렬 — 기본 → 픽업 먼저 → 배달 먼저 로 돌아간다
+        function calCycleWaySort() {
+            calWaySort = calWaySort === '' ? 'pick' : calWaySort === 'pick' ? 'del' : '';
+            renderOrderCalendar();
+        }
+        // 카드 열쇠 — 인원 보기는 손님, 물건 보기는 상품 기준
+        const calCardKeyOfRow = o => (calCellMode === 'kinds')
+            ? ('P_' + String(o.item || '상품명 없음').trim())
+            : ((o.name || '무명') + '_' + String(o.phone || ''));
+
+        // 보관함에만 있는 옛 주문은 rawOrders에 없어 고칠 수 없다.
+        function calCanEditStatus(o) {
+            if (!o || !o.orderKey) return false;
+            return (rawOrders || []).some(it => it.orderKey === o.orderKey);
+        }
+
+        function calToggleCard(key) {
+            if (calSelected.has(key)) calSelected.delete(key);
+            else calSelected.add(key);
+            renderOrderCalendar();
+        }
+
+        function calClearSelection() {
+            calSelected.clear();
+            calSelItems.clear(); calItemMode = false;
+            renderOrderCalendar();
+        }
+
+        // 그날 화면에 있는 손님을 모두 고른다 / 이미 다 골랐으면 푼다
+        function calToggleAllCards(keysJson) {
+            let keys = [];
+            try { keys = JSON.parse(decodeURIComponent(keysJson)); } catch (e) { return; }
+            const allOn = keys.length > 0 && keys.every(k => calSelected.has(k));
+            if (allOn) keys.forEach(k => calSelected.delete(k));
+            else keys.forEach(k => calSelected.add(k));
+            renderOrderCalendar();
+        }
+
+        /* 세부 선택 — 손님 단위가 아니라 품목 한 줄씩 고르는 모드.
+           카드로 크게 고른 뒤 '세부'를 눌러 필요 없는 줄만 빼는 식으로 쓴다. */
+        let calItemMode = false;
+        let calSelItems = new Set();      // 골라 둔 줄의 orderKey
+
+        function calToggleItemMode() {
+            const day = calPickedDay;
+            if (!calItemMode) {
+                // 켤 때는 지금 고른 카드의 줄을 모두 담아 두고 시작한다
+                calSelItems = new Set(calRowsOfSelection(day).map(o => o.orderKey));
+                calItemMode = true;
+            } else {
+                calItemMode = false;
+                calSelItems.clear();
+            }
+            renderOrderCalendar();
+        }
+
+        function calToggleItem(orderKey) {
+            if (calSelItems.has(orderKey)) calSelItems.delete(orderKey);
+            else calSelItems.add(orderKey);
+            renderOrderCalendar();
+        }
+
+        function calRowsOfSelection(day) {
+            const alive = o => calDayOf(o) === day
+                && !isSalesCanceled(o)
+                && String(o.status || '') !== '취소'
+                && !/\[취소\]/.test(String(o.item || ''));
+            if (calItemMode) {
+                // 고른 카드 안의 줄만 센다 (카드를 벗어난 줄이 남아 있을 일은 없지만 안전하게)
+                return (rawOrders || []).filter(o => alive(o) && calSelItems.has(o.orderKey) && calSelected.has(calCardKeyOfRow(o)));
+            }
+            return (rawOrders || []).filter(o => alive(o) && calSelected.has(calCardKeyOfRow(o)));
+        }
+
+        // 달력이 열려 있으면 다시 그린다. 상태를 바꾼 뒤 화면이 옛 값으로 남지 않게.
+        function calRefreshIfOpen() {
+            const box = document.getElementById('orders-sub-calendar');
+            if (box && box.style.display !== 'none' && typeof renderOrderCalendar === 'function') {
+                renderOrderCalendar();
+            }
+        }
+
+        /* 카드를 고르면 화면 아래에서 올라오는 상태 바꾸기 띠.
+           가운데 창을 띄우지 않고, 고르는 동안 계속 아래에 붙어 있어 바로 누를 수 있다. */
+        function calPaintActionSheet() {
+            const id = 'cal-action-sheet';
+            let el = document.getElementById(id);
+
+            const tab = document.getElementById('orders-sub-calendar');
+            const shown = tab && tab.style.display !== 'none';
+            const rows = shown ? calRowsOfSelection(calPickedDay) : [];
+
+            if (!rows.length) {
+                if (el) el.remove();
+                document.body.style.paddingBottom = '';
+                return;
+            }
+
+            if (!el) {
+                el = document.createElement('div');
+                el.id = id;
+                el.style = `position:fixed; left:0; right:0; bottom:0; z-index:9000; background:#fff;
+                    border-top:1.5px solid var(--border); box-shadow:0 -6px 20px rgba(0,0,0,0.12);
+                    padding:10px 12px; padding-bottom:calc(10px + env(safe-area-inset-bottom));`;
+                document.body.appendChild(el);
+            }
+
+            const names = [...new Set(rows.map(o => o.name || '무명'))];
+            // 고른 것이 모두 입금이면 단추가 '푸는' 쪽으로 바뀐다 (주문 내역과 같은 규칙)
+            const allPaid = rows.every(o => o.paid === true || o.paid === 'true');
+            // 고른 것이 모두 배달이면 단추는 '픽업으로', 아니면 '배달로' (입금 단추와 같은 결)
+            const allDel = rows.every(o => String(o.shippingMethod || '').includes('배달'));
+            const options = [
+                { status: '대기', label: '🔘 대기', color: '#64748b', bg: '#f1f5f9' },
+                { status: '입고', label: '🟡 입고', color: '#d97706', bg: '#fffbeb' },
+                { status: '픽업', label: '🟣 픽업', color: '#7c3aed', bg: '#f5f3ff' },
+                { status: '배달완료', label: '🟢 배달', color: '#059669', bg: '#ecfdf5' },
+                { status: '취소', label: '🔴 취소', color: '#dc2626', bg: '#fef2f2' }
+            ];
+            /* [신규] 손님 한 명만 골랐을 때, 그 손님의 지난 미완료가 며칟날 것인지 여기에 적는다.
+               오늘 물건을 건네면서 지난 것도 함께 챙겨 주라는 뜻이다.
+               잣대는 주문 내역의 gPastUnpickedOf 와 같고, 지금 보는 날만 뺀다. */
+            let overdueLine = '';
+            if (!calItemMode && calCellMode !== 'kinds' && calSelected.size === 1) {
+                const phone = String((rows[0] || {}).phone || '');
+                const past = (typeof gPastUnpickedOf === 'function' ? gPastUnpickedOf(phone) : [])
+                    .filter(r => r.dateStr !== calPickedDay);
+                if (past.length) {
+                    const byDate = new Map();
+                    past.forEach(r => byDate.set(r.dateStr, (byDate.get(r.dateStr) || 0) + 1));
+                    const parts = [...byDate.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+                        .map(([d, n]) => `${fmtMD(d)} ${n}건`);
+                    overdueLine = `
+                        <div style="display:flex; gap:6px; align-items:baseline; flex-wrap:wrap; margin-bottom:8px; padding:6px 8px;
+                                    border:1px solid #fca5a5; background:#fef2f2; border-radius:8px; font-size:12px; font-weight:700;">
+                            <b style="color:#b91c1c;">⚠️ 지난 미완료 ${past.length}건</b>
+                            <span style="color:#b91c1c;">${parts.slice(0, 6).join(' · ')}${parts.length > 6 ? ` 외 ${parts.length - 6}일` : ''}</span>
+                        </div>`;
+                }
+            }
+            /* [신규] 손님 한 명만 골랐을 때 그 손님 메모를 여기 보여 준다.
+               주문 내역과 같은 곳간을 읽는다 — 고객고정(fixedMemos) · 이번주문(customerMemos) · 인쇄고정(printFixedMemos).
+               ✎ 를 누르면 주문 내역과 같은 메모 창이 떠서 그 자리에서 고친다. */
+            let memoLine = '';
+            if (!calItemMode && calCellMode !== 'kinds' && calSelected.size === 1 && rows.length) {
+                const one = rows[0];
+                const cleanPhone = String(one.phone || '').replace(/\D/g, '');
+                const baseKey = (!cleanPhone) ? ((one.name || '무명').trim() + '_비인증') : cleanPhone;
+                const fixed = String(fixedMemos[baseKey] || '').trim();
+                const printFix = String(printFixedMemos[baseKey] || '').trim();
+                const orderMemos = [...new Set(rows
+                    .map(o => String(customerMemos[baseKey + '_' + String(o.timestamp).replace(/\s+/g, '')] || '').trim())
+                    .filter(Boolean))];
+
+                const chip = (icon, txt, color) => `<span style="color:${color}; word-break:break-all;">${icon} ${gEscapeHtml(txt)}</span>`;
+                const parts = [];
+                if (fixed) parts.push(chip('📌', fixed, '#b45309'));
+                orderMemos.forEach(m => parts.push(chip('📝', m, '#0369a1')));
+                if (printFix) parts.push(chip('🖨️', printFix, '#7c3aed'));
+
+                memoLine = `
+                    <div style="display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; margin-bottom:8px; padding:6px 8px;
+                                border:1px solid ${parts.length ? '#fde68a' : 'var(--border)'}; background:${parts.length ? '#fffbeb' : '#f8fafc'};
+                                border-radius:8px; font-size:12px; font-weight:700;">
+                        ${parts.length ? parts.join('<span style="color:#cbd5e1;">·</span>')
+                            : `<span style="color:var(--text-sub); font-weight:600;">메모 없음</span>`}
+                        <button type="button" onclick="openMemoModal('${escapeArg(one.name || '')}','${escapeArg(one.phone || '')}','${escapeArg(one.timestamp || '')}')"
+                            style="margin-left:auto; flex-shrink:0; height:22px; padding:0 8px; border:1px solid var(--border); background:#fff;
+                                   color:#475569; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">✎ 메모</button>
+                    </div>`;
+            }
+
+            el.innerHTML = `
+                <div style="max-width:900px; margin:0 auto;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <b style="font-size:13px; color:#2563eb;">${calItemMode ? `${rows.length}건 고름` : `${calSelected.size}${calCellMode === "kinds" ? "종류" : "명"} · ${rows.length}건 고름`}</b>
+                    </div>
+                    ${overdueLine}
+                    ${memoLine}
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button type="button" onclick="calToggleItemMode()"
+                            style="flex:1 1 0; min-width:64px; height:36px;
+                                   border:1.5px solid ${calItemMode ? '#2563eb' : 'var(--border)'}; background:${calItemMode ? '#eff6ff' : '#f8fafc'};
+                                   color:${calItemMode ? '#2563eb' : '#475569'}; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">${calItemMode ? '☑ 세부' : '☐ 세부'}</button>
+                        <button type="button" onclick="calApplySelectedMethod('${allDel ? '매장픽업' : '배달주문'}')"
+                            style="flex:1 1 0; min-width:64px; height:36px;
+                                   border:1.5px solid ${allDel ? '#05966933' : '#0284c733'}; background:${allDel ? '#ecfdf5' : '#e0f2fe'};
+                                   color:${allDel ? '#047857' : '#0369a1'}; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">${allDel ? '🏠 픽업' : '🛵 배달'}</button>
+                        <button type="button" onclick="calOpenDateMove()"
+                            style="flex:1 1 0; min-width:64px; height:36px; border:1.5px solid var(--border); background:#f8fafc;
+                                   color:#475569; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">📅 날짜</button>
+                        <button type="button" onclick="calApplySelectedPaid()"
+                            style="flex:1 1 0; min-width:64px; height:36px; border:1.5px solid ${allPaid ? '#dc262633' : '#05966933'};
+                                   background:${allPaid ? '#fef2f2' : '#ecfdf5'}; color:${allPaid ? '#dc2626' : '#059669'};
+                                   border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">${allPaid ? '💵 입금 풀기' : '💵 입금'}</button>
+                        <button type="button" onclick="calClearSelection()"
+                            style="flex:1 1 0; min-width:64px; height:36px; border:1.5px solid var(--border); background:#fff;
+                                   color:#475569; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">✕ 해제</button>
+                    </div>
+                    <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+                        ${options.map(o => `
+                        <button type="button" onclick="calApplySelectedStatus('${o.status}')"
+                            style="flex:1 1 auto; min-width:78px; height:38px; border:1.5px solid ${o.color}33; background:${o.bg};
+                                   color:${o.color}; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">${o.label}</button>`).join('')}
+                    </div>
+                </div>`;
+
+            // 띠에 가려 마지막 카드가 안 보이지 않게 아래를 그만큼 띄운다
+            document.body.style.paddingBottom = (el.offsetHeight + 12) + 'px';
+        }
+
+        async function calApplySelectedStatus(newStatus) {
+            const day = calPickedDay;
+            const picked = calRowsOfSelection(day);
+            if (!picked.length) { showToast('고른 손님이 없습니다.'); return; }
+
+            /* [수정] 주문 내역의 일괄 변경(handleBatchUpdate)과 같은 규칙을 쓴다.
+               '입고'는 이미 픽업·배달을 마친 건에는 걸지 않는다. 완료한 것을 되돌리면 안 되기 때문이다.
+               (취소된 건은 달력 목록에 아예 안 나오므로 여기서 걸러질 일이 없다) */
+            let skippedDone = 0;
+            const rows = picked.filter(o => {
+                if (newStatus !== '입고') return true;
+                const delivered = (o.delivered === true || o.delivered === 'true' || String(o.delivered).toUpperCase() === 'TRUE');
+                const received = (o.received === true || o.received === 'true' || String(o.received).toUpperCase() === 'TRUE');
+                if (delivered || received) { skippedDone++; return false; }
+                return true;
+            });
+
+            if (!rows.length) {
+                showToast(skippedDone > 0
+                    ? '고른 것이 픽업·배달을 마친 건이라 입고로 바꾸지 않았습니다.'
+                    : '바꿀 줄이 없습니다.');
+                return;
+            }
+
+            showLoader(`${rows.length}건 [${newStatus}] 업데이트 중...`);
+            try {
+                const patchBody = getStatusPatchBody(newStatus);
+                const wasCanceled = rows.map(o => isSalesCanceled(o));
+
+                await Promise.all(rows.map(o => {
+                    const phoneKey = o.firebasePhoneKey ? o.firebasePhoneKey : String(o.phone || '').replace(/\D/g, '');
+                    return gPatchOrder(phoneKey, o.orderKey, patchBody, [{
+                        phone: phoneKey, name: o.name || '', item: o.item || '',
+                        what: '상태', from: gStatusLabelOf(o), to: newStatus, note: `달력 ${fmtMD(day)} 고른 손님`
+                    }]).then(res => {
+                        // 주문 내역과 같이, 저장에 성공한 것만 화면 쪽 값을 고친다
+                        if (res && res.ok) {
+                            Object.assign(o, patchBody);
+                            syncStatusToGoogleSheets(o.phone, o.timestamp, o.item, newStatus);
+                            if (newStatus !== '배달완료') {
+                                fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(phoneKey)}/${encodeURIComponent(o.orderKey)}.json`, { method: 'DELETE' })
+                                    .catch(e => console.error('배달사진 이미지 삭제 실패:', e));
+                            }
+                        }
+                    });
+                }));
+
+                for (let i = 0; i < rows.length; i++) {
+                    await applyStockDeltaForCancel(rows[i], wasCanceled[i], newStatus === '취소');
+                }
+
+                showToast(skippedDone > 0
+                    ? `${rows.length}건을 [${newStatus}]로 바꿨습니다. (이미 끝난 ${skippedDone}건은 그대로 뒀습니다)`
+                    : `${rows.length}건을 [${newStatus}]로 바꿨습니다.`);
+                calSelected.clear(); calSelItems.clear(); calItemMode = false;
+                renderFilteredOrders();
+                calRefreshIfOpen();
+
+                if (newStatus === '취소') {
+                    const first = rows.find(o => o.pickupDate);
+                    if (first) await checkAndApplyDeliveryFeeAfterCancellation(first.phone, first.pickupDate);
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('업데이트 오류가 발생했습니다.');
+            } finally {
+                hideLoader();
+            }
+        }
+
+        /* 고른 손님들의 그날 줄 입금 여부를 한꺼번에 바꾼다.
+           주문 내역의 '💵 입금완료'와 같은 규칙 — 고른 것이 모두 입금이면 한 번 더 눌러 푼다. */
+        async function calApplySelectedPaid() {
+            const day = calPickedDay;
+            const rows = calRowsOfSelection(day);
+            if (!rows.length) { showToast('고른 손님이 없습니다.'); return; }
+
+            const 이미입금 = o => !!(o && (o.paid === true || o.paid === 'true'));
+            const 새값 = !rows.every(이미입금);
+
+            showLoader(새값 ? `${rows.length}건 [입금완료] 처리 중...` : `${rows.length}건 [입금완료] 푸는 중...`);
+            try {
+                const patchBody = { paid: 새값 };
+                await Promise.all(rows.map(o => {
+                    const phoneKey = o.firebasePhoneKey ? o.firebasePhoneKey : String(o.phone || '').replace(/\D/g, '');
+                    return gPatchOrder(phoneKey, o.orderKey, patchBody, [{
+                        phone: phoneKey, name: o.name || '', item: o.item || '',
+                        what: '입금', from: 이미입금(o) ? '입금완료' : '미입금', to: 새값 ? '입금완료' : '미입금',
+                        note: `달력 ${fmtMD(day)} 고른 손님`
+                    }]).then(res => { if (res && res.ok) o.paid = 새값; });
+                }));
+
+                showToast(새값 ? `${rows.length}건을 입금완료로 찍었습니다.` : `${rows.length}건의 입금완료를 풀었습니다.`);
+                calSelected.clear(); calSelItems.clear(); calItemMode = false;
+                renderFilteredOrders();
+                calRefreshIfOpen();
+            } catch (e) {
+                console.error(e);
+                showToast('입금 처리 중 오류가 발생했습니다.');
+            } finally {
+                hideLoader();
+            }
+        }
+
+        /* 고른 손님들의 그날 줄 수령방법(배달/픽업)을 바꾼다.
+           주문 내역의 `toggleShippingMethod`를 손님별로 그대로 쓴다 —
+           픽업→배달로 갈 때 예전 주소를 찾아 채워 주는 손질이 거기 들어 있어서다.
+           손님마다 다시 묻지 않도록, 한 번 물은 뒤 confirm 을 잠깐 막는다. */
+        async function calApplySelectedMethod(targetMethod) {
+            const day = calPickedDay;
+            const rows = calRowsOfSelection(day);
+            if (!rows.length) { showToast('고른 손님이 없습니다.'); return; }
+
+            const label = targetMethod === '배달주문' ? '배달' : '픽업';
+            const byPhone = new Map();
+            rows.forEach(o => {
+                const p = String(o.phone || '');
+                if (!byPhone.has(p)) byPhone.set(p, []);
+                byPhone.get(p).push(o.orderKey);
+            });
+
+            if (!confirm(`${byPhone.size}명 · ${rows.length}건을 ${label}(으)로 바꿀까요?\n${fmtMD(day)} 것만 바뀝니다.`)) return;
+
+            const origConfirm = window.confirm;
+            window.confirm = () => true;
+            try {
+                for (const [phone, keys] of byPhone) {
+                    await toggleShippingMethod(phone, keys.join('|@@|'), targetMethod);
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('수령방법 변경 중 오류가 났습니다.');
+            } finally {
+                window.confirm = origConfirm;
+            }
+            calSelected.clear();
+            calSelItems.clear(); calItemMode = false;
+            calRefreshIfOpen();
+        }
+
+        /* 고른 손님들의 그날 줄을 다른 날로 옮긴다. 주문 내역과 같은 날짜 고르기 창을 쓴다. */
+        function calOpenDateMove() {
+            const rows = calRowsOfSelection(calPickedDay);
+            if (!rows.length) { showToast('고른 손님이 없습니다.'); return; }
+            showDatePickerModal(`${calSelected.size}명 · ${rows.length}건 날짜 옮기기`, calPickedDay, iso => calApplySelectedDate(iso));
+        }
+
+        async function calApplySelectedDate(iso) {
+            const day = calPickedDay;
+            const target = String(iso || '').trim();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(target)) { showToast('날짜를 알아보지 못했습니다.'); return; }
+            const rows = calRowsOfSelection(day);
+            if (!rows.length) { showToast('고른 손님이 없습니다.'); return; }
+
+            // 다른 주문들과 표기를 맞춰 저장해야 같은 날로 묶인다 (배달비 계산이 여기에 걸린다)
+            const savedDate = fToPickupLabel(target);
+            const phones = [...new Set(rows.map(o => String(o.phone || '')))];
+
+            showLoader(`${rows.length}건 날짜 옮기는 중...`);
+            try {
+                await Promise.all(rows.map(o => {
+                    const payload = { pickupDate: savedDate, date: savedDate, orderDate: savedDate };
+                    if (o.matchKey) payload.matchKey = savedDate;
+                    const prev = o.pickupDate || o.date || '';
+                    const phoneKey = o.firebasePhoneKey ? String(o.firebasePhoneKey).trim() : String(o.phone || '').replace(/\D/g, '');
+                    return gPatchOrder(phoneKey, o.orderKey, payload, [{
+                        phone: phoneKey, name: o.name || '', item: o.item || '',
+                        what: '픽업/배달 날짜', from: prev, to: savedDate, note: `달력 ${fmtMD(day)} 고른 손님`
+                    }]).then(res => { if (res && res.ok) Object.assign(o, payload); });
+                }));
+
+                // 옮긴 날과 떠난 날 양쪽에서 배달비를 다시 맞춘다 (주문 내역과 같은 손질)
+                for (const p of phones) {
+                    await checkAndApplyDeliveryFeeAfterCancellation(p, day);
+                    await checkAndApplyDeliveryFeeAfterCancellation(p, savedDate);
+                }
+
+                showToast(`${rows.length}건을 ${fmtMD(target)}로 옮겼습니다.`);
+                calSelected.clear(); calSelItems.clear(); calItemMode = false;
+                calPickedDay = target;      // 옮긴 날을 바로 보여 준다
+                const d = new Date(target);
+                if (!isNaN(d.getTime())) { calYear = d.getFullYear(); calMonth = d.getMonth(); }
+                renderFilteredOrders();
+                calRefreshIfOpen();
+            } catch (e) {
+                console.error(e);
+                showToast('날짜 변경 중 오류가 났습니다.');
+            } finally {
+                hideLoader();
+            }
+        }
+
         async function switchOrderSubTab(which){
             _relocatePurchaseAgg();
             document.querySelectorAll('.orders-sub-btn').forEach(b => b.classList.toggle('active', b.id === 'btn-orders-sub-' + which));
@@ -16769,12 +17611,18 @@
             const pur = document.getElementById('orders-sub-purchase');
             if (list) list.style.display = (which === 'list') ? 'block' : 'none';
             if (pur) pur.style.display = (which === 'purchase') ? 'block' : 'none';
+            const cal = document.getElementById('orders-sub-calendar');
+            if (cal) cal.style.display = (which === 'calendar') ? 'block' : 'none';
+            if (which !== 'calendar' && typeof calPaintActionSheet === 'function') calPaintActionSheet();   // 다른 탭으로 가면 아래 띠를 걷는다
             if (which === 'purchase'){
                 if (typeof uploadProducts === 'undefined' || !uploadProducts || uploadProducts.length === 0){
                     try { await loadProductsFromServer(); } catch(e){}
                 }
                 try { loadSalesArchiveFromCache(); } catch(e){}
                 renderSalesUpcoming();
+            }
+            if (which === 'calendar'){
+                await initOrderCalendarTab();
             }
         }
 
