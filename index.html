@@ -16988,8 +16988,8 @@
                     날짜를 누르면 그날 주문이 손님별로 여기에 펼쳐집니다.
                 </div>`;
             }
-            const g = data.get(calPickedDay);
-            const label = `${fmtMD(calPickedDay)} 픽업/배달`;
+            const g = calOverdueMode ? calOverdueGroup() : data.get(calPickedDay);
+            const label = calOverdueMode ? '⚠️ 과거 미완료' : `${fmtMD(calPickedDay)} 픽업/배달`;
             if (!g || !g.rows.length) {
                 return `<div style="margin-top:12px; padding:14px; text-align:center; color:var(--text-sub); font-size:12px; border:1px solid var(--border); border-radius:10px;">
                     <b>${label}</b> — 주문이 없습니다.
@@ -17086,11 +17086,13 @@
                         ? ` onclick="event.stopPropagation(); calToggleItem('${escapeArg(o.orderKey)}')"`
                         : '';
                     // 인원 보기의 줄은 '상품', 물건 보기의 줄은 '손님'
+                    // 미완료 모아보기에서는 며칟날 것인지 앞에 적는다
+                    const dayTag = calOverdueMode ? `<b style="color:#b91c1c; margin-right:4px;">${fmtMD(calDayOf(o))}</b>` : "";
                     const lineLabel = byKind
                         ? `${o.name || '무명'} <span style="font-size:10.5px; color:var(--text-sub); font-weight:600;">${String(o.phone || '')}</span>`
                         : `${o.item || '상품명 없음'}`;
                     return `<div${lineClick} style="display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:3px 0; border-top:1px dashed #f1f5f9;${lineCanPick ? ' cursor:pointer;' : ''}${lineOn ? ' background:#eff6ff;' : ''}">
-                        <span style="word-break:break-all;">${(calItemMode && inPickedCard) ? `<span style="color:${lineOn ? "#2563eb" : "#cbd5e1"}; margin-right:3px;">${lineOn ? "☑" : "☐"}</span>` : ""}${lineLabel}${qty ? ` <b style="white-space:nowrap;">×${qty}</b>` : ""}${gOptionLines(o.optionText, { style: 'font-size:11px; font-weight:700; color:#c2610a;' })}</span>
+                        <span style="word-break:break-all;">${(calItemMode && inPickedCard) ? `<span style="color:${lineOn ? "#2563eb" : "#cbd5e1"}; margin-right:3px;">${lineOn ? "☑" : "☐"}</span>` : ""}${dayTag}${lineLabel}${qty ? ` <b style="white-space:nowrap;">×${qty}</b>` : ""}${gOptionLines(o.optionText, { style: 'font-size:11px; font-weight:700; color:#c2610a;' })}</span>
                         <span style="flex-shrink:0; white-space:nowrap; color:var(--text-sub);">
                             ${calAmount(o).toLocaleString()}원${payTag ? ` · ${payTag}` : ''} · ${stTag}
                         </span>
@@ -17182,6 +17184,7 @@
             // 전체 대비 남은 수를 함께 보여 준다 — 14/20 처럼
             const delAll = arr.filter(c => c.items.some(o => String(o.shippingMethod || "").includes("배달"))).length;
             const pickAll = arr.length - delAll;
+            const calOverdueTotal = calOverdueRows().length;   // '⚠️ 미완료' 단추에 적을 수
 
             return `<div style="margin-top:12px;">
                 <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
@@ -17189,22 +17192,26 @@
                     <span style="font-size:12px; color:var(--text-sub); font-weight:700;">${byKind ? `${arr.length}종류` : `손님 ${arr.length}명`} · ${g.qty}개 · ${g.amount.toLocaleString()}원</span>
                     <span style="margin-left:auto; font-size:12px; font-weight:800; color:${g.todo ? '#d97706' : '#059669'}; white-space:nowrap;">${g.todo ? `${g.todoQty}개 남음` : "다 끝냄"}</span>
                     <!-- 정렬·전체선택은 한 묶음. 휴대폰에서는 이 묶음이 통째로 다음 줄로 내려간다.
-                         수령방법(기본/픽업/배달)과 뒷번호는 서로 다른 축이라 겹쳐 걸 수 있다. -->
+                         수령방법(기본→픽업→배달)은 단추 하나를 눌러 돌리고, 뒷번호는 그 위에 겹쳐 건다. -->
                     <div class="cal-detail-tools" style="display:flex; gap:4px; align-items:center; min-width:0;">
-                        ${byKind ? '' : [
-                            { v: '', label: '↕ 기본', color: '#475569', bg: '#f8fafc' },
-                            { v: 'pick', label: `🏠 픽업 ${pickTodo}/${pickAll}`, color: '#047857', bg: '#ecfdf5' },
-                            { v: 'del', label: `🛵 배달 ${delTodo}/${delAll}`, color: '#0369a1', bg: '#e0f2fe' }
-                        ].map(o => {
-                            const on = (calWaySort === o.v);
-                            return `<button type="button" onclick="calSetWaySort('${o.v}')"
-                                style="flex-shrink:0; height:22px; padding:0 7px; border:1px solid ${on ? o.color : 'var(--border)'};
-                                       background:${on ? o.bg : '#fff'}; color:${on ? o.color : '#94a3b8'};
-                                       border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${o.label}</button>`;
-                        }).join('') + `<button type="button" onclick="calTogglePhoneSort()" title="위 정렬에 겹쳐서 뒷번호 4자리 순으로 줄 세웁니다"
+                        ${byKind ? '' : (() => {
+                            const w = calWaySort === 'pick'
+                                ? { label: `🏠 픽업 ${pickTodo}/${pickAll}`, color: '#047857', bg: '#ecfdf5' }
+                                : calWaySort === 'del'
+                                    ? { label: `🛵 배달 ${delTodo}/${delAll}`, color: '#0369a1', bg: '#e0f2fe' }
+                                    : { label: `↕ 기본 ${todoCards.length}/${arr.length}`, color: '#475569', bg: '#f8fafc' };
+                            return `<button type="button" onclick="calCycleWaySort()" title="눌러서 기본 → 픽업 → 배달 순서로 바꿉니다"
+                                style="flex-shrink:0; height:22px; padding:0 8px; border:1px solid ${w.color};
+                                       background:${w.bg}; color:${w.color};
+                                       border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${w.label}</button>`;
+                        })() + `<button type="button" onclick="calTogglePhoneSort()" title="위 정렬에 겹쳐서 뒷번호 4자리 순으로 줄 세웁니다"
                                 style="flex-shrink:0; height:22px; padding:0 7px; border:1px solid ${calPhoneSort ? '#7c3aed' : 'var(--border)'};
                                        background:${calPhoneSort ? '#f5f3ff' : '#fff'}; color:${calPhoneSort ? '#7c3aed' : '#94a3b8'};
                                        border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${calPhoneSort ? '🔢 뒷번호 ✓' : '🔢 뒷번호'}</button>`}
+                        <button type="button" onclick="calToggleOverdueMode()" title="오늘 이전에 아직 안 넘긴 것만 모아 봅니다"
+                            style="flex-shrink:0; height:22px; padding:0 7px; border:1px solid ${calOverdueMode ? '#b91c1c' : (calOverdueTotal ? '#fca5a5' : 'var(--border)')};
+                                   background:${calOverdueMode ? '#fef2f2' : '#fff'}; color:${calOverdueMode ? '#b91c1c' : (calOverdueTotal ? '#b91c1c' : '#94a3b8')};
+                                   border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">⚠️ 미완료 ${calOverdueTotal}</button>
                         ${selKeys.length ? `<button type="button" onclick="calToggleAllCards('${keysJson}')"
                             style="margin-left:auto; flex-shrink:0; height:22px; padding:0 8px; border:1px solid ${allOn ? "var(--primary)" : "var(--border)"};
                                    background:${allOn ? 'var(--primary-light)' : '#fff'}; color:${allOn ? 'var(--primary)' : '#475569'};
@@ -17235,6 +17242,46 @@
         let calCellMode = 'people';       // 달력 칸 보기 — 'people' 손님 수 · 'kinds' 상품 종류 수
         let calOpenCards = new Set();     // 물건 보기에서 손님 줄을 펼쳐 둔 카드
 
+        /* ===== [신규] 과거 미완료 모아보기 =====
+           '⚠️ 미완료' 를 누르면 고른 날 대신, 오늘 이전에 아직 안 넘긴 것만 날짜 상관없이 모아 본다.
+           밀린 것을 한 번에 훑고 상태·날짜를 손보라는 자리다. */
+        let calOverdueMode = false;
+
+        function calToggleOverdueMode() {
+            calOverdueMode = !calOverdueMode;
+            calSelected.clear(); calSelItems.clear(); calItemMode = false; calOpenCards.clear();
+            renderOrderCalendar();
+        }
+
+        // 오늘 이전에 아직 안 넘긴 줄 (취소·배달비 줄은 뺀다). 잣대는 주문 내역과 같다.
+        function calOverdueRows() {
+            const tKey = gTodayKey();
+            return (rawOrders || []).filter(o => {
+                if (!o) return false;
+                if (o.canceled === true || o.canceled === 'true' || String(o.canceled).toUpperCase() === 'TRUE') return false;
+                if (gIsHandedOver(o.status)) return false;
+                if (gIsFeeRow(o)) return false;
+                if (/\[취소\]/.test(String(o.item || ''))) return false;
+                const d = calDayOf(o);
+                return !!d && d < tKey;
+            });
+        }
+
+        // 날짜 묶음(g)과 같은 모양으로 만들어, 아래 카드 그리는 쪽을 그대로 쓴다
+        function calOverdueGroup() {
+            const rows = calOverdueRows();
+            const g = { rows: rows, qty: 0, amount: 0, done: 0, todo: 0, todoQty: 0, todoAmount: 0,
+                        people: new Set(), kinds: new Set() };
+            rows.forEach(o => {
+                const q = parseInt(o.qty || 0) || 0;
+                g.qty += q; g.amount += calAmount(o);
+                g.people.add((o.name || '무명') + '_' + String(o.phone || ''));
+                g.kinds.add(String(o.item || '').trim());
+                g.todo++; g.todoQty += q; g.todoAmount += calAmount(o);
+            });
+            return g;
+        }
+
         // 물건 카드에서 '누가 시켰는지' 줄을 폈다 접었다 한다
         function calToggleCardOpen(key) {
             if (calOpenCards.has(key)) calOpenCards.delete(key);
@@ -17252,9 +17299,9 @@
             if (mode === 'kinds') calWaySort = '';
             renderOrderCalendar();
         }
-        // 수령방법 정렬 — 기본 / 픽업 먼저 / 배달 먼저 중 하나를 고른다
-        function calSetWaySort(v) {
-            calWaySort = v;
+        // 수령방법 정렬 — 기본 → 픽업 먼저 → 배달 먼저 로 돌아간다
+        function calCycleWaySort() {
+            calWaySort = calWaySort === '' ? 'pick' : calWaySort === 'pick' ? 'del' : '';
             renderOrderCalendar();
         }
         /* 뒷번호 4자리 정렬 — 위 정렬에 겹쳐 건다.
@@ -17321,7 +17368,10 @@
         }
 
         function calRowsOfSelection(day) {
-            const alive = o => calDayOf(o) === day
+            /* 미완료 모아보기 중에는 날짜가 여럿이라 '그날' 로 거르지 않는다.
+               대신 오늘 이전 미완료 줄 전부를 바탕으로 삼는다. */
+            const base = calOverdueMode ? new Set(calOverdueRows().map(o => o.orderKey)) : null;
+            const alive = o => (base ? base.has(o.orderKey) : calDayOf(o) === day)
                 && !isSalesCanceled(o)
                 && String(o.status || '') !== '취소'
                 && !/\[취소\]/.test(String(o.item || ''));
