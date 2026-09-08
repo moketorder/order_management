@@ -2443,14 +2443,14 @@
             <div id="orders-sub-purchase" style="display:none;"></div>
             <!-- [신규] 주문 달력 — 예정일/주문일을 한 달치 달력으로 본다 -->
             <div id="orders-sub-calendar" style="display:none;">
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                <div class="cal-nav" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
                     <button onclick="calMoveMonth(-1)" style="height:34px; width:34px; border:1px solid var(--border); background:#fff; border-radius:8px; font-size:15px; font-weight:900; cursor:pointer;">‹</button>
                     <b id="orders-cal-title" style="font-size:15px; min-width:110px; text-align:center;"></b>
                     <button onclick="calMoveMonth(1)" style="height:34px; width:34px; border:1px solid var(--border); background:#fff; border-radius:8px; font-size:15px; font-weight:900; cursor:pointer;">›</button>
                     <button onclick="calGoToday()" style="height:34px; padding:0 12px; border:1px solid var(--border); background:#fff; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">오늘</button>
                     <!-- [수정] 보기 전환은 이 탭에서 가장 크게 갈리는 단추다.
                          작은 단추 하나로는 눈에 안 띄어, 하위 탭과 같은 모양의 두 칸짜리로 바꿨다. -->
-                    <div style="margin-left:auto; display:flex; gap:3px; background:#e2e8f0; padding:3px; border-radius:10px;">
+                    <div class="cal-mode-wrap" style="margin-left:auto; display:flex; gap:3px; background:#e2e8f0; padding:3px; border-radius:10px; flex-shrink:0;">
                         <button class="cal-mode-btn" data-mode="people" onclick="calSetCellMode('people')"
                             style="height:30px; padding:0 14px; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">👥 인원</button>
                         <button class="cal-mode-btn" data-mode="kinds" onclick="calSetCellMode('kinds')"
@@ -3333,8 +3333,36 @@
         .sales-sub-btn { color:var(--text-sub); }
         .sales-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
         .orders-sub-btn { color:var(--text-sub); }
-        /* 좁은 화면에서는 달력 칸에 건수만 남긴다 (금액까지 넣으면 칸이 터진다) */
-        @media (max-width: 560px) { .cal-amt { display:none; } }
+        /* 날짜 머리줄은 늘 두 줄이다 — 윗줄에 날짜·통계·남은것, 아랫줄에 정렬·전체선택 */
+        .cal-detail-tools { flex: 1 0 100%; }
+        /* PC 에서는 억지로 늘리지 않고 여유를 둔다. 달 넘기는 단추만 조금 넓혀 누르기 쉽게 한다.
+           (인원/물건은 인라인 margin-left:auto 로 오른쪽 끝에 붙는다) */
+        .cal-nav > button:nth-child(1), .cal-nav > button:nth-child(3) { width: 58px !important; }
+        #orders-cal-title { min-width: 120px; }
+        /* [수정] 주문 달력 — 좁은 화면(휴대폰)에서 칸이 어긋나지 않게 다듬는다.
+           금액을 만원 단위로 줄여 이제는 감추지 않고, 대신 '몇 명 / 몇 개'를 두 줄로 나눈다. */
+        @media (max-width: 640px) {
+            .cal-cell { min-height: 76px !important; padding: 3px 4px !important; }
+            .cal-cell-count { font-size: 10.5px !important; line-height: 1.25; }
+            .cal-cell-count .cal-unit2 { display: block; }   /* '11명' / '21개' 두 줄로 */
+            /* 좁은 칸에서는 '미완료' 글자가 날짜와 부딪힌다. 빨간 점만 남기고 테두리로 함께 알린다 */
+            .cal-overdue-tag { font-size: 0 !important; line-height: 1; }
+            .cal-overdue-tag::before { content: "●"; font-size: 9px; }
+            .cal-amt { font-size: 9.5px !important; }
+            .cal-todo { font-size: 8.5px !important; letter-spacing: -0.3px; }   /* '36개 남음' 이 한 줄에 들어가게 */
+            .cal-head-bar > span { margin-left: 0 !important; }   /* 요약 띠를 왼쪽부터 차곡차곡 */
+            /* 달·오늘·인원/물건을 한 줄에, 남는 자리 없이 꽉 채운다 */
+            .cal-nav { gap: 4px !important; flex-wrap: nowrap !important; }
+            .cal-nav > button { height: 30px !important; }
+            .cal-nav > button:nth-child(1), .cal-nav > button:nth-child(3) { width: 34px !important; flex: 0 0 34px !important; font-size: 15px !important; }
+            #orders-cal-title { font-size: 13px !important; min-width: 0 !important; white-space: nowrap; flex: 0 0 auto; }
+            .cal-nav > button:nth-child(4) { flex: 0 0 42px !important; padding: 0 !important; font-size: 11px !important; }
+            .cal-mode-wrap { margin-left: 0 !important; padding: 2px !important; flex: 2 1 0 !important; }
+            .cal-mode-btn { flex: 1 1 0 !important; height: 26px !important; padding: 0 !important; font-size: 12px !important; }
+            /* 아래 띠 — 글자가 단추 안에서 두 줄로 접히며 띠가 화면을 다 먹던 것을 막는다 */
+            #cal-action-sheet { padding: 8px 8px !important; padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important; }
+            #cal-action-sheet button { font-size: 11px !important; padding: 0 6px !important; min-width: 56px !important; height: 32px !important; white-space: nowrap; }
+        }
         .orders-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
         /* [신규] 자료 정리 하위탭(판매 통계 / 아파트 관리) — 위 탭들과 같은 선택 표시 */
         .data-sub-btn { color:var(--text-sub); }
@@ -16819,7 +16847,7 @@
                 if (/\[취소\]/.test(String(o.item || ''))) return;
                 const day = calDayOf(o);
                 if (!day) return;
-                if (!map.has(day)) map.set(day, { rows: [], qty: 0, amount: 0, done: 0, todo: 0, people: new Set(), kinds: new Set() });
+                if (!map.has(day)) map.set(day, { rows: [], qty: 0, amount: 0, done: 0, todo: 0, todoQty: 0, todoAmount: 0, people: new Set(), kinds: new Set() });
                 const g = map.get(day);
                 g.rows.push(o);
                 g.people.add((o.name || '무명') + '_' + String(o.phone || ''));   // 그날 몇 분인지
@@ -16827,7 +16855,8 @@
                 if (!gIsFeeRow(o)) {                 // 배달비 줄은 물건이 아니라 건수에서 뺀다
                     g.qty += parseInt(o.qty || 0) || 0;
                     g.kinds.add(String(o.item || '').trim());   // 그날 몇 종류가 나가는지
-                    if (calIsDone(o)) g.done++; else g.todo++;
+                    const q = parseInt(o.qty || 0) || 0;
+                    if (calIsDone(o)) g.done++; else { g.todo++; g.todoQty += q; g.todoAmount += calAmount(o); }   // 남은 것은 개수·금액으로 센다
                 }
             });
             return map;
@@ -16866,34 +16895,31 @@
             const lead = first.getDay();                       // 1일이 무슨 요일인지 (일=0)
             const monthPrefix = `${calYear}-${calPad(calMonth + 1)}-`;
 
-            // 이 달 요약
-            let mRows = 0, mQty = 0, mAmount = 0, mTodo = 0;
+            /* 이 달 요약 — 오늘을 기준으로 지난 것과 앞으로 것을 갈라 놓는다.
+               달 이름은 바로 위 달력 머리에 있으니 여기서는 안 적는다. */
+            let mQty = 0, mTodo = 0, mTodoQty = 0, mTodoAmount = 0;
+            let pQty = 0, pAmount = 0, pDays = 0;      // 오늘 이전
+            let fQty = 0, fAmount = 0, fDays = 0;      // 오늘 이후 (오늘 포함)
             data.forEach((g, day) => {
                 if (!day.startsWith(monthPrefix)) return;
-                mRows += g.rows.filter(o => !gIsFeeRow(o)).length;
-                mQty += g.qty; mAmount += g.amount; mTodo += g.todo;
+                mQty += g.qty; mTodo += g.todo; mTodoQty += g.todoQty; mTodoAmount += g.todoAmount;
+                if (day < todayKey) { pDays++; pQty += g.qty; pAmount += g.amount; }
+                else { fDays++; fQty += g.qty; fAmount += g.amount; }
             });
 
-            // 오늘 이후로 남은 것 (달을 넘어가도 다 센다) — '미래 주문'
-            let fRows = 0, fAmount = 0, fDays = 0;
-            data.forEach((g, day) => {
-                if (day < todayKey) return;
-                fDays++;
-                fRows += g.rows.filter(o => !gIsFeeRow(o)).length;
-                fAmount += g.amount;
-            });
-
-            /* [수정] 딱지 여섯 장이 두 줄로 접혀 정신없었다.
-               한 줄짜리 띠로 모아, 이 달 · 남은 것 · 앞으로 것 셋만 보이게 했다. */
+            /* 지표는 한 줄이다 — 이번 달과 남은 것을 나란히 놓는다.
+               자리가 모자라면(휴대폰) 저절로 다음 줄로 접힌다. */
             const head = `
-                <div style="display:flex; gap:6px 14px; flex-wrap:wrap; align-items:baseline; margin-bottom:10px;
-                            padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:10px;
+                <div class="cal-head-bar" style="display:flex; gap:4px 16px; flex-wrap:wrap; align-items:baseline;
+                            margin-bottom:10px; padding:8px 14px;
+                            background:#f8fafc; border:1px solid var(--border); border-radius:10px;
                             font-size:12px; font-weight:700;">
-                    <span><b style="font-size:13px; color:var(--text-main);">${calMonth + 1}월</b>
-                        <span style="color:var(--text-sub);">${mRows.toLocaleString()}건 · ${mQty.toLocaleString()}개 · ${mAmount.toLocaleString()}원</span></span>
-                    <span style="color:${mTodo ? '#d97706' : '#059669'};">${mTodo ? `남은 ${mTodo.toLocaleString()}건` : '이 달 다 끝냄'}</span>
-                    <span style="margin-left:auto; color:#2563eb;">오늘 이후 ${fRows.toLocaleString()}건 · ${fAmount.toLocaleString()}원
-                        <span style="color:var(--text-sub); font-weight:600;">(${fDays}일)</span></span>
+                    <span><b style="color:var(--text-main); font-weight:900;">이번 달</b>
+                        <b style="font-size:13px; color:var(--text-main);">${mQty.toLocaleString()}개</b>
+                        <span style="color:var(--text-sub);">${(pAmount + fAmount).toLocaleString()}원</span></span>
+                    <span style="margin-left:auto; color:${mTodo ? "#d97706" : "#059669"};"><b style="font-weight:900;">남은 것</b>
+                        <b style="font-size:13px;">${mTodo ? `${mTodoQty.toLocaleString()}개` : '없음'}</b>
+                        <span style="opacity:.85;">${mTodo ? `${mTodoAmount.toLocaleString()}원` : '다 끝냄'}</span></span>
                 </div>`;
 
             // 요일 머리
@@ -16924,17 +16950,19 @@
 
                 const numColor = dow === 0 ? '#dc2626' : dow === 6 ? '#2563eb' : 'var(--text-main)';
                 const rows = g ? g.rows.filter(o => !gIsFeeRow(o)).length : 0;
+                // 칸이 좁아 금액을 만원 단위로 줄인다 (46만). 만원이 안 되면 그냥 원으로 적는다
+                const money = g ? (g.amount >= 10000 ? `${Math.round(g.amount / 10000).toLocaleString()}만` : `${g.amount.toLocaleString()}원`) : '';
 
-                grid += `<div onclick="calPickDay('${day}')" title="${day}"
+                grid += `<div class="cal-cell" onclick="calPickDay('${day}')" title="${day}"
                     style="min-height:62px; border:${border}; background:${bg}; border-radius:8px; padding:4px 5px; cursor:pointer; overflow:hidden;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <span style="font-size:12px; font-weight:800; color:${numColor};">${d}</span>
-                        ${overdue ? `<span style="font-size:9px; font-weight:900; color:#dc2626;">미완료</span>` : ''}
+                        ${overdue ? `<span class="cal-overdue-tag" style="font-size:9px; font-weight:900; color:#dc2626;">미완료</span>` : ''}
                     </div>
                     ${rows ? `
-                        <div style="margin-top:2px; font-size:11px; font-weight:900; color:var(--text-main);">${calCellMode === "kinds" ? `${g.kinds.size}종류` : `${g.people.size}명`} ${g.qty}개</div>
-                        <div class="cal-amt" style="font-size:10px; font-weight:700; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${g.amount.toLocaleString()}원</div>
-                        ${g.todo ? `<div style="font-size:9px; font-weight:800; color:#d97706;">남은 ${g.todo}</div>` : ''}
+                        <div class="cal-cell-count" style="margin-top:2px; font-size:11px; font-weight:900; color:var(--text-main); white-space:nowrap;">${calCellMode === "kinds" ? `${g.kinds.size}종류` : `${g.people.size}명`}<span class="cal-unit2"> ${g.qty}개</span></div>
+                        <div class="cal-amt" style="font-size:10px; font-weight:700; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${money}</div>
+                        ${g.todo ? `<div class="cal-todo" style="font-size:9px; font-weight:800; color:#d97706; white-space:nowrap;">${g.todoQty}개 남음</div>` : ''}
                     ` : ''}
                 </div>`;
             }
@@ -16996,9 +17024,15 @@
             const delOf = c => c.items.some(o => String(o.shippingMethod || '').includes('배달')) ? 1 : 0;
             const wayOf = c => calWaySort === 'del' ? (1 - delOf(c))
                 : calWaySort === 'pick' ? delOf(c) : 0;
+            /* 뒷번호 4자리는 위 정렬에 '겹쳐' 거는 축이다.
+               완료 → 수령방법 → (뒷번호) → 최근 주문/수량 → 금액 차례로 줄 세운다. */
+            const last4 = c => String(c.phone || '').replace(/\D/g, '').slice(-4);
             const arr = [...groups.values()].sort((a, b) =>
-                (doneOf(a) - doneOf(b)) || (wayOf(a) - wayOf(b))
-                || (byKind ? (b.qty - a.qty) : (b.latest - a.latest)) || (b.amount - a.amount));
+                (doneOf(a) - doneOf(b))
+                || (wayOf(a) - wayOf(b))
+                || (calPhoneSort ? last4(a).localeCompare(last4(b)) : 0)
+                || (byKind ? (b.qty - a.qty) : (b.latest - a.latest))
+                || (b.amount - a.amount));
             // 카드 안에서도 끝난 줄은 아래로, 나머지는 늦게 들어온 줄이 위로
             arr.forEach(c => c.items.sort((x, y) =>
                 ((calIsDone(x) ? 1 : 0) - (calIsDone(y) ? 1 : 0))
@@ -17056,7 +17090,7 @@
                         ? `${o.name || '무명'} <span style="font-size:10.5px; color:var(--text-sub); font-weight:600;">${String(o.phone || '')}</span>`
                         : `${o.item || '상품명 없음'}`;
                     return `<div${lineClick} style="display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:3px 0; border-top:1px dashed #f1f5f9;${lineCanPick ? ' cursor:pointer;' : ''}${lineOn ? ' background:#eff6ff;' : ''}">
-                        <span style="word-break:break-all;">${(calItemMode && inPickedCard) ? `<span style="color:${lineOn ? "#2563eb" : "#cbd5e1"}; margin-right:3px;">${lineOn ? "☑" : "☐"}</span>` : ""}${lineLabel}${qty ? ` <b>×${qty}</b>` : ''}${gOptionLines(o.optionText, { style: 'font-size:11px; font-weight:700; color:#c2610a;' })}</span>
+                        <span style="word-break:break-all;">${(calItemMode && inPickedCard) ? `<span style="color:${lineOn ? "#2563eb" : "#cbd5e1"}; margin-right:3px;">${lineOn ? "☑" : "☐"}</span>` : ""}${lineLabel}${qty ? ` <b style="white-space:nowrap;">×${qty}</b>` : ""}${gOptionLines(o.optionText, { style: 'font-size:11px; font-weight:700; color:#c2610a;' })}</span>
                         <span style="flex-shrink:0; white-space:nowrap; color:var(--text-sub);">
                             ${calAmount(o).toLocaleString()}원${payTag ? ` · ${payTag}` : ''} · ${stTag}
                         </span>
@@ -17126,7 +17160,7 @@
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
                         <div style="font-weight:800; font-size:13px;">
                             ${box}${c.name}
-                            <span style="font-size:11px; color:var(--text-sub); font-weight:600;">${c.phone}</span>
+                            <span style="font-size:11px; color:var(--text-sub); font-weight:600;">${(calPhoneSort && String(c.phone || "").length > 4) ? String(c.phone).slice(0, -4) + `<b style="color:#7c3aed; font-size:13px;">` + String(c.phone).slice(-4) + `</b>` : c.phone}</span>
                             ${overdueN ? `<span title="지난 미완료 ${overdueN}건 — 카드를 고르면 아래에 날짜가 나옵니다"
                                 style="margin-left:3px; padding:1px 6px; border-radius:20px; border:1px solid #fca5a5; background:#fef2f2; color:#b91c1c; font-size:10.5px; font-weight:800;">⚠️ 미완료 ${overdueN}건</span>` : ""}
                             ${hasMemo ? `<span title="메모 있음 — 카드를 고르면 아래에 나옵니다" style="margin-left:3px; font-size:12px;">📝</span>` : ""}
@@ -17145,21 +17179,37 @@
             const todoCards = arr.filter(c => !c.items.every(calIsDone));
             const delTodo = todoCards.filter(c => c.items.some(o => String(o.shippingMethod || '').includes('배달'))).length;
             const pickTodo = todoCards.length - delTodo;
+            // 전체 대비 남은 수를 함께 보여 준다 — 14/20 처럼
+            const delAll = arr.filter(c => c.items.some(o => String(o.shippingMethod || "").includes("배달"))).length;
+            const pickAll = arr.length - delAll;
 
             return `<div style="margin-top:12px;">
                 <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
                     <b style="font-size:14px;">${label}</b>
-                    <span style="font-size:12px; color:var(--text-sub); font-weight:700;">${byKind ? `${arr.length}종류` : `손님 ${arr.length}명`} · ${g.rows.filter(o => !gIsFeeRow(o)).length}건 · ${g.qty}개 · ${g.amount.toLocaleString()}원</span>
-                    ${byKind ? '' : `<button type="button" onclick="calCycleWaySort()" title="눌러서 배달·픽업 순서 바꾸기"
-                        style="height:22px; padding:0 8px; border:1px solid ${calWaySort ? (calWaySort === 'del' ? '#0284c7' : '#059669') : 'var(--border)'};
-                               background:${calWaySort === 'del' ? '#e0f2fe' : calWaySort === 'pick' ? '#ecfdf5' : '#fff'};
-                               color:${calWaySort === 'del' ? '#0369a1' : calWaySort === 'pick' ? '#047857' : '#475569'};
-                               border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${calWaySort === 'del' ? `🛵 배달 ${delTodo}` : calWaySort === 'pick' ? `🏠 픽업 ${pickTodo}` : '↕ 기본순'}</button>`}
-                    <span style="margin-left:auto; font-size:12px; font-weight:800; color:${g.todo ? '#d97706' : '#059669'}; white-space:nowrap;">${g.todo ? `남은 ${g.todo}건` : '다 끝냄'}</span>
-                    ${selKeys.length ? `<button type="button" onclick="calToggleAllCards('${keysJson}')"
-                        style="flex-shrink:0; height:22px; padding:0 8px; border:1px solid ${allOn ? 'var(--primary)' : 'var(--border)'};
-                               background:${allOn ? 'var(--primary-light)' : '#fff'}; color:${allOn ? 'var(--primary)' : '#475569'};
-                               border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${allOn ? '☑ 전체 선택' : '☐ 전체 선택'}</button>` : ''}
+                    <span style="font-size:12px; color:var(--text-sub); font-weight:700;">${byKind ? `${arr.length}종류` : `손님 ${arr.length}명`} · ${g.qty}개 · ${g.amount.toLocaleString()}원</span>
+                    <span style="margin-left:auto; font-size:12px; font-weight:800; color:${g.todo ? '#d97706' : '#059669'}; white-space:nowrap;">${g.todo ? `${g.todoQty}개 남음` : "다 끝냄"}</span>
+                    <!-- 정렬·전체선택은 한 묶음. 휴대폰에서는 이 묶음이 통째로 다음 줄로 내려간다.
+                         수령방법(기본/픽업/배달)과 뒷번호는 서로 다른 축이라 겹쳐 걸 수 있다. -->
+                    <div class="cal-detail-tools" style="display:flex; gap:4px; align-items:center; min-width:0;">
+                        ${byKind ? '' : [
+                            { v: '', label: '↕ 기본', color: '#475569', bg: '#f8fafc' },
+                            { v: 'pick', label: `🏠 픽업 ${pickTodo}/${pickAll}`, color: '#047857', bg: '#ecfdf5' },
+                            { v: 'del', label: `🛵 배달 ${delTodo}/${delAll}`, color: '#0369a1', bg: '#e0f2fe' }
+                        ].map(o => {
+                            const on = (calWaySort === o.v);
+                            return `<button type="button" onclick="calSetWaySort('${o.v}')"
+                                style="flex-shrink:0; height:22px; padding:0 7px; border:1px solid ${on ? o.color : 'var(--border)'};
+                                       background:${on ? o.bg : '#fff'}; color:${on ? o.color : '#94a3b8'};
+                                       border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${o.label}</button>`;
+                        }).join('') + `<button type="button" onclick="calTogglePhoneSort()" title="위 정렬에 겹쳐서 뒷번호 4자리 순으로 줄 세웁니다"
+                                style="flex-shrink:0; height:22px; padding:0 7px; border:1px solid ${calPhoneSort ? '#7c3aed' : 'var(--border)'};
+                                       background:${calPhoneSort ? '#f5f3ff' : '#fff'}; color:${calPhoneSort ? '#7c3aed' : '#94a3b8'};
+                                       border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${calPhoneSort ? '🔢 뒷번호 ✓' : '🔢 뒷번호'}</button>`}
+                        ${selKeys.length ? `<button type="button" onclick="calToggleAllCards('${keysJson}')"
+                            style="margin-left:auto; flex-shrink:0; height:22px; padding:0 8px; border:1px solid ${allOn ? "var(--primary)" : "var(--border)"};
+                                   background:${allOn ? 'var(--primary-light)' : '#fff'}; color:${allOn ? 'var(--primary)' : '#475569'};
+                                   border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${allOn ? '☑ 전체 선택' : '☐ 전체 선택'}</button>` : ''}
+                    </div>
                 </div>
                 ${cards}
             </div>`;
@@ -17180,7 +17230,8 @@
            고른 손님들의 '그날' 줄을 한꺼번에 바꾼다.
            (주문 내역의 updateCustomerAllItems 는 그 손님의 모든 날짜를 건드리므로 여기서는 안 쓴다) */
         let calSelected = new Set();      // 골라 둔 손님 카드 열쇠
-        let calWaySort = '';              // '' 기본 · 'del' 배달 먼저 · 'pick' 픽업 먼저
+        let calWaySort = '';              // '' 기본 · 'pick' 픽업 먼저 · 'del' 배달 먼저
+        let calPhoneSort = false;         // 위 정렬에 겹쳐 거는 뒷번호 4자리 순
         let calCellMode = 'people';       // 달력 칸 보기 — 'people' 손님 수 · 'kinds' 상품 종류 수
         let calOpenCards = new Set();     // 물건 보기에서 손님 줄을 펼쳐 둔 카드
 
@@ -17201,9 +17252,15 @@
             if (mode === 'kinds') calWaySort = '';
             renderOrderCalendar();
         }
-        // 수령방법 정렬 — 기본 → 픽업 먼저 → 배달 먼저 로 돌아간다
-        function calCycleWaySort() {
-            calWaySort = calWaySort === '' ? 'pick' : calWaySort === 'pick' ? 'del' : '';
+        // 수령방법 정렬 — 기본 / 픽업 먼저 / 배달 먼저 중 하나를 고른다
+        function calSetWaySort(v) {
+            calWaySort = v;
+            renderOrderCalendar();
+        }
+        /* 뒷번호 4자리 정렬 — 위 정렬에 겹쳐 건다.
+           '픽업 먼저 + 그 안에서 뒷번호순' 처럼 두 축을 함께 쓸 수 있다. */
+        function calTogglePhoneSort() {
+            calPhoneSort = !calPhoneSort;
             renderOrderCalendar();
         }
         // 카드 열쇠 — 인원 보기는 손님, 물건 보기는 상품 기준
