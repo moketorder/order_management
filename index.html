@@ -2618,14 +2618,42 @@
                                 <!-- [수정] 식별번호는 발주와 이어 주는 참고값일 뿐인데 한 줄을 통째로 차지하고 있었다.
                                      상품명 라벨 오른쪽 끝에 작은 표로 붙여 자리를 안 먹게 한다.
                                      번호가 아직 없는 상품(발주 전)에서는 아예 보이지 않는다. -->
-                                <label style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                                <!-- [수정] 식별번호 자리를 발주등록과 같은 모양으로 맞췄다.
+                                     갈래(자동·과일·사다드림)를 고르고, 번호와 그 이름을 옆에서 바로 본다. -->
+                                <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
                                     <span>상품명</span>
-                                    <span id="product-code-badge" style="display:none; align-items:center; gap:4px; font-size:11px; font-weight:800; color:#475569; background:#f1f5f9; border:1px solid var(--border); border-radius:6px; padding:2px 8px; letter-spacing:0;">🔖 <span id="productCodeText"></span></span>
+                                    <span style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                        <span style="display:inline-flex; gap:2px; background:#e2e8f0; padding:2px; border-radius:8px;">
+                                            <button type="button" id="ck-auto" onclick="setCodeKind('')"   style="padding:2px 10px; border:none; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">자동</button>
+                                            <button type="button" id="ck-F"    onclick="setCodeKind('F')"  style="padding:2px 10px; border:none; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">🍎 과일</button>
+                                            <button type="button" id="ck-S"    onclick="setCodeKind('S')"  style="padding:2px 10px; border:none; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">🛒 사다드림</button>
+                                        </span>
+                                        <button type="button" onclick="openCodePicker()" title="쓰던 번호에서 고르기"
+                                            style="flex:0 0 auto; padding:2px 9px; border:1px solid #bfdbfe; background:#eff6ff; color:#2563eb; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">🔍 찾기</button>
+                                        <button type="button" id="btn-code-clear" onclick="clearPickedCode()" title="번호 비우기 (저장 때 자동)"
+                                            style="display:none; flex:0 0 auto; padding:2px 8px; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">✕</button>
+                                    </span>
                                 </label>
+
+                                <!-- 번호와 그 이름 — 발주등록과 같은 모양. 번호는 못 고치고, 이름은 과일·사다드림일 때만 고칠 수 있다. -->
+                                <div style="display:flex; gap:6px; align-items:center; margin:6px 0 2px; flex-wrap:wrap;">
+                                    <span style="flex:0 0 auto; font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
+                                    <input type="text" id="productCodeView" class="form-control" placeholder="자동" readonly tabindex="-1"
+                                        style="flex:0 0 92px; width:92px; height:32px; padding:5px 9px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
+                                    <input type="text" id="productCodeLabel" class="form-control" placeholder="번호 이름 (과일·사다드림만)"
+                                        style="flex:1 1 170px; min-width:140px; height:32px; padding:5px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:700; box-sizing:border-box;">
+                                    <span id="code-label-hint" style="flex:0 0 auto; font-size:11px; font-weight:700; color:#cbd5e1; white-space:nowrap;"></span>
+                                </div>
+                                <!-- 갈래를 고르면 그 갈래의 번호 목록이 여기 뜬다 -->
+                                <div id="code-kind-row" style="display:none; gap:6px; align-items:center; margin:0 0 4px; flex-wrap:wrap;">
+                                    <select id="code-kind-select" onchange="pickKindCode(this.value)"
+                                        style="flex:1 1 220px; min-width:180px; height:32px; padding:0 8px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:800; color:#475569; background:#fff; cursor:pointer;"></select>
+                                </div>
                                 <!-- [수정] 상품명 칸이 버튼 두 개에 밀려 모바일에서 너무 좁았다.
                                      이름칸은 한 줄을 다 쓰고, 버튼 두 개는 아랫줄에 반반으로 놓는다. -->
                                 <input type="text" id="productName" class="form-control" placeholder="예: 무농약 프리미엄 딸기 1kg" required style="width: 100%; box-sizing: border-box;">
                                 <!-- [수정] 노출 버튼 두 개는 아래 '보관방법 / 노출여부' 줄로 옮겼다. -->
+
                             </div>
 
                             <!-- [수정] 가격·상세옵션·재고가 각각 줄을 차지하던 것을 한 줄 세 칸으로 합쳤다. -->
@@ -2916,8 +2944,8 @@
                         <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-link" onclick="switchPurchaseSubTab('link')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🔗 코드 연결</div>
-                        <!-- [신규] 재고 점검 — 재고가 남은 상품을 마지막 발주와 견줘 본다 -->
-                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-check" onclick="switchPurchaseSubTab('check')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📦 재고 점검</div>
+                        <!-- [신규] 품목 분석 — 재고 점검과 잘 나가는 품목을 한 자리에 둔다 -->
+                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-check" onclick="switchPurchaseSubTab('check')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 품목 분석</div>
                     </div>
                 </div>
 
@@ -2969,9 +2997,13 @@
                                         </span>
                                         <!-- [신규] 식별번호 — 이름이 달라도 이 번호가 같으면 같은 상품으로 본다.
                                              손으로 못 고치게 읽기전용. '🔍 상품 찾기'로 고르면 채워지고, 비어 있으면 저장할 때 자동으로 붙는다. -->
-                                        <span style="display: inline-flex; align-items: center; gap: 6px;">
+                                        <span style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                             <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
                                             <input type="text" id="purchase-product-code" class="form-control" placeholder="자동" readonly tabindex="-1" style="flex:0 0 100px; width:100px; height:30px; padding:5px 9px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
+                                            <!-- [신규] 그 번호가 어느 상품과 맞물리는지 보여 주는 칸. 손으로 못 고친다.
+                                                 과일(F)·사다드림(S)은 여러 상품이 한 번호를 함께 쓰므로 이름표를, 아니면 상품명을 적는다. -->
+                                            <input type="text" id="purchase-code-name" class="form-control" placeholder="상품명" readonly tabindex="-1" title=""
+                                                style="flex:1 1 180px; min-width:150px; height:30px; padding:5px 9px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
                                         </span>
                                     </div>
                                     <!-- [수정] 브라우저 기본 자동완성 목록(datalist)을 뗐다. 글씨를 칠 때마다 목록이 떠서
@@ -3143,9 +3175,14 @@
                     <div id="code-link-list"><!-- 동적 삽입 --></div>
                 </div>
 
-                <!-- 하위 섹션 4: 재고 점검 — 재고가 남은 상품과 마지막 발주를 나란히 본다 -->
+                <!-- 하위 섹션 4: 품목 분석 — 재고 점검(무엇이 남았나)과 잘 나가는 품목(무엇이 나가나)을 나란히 둔다 -->
                 <div id="purchase-section-check" class="purchase-sub-section" style="display: none;">
+                    <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin:0 0 10px;">
+                        <div class="segment-btn pchk-sub-btn active" id="btn-pchk-stock" onclick="switchCheckSubTab('stock')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">📦 재고 점검</div>
+                        <div class="segment-btn pchk-sub-btn" id="btn-pchk-sales" onclick="switchCheckSubTab('sales')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">🔥 잘 나가는 품목</div>
+                    </div>
                     <div id="stock-check-body"><!-- 동적 삽입 --></div>
+                    <div id="sales-pattern-body" style="display:none;"><!-- 동적 삽입 --></div>
                 </div>
 
             </div>
@@ -3178,6 +3215,35 @@
         }
         .ms-cal-cell.empty { background:transparent; border-color:transparent; cursor:default; }
         .ms-cal-cell.has { background:#f0fdf4; border-color:#bbf7d0; }
+        /* [신규] 잘 나가는 품목 — 줄이 많아 어수선해지기 쉬운 목록이라, 자리를 못박아 눈이 세로로 흐르게 한다.
+           숫자 칸은 폭을 고정하고 오른쪽 맞춤이라, 자릿수가 달라도 줄이 흔들리지 않는다. */
+        .sp-card {
+            border:1px solid #e2e8f0; border-left:4px solid #cbd5e1; border-radius:9px;
+            padding:8px 11px; margin-bottom:5px; background:#fff; cursor:pointer;
+        }
+        .sp-card:hover { background:#fcfdff; }
+        .sp-r1 { display:flex; align-items:baseline; gap:8px; }
+        .sp-name {
+            flex:1; min-width:0; font-size:13px; font-weight:800; color:#0f172a;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+        }
+        .sp-term { flex:0 0 auto; width:92px; text-align:right; font-size:11.5px; font-weight:900; white-space:nowrap; }
+        .sp-qty  { flex:0 0 auto; width:92px; text-align:right; font-size:13px; font-weight:900; color:#0f172a; white-space:nowrap; }
+        .sp-r2 {
+            display:flex; align-items:center; gap:9px; margin-top:3px;
+            font-size:11px; font-weight:700; color:#94a3b8; white-space:nowrap;
+        }
+        .sp-r2 .sp-due { margin-left:auto; font-weight:900; }
+        /* 회차 눈금 — 왼쪽이 첫 회차, 오른쪽이 오늘. 막대가 오른쪽으로 몰릴수록 요즘 자주 꺼낸 것이다. */
+        .sp-spark { position:relative; height:9px; margin-top:5px; background:#f1f5f9; border-radius:3px; overflow:hidden; }
+        .sp-spark > i { position:absolute; bottom:0; border-radius:1px; opacity:.8; }
+        @media (max-width: 640px) {
+            .sp-term { width:80px; }
+            .sp-qty { width:78px; font-size:12px; }
+            .sp-r2 { flex-wrap:wrap; white-space:normal; }
+            .sp-r2 .sp-due { margin-left:0; }
+        }
+
         .ms-cal-cell.today { outline:2px solid #93c5fd; }
         /* [신규] 펼쳐 놓은 날 — 어느 칸을 열어 둔 것인지 알아야 아래 내용과 이어 읽힌다 */
         .ms-cal-cell.ms-cal-open { outline:2px solid #f59e0b; background:#fffbeb; border-color:#fde68a; }
@@ -17216,25 +17282,39 @@
                          수령방법(기본→픽업→배달)은 단추 하나를 눌러 돌리고, 뒷번호는 그 위에 겹쳐 건다. -->
                     <div class="cal-detail-tools" style="display:flex; gap:4px; align-items:center; min-width:0;">
                         ${byKind ? '' : (() => {
+                            /* [수정] 정렬 단추들이 서로 다른 옷을 입고 있었다. 기본만 테두리가 새까맣고
+                               뒷번호·미완료는 흐린 회색이라 한 줄로 안 읽혔다.
+                               테두리 진하기를 모두 같은 단계(색의 300쯤)로 맞추고, 색만 저마다 다르게 둔다.
+                                 · 꺼짐 — 흰 바탕 · 제 색 글씨 · 같은 진하기의 제 색 테두리
+                                 · 켜짐 — 옅은 제 색 바탕 · 진한 제 색 테두리 · 뒤에 ✓
+                               (미완료가 0건일 때만 회색이다. 꺼진 것이 아니라 볼 것이 없다는 뜻이라 다르다) */
+                            const tool = (on, hue, soft, fill, label, fn, tip) =>
+                                `<button type="button" onclick="${fn}" title="${tip}"
+                                    style="flex-shrink:0; height:22px; padding:0 8px; border:1px solid ${on ? hue : soft};
+                                           background:${on ? fill : '#fff'}; color:${hue};
+                                           border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${label}</button>`;
+
+                            /* 기본은 '고르지 않은 상태'라 꺼진 옷을 입힌다. 픽업·배달만 켜진 것으로 본다. */
                             const w = calWaySort === 'pick'
-                                ? { label: `🏠 픽업 ${pickTodo}/${pickAll}`, color: '#047857', bg: '#ecfdf5' }
+                                ? { on: true, label: `🏠 픽업 ${pickTodo}/${pickAll}`, hue: '#047857', soft: '#6ee7b7', fill: '#ecfdf5' }
                                 : calWaySort === 'del'
-                                    ? { label: `🛵 배달 ${delTodo}/${delAll}`, color: '#0369a1', bg: '#e0f2fe' }
-                                    : { label: `↕ 기본 ${todoCards.length}/${arr.length}`, color: '#475569', bg: '#f8fafc' };
-                            return `<button type="button" onclick="calCycleWaySort()" title="눌러서 기본 → 픽업 → 배달 순서로 바꿉니다"
-                                style="flex-shrink:0; height:22px; padding:0 8px; border:1px solid ${w.color};
-                                       background:${w.bg}; color:${w.color};
-                                       border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${w.label}</button>`;
-                        })() + `<button type="button" onclick="calTogglePhoneSort()" title="위 정렬에 겹쳐서 뒷번호 4자리 순으로 줄 세웁니다"
-                                style="flex-shrink:0; height:22px; padding:0 7px; border:1px solid ${calPhoneSort ? '#7c3aed' : 'var(--border)'};
-                                       background:${calPhoneSort ? '#f5f3ff' : '#fff'}; color:${calPhoneSort ? '#7c3aed' : '#94a3b8'};
-                                       border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${calPhoneSort ? '🔢 뒷번호 ✓' : '🔢 뒷번호'}</button>`}
-                        ${byKind ? '' : `<button type="button" onclick="calToggleOverdueMode()" title="오늘 이전에 아직 안 넘긴 것만 모아 봅니다"
-                            style="flex-shrink:0; height:22px; padding:0 7px; border:1px solid ${calOverdueMode ? '#b91c1c' : (calOverdueTotal ? '#fca5a5' : 'var(--border)')};
-                                   background:${calOverdueMode ? '#fef2f2' : '#fff'}; color:${calOverdueMode ? '#b91c1c' : (calOverdueTotal ? '#b91c1c' : '#94a3b8')};
-                                   border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">⚠️ 미완료 ${calOverdueTotal}</button>`}
+                                    ? { on: true, label: `🛵 배달 ${delTodo}/${delAll}`, hue: '#0369a1', soft: '#7dd3fc', fill: '#e0f2fe' }
+                                    : { on: false, label: `↕ 기본 ${todoCards.length}/${arr.length}`, hue: '#475569', soft: '#cbd5e1', fill: '#f1f5f9' };
+
+                            const noOverdue = !calOverdueTotal;
+                            return tool(w.on, w.hue, w.soft, w.fill, w.label,
+                                    'calCycleWaySort()', '눌러서 기본 → 픽업 → 배달 순서로 바꿉니다')
+                                + tool(calPhoneSort, '#7c3aed', '#c4b5fd', '#f5f3ff',
+                                    `🔢 뒷번호${calPhoneSort ? ' ✓' : ''}`,
+                                    'calTogglePhoneSort()', '위 정렬에 겹쳐서 뒷번호 4자리 순으로 줄 세웁니다')
+                                + tool(calOverdueMode, noOverdue ? '#94a3b8' : '#b91c1c',
+                                    noOverdue ? '#cbd5e1' : '#fca5a5', '#fef2f2',
+                                    `⚠️ 미완료 ${calOverdueTotal}${calOverdueMode ? ' ✓' : ''}`,
+                                    'calToggleOverdueMode()', '오늘 이전에 아직 안 넘긴 것도 함께 봅니다');
+                        })()}
+                        <!-- 전체 선택도 옆 단추들과 같은 진하기의 테두리를 쓴다 (혼자 흐리면 줄이 끊겨 보인다) -->
                         ${selKeys.length ? `<button type="button" onclick="calToggleAllCards('${keysJson}')"
-                            style="margin-left:auto; flex-shrink:0; height:22px; padding:0 8px; border:1px solid ${allOn ? "var(--primary)" : "var(--border)"};
+                            style="margin-left:auto; flex-shrink:0; height:22px; padding:0 8px; border:1px solid ${allOn ? "var(--primary)" : "#cbd5e1"};
                                    background:${allOn ? 'var(--primary-light)' : '#fff'}; color:${allOn ? 'var(--primary)' : '#475569'};
                                    border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${allOn ? '☑ 전체 선택' : '☐ 전체 선택'}</button>` : ''}
                     </div>
@@ -19905,6 +19985,7 @@
             try {
                 await loadShelves();   // [신규] 선반 목록을 먼저 받아 둔다 (탭·드롭다운·그룹 제목이 모두 이걸 쓴다)
                 await loadOptionStock();   // [신규] 옵션 항목별 재고 (상품 목록의 옵션 뱃지가 쓴다)
+                await gLoadCodeLabels();   // [신규] 번호 이름표 (F·S 번호 옆에 무엇인지 붙여 준다)
                 const [res, stockRes] = await Promise.all([
                     fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`),
                     fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 재고 로드 실패:", e); return { ok: false }; })
@@ -20272,7 +20353,7 @@
                                 ${isRecommendListProduct(prod) ? `<span style="color:#ff6d00; font-weight:800;">[오늘의추천]</span> ` : ``}${listDisplayName(prod)}
                             </div>
                             <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                ${prod.productCode ? `<span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${prod.productCode}</span>` : ``}
+                                ${prod.productCode ? `<span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${prod.productCode}</span>${gCodeLabelChip(prod.productCode)}` : ``}
                                 ${priceHtml}
                                 ${stockText ? `<span style="color: var(--text-sub);">|</span><span>${stockText}</span>` : ``}
                                 ${storageBadge}${statusBadge}${discountBadge}${optionBadge}
@@ -20677,12 +20758,20 @@
                 const showReserve = keepShowReserve;
                 const showWeekly = isShowWeekly;
 
-                // [수정] 식별번호는 발주가 있는 상품에만 붙는다. 상품등록에 꼭 필요한 값이 아니다.
-                //  · 수정 중이면 붙어 있던 번호를 그대로 둔다 (상품명을 바꿔도 번호는 유지)
-                //  · 새 상품은 발주에 같은 이름이 있을 때만 그 번호를 물려받고, 없으면 번호 없이 등록한다
-                //    (그 상품을 처음 발주하는 순간 번호가 생긴다)
+                /* [수정] 식별번호는 이제 모든 상품에 붙인다.
+                   예전에는 발주가 있는 상품에만 붙였는데, 그래서 과일처럼 발주를 안 넣는 물건은
+                   번호가 없었다. 번호가 없으면 주문에서 같은 물건인지 알 길이 이름뿐이라,
+                   이름을 조금만 바꿔 올려도 딴 물건으로 세어졌다 (계란 한 가지가 아홉으로 갈렸다).
+                   차례는 이렇다.
+                     · 수정 중이면 붙어 있던 번호를 그대로 둔다 (상품명을 바꿔도 번호는 유지)
+                     · 발주 목록에서 넘어왔으면 그 발주의 번호를 쓴다
+                     · 발주에 같은 이름이 있으면 그 번호를 물려받는다
+                     · 그래도 없으면 새 번호를 만들어 붙인다 */
                 const _existingProd = (uploadIsEditMode && uploadEditProductKey !== null) ? uploadProducts[uploadEditProductKey] : null;
-                let _productCode = (_existingProd && /^P\d+$/.test(String(_existingProd.productCode || "").trim()))
+                /* [신규] '🔍 번호 찾기'로 손수 고른 번호가 가장 먼저다.
+                   수정 중이라도 골랐으면 그것으로 바꾼다 (같은 물건으로 이어 붙이려는 뜻이므로). */
+                let _productCode = /^[PFS]\d+$/.test(String(gPickedCode || '').trim()) ? String(gPickedCode).trim() : "";
+                if (!_productCode) _productCode = (_existingProd && /^[PFS]\d+$/.test(String(_existingProd.productCode || "").trim()))
                     ? String(_existingProd.productCode).trim()
                     : "";
                 // 발주 목록에서 '상품등록'으로 넘어온 경우엔 그 발주의 번호를 그대로 쓴다 (이름이 달라도 연결 유지)
@@ -20690,9 +20779,17 @@
                 if (!_productCode) {
                     const _key = fNormItemName(name);
                     const _hit = purchaseOrders.concat(purchaseArchive)
-                        .find(po => fNormItemName(po.itemName) === _key && /^P\d+$/.test(String(po.productCode || '').trim()));
+                        .find(po => fNormItemName(po.itemName) === _key && /^[PFS]\d+$/.test(String(po.productCode || '').trim()));
                     if (_hit) _productCode = String(_hit.productCode).trim();
                 }
+                if (!_productCode) {
+                    // 저장함까지 봐야 이미 쓰는 가장 큰 번호를 안다. 안 보면 번호가 겹칠 수 있다.
+                    try { await loadPurchaseArchiveIfNeeded(); } catch (e) { console.error('발주 저장함 로드 실패:', e); }
+                    // 갈래를 골랐으면 그 갈래의 새 번호를, 아니면 여느 때처럼 P 번호를 만든다
+                    _productCode = gCodeKind ? gNextCodeOf(gCodeKind) : gNextProductCode();
+                }
+                // [신규] 과일·사다드림 번호라면 옆 칸에 적은 이름표도 함께 저장한다
+                await saveCodeLabelIfNeeded(_productCode);
 
                 const productObj = {
                     name: name,
@@ -21477,6 +21574,7 @@
                 || (prod.isRecommend === undefined && /^\s*\[\s*오늘의추천\s*\]/.test(String(prod.name || '')));
             selectMainTab(tabType);
 
+            gPickedCode = ''; gCodeKind = ''; paintCodeKind();   // 다른 상품을 불러왔으니 앞서 고른 것은 버린다
             paintProductCodeField(prod);   // [신규] 식별번호 칸 채우기
 
             // 말머리는 체크박스가 담당하므로 입력칸에는 순수 상품명만 보여준다
@@ -21616,6 +21714,7 @@
             document.getElementById('unlimitedStock').checked = false;
             document.getElementById('productStock').disabled = false;
             pendingProductCodeFromPurchase = '';   // 발주에서 물려받던 번호도 함께 푼다
+            gPickedCode = ''; gCodeKind = ''; paintCodeKind();   // 손수 고른 번호와 갈래도 푼다
             paintProductCodeField(null);   // [신규] 새 상품이므로 식별번호 칸을 비운다
 
             uploadEditShelf = ''; // [신규] 선반위치 기억값 초기화
@@ -22282,7 +22381,7 @@
             } else if (subTabName === 'link') {
                 renderCodeLinkCandidates();
             } else if (subTabName === 'check') {
-                initStockCheckTab();
+                switchCheckSubTab(pchkSubTab);   // 지난번에 보던 쪽(재고 점검 / 잘 나가는 품목)으로 연다
             }
         }
 
@@ -22481,9 +22580,12 @@
                     <div style="font-size:12.5px; font-weight:700; color:#64748b; line-height:1.6;">
                         재고가 남은 상품을 <b>마지막 발주</b>와 견줍니다.
                         늘 시키던 간격보다 오래 비었으면 왼쪽에 🟡 🟠 🔴 로 표시합니다.<br>
-                        <b>소진율</b>은 마지막에 들여온 수량 중 얼마나 나갔는지입니다 — <b>0%면 한 개도 안 나간 것</b>입니다.<br>
-                        재고가 들여온 수보다 많으면 막대가 <b style="color:#7c3aed;">보라색</b>으로 가득 찹니다.
-                        발주를 빠뜨렸거나 재고 숫자가 틀린 것이라, 소진율을 믿을 수 없다는 뜻입니다.
+                        아래 <b>막대</b>는 마지막에 들여온 것 중 <b>얼마나 남았는지</b>입니다. 팔릴수록 줄어듭니다 —
+                        <b style="color:#10b981;">넉넉</b> · <b style="color:#84cc16;">여유</b> ·
+                        <b style="color:#eab308;">절반 밑</b> · <b style="color:#f59e0b;">얼마 안 남음</b> ·
+                        <b style="color:#dc2626;">바닥 가까움</b> · <span style="color:#94a3b8;">품절</span>.<br>
+                        <b>재고>입고</b>라고 적힌 것은 재고가 들여온 수보다 많은 경우입니다.
+                        발주를 빠뜨렸거나 재고 숫자가 틀린 것이라, 숫자를 믿을 수 없다는 뜻입니다.
                     </div>
                     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
                         ${fbtn('warn', `⚠️ 살펴볼 것 ${nWarn}`, '#c2410c')}
@@ -22499,9 +22601,9 @@
                     <div style="display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; align-items:center;">
                         <span style="font-size:11px; font-weight:800; color:#94a3b8;">정렬</span>
                         ${sbtn('days', '오래된 순')}
-                        ${sbtn('cycleAsc', '주기 짧은 순')}
-                        ${sbtn('cycleDesc', '주기 긴 순')}
                         ${sbtn('stock', '재고 많은 순')}
+                        ${sbtn('cycleDesc', '주기 긴 순')}
+                        ${sbtn('cycleAsc', '주기 짧은 순')}
                     </div>
                 </div>`;
 
@@ -22512,16 +22614,32 @@
 
             const cards = list.map(r => {
                 const c = scLevelColor(r.stock > 0 ? r.level : 0);
-                const pct = r.soldRate === null ? null : Math.round(r.soldRate * 100);
-                /* 막대 — 셈이 안 맞는 것은 소진율을 낼 수 없어 비어 있었는데, 빈 칸은 '0%'처럼 보여 되레 헷갈렸다.
-                   가득 채우고 보라색을 써서, 값이 없는 것이 아니라 다른 갈래임을 알린다. */
-                const barPct = r.mismatch ? 100 : (pct === null ? 0 : pct);
-                const barColor = r.mismatch ? '#7c3aed'
-                    : pct === null ? '#cbd5e1' : pct === 0 ? '#38bdf8' : pct < 40 ? '#f59e0b' : '#10b981';
-                const rateText = r.mismatch ? `재고>입고 (${r.inUnits}개 들임)`
-                    : pct === null ? '수량 모름'
-                    : pct === 0 ? `안 나감 (${r.inUnits}개 그대로)`
-                    : `소진 ${pct}% · ${r.inUnits}개 중`;
+                /* [수정] 막대는 이제 '기름 게이지'다 — 들여온 것 중 얼마나 남았나를 보여 준다.
+                   예전에는 소진율이라 다 팔릴수록 막대가 찼는데, 품절인데 초록으로 꽉 찬 꼴이라
+                   재고가 넉넉해 보였다. 뒤집으니 가득 = 넉넉(초록), 줄수록 = 모자람(빨강), 바닥 = 품절(빈 칸).
+                     · 재고>입고 로 셈이 안 맞는 것도 넉넉한 건 매한가지라 초록으로 가득 채운다.
+                       (숫자를 믿을 수 없다는 것은 옆 글씨로 알린다) */
+                const isOut = r.stock <= 0;
+                const left = (!r.mismatch && r.inUnits > 0)
+                    ? Math.max(0, Math.min(1, r.stock / r.inUnits)) : null;   // 남은 비율
+                const leftPct = left === null ? null : Math.round(left * 100);
+
+                const barPct = r.mismatch ? 100 : (leftPct === null ? 0 : leftPct);
+                /* 게이지 색은 다섯 칸으로 나눈다 — 초록에서 노랑을 거쳐 빨강으로 미끄러진다.
+                   셋만 두니 초록에서 주황으로 건너뛰어, 반쯤 남은 것과 바닥 난 것이 한 색이었다. */
+                const barColor = r.mismatch ? '#10b981'
+                    : left === null ? '#cbd5e1'
+                    : left >= 0.75 ? '#10b981'     // 넉넉
+                    : left >= 0.50 ? '#84cc16'     // 아직 여유
+                    : left >= 0.30 ? '#eab308'     // 절반 밑
+                    : left >= 0.15 ? '#f59e0b'     // 얼마 안 남음
+                    : left > 0 ? '#dc2626'         // 바닥 가까움
+                    : '#cbd5e1';                   // 품절
+                const textColor = isOut ? '#94a3b8' : barColor;   // 빈 게이지에 회색 글씨면 안 보인다
+                const rateText = isOut ? '다 나감 · 재고 없음'
+                    : r.mismatch ? `재고>입고 (${r.inUnits}개 들임)`
+                    : left === null ? '수량 모름'
+                    : `${r.inUnits}개 중 ${r.stock}개 남음`;
                 const open = scOpen.has(r.code);
 
                 const histHtml = !open ? '' : `
@@ -22544,7 +22662,7 @@
                             border-radius:10px; padding:10px 12px; margin-bottom:6px; cursor:pointer;"
                      onclick="scToggleOpen('${r.code}')">
                     <div style="display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;">
-                        <b style="font-size:13.5px; color:#0f172a; flex:1 1 200px; min-width:0;">${c.dot} ${gEscapeHtml(r.name)}</b>
+                        <b style="font-size:13.5px; color:#0f172a; flex:1 1 200px; min-width:0;">${c.dot} ${gEscapeHtml(r.name)}${gCodeLabelChip(r.code)}</b>
                         <span style="font-size:12px; font-weight:900; color:${r.stock > 0 ? '#0f172a' : '#b91c1c'};">재고 ${r.stock}개</span>
                         <span style="font-size:12px; font-weight:900; color:${c.fg}; background:#fff;
                                      border:1px solid ${c.bd}; border-radius:6px; padding:1px 7px;">${r.days}일 전</span>
@@ -22559,7 +22677,7 @@
                         <div style="flex:1; height:7px; background:#e2e8f0; border-radius:99px; overflow:hidden; min-width:80px;">
                             <div style="height:100%; width:${barPct}%; background:${barColor};"></div>
                         </div>
-                        <span style="font-size:11.5px; font-weight:900; color:${barColor}; min-width:110px; text-align:right;">${rateText}</span>
+                        <span style="font-size:11.5px; font-weight:900; color:${textColor}; min-width:110px; text-align:right;">${rateText}</span>
                     </div>
                     ${histHtml}
                 </div>`;
@@ -22568,6 +22686,451 @@
             box.innerHTML = head
                 + `<div style="font-size:11.5px; font-weight:800; color:#94a3b8; margin:0 2px 6px;">${list.length}개 · 눌러서 발주 이력 보기</div>`
                 + cards;
+        }
+
+        /* ================= [신규] 잘 나가는 품목 =================
+           우리 가게는 모든 품목을 늘 두는 곳이 아니다. 한 번 쫙 팔고 다른 품목으로 넘어갔다가,
+           텀을 두고 다시 꺼낸다. 그러니 '하루하루 얼마 팔렸나'로 보면 아무것도 안 보인다.
+           팔린 날들을 '회차'로 묶고, 회차와 회차 사이의 텀을 본다.
+             · 텀이 줄어든다 = 더 자주 꺼내게 된다 = 잘 나가는 물건
+             · 텀이 늘어난다 = 손이 덜 가게 된 물건
+             · 평균 텀이 지났는데 안 꺼냈다 = 다시 꺼낼 때가 된 물건 */
+
+        // [제거] 판매 회차(SP_EPISODE_GAP)는 걷어냈다. 걸었다 내렸다 하는 물건에만 맞는 잣대라,
+        //  늘 두는 물건은 죄다 1회차로 뭉쳐 아무 말도 못 했다. 이제 주당 판매량으로 본다.
+
+        /* [수정] 사다드림 이름을 여기 박아 두었는데, 이제 번호마다 이름표를 DB(product_code_labels)에
+           적어 두므로 그쪽 하나만 본다. 갈래를 고치려면 이름표만 고치면 된다. */
+        /* 며칠치를 보나 (개월). 기본은 6개월.
+           주문 기록이 2026-04부터라, 1년을 고르면 앞 절반이 통째로 비어 죄다 '새로'가 된다.
+           자료가 1년을 넘기면 12로 올려도 된다. */
+        let spMonths = 6;
+        let spFilter = 'all';        // all | hot | cold | due | once
+        let spSort = 'qty';          // qty | shrink | gapAsc | idle | recent
+        let spQuery = '';            // 이름 찾기
+        let spOpen = new Set();      // 펼쳐 놓은 품목
+        let spCodeLabels = {};       // 옛 물건 번호 -> 보여 줄 이름 (product_code_labels 에서 받아 온다)
+
+        function spDayNum(iso) { return Math.round(new Date(iso + 'T00:00:00') / 86400000); }
+        function spTodayNum() { const d = new Date(); d.setHours(0, 0, 0, 0); return Math.round(d / 86400000); }
+
+        /* 팔린 줄을 품목별로 모아 회차로 나눈다. */
+        function spBuildRows() {
+            const src = (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : (rawOrders || []))
+                .filter(o => o && !gIsFeeRow(o) && !isSalesCanceled(o));
+
+            const cut = spTodayNum() - Math.round((spMonths || 12) * 30.4);   // 최대 1년까지만 본다
+            /* [수정] 이름으로 묶으면 같은 물건이 흩어진다.
+               계란 한 가지가 '자연방사 난각1번 유정란 왕란 30구 한판' / '[신선]자연방사 …' /
+               '[신선]… (산란일자 8월18일)' 처럼 아홉 이름으로 갈려, 저마다 회차 하나가 되어 버렸다.
+               그래서 식별번호(P0xxx)로 묶는다. 주문 줄에는 번호가 없으니 이름으로 번호를 찾아 온다.
+                 · 상품 목록에서 찾고, 없으면 발주 기록의 이름에서 찾는다
+                 · 그래도 번호를 못 찾은 것은 아예 뺀다 (같은 물건인지 알 수 없어 셈이 틀어진다) */
+            const codeOf = new Map();     // 다듬은 이름 -> 식별번호
+            const prodOf = new Map();     // 식별번호 -> 상품 (재고를 붙이려고)
+            const nameOf = new Map();     // 식별번호 -> 보여 줄 이름
+            /* 번호마다 걸 이름은 이름표(product_code_labels)를 가장 먼저 본다.
+               과일(F)·사다드림(S)은 여러 상품이 한 번호를 함께 쓰므로, 상품 이름을 그대로 쓰면
+               그중 하나만 대표로 떠 엉뚱해 보인다. 지금은 안 파는 옛 물건도 걸 이름이 여기밖에 없다. */
+            Object.entries(spCodeLabels || {}).forEach(([c, label]) => nameOf.set(c, label));
+            (Array.isArray(uploadProducts) ? uploadProducts : []).forEach(p => {
+                if (!p || !p.name) return;
+                const c = String(p.productCode || '').trim();
+                if (!c) return;
+                const k = fTightName(p.name);
+                if (k && !codeOf.has(k)) codeOf.set(k, c);
+                if (!prodOf.has(c)) prodOf.set(c, p);
+                if (!nameOf.has(c)) nameOf.set(c, p.name);
+            });
+            // 발주 기록에도 번호가 붙은 이름이 있다. 지금 안 파는 옛 물건은 여기서만 찾을 수 있다.
+            (purchaseOrders || []).concat(purchaseArchive || []).forEach(po => {
+                if (!po || !po.itemName) return;
+                const c = String(po.productCode || '').trim();
+                if (!c) return;
+                const k = fTightName(po.itemName);
+                if (k && !codeOf.has(k)) codeOf.set(k, c);
+                if (!nameOf.has(c)) nameOf.set(c, po.itemName);
+            });
+
+            const m = new Map();
+            let dropped = 0;
+            src.forEach(o => {
+                const d = parseTimestampToDate(o.timestamp);
+                if (!d || d.getFullYear() < 2020) return;
+                const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                if (spDayNum(ds) < cut) return;
+                const nm = String(o.item || '').trim();
+                if (!nm || /\[취소\]/.test(nm)) return;
+                /* 주문 줄에 번호가 적혀 있으면 그것을 쓴다 (2026-09-09에 지난 주문까지 채워 넣었고,
+                   그 뒤 주문서는 번호를 함께 저장한다). 없는 옛 줄만 이름으로 되짚는다. */
+                const code = String(o.productCode || '').trim() || codeOf.get(fTightName(nm));
+                if (!code) { dropped++; return; }        // 번호를 못 찾은 줄은 뺀다
+                if (!m.has(code)) m.set(code, { key: code, name: nameOf.get(code) || nm, last: '', rows: [] });
+                const v = m.get(code);
+                if (ds >= v.last) v.last = ds;
+                /* 매출은 줄 합계(total)를 먼저 쓴다. 사다드림 대행료가 얹혀 있어 단가×수량과 다르다.
+                   total 이 없는 옛 줄만 단가×수량으로 메운다. */
+                const q = parseInt(o.qty || 0) || 0;
+                const amt = (parseInt(o.total || 0) || 0) || ((parseInt(o.price || 0) || 0) * q);
+                v.rows.push({ d: ds, q, amt });
+            });
+            spDropped = dropped;
+
+            const today = spTodayNum();
+            // 주 단위 자 — 기간 단추를 그대로 따르고, 이번 주 월요일에서 거꾸로 센다
+            const nWeeks = Math.max(4, Math.round((spMonths || 12) * 4.35));
+            const mondayNum = spDayNum(spWeekStart(
+                (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })()
+            ));
+
+            const out = [];
+            m.forEach(v => {
+                v.rows.sort((a, b) => a.d.localeCompare(b.d));
+
+                /* [수정] 예전에는 판매를 '회차'로 묶고 회차 사이 텀이 줄었나로 봤다.
+                   그 잣대는 걸었다 내렸다 하는 물건에만 맞아, 늘 두는 물건(왕란·두부·감귤)은
+                   죄다 '1회차'로 뭉쳐 아무 말도 못 했다. 618개 중 판정된 것이 69개뿐이었다.
+                   이제는 '주당 얼마나 팔았나'를 앞뒤 반으로 갈라 견준다. 물건 성격을 안 가리고,
+                   같은 자료로 278개가 판정된다. */
+                /* [수정] 개수 대신 금액으로 센다. 5천원짜리 하나와 3만원짜리 하나가 같은 '1개'라
+                   개수로는 무엇이 가게에 보탬이 되는지 안 보였다. weeks 는 주별 금액이다. */
+                const weeks = new Array(nWeeks).fill(0);
+                const weekQty = new Array(nWeeks).fill(0);
+                v.rows.forEach(x => {
+                    const i = nWeeks - 1 - Math.round((mondayNum - spDayNum(spWeekStart(x.d))) / 7);
+                    if (i >= 0 && i < nWeeks) { weeks[i] += x.amt; weekQty[i] += x.q; }
+                });
+                const halfW = Math.floor(nWeeks / 2);
+                const oldQty = weeks.slice(0, halfW).reduce((a, b) => a + b, 0);
+                const newQty = weeks.slice(halfW).reduce((a, b) => a + b, 0);
+
+                /* 갈래는 넷.
+                     · 앞쪽에 판 적이 없으면 견줄 것이 없다 → 새로 나온 물건 (철 따라 나오는 과일이 대개 여기다)
+                     · 1.5배 넘게 늘면 🔥, 3분의 2 밑으로 줄면 🧊, 그 사이는 비슷 */
+                let trend, ratio = null;
+                if (!oldQty && !newQty) trend = null;
+                else if (!oldQty) trend = 'new';
+                else { ratio = newQty / oldQty; trend = ratio >= 1.5 ? 'up' : ratio <= 0.67 ? 'down' : 'flat'; }
+
+                const days = [...new Set(v.rows.map(x => x.d))];       // 판 날수 (회차 대신 쓴다)
+                const lastEnd = v.rows[v.rows.length - 1].d;
+                const idle = today - spDayNum(lastEnd);                // 마지막 판매 뒤 며칠 쉬었나
+
+                const prod = prodOf.get(v.key) || null;
+                let stock = null;
+                if (prod) { const s = salesRealStock(prod); stock = (s === Infinity) ? Infinity : (parseInt(s || 0) || 0); }
+
+                out.push({
+                    key: v.key, name: v.name, weeks, weekQty, oldQty, newQty, ratio, trend,
+                    lastEnd, idle, stock, soldDays: days.length,
+                    rows: v.rows,                                  // 주별 그래프가 쓴다
+                    totalQty: v.rows.reduce((s, x) => s + x.q, 0),
+                    totalAmt: v.rows.reduce((s, x) => s + x.amt, 0),
+                    totalOrders: v.rows.length
+                });
+            });
+            return out;
+        }
+
+        function spSetMonths(v) { spMonths = parseInt(v) || 0; spOpen.clear(); renderSalesPattern(); }
+        function spSetFilter(v) { spFilter = v; renderSalesPattern(); }
+        function spSetSort(v) { spSort = v; renderSalesPattern(); }
+        function spSetQuery(v) { spQuery = String(v || '').trim(); renderSalesPattern(); }
+        function spToggleOpen(k) { if (spOpen.has(k)) spOpen.delete(k); else spOpen.add(k); renderSalesPattern(); }
+
+        async function initSalesPatternTab() {
+            const box = document.getElementById('sales-pattern-body');
+            if (box) box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
+            try {
+                await ensureProductsLoaded();
+                if (typeof loadSalesArchiveFromCache === 'function') loadSalesArchiveFromCache();
+                await loadPurchaseArchiveIfNeeded();   // 옛 발주의 이름-번호 짝도 써야 한다
+                spCodeLabels = await gLoadCodeLabels();   // 이름표는 온 화면이 한 벌만 쓴다
+                spPoCache = null;                        // 발주가 새로 들어왔을 수 있으니 텀을 다시 센다
+            } catch (e) { console.error('잘 나가는 품목 준비 실패:', e); }
+            renderSalesPattern();
+        }
+
+        /* [신규] 펼쳤을 때 보이는 주별 판매량 그래프.
+           위 '기간' 단추(3개월·6개월·1년·전체)를 그대로 따라간다.
+           안 판 주도 빈칸으로 남긴다 — 그래야 얼마나 쉬었는지가 눈에 보인다. */
+
+        /* [신규] 발주 텀 — 그 번호로 얼마 만에 한 번씩 시켰나.
+           재고 점검이 쓰는 회차 묶기(scRoundsByCode)를 그대로 빌려 쓴다. 며칠 안에 나눠 적은 발주는 한 번으로 친다.
+           지금은 발주가 두 번 넘는 상품이 적지만, 앞으로 꾸준히 적으면 이 값이 가장 든든한 잣대가 된다. */
+        let spPoCache = null;
+        function spPoTerm(code) {
+            if (!spPoCache) {
+                spPoCache = new Map();
+                try {
+                    scRoundsByCode().forEach((rounds, c) => {
+                        if (!rounds || !rounds.length) return;
+                        const gaps = [];
+                        for (let i = 1; i < rounds.length; i++) {
+                            const g = scDaysSince(rounds[i - 1].date) - scDaysSince(rounds[i].date);
+                            if (g > 0 && g < 400) gaps.push(g);
+                        }
+                        spPoCache.set(c, {
+                            n: rounds.length,
+                            avg: gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null,
+                            first: rounds[0].date,
+                            last: rounds[rounds.length - 1].date,
+                            // 눈금에 찍을 날짜와 그때 넣은 금액·수량 (막대 높이로 쓴다)
+                            rounds: rounds.map(x => ({
+                                date: x.date,
+                                units: x.units || 0,
+                                amt: (x.rows || []).reduce((s, po) => s + (parseInt(po.totalPrice || 0) || 0), 0)
+                            })),
+                            totalAmt: rounds.reduce((s, x) => s + (x.rows || []).reduce((a, po) => a + (parseInt(po.totalPrice || 0) || 0), 0), 0)
+                        });
+                    });
+                } catch (e) { console.warn('발주 텀 셈 실패:', e); }
+            }
+            return spPoCache.get(String(code || '').trim()) || null;
+        }
+        function spPoTermChip(code) {
+            const v = spPoTerm(code);
+            // 발주가 없는 것도 '0번'으로 적는다 — 빈칸이면 아직 안 센 것인지 없는 것인지 알 수 없다
+            if (!v || !v.n) return `<span title="이 번호로 발주한 기록이 없습니다" style="color:#cbd5e1;">발주 0번</span>`;
+            const md = s => String(s || '').slice(5).replace('-', '/');   // 2026-03-17 → 03/17
+            const since = v.last ? scDaysSince(v.last) : null;
+            // 늘 시키던 간격보다 오래 비었으면 눈에 띄게 (텀을 아는 것만)
+            const late = v.avg !== null && since !== null && since > v.avg * 1.5;
+            const tip = `발주 ${v.n}번 · 첫 ${v.first} · 최근 ${v.last}`
+                + (v.avg !== null ? ` · 평균 ${v.avg}일마다` : '')
+                + (v.totalAmt ? ` · 모두 ${v.totalAmt.toLocaleString()}원` : '');
+            return `<span title="${tip}" style="color:${late ? '#c2410c' : '#94a3b8'}; font-weight:${late ? 900 : 700};">`
+                + `발주 ${v.n}번 ${md(v.first)}~`
+                + (v.avg !== null ? ` ${v.avg}일마다` : '')
+                + (v.totalAmt ? ` · ${v.totalAmt.toLocaleString()}원` : '')
+                + (late ? ` (${since}일째)` : '')
+                + `</span>`;
+        }
+
+        /* [신규] 접힌 카드의 눈금 — 그 번호로 언제 발주했나를 기간 창에 찍는다.
+           고른 기간을 그대로 자로 쓰므로 위아래 카드를 견줄 수 있다. */
+        function spPoTimeline(code) {
+            const v = spPoTerm(code);
+            const rounds = (v && v.rounds) || [];
+            const now = spTodayNum();
+            const first = now - Math.round((spMonths || 12) * 30.4);
+            const span = Math.max(1, now - first);
+            // 창 안에 든 발주만 그린다. 막대 높이는 그때 넣은 금액이다 (얼마나 크게 시켰나).
+            const inWin = rounds.map(x => ({ ...x, n: spDayNum(String(x.date).slice(0, 10)) }))
+                .filter(x => !isNaN(x.n) && x.n >= first);
+            const maxAmt = Math.max(...inWin.map(x => x.amt), 1);
+            const marks = inWin.map(x => {
+                const px = Math.max(0, Math.min(98.5, ((x.n - first) / span) * 100));
+                const h = x.amt ? Math.max(30, Math.round((x.amt / maxAmt) * 100)) : 30;
+                return `<i title="${x.date} · ${x.units}개 · ${x.amt.toLocaleString()}원"
+                    style="left:${px}%; width:1.5%; height:${h}%; background:#c2410c;"></i>`;
+            }).join('');
+            const tip = rounds.length
+                ? `발주 ${rounds.length}번 · 모두 ${(v.totalAmt || 0).toLocaleString()}원`
+                : '발주 기록 없음';
+            return `<div class="sp-spark" title="${tip}">${marks}</div>`;
+        }
+
+        /* [신규] 막대 색 — 바로 앞 주와 견준다. 늘면 빨강, 줄면 파랑, 같으면 회색.
+           앞 주가 0이면 늘어난 것으로 본다 (안 팔던 것을 팔기 시작한 것이니 는 것이 맞다). */
+        function spWeekColor(weeks, i) {
+            const cur = weeks[i], prev = i > 0 ? weeks[i - 1] : null;
+            if (prev === null) return '#94a3b8';       // 첫 주는 견줄 데가 없다
+            if (cur > prev) return '#dc2626';
+            if (cur < prev) return '#2563eb';
+            return '#94a3b8';
+        }
+
+        // 그 날이 속한 주의 월요일 (YYYY-MM-DD)
+        function spWeekStart(iso) {
+            const t = new Date(iso + 'T00:00:00');
+            t.setDate(t.getDate() - ((t.getDay() + 6) % 7));
+            return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+        }
+
+        function spWeeklyChart(r) {
+            const rows = r.rows || [];
+            if (!rows.length) return '';
+
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const monday = new Date(today); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+
+            // 몇 주를 그릴까 — 기간 단추를 그대로 따른다 (1개월 4주 ~ 1년 52주)
+            const nWeeks = Math.max(4, Math.round((spMonths || 12) * 4.35));
+
+            const weeks = [];
+            for (let i = nWeeks - 1; i >= 0; i--) {
+                const d = new Date(monday); d.setDate(d.getDate() - i * 7);
+                weeks.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, d, qty: 0, amt: 0 });
+            }
+            const idx = new Map(weeks.map((w, i) => [w.key, i]));
+            rows.forEach(x => {
+                const i = idx.get(spWeekStart(x.d));
+                if (i === undefined) return;
+                weeks[i].qty += x.q; weeks[i].amt += x.amt;
+            });
+
+            // [수정] 막대 높이는 금액이다. 5천원짜리와 3만원짜리가 같은 '1개'로 보이던 것을 바로잡는다.
+            const maxAmt = Math.max(...weeks.map(w => w.amt), 1);
+            const sumAmt = weeks.reduce((s, w) => s + w.amt, 0);
+            const sold = weeks.filter(w => w.amt > 0).length;
+            const gap = nWeeks > 40 ? 1 : 2;
+
+            // 막대 색은 바로 앞 주와 견준 결과 — 늘면 빨강, 줄면 파랑
+            const amts = weeks.map(w => w.amt);
+            const bars = weeks.map((w, i) => {
+                const h = w.amt ? Math.max(8, Math.round((w.amt / maxAmt) * 100)) : 0;
+                const md = `${w.d.getMonth() + 1}/${w.d.getDate()}`;
+                const prev = i > 0 ? amts[i - 1] : null;
+                const d = prev === null || !w.amt ? null : w.amt - prev;
+                const diff = d === null ? '' : (d > 0 ? ` (앞 주보다 +${d.toLocaleString()}원)` : d < 0 ? ` (앞 주보다 ${d.toLocaleString()}원)` : ' (앞 주와 같음)');
+                const tip = w.amt ? `${md} 주 · ${w.amt.toLocaleString()}원 · ${w.qty}개${diff}` : `${md} 주 · 판매 없음`;
+                return `<div title="${tip}" style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:flex-end; height:100%;">
+                    ${w.amt ? `<div style="height:${h}%; background:${spWeekColor(amts, i)}; border-radius:2px 2px 0 0;"></div>`
+                            : `<div style="height:2px; background:#e2e8f0;"></div>`}
+                </div>`;
+            }).join('');
+
+            // 눈금은 달이 바뀌는 주에만 (칸마다 적으면 글자가 겹친다)
+            const ticks = weeks.map((w, i) => {
+                const prev = weeks[i - 1];
+                const isNewMonth = !prev || prev.d.getMonth() !== w.d.getMonth();
+                return `<div style="flex:1; min-width:0; font-size:9px; font-weight:800; color:#cbd5e1; white-space:nowrap; overflow:visible;">${isNewMonth ? `${w.d.getMonth() + 1}월` : ''}</div>`;
+            }).join('');
+
+            const term = (spMonths === 12 || !spMonths) ? '1년' : `${spMonths}개월`;
+            return `
+                <div style="margin-top:8px; padding:9px 11px; background:#fff; border:1px solid var(--border); border-radius:8px;">
+                    <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:6px;">
+                        <span style="font-size:11px; font-weight:900; color:#475569;">주별 매출</span>
+                        <span style="font-size:10.5px; font-weight:700; color:#cbd5e1;">${term} · ${nWeeks}주 중 ${sold}주 판매</span>
+                        <b style="margin-left:auto; font-size:12px; font-weight:900; color:#059669;">${sumAmt.toLocaleString()}원</b>
+                    </div>
+                    <div style="display:flex; align-items:flex-end; gap:${gap}px; height:46px;">${bars}</div>
+                    <div style="display:flex; gap:${gap}px; margin-top:3px;">${ticks}</div>
+                </div>`;
+        }
+
+        function renderSalesPattern() {
+            const box = document.getElementById('sales-pattern-body');
+            if (!box) return;
+
+            /* [수정] 늘었다·줄었다·비슷·새로 갈래를 걷어냈다.
+               618개 중 562개가 '새로' 아니면 '줄었다'로 쏠려 아무것도 갈라놓지 못했다.
+               한 철 팔고 마는 물건이 죄다 '줄었다'가 되고, 철 따라 나오는 과일은 죄다 '새로'였다.
+               매출 숫자와 주별 그래프(앞 주보다 늘면 빨강)가 같은 것을 더 정확히 말해 준다. */
+            const all = spBuildRows();
+            let list = all;
+            if (spQuery) {
+                const q = fTightName(spQuery);
+                /* [버그수정] 묶는 열쇠를 이름에서 식별번호로 바꾼 뒤, 여기가 번호를 뒤지고 있어
+                   이름으로는 아무것도 안 나왔다. 이름으로 찾되 번호로도 찾을 수 있게 둔다. */
+                const raw = spQuery.toUpperCase();
+                list = list.filter(r => fTightName(r.name).includes(q) || r.key.toUpperCase().includes(raw));
+            }
+
+            const cmp = {
+                qty: (a, b) => b.totalAmt - a.totalAmt,
+                // 많이 늘어난 것부터. 배수를 못 내는 것(새로 나옴·판 적 없음)은 뒤로 민다.
+                up: (a, b) => (a.ratio === null) - (b.ratio === null) || ((b.ratio || 0) - (a.ratio || 0)),
+                down: (a, b) => (a.ratio === null) - (b.ratio === null) || ((a.ratio || 0) - (b.ratio || 0)),
+                idle: (a, b) => b.idle - a.idle,
+                recent: (a, b) => b.lastEnd.localeCompare(a.lastEnd)
+            }[spSort] || ((a, b) => b.totalAmt - a.totalAmt);
+            list = list.slice().sort(cmp);
+
+            const fbtn = (key, label, color) => `<button type="button" onclick="spSetFilter('${key}')"
+                style="height:30px; padding:0 12px; border:1.5px solid ${spFilter === key ? (color || 'var(--primary)') : '#cbd5e1'};
+                       background:${spFilter === key ? (color ? color + '18' : 'var(--primary-light)') : '#fff'};
+                       color:${spFilter === key ? (color || 'var(--primary)') : '#64748b'};
+                       border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">${label}</button>`;
+
+            /* 정렬·기간은 단추로 아홉 개를 늘어놓으니 화면이 어수선했다. 드롭다운 둘로 줄인다. */
+            const sel = (fn, cur, opts) => `<select onchange="${fn}(this.value)"
+                style="height:30px; padding:0 6px; border:1.5px solid #cbd5e1; border-radius:8px;
+                       font-size:12px; font-weight:800; color:#475569; background:#fff; cursor:pointer;">
+                ${opts.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${l}</option>`).join('')}
+            </select>`;
+
+            const head = `
+                <div class="card" style="background:#fff; border-radius:14px; padding:12px 14px; box-shadow:var(--shadow); margin-bottom:10px; border:1px solid var(--border);">
+                    <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
+                        <b style="font-size:14px; font-weight:900; color:#0f172a;">🔥 잘 나가는 품목</b>
+                        <span style="font-size:11.5px; font-weight:700; color:#94a3b8;">
+                            눌러서 주별 매출을 봅니다. 앞 주보다 늘면 <b style="color:#dc2626;">빨강</b>, 줄면 <b style="color:#2563eb;">파랑</b>.
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center;">
+                        <span style="font-size:12px; font-weight:800; color:#475569;">${all.length}개</span>
+                        ${sel('spSetSort', spSort, [['qty', '매출 많은 순'], ['idle', '오래 안 판 순'], ['recent', '최근 판 순']])}
+                        ${/* [수정] '전체 기간'을 뺐다. 그 창은 품목마다 길이가 달라져 눈금 자가 흔들렸고,
+                              길어질수록 막대가 실오라기가 됐다. 최대 1년으로 못박는다. */''}
+                        ${sel('spSetMonths', spMonths, [[1, '1개월'], [3, '3개월'], [6, '6개월'], [12, '1년']])}
+                        <input type="text" value="${gEscapeHtml(spQuery)}" oninput="spSetQuery(this.value)" placeholder="🔍 찾기"
+                            style="flex:1 1 100px; min-width:88px; height:30px; padding:0 10px; border:1.5px solid #cbd5e1;
+                                   border-radius:8px; font-size:12px; font-weight:700; box-sizing:border-box;">
+                    </div>
+                </div>`;
+
+            if (!list.length) {
+                box.innerHTML = head + `<div style="padding:34px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">해당하는 품목이 없습니다.</div>`;
+                return;
+            }
+
+            const cards = list.map(r => {
+                /* [수정] 배수를 뺐다. 3개에서 1개로 준 것도 '▼ 3배'로 떠서, 작은 수에서 값이 튀었다.
+                   말로만 적고 정확한 수는 마우스를 올리면 나온다. */
+                // 만 단위로 줄여 적는다 — 좁은 칸에 원 단위를 다 적으면 넘친다
+                const won = n => n >= 10000 ? `${Math.round(n / 10000).toLocaleString()}만` : n.toLocaleString();
+                // 판정 칸이 없어졌으니 그 자리에 최근 4주 실적을 적는다 (지금 나가고 있나)
+                const last4 = r.weeks.slice(-4).reduce((a, b) => a + b, 0);
+                const last4q = (r.weekQty || []).slice(-4).reduce((a, b) => a + b, 0);
+
+                /* 접힌 카드의 눈금은 '언제 발주했나'다. 판매 흐름은 펼쳤을 때 주별 그래프가 맡는다.
+                   빨강·파랑은 그 그래프에서 앞 주와 견주는 뜻으로 쓰므로, 여기서는 한 가지 색만 쓴다. */
+                const timeline = spPoTimeline(r.key);
+
+                const open = spOpen.has(r.key);
+                const histHtml = !open ? '' : spWeeklyChart(r);
+
+                /* 두 줄로 못박는다 — 윗줄은 이름·텀·수량, 아랫줄은 곁다리.
+                   칸 폭이 고정이라 숫자가 세로로 줄을 맞춰, 목록을 훑을 때 눈이 흔들리지 않는다. */
+                return `
+                <div class="sp-card" style="border-left-color:${last4 ? '#10b981' : '#e2e8f0'}; ${open ? 'background:#fcfdff;' : ''}"
+                     onclick="spToggleOpen('${r.key}')">
+                    <div class="sp-r1">
+                        <span class="sp-name">${gEscapeHtml(r.name)}</span>
+                        <span class="sp-term" style="color:${last4 ? '#059669' : '#cbd5e1'};" title="최근 4주 ${last4q}개 · ${last4.toLocaleString()}원">${last4 ? `${last4q}개 ${won(last4)}` : '없음'}</span>
+                        <span class="sp-qty" title="${r.totalQty}개 · ${r.totalAmt.toLocaleString()}원">${r.totalQty}개 ${won(r.totalAmt)}</span>
+                    </div>
+                    <div class="sp-r2">
+                        ${spPoTermChip(r.key)}
+                    </div>
+                    ${timeline}
+                    ${histHtml}
+                </div>`;
+            }).join('');
+
+            box.innerHTML = head
+                + `<div style="display:flex; gap:8px; align-items:baseline; font-size:11px; font-weight:800; color:#cbd5e1; margin:0 4px 5px;">
+                       <span style="flex:1;">${list.length}개 · 눌러서 주별로 보기</span>
+                       <span style="width:92px; text-align:right;">최근 4주</span>
+                       <span style="width:92px; text-align:right;">개수 · 매출</span>
+                   </div>`
+                + cards;
+        }
+
+        /* 품목 분석 안에서 재고 점검 / 잘 나가는 품목을 오간다 */
+        let pchkSubTab = 'stock';
+        function switchCheckSubTab(which) {
+            pchkSubTab = which;
+            document.querySelectorAll('.pchk-sub-btn').forEach(b =>
+                b.classList.toggle('active', b.id === `btn-pchk-${which}`));
+            const s = document.getElementById('stock-check-body');
+            const p = document.getElementById('sales-pattern-body');
+            if (s) s.style.display = which === 'stock' ? '' : 'none';
+            if (p) p.style.display = which === 'sales' ? '' : 'none';
+            if (which === 'stock') initStockCheckTab(); else initSalesPatternTab();
         }
 
         /* ---------------- [신규] 상품 ↔ 발주 식별번호 연결 후보 ---------------- */
@@ -22605,7 +23168,7 @@
             const poByCode = new Map();
             allPO.forEach(po => {
                 const c = String(po.productCode || '').trim();
-                if (!/^P\d+$/.test(c)) return;
+                if (!/^[PFS]\d+$/.test(c)) return;
                 const prev = poByCode.get(c);
                 if (!prev || String(po.date || '') > String(prev.date || '')) poByCode.set(c, po);
             });
@@ -22687,7 +23250,7 @@
                         <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
                             <div style="font-size:11px; font-weight:800; color:#64748b; margin-bottom:4px;">🚚 발주목록 · 최근 ${best.po.date || '-'}</div>
                             <div style="font-size:13.5px; font-weight:800; color:#0f172a; word-break:keep-all; line-height:1.4;">${best.po.itemName}</div>
-                            <div style="margin-top:5px;"><span style="background:#dcfce7; color:#166534; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${best.po.productCode}</span></div>
+                            <div style="margin-top:5px;"><span style="background:#dcfce7; color:#166534; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${best.po.productCode}</span>${gCodeLabelChip(best.po.productCode)}</div>
                         </div>
                     </div>
                     ${others.length ? `<div style="margin-top:9px; padding-top:9px; border-top:1px dashed #e2e8f0;">
@@ -22743,7 +23306,7 @@
                 const patch = {};
                 targets.forEach(c => {
                     const code = String(c.hits[0].po.productCode || '').trim();
-                    if (/^P\d+$/.test(code)) patch[`${c.idx}/productCode`] = code;
+                    if (/^[PFS]\d+$/.test(code)) patch[`${c.idx}/productCode`] = code;
                 });
                 const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
                     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
@@ -22751,7 +23314,7 @@
                 if (!res.ok) throw new Error('저장 실패 ' + res.status);
                 targets.forEach(c => {
                     const code = String(c.hits[0].po.productCode || '').trim();
-                    if (uploadProducts[c.idx] && /^P\d+$/.test(code)) uploadProducts[c.idx].productCode = code;
+                    if (uploadProducts[c.idx] && /^[PFS]\d+$/.test(code)) uploadProducts[c.idx].productCode = code;
                 });
                 showToast(`${Object.keys(patch).length}건 연결 완료`);
                 await renderCodeLinkCandidates();
@@ -22792,7 +23355,7 @@
             const hit = c.hits[hitIdx];
             if (!hit) return;
             const newCode = String(hit.po.productCode || '').trim();
-            if (!/^P\d+$/.test(newCode)) { showToast("발주 쪽 식별번호가 올바르지 않습니다."); return; }
+            if (!/^[PFS]\d+$/.test(newCode)) { showToast("발주 쪽 식별번호가 올바르지 않습니다."); return; }
 
             showLoader("식별번호 연결 중...");
             try {
@@ -22822,7 +23385,7 @@
                     document.getElementById('purchase-sale-price').value = price;
                     // [신규] 고른 상품의 식별번호를 그대로 가져온다. 이름을 바꿔 적어도 이 번호로 묶인다.
                     const codeEl = document.getElementById('purchase-product-code');
-                    if (codeEl && /^P\d+$/.test(String(prod.productCode || '').trim())) {
+                    if (codeEl && /^[PFS]\d+$/.test(String(prod.productCode || '').trim())) {
                         codeEl.value = String(prod.productCode).trim();
                     }
                 }
@@ -22918,7 +23481,7 @@
             const price = parseInt(String(prod.price || '').replace(/\D/g, '')) || 0;
             document.getElementById('purchase-sale-price').value = price;
             const codeEl = document.getElementById('purchase-product-code');
-            if (codeEl) codeEl.value = /^P\d+$/.test(String(prod.productCode || '').trim()) ? String(prod.productCode).trim() : '';
+            if (codeEl) codeEl.value = /^[PFS]\d+$/.test(String(prod.productCode || '').trim()) ? String(prod.productCode).trim() : '';
 
             onPurchaseCodeChange();
             calcPurchaseTotal();
@@ -22936,26 +23499,43 @@
             const code = String(codeEl.value || '').trim().toUpperCase();
             if (code && codeEl.value !== code) codeEl.value = code;
 
+            /* [신규] 그 번호가 어느 상품과 맞물리는지 옆 칸에 적어 준다 (보기 전용).
+               과일(F)·사다드림(S)은 상품이 여럿이라 이름표를, 아니면 그 상품 이름을 쓴다. */
+            const nameEl = document.getElementById('purchase-code-name');
+            const paintName = (v, tip) => { if (nameEl) { nameEl.value = v || ''; nameEl.title = tip || v || ''; } };
+
             if (!code) {
                 hint.innerHTML = `‘🔍 상품 찾기’로 고르면 자동으로 채워집니다. <span style="color:#94a3b8;">비워두면 저장할 때 상품명으로 번호가 붙습니다.</span>`;
                 hint.style.color = '#64748b';
+                paintName('');
                 return;
             }
-            if (!/^P\d+$/.test(code)) {
+            if (!/^[PFS]\d+$/.test(code)) {
                 hint.innerText = '⚠️ 식별번호 형식이 올바르지 않습니다. 상품 찾기로 다시 골라 주세요.';
                 hint.style.color = '#dc2626';
+                paintName('');
                 return;
             }
 
             const prod = (Array.isArray(uploadProducts) ? uploadProducts : []).find(p => p && String(p.productCode || '').trim() === code);
             const pos = purchaseOrders.concat(purchaseArchive).filter(p => String(p.productCode || '').trim() === code);
 
+            /* [신규] 과일(F)·사다드림(S)은 여러 상품이 한 번호를 함께 쓴다.
+               번호만 봐서는 무엇인지 모르니, 이름표를 맨 앞에 세워 준다. */
+            const label = gCodeLabelOf(code);
+            // 옆 칸에는 이름표를 먼저, 없으면 그 번호를 쓰는 상품 이름을 적는다
+            const sameCoded = (Array.isArray(uploadProducts) ? uploadProducts : [])
+                .filter(p => p && String(p.productCode || '').trim() === code).map(p => p.name);
+            paintName(label || sameCoded[0] || (pos[0] && pos[0].itemName) || '',
+                (label ? label + '\n' : '') + (sameCoded.length ? `상품 ${sameCoded.length}개\n` + sameCoded.slice(0, 6).join('\n') : ''));
+
             if (!prod && pos.length === 0) {
-                hint.innerText = `🆕 처음 쓰는 번호입니다.`;
+                hint.innerText = label ? `${label} — 아직 이 번호로 발주한 적이 없습니다.` : `🆕 처음 쓰는 번호입니다.`;
                 hint.style.color = '#475569';
                 return;
             }
             const bits = [];
+            if (label) bits.push(`🏷️ ${label}`);
             if (prod) bits.push(`📦 상품 「${prod.name}」`);
             if (pos.length > 0) {
                 // 발주일자가 'X' 같은 옛 자료가 섞여 있어, 날짜 형식인 것만 보고 '최근'을 정한다
@@ -23029,6 +23609,51 @@
             return String(s || "").trim().replace(/\s+/g, ' ').toLowerCase();
         }
 
+        /* [신규] 다음 식별번호를 만든다 (P0001 꼴).
+           상품과 발주 양쪽에서 이미 쓰는 번호를 모두 보고, 그 다음 수를 쓴다.
+           둘 다 봐야 하는 까닭은 번호를 발주에서 먼저 만드는 길도 있기 때문이다. */
+        function gNextProductCode() {
+            let max = 0;
+            const eat = c => {
+                const s = String(c || '').trim();
+                // 새 P 번호를 매길 때는 P 만 센다. 과일(F)·사다드림(S)은 딴 갈래로 따로 센다.
+                if (/^P[0-9]+$/.test(s)) { const n = parseInt(s.slice(1), 10) || 0; if (n > max) max = n; }
+            };
+            (Array.isArray(uploadProducts) ? uploadProducts : []).forEach(p => p && eat(p.productCode));
+            (purchaseOrders || []).forEach(po => po && eat(po.productCode));
+            (purchaseArchive || []).forEach(po => po && eat(po.productCode));
+            /* [버그수정] 지금 안 파는 옛 물건들은 상품 목록에도 발주에도 없고 주문과 이름표에만 있다.
+               그것을 안 세면 이미 쓰는 번호를 새 상품에 또 내주게 된다. 이름표까지 봐야 한다. */
+            Object.keys(gCodeLabels || {}).forEach(eat);
+            return 'P' + String(max + 1).padStart(4, '0');
+        }
+
+        /* [신규] 번호에 걸린 이름표.
+           과일(F)·사다드림(S)은 여러 상품이 한 번호를 함께 쓴다. 번호만 보면 무엇인지 알 수 없어,
+           'F0001' 옆에 '[과일] 백도' 를 붙여 준다. 이름표는 DB(product_code_labels)에 있다. */
+        let gCodeLabels = {};
+        async function gLoadCodeLabels(force) {
+            if (!force && Object.keys(gCodeLabels).length) return gCodeLabels;
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}product_code_labels.json?t=${Date.now()}`);
+                if (res.ok) gCodeLabels = (await res.json()) || {};
+            } catch (e) { console.warn('번호 이름표 불러오기 실패:', e); }
+            return gCodeLabels;
+        }
+        // 이름표만 (없으면 빈 글자)
+        function gCodeLabelOf(code) {
+            return String((gCodeLabels || {})[String(code || '').trim()] || '').trim();
+        }
+        /* 번호 옆에 붙일 작은 딱지. 이름표가 없으면 아무것도 안 만든다 (P 번호는 상품 이름이 옆에 있다). */
+        function gCodeLabelChip(code) {
+            const l = gCodeLabelOf(code);
+            if (!l) return '';
+            const isF = /^F/.test(String(code || ''));
+            return `<span style="margin-left:4px; padding:1px 6px; border-radius:5px; font-size:10.5px; font-weight:800;
+                background:${isF ? '#fefce8' : '#fff7ed'}; color:${isF ? '#a16207' : '#c2410c'};
+                border:1px solid ${isF ? '#fde68a' : '#fed7aa'};">${gEscapeHtml(l)}</span>`;
+        }
+
         function fIsPurchaseDate(s) {
             return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
         }
@@ -23049,7 +23674,7 @@
             let maxNum = 0;
             const scan = (row, nameField) => {
                 const code = String((row && row.productCode) || "").trim();
-                if (!/^P\d+$/.test(code)) return;
+                if (!/^[PFS]\d+$/.test(code)) return;
                 maxNum = Math.max(maxNum, parseInt(code.slice(1), 10) || 0);
                 const key = fNormItemName(row[nameField]);
                 if (key && !map.has(key)) map.set(key, code);
@@ -23074,7 +23699,7 @@
                 const poByName = new Map();
                 purchaseOrders.concat(purchaseArchive).forEach(po => {
                     const code = String(po.productCode || '').trim();
-                    if (!/^P\d+$/.test(code)) return;
+                    if (!/^[PFS]\d+$/.test(code)) return;
                     const key = fNormItemName(po.itemName);
                     if (key && !poByName.has(key)) poByName.set(key, code);
                 });
@@ -23084,7 +23709,7 @@
 
                 uploadProducts.forEach((prod, idx) => {
                     if (!prod || !prod.name) return;
-                    if (/^P\d+$/.test(String(prod.productCode || "").trim())) return; // 이미 있음
+                    if (/^[PFS]\d+$/.test(String(prod.productCode || "").trim())) return; // 이미 있음
 
                     const code = poByName.get(fNormItemName(prod.name));
                     if (!code) return;   // 발주에 없는 상품이면 번호를 붙이지 않는다
@@ -23265,7 +23890,7 @@
                     if (!po || !po.id) return;
 
                     // 식별번호가 없는 건에만 상품명 기준으로 새로 부여한다 (이미 있으면 그대로 둔다)
-                    const hadCode = /^P\d+$/.test(String(po.productCode || "").trim());
+                    const hadCode = /^[PFS]\d+$/.test(String(po.productCode || "").trim());
                     let code = hadCode ? String(po.productCode).trim() : fTakePurchaseCode(state, po.itemName);
                     if (!hadCode && code) po.productCode = code;
 
@@ -23343,7 +23968,7 @@
             //  ② 수정 중이면 그 건에 붙어 있던 번호 (상품명을 고쳐도 번호는 안 흔들린다)
             //  ③ 둘 다 없으면 상품명으로 찾거나 새로 만든다
             const _typedCode = String(document.getElementById('purchase-product-code')?.value || "").trim().toUpperCase();
-            if (_typedCode && !/^P\d+$/.test(_typedCode)) {
+            if (_typedCode && !/^[PFS]\d+$/.test(_typedCode)) {
                 showToast("식별번호는 P0001 형식으로 적어 주세요.");
                 return;
             }
@@ -23351,7 +23976,7 @@
             const _codeState = buildPurchaseCodeMap();
             const productCode = _typedCode
                 ? _typedCode
-                : ((_editingPo && /^P\d+$/.test(String(_editingPo.productCode || "").trim()))
+                : ((_editingPo && /^[PFS]\d+$/.test(String(_editingPo.productCode || "").trim()))
                     ? String(_editingPo.productCode).trim()
                     : fTakePurchaseCode(_codeState, itemName));
 
@@ -23398,7 +24023,7 @@
                     const _pi = pendingProductCodeLink;
                     pendingProductCodeLink = null;
                     const _p = uploadProducts[_pi];
-                    if (_p && !/^P\d+$/.test(String(_p.productCode || '').trim()) && /^P\d+$/.test(productCode)) {
+                    if (_p && !/^[PFS]\d+$/.test(String(_p.productCode || '').trim()) && /^[PFS]\d+$/.test(productCode)) {
                         try {
                             await fetch(`${FIREBASE_DB_URL}published_products.json`, {
                                 method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -25281,7 +25906,7 @@
             const found = findPurchaseById(selectedPurchaseId);
             if (!found) return;
             const code = String(found.item.productCode || '').trim();
-            if (!/^P\d+$/.test(code)) { showToast("이 발주에는 식별번호가 없습니다."); return; }
+            if (!/^[PFS]\d+$/.test(code)) { showToast("이 발주에는 식별번호가 없습니다."); return; }
 
             clearPurchaseSelection();
             purchaseCodeFilter = code;
@@ -25417,7 +26042,7 @@
 
             // [신규] 이 발주의 식별번호를 그대로 물려준다.
             //  상품명을 손님용으로 고쳐 적어도 발주와의 연결이 끊기지 않는다.
-            pendingProductCodeFromPurchase = /^P\d+$/.test(String(po.productCode || '').trim())
+            pendingProductCodeFromPurchase = /^[PFS]\d+$/.test(String(po.productCode || '').trim())
                 ? String(po.productCode).trim() : '';
             paintProductCodeField(pendingProductCodeFromPurchase ? { productCode: pendingProductCodeFromPurchase } : null);
 
@@ -25635,7 +26260,7 @@
                     <tr class="po-row${selectedPurchaseId === po.id ? ' selected' : ''}" onclick="selectPurchaseRow('${po.id}')">
                         <td class="po-date">${po.date || '-'}${po.isArchived ? `<br><span class="po-arch">저장함</span>` : ``}</td>
                         <td class="po-name">${po.itemName || '-'}</td>
-                        <td class="po-code"><span class="po-code-badge">${po.productCode || '-'}</span></td>
+                        <td class="po-code"><span class="po-code-badge">${po.productCode || '-'}</span>${gCodeLabelChip(po.productCode)}</td>
                         <td class="po-supplier">${po.supplier || '-'}</td>
                         <td class="po-num po-qty">${parseInt(po.qty || 0).toLocaleString()}박스<br><span class="po-sub">${parseInt(po.itemsPerBox || 1).toLocaleString()}개입</span></td>
                         <td class="po-num po-units">${parseInt(po.totalUnits || 0).toLocaleString()}개</td>
@@ -25656,7 +26281,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 10px;">
                             <div style="font-size: 12px; font-weight: 800; color: #64748b; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                                 <span>📅 ${po.date || "-"}</span>
-                                <span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-weight:800;">${po.productCode || '-'}</span>
+                                <span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-weight:800;">${po.productCode || '-'}</span>${gCodeLabelChip(po.productCode)}
                                 ${po.isArchived ? `<span style="background:#f1f5f9; color:#64748b; padding:2px 7px; border-radius:6px; font-weight:800;">저장함</span>` : ''}
                                 ${po.supplier ? `<span style="background: #f1f5f9; padding: 2px 7px; border-radius: 6px; color: #334155; font-weight: 800;">🏢 ${po.supplier}</span>` : ''}
                             </div>
@@ -25704,28 +26329,251 @@
         // [신규] 상품등록 폼의 식별번호 칸을 채운다. 그 번호로 잡힌 발주가 몇 건인지도 알려 준다.
         // [수정] 식별번호를 상품명 라벨 옆 작은 표로 보여 준다.
         //  번호가 없으면(발주 전) 표 자체를 감춘다 — 없는 값을 굳이 설명할 자리를 두지 않는다.
+
+        /* ================= [신규] 상품등록 — 식별번호 고르기 =================
+           주마다 이름을 조금씩 바꿔 새로 올리는 물건(과일·사다드림 등)은,
+           새 번호를 받으면 지난 판매와 이어지지 않아 저마다 '회차 한 번'이 되어 버린다.
+           여기서 지난 번호를 골라 주면 이름이 달라도 하나로 이어진다.
+           안 고르면 지금까지처럼 저장할 때 새 번호가 저절로 붙는다. */
+
+        let gPickedCode = '';        // 이번 등록에 손으로 고른 번호 ('' 이면 자동)
+        let gCodePickerQuery = '';
+
+        function clearPickedCode() {
+            gPickedCode = '';
+            paintProductCodeField(uploadIsEditMode && uploadEditProductKey !== null ? uploadProducts[uploadEditProductKey] : null);
+            showToast('번호를 비웠습니다. 저장 때 자동으로 붙습니다.');
+        }
+
+        /* 고를 수 있는 번호 목록 — 번호마다 이름표·상품·발주 건수를 함께 보여 준다 */
+        function gCodePickerRows() {
+            const m = new Map();
+            const put = (code, patch) => {
+                const c = String(code || '').trim();
+                if (!/^[PFS]\d+$/.test(c)) return;
+                if (!m.has(c)) m.set(c, { code: c, label: gCodeLabelOf(c), names: new Set(), po: 0, lastPo: '' });
+                Object.assign(m.get(c), patch(m.get(c)));
+            };
+            (Array.isArray(uploadProducts) ? uploadProducts : []).forEach(p => {
+                if (!p || !p.name) return;
+                put(p.productCode, v => { v.names.add(p.name); return {}; });
+            });
+            (purchaseOrders || []).concat(purchaseArchive || []).forEach(po => {
+                if (!po) return;
+                put(po.productCode, v => {
+                    if (po.itemName) v.names.add(po.itemName);
+                    const d = String(po.date || '');
+                    return { po: v.po + 1, lastPo: (fIsPurchaseDate(d) && d > v.lastPo) ? d : v.lastPo };
+                });
+            });
+            // 이름표만 있고 상품·발주가 없는 옛 번호도 고를 수 있게 넣는다
+            Object.keys(gCodeLabels || {}).forEach(c => put(c, () => ({})));
+
+            return [...m.values()].sort((a, b) => {
+                const rank = x => /^F/.test(x.code) ? 0 : /^S/.test(x.code) ? 1 : 2;   // 과일·사다드림을 위로
+                return (rank(a) - rank(b)) || a.code.localeCompare(b.code);
+            });
+        }
+
+        function openCodePicker() {
+            gCodePickerQuery = '';
+            const el = document.getElementById('code-picker-modal');
+            if (el) el.style.display = 'flex';
+            renderCodePicker();
+            setTimeout(() => { const i = document.getElementById('code-picker-search'); if (i) i.focus(); }, 60);
+        }
+        function closeCodePicker() {
+            const el = document.getElementById('code-picker-modal');
+            if (el) el.style.display = 'none';
+        }
+        function onCodePickerSearch(v) { gCodePickerQuery = String(v || '').trim(); renderCodePicker(); }
+
+        function renderCodePicker() {
+            const box = document.getElementById('code-picker-list');
+            if (!box) return;
+            let rows = gCodePickerRows();
+            if (gCodePickerQuery) {
+                const q = fTightName(gCodePickerQuery), up = gCodePickerQuery.toUpperCase();
+                rows = rows.filter(r => r.code.includes(up)
+                    || fTightName(r.label).includes(q)
+                    || [...r.names].some(n => fTightName(n).includes(q)));
+            }
+            const cnt = document.getElementById('code-picker-count');
+            if (cnt) cnt.innerText = `${rows.length}개`;
+
+            if (!rows.length) {
+                box.innerHTML = `<div style="padding:30px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">찾는 번호가 없습니다.</div>`;
+                return;
+            }
+            box.innerHTML = rows.slice(0, 400).map(r => {
+                const names = [...r.names];
+                const head = r.label || names[0] || '(이름 없음)';
+                const sub = [];
+                if (names.length) sub.push(`${names.length > 1 ? `상품 ${names.length}개 · ` : ''}${names[0].slice(0, 34)}`);
+                if (r.po) sub.push(`발주 ${r.po}건${r.lastPo ? ` (최근 ${r.lastPo})` : ''}`);
+                const isF = /^F/.test(r.code), isS = /^S/.test(r.code);
+                const hue = isF ? '#a16207' : isS ? '#c2410c' : '#4338ca';
+                const bg = isF ? '#fefce8' : isS ? '#fff7ed' : '#eef2ff';
+                const bd = isF ? '#fde68a' : isS ? '#fed7aa' : '#c7d2fe';
+                return `<div onclick="pickCode('${r.code}')"
+                    style="display:flex; align-items:center; gap:9px; padding:9px 11px; border:1px solid var(--border);
+                           border-radius:9px; margin-bottom:5px; cursor:pointer; background:#fff;">
+                    <span style="flex:0 0 auto; background:${bg}; color:${hue}; border:1px solid ${bd};
+                                 padding:2px 8px; border-radius:6px; font-size:11.5px; font-weight:900;">${r.code}</span>
+                    <span style="flex:1; min-width:0;">
+                        <div style="font-size:13px; font-weight:800; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(head)}</div>
+                        ${sub.length ? `<div style="font-size:11px; font-weight:700; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(sub.join(' · '))}</div>` : ''}
+                    </span>
+                </div>`;
+            }).join('') + (rows.length > 400
+                ? `<div style="padding:10px; text-align:center; font-size:11.5px; font-weight:800; color:#cbd5e1;">앞 400개만 보입니다. 이름으로 찾으세요.</div>` : '');
+        }
+
+        function pickCode(code) {
+            gPickedCode = String(code || '').trim();
+            // 고른 번호가 F·S 면 갈래 단추도 그쪽으로 맞춰 준다
+            gCodeKind = /^[FS]/.test(gPickedCode) ? gPickedCode[0] : '';
+            closeCodePicker();
+            paintCodeKind();
+            paintProductCodeField({ productCode: gPickedCode });
+            const label = gCodeLabelOf(gPickedCode);
+            showToast(`${gPickedCode}${label ? ' · ' + label : ''} 로 저장됩니다.`);
+        }
         //  발주와 몇 건 이어져 있는지는 표에 마우스를 올리면 나온다.
         function paintProductCodeField(prod) {
             const badge = document.getElementById('product-code-badge');
             const text = document.getElementById('productCodeText');
-            if (!badge || !text) return;
+
+            // 손수 고른 번호를 지우는 ✕ 는, 고른 번호가 있을 때만 보인다
+            const clr = document.getElementById('btn-code-clear');
+            if (clr) clr.style.display = /^[PFS]\d+$/.test(String(gPickedCode || '').trim()) ? 'inline-block' : 'none';
 
             const code = String((prod && prod.productCode) || '').trim();
-            if (!/^P\d+$/.test(code)) {
-                badge.style.display = 'none';
-                text.innerText = '';
-                badge.title = '';
+            if (!/^[PFS]\d+$/.test(code)) {
+                if (badge) { badge.style.display = 'none'; badge.title = ''; }
+                if (text) text.innerText = '';
+                paintCodeLabelRow('');
                 return;
             }
 
-            badge.style.display = 'inline-flex';
-            text.innerText = code;
+            // [신규] 과일(F)·사다드림(S)은 여러 상품이 한 번호를 함께 쓰므로 무엇인지 옆에 적어 준다
+            const label = gCodeLabelOf(code);
+            if (badge) badge.style.display = 'inline-flex';
+            if (text) text.innerText = label ? `${code} · ${label}` : code;
+            paintCodeLabelRow(code);
 
             const pos = purchaseOrders.concat(purchaseArchive).filter(p => String(p.productCode || '').trim() === code);
             const days = pos.map(p => String(p.date || '')).filter(fIsPurchaseDate).sort();
-            badge.title = pos.length
+            // 발주가 몇 건 걸려 있는지는 번호 칸에 마우스를 올리면 나온다 (옛 뱃지는 없어졌다)
+            const tipTxt = (label ? `${label}\n` : '') + (pos.length
                 ? `식별번호 ${code} · 발주 ${pos.length}건과 이어져 있습니다${days.length ? ` (최근 ${days[days.length - 1]})` : ''}.`
-                : `식별번호 ${code} · 발주 기록은 아직 없습니다.`;
+                : `식별번호 ${code} · 발주 기록은 아직 없습니다.`);
+            if (badge) badge.title = tipTxt;
+            const view = document.getElementById('productCodeView');
+            if (view) view.title = tipTxt;
+        }
+
+        /* [신규] 번호 갈래 — '' 자동(P) / 'F' 과일 / 'S' 사다드림.
+           과일·사다드림은 여러 상품이 한 번호를 함께 쓰므로, 어느 갈래에 넣을지 먼저 고르고
+           그 갈래의 번호 목록에서 고르거나 새 갈래를 만든다. */
+        let gCodeKind = '';
+
+        function gNextCodeOf(prefix) {
+            let max = 0;
+            const eat = c => { const s = String(c || '').trim();
+                if (new RegExp('^' + prefix + '[0-9]+$').test(s)) { const n = parseInt(s.slice(1), 10) || 0; if (n > max) max = n; } };
+            (Array.isArray(uploadProducts) ? uploadProducts : []).forEach(p => p && eat(p.productCode));
+            (purchaseOrders || []).forEach(po => po && eat(po.productCode));
+            (purchaseArchive || []).forEach(po => po && eat(po.productCode));
+            Object.keys(gCodeLabels || {}).forEach(eat);
+            return prefix + String(max + 1).padStart(4, '0');
+        }
+
+        function setCodeKind(kind) {
+            gCodeKind = kind || '';
+            // 갈래를 바꾸면 앞서 고른 번호는 버린다 (과일에서 사다드림으로 옮겼는데 F 번호가 남으면 안 된다)
+            if (!gCodeKind || !String(gPickedCode || '').startsWith(gCodeKind)) gPickedCode = '';
+            paintCodeKind();
+            paintProductCodeField(gPickedCode ? { productCode: gPickedCode }
+                : (uploadIsEditMode && uploadEditProductKey !== null ? uploadProducts[uploadEditProductKey] : null));
+        }
+
+        // 갈래 단추 색과 목록을 다시 그린다
+        function paintCodeKind() {
+            [['', 'ck-auto'], ['F', 'ck-F'], ['S', 'ck-S']].forEach(([k, id]) => {
+                const el = document.getElementById(id); if (!el) return;
+                const on = gCodeKind === k;
+                el.style.background = on ? '#fff' : 'transparent';
+                el.style.color = on ? '#0f172a' : '#64748b';
+                el.style.boxShadow = on ? '0 1px 3px rgba(0,0,0,.12)' : 'none';
+            });
+            const row = document.getElementById('code-kind-row');
+            const sel = document.getElementById('code-kind-select');
+            if (!row || !sel) return;
+            if (!gCodeKind) { row.style.display = 'none'; return; }
+            row.style.display = 'flex';
+
+            // 그 갈래에 이미 있는 번호들 (이름표가 붙은 것)
+            const opts = Object.entries(gCodeLabels || {})
+                .filter(([c]) => c.startsWith(gCodeKind))
+                .sort((a, b) => a[1].localeCompare(b[1], 'ko'));
+            const next = gNextCodeOf(gCodeKind);
+            sel.innerHTML = `<option value="">＋ 새 갈래 만들기 (${next})</option>`
+                + opts.map(([c, l]) => `<option value="${c}" ${gPickedCode === c ? 'selected' : ''}>${gEscapeHtml(l)} · ${c}</option>`).join('');
+        }
+
+        function pickKindCode(code) {
+            gPickedCode = String(code || '').trim();
+            paintProductCodeField(gPickedCode ? { productCode: gPickedCode } : null);
+            paintCodeKind();
+            if (!gPickedCode) {
+                const inp = document.getElementById('productCodeLabel');
+                if (inp) { inp.value = ''; inp.focus(); }
+            }
+        }
+
+        /* 번호와 이름 칸을 채운다. 이름은 과일·사다드림일 때만 고칠 수 있다. */
+        function paintCodeLabelRow(code) {
+            const view = document.getElementById('productCodeView');
+            const inp = document.getElementById('productCodeLabel');
+            const hint = document.getElementById('code-label-hint');
+            const c = String(code || '').trim();
+
+            if (view) view.value = /^[PFS]\d+$/.test(c) ? c
+                : (gCodeKind ? gNextCodeOf(gCodeKind) : '');
+            if (!inp) return;
+
+            const isFS = /^[FS]\d+$/.test(c) || !!gCodeKind;
+            inp.readOnly = !isFS;
+            inp.style.background = isFS ? '#fff' : '#f1f5f9';
+            inp.placeholder = !isFS ? '번호 이름 (과일·사다드림만)'
+                : (gCodeKind === 'S' || /^S/.test(c)) ? '예: [사다드림] 빵' : '예: [과일] 백도';
+            // 번호가 정해졌으면 그 이름표를, 새 갈래를 만드는 중이면 빈칸으로 둔다
+            if (/^[FS]\d+$/.test(c)) inp.value = gCodeLabelOf(c);
+            else inp.value = '';
+
+            if (hint) {
+                const n = /^[FS]\d+$/.test(c)
+                    ? (Array.isArray(uploadProducts) ? uploadProducts : []).filter(p => p && String(p.productCode || '').trim() === c).length : 0;
+                hint.innerText = n > 1 ? `상품 ${n}개` : '';
+            }
+        }
+
+        /* 저장할 때 이름표도 함께 넣는다. 비워 두면 이름표를 지운다. */
+        async function saveCodeLabelIfNeeded(code) {
+            const c = String(code || '').trim();
+            if (!/^[FS]\d+$/.test(c)) return;
+            const inp = document.getElementById('productCodeLabel');
+            if (!inp) return;
+            const v = String(inp.value || '').trim();
+            if (v === gCodeLabelOf(c)) return;          // 안 바뀌었으면 건드리지 않는다
+            try {
+                await fetch(`${FIREBASE_DB_URL}product_code_labels.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [c]: v || null })
+                });
+                if (v) gCodeLabels[c] = v; else delete gCodeLabels[c];
+            } catch (e) { console.error('번호 이름표 저장 실패:', e); }
         }
 
         // [신규] 상품관리에서 '발주'로 넘어온 상품. 발주가 저장되면 그때 생긴 번호를 이 상품에도 붙여 준다.
@@ -25749,7 +26597,7 @@
             //  (상품명은 손님에게 보이는 이름, 발주 상품명은 거래처에서 부르는 이름이라 대개 다르다)
             const code = String(prod.productCode || '').trim();
             const codeEl = document.getElementById('purchase-product-code');
-            if (codeEl) codeEl.value = /^P\d+$/.test(code) ? code : '';
+            if (codeEl) codeEl.value = /^[PFS]\d+$/.test(code) ? code : '';
 
             // 그 번호로 잡힌 지난 발주 중 가장 최근 것
             const past = purchaseOrders.concat(purchaseArchive)
@@ -25830,7 +26678,7 @@
             switchAdminTab('product-upload');
             exitEditMode();
 
-            pendingProductCodeFromPurchase = /^P\d+$/.test(String(po.productCode || '').trim())
+            pendingProductCodeFromPurchase = /^[PFS]\d+$/.test(String(po.productCode || '').trim())
                 ? String(po.productCode).trim() : '';
             paintProductCodeField(pendingProductCodeFromPurchase ? { productCode: pendingProductCodeFromPurchase } : null);
 
@@ -25865,7 +26713,7 @@
             await loadPurchaseArchiveIfNeeded();   // 옛 발주까지 세야 정확하다
 
             const code = String(prod.productCode || '').trim();
-            const pos = /^P\d+$/.test(code)
+            const pos = /^[PFS]\d+$/.test(code)
                 ? purchaseOrders.concat(purchaseArchive).filter(p => String(p.productCode || '').trim() === code)
                 : [];
             const days = pos.map(p => String(p.date || '')).filter(fIsPurchaseDate).sort();
@@ -25902,7 +26750,7 @@
             const prod = uploadProducts[idx];
             const code = String((prod && prod.productCode) || '').trim();
             closePurchaseChoice();
-            if (!/^P\d+$/.test(code)) { showToast("아직 발주한 적이 없는 상품입니다."); return; }
+            if (!/^[PFS]\d+$/.test(code)) { showToast("아직 발주한 적이 없는 상품입니다."); return; }
 
             await loadPurchaseArchiveIfNeeded();
             purchaseCodeFilter = code;
@@ -25993,6 +26841,25 @@
                 <div style="margin-top:6px; font-size:11px; font-weight:700; color:#94a3b8;">30일치까지 남습니다. 그 전 기록은 자동으로 지워집니다.</div>
             </div>
             <div id="order-log-body" style="overflow-y:auto; padding:10px 14px 14px; -webkit-overflow-scrolling:touch;"></div>
+        </div>
+    </div>
+
+    <!-- [신규] 식별번호 고르기 — 상품등록에서 지난 번호를 물려줄 때 쓴다 -->
+    <div id="code-picker-modal" class="no-print" style="display:none; position:fixed; z-index:10003; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.55); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;" onclick="if(event.target===this) closeCodePicker()">
+        <div style="background:#fff; border-radius:16px; width:100%; max-width:520px; max-height:84vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.25);">
+            <div style="padding:13px 16px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; gap:8px;">
+                <b style="flex:1; font-size:15px; font-weight:900; color:#0f172a;">🔖 식별번호 고르기</b>
+                <span id="code-picker-count" style="font-size:11.5px; font-weight:800; color:#94a3b8;"></span>
+                <span onclick="closeCodePicker()" style="font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+            </div>
+            <div style="padding:10px 14px; border-bottom:1px solid #f1f5f9;">
+                <input type="text" id="code-picker-search" oninput="onCodePickerSearch(this.value)" placeholder="🔍 번호·이름으로 찾기 (예: 백도, F0001)"
+                    style="width:100%; box-sizing:border-box; height:36px; padding:7px 11px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:12.5px; font-weight:700;">
+                <div style="margin-top:6px; font-size:11px; font-weight:700; color:#94a3b8; line-height:1.5;">
+                    이름만 바뀐 상품에 <b>지난 번호</b>를 물려줄 때 씁니다. 안 고르면 저장 때 새 번호가 붙습니다.
+                </div>
+            </div>
+            <div id="code-picker-list" style="overflow-y:auto; padding:10px 14px 14px; -webkit-overflow-scrolling:touch;"></div>
         </div>
     </div>
 
