@@ -2912,10 +2912,12 @@
                 
                 <!-- 하위 카테고리 탭 (발주 등록 / 발주 목록) -->
                 <div class="sub-tabs-container no-print" style="margin-bottom: 3px; padding: 0;">
-                    <div class="segment-control two-cols" style="display: grid; grid-template-columns: 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
+                    <div class="segment-control two-cols" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
                         <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-link" onclick="switchPurchaseSubTab('link')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🔗 코드 연결</div>
+                        <!-- [신규] 재고 점검 — 재고가 남은 상품을 마지막 발주와 견줘 본다 -->
+                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-check" onclick="switchPurchaseSubTab('check')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📦 재고 점검</div>
                     </div>
                 </div>
 
@@ -3141,6 +3143,11 @@
                     <div id="code-link-list"><!-- 동적 삽입 --></div>
                 </div>
 
+                <!-- 하위 섹션 4: 재고 점검 — 재고가 남은 상품과 마지막 발주를 나란히 본다 -->
+                <div id="purchase-section-check" class="purchase-sub-section" style="display: none;">
+                    <div id="stock-check-body"><!-- 동적 삽입 --></div>
+                </div>
+
             </div>
         </div>
         </div>
@@ -3172,6 +3179,14 @@
         .ms-cal-cell.empty { background:transparent; border-color:transparent; cursor:default; }
         .ms-cal-cell.has { background:#f0fdf4; border-color:#bbf7d0; }
         .ms-cal-cell.today { outline:2px solid #93c5fd; }
+        /* [신규] 펼쳐 놓은 날 — 어느 칸을 열어 둔 것인지 알아야 아래 내용과 이어 읽힌다 */
+        .ms-cal-cell.ms-cal-open { outline:2px solid #f59e0b; background:#fffbeb; border-color:#fde68a; }
+        /* [신규] 그 줄 밑에 통째로 깔리는 속내 칸. 일곱 칸을 가로질러 한 줄을 다 쓴다. */
+        .ms-cal-detail {
+            grid-column:1 / -1; margin:2px 0 5px; padding:11px 12px;
+            border:1.5px solid #fde68a; border-radius:10px; background:#fffdf5;
+            cursor:default;
+        }
         .ms-cal-day { font-weight:900; color:#334155; }
         .ms-cal-sun .ms-cal-day { color:#dc2626; }
         .ms-cal-sat .ms-cal-day { color:#2563eb; }
@@ -3387,10 +3402,12 @@
         .admin-nav-tabs .admin-nav-btn[data-tab="thumbnail-generator"] { display: none !important; }
         /* [수정] 발주관리 하위탭도 다른 박스 버튼과 같은 높이(--seg-btn-h)를 쓴다. 예전에는 36px로 못 박혀 있었다. */
         #tab-admin-purchase-history .segment-control.two-cols .purchase-sub-btn.segment-btn { height:var(--seg-btn-h) !important; padding:0 4px !important; font-size:12px !important; }
-        /* [신규] 발주관리 하위탭은 세 개(목록·등록·코드 연결)라 한 줄에 셋으로 놓는다.
+        /* [수정] 발주관리 하위탭은 네 개(목록·등록·코드 연결·재고 점검)라 한 줄에 넷으로 놓는다.
            위쪽 미디어쿼리가 .two-cols를 2칸으로 못박고 있어, 여기서 뒤에 한 번 더 덮어쓴다. */
-        #tab-admin-purchase-history .segment-control.two-cols { grid-template-columns: repeat(3, 1fr) !important; }
+        #tab-admin-purchase-history .segment-control.two-cols { grid-template-columns: repeat(4, 1fr) !important; }
         @media (max-width: 560px) {
+            /* 좁은 화면에서는 넷을 한 줄에 밀어 넣으면 글자가 깨진다. 두 줄로 나눈다. */
+            #tab-admin-purchase-history .segment-control.two-cols { grid-template-columns: repeat(2, 1fr) !important; }
             #tab-admin-purchase-history .segment-control.two-cols .purchase-sub-btn.segment-btn { font-size:11px !important; padding:10px 1px !important; }
         }
         #tab-admin-sales table th, #tab-admin-sales table td { border-bottom:1px solid #f1f5f9; }
@@ -8972,7 +8989,11 @@
             const vals = {
                 fixed: fixedMemos[baseKey] || '', order: customerMemos[memoKey] || '', print: printFixedMemos[baseKey] || ''
             };
-            _memoModal = { name, phone, orderTime, type: 'fixed', values: { ...vals }, original: { ...vals } };
+            /* [버그수정] type 을 미리 'fixed' 로 두면, 아래 setMemoType('fixed') 가
+               아직 비어 있는 입력칸을 values.fixed 에 덮어써서 불러온 고정메모가 날아갔다.
+               그 상태로 저장하면 '바뀐 것'으로 잡혀 고정메모가 지워졌다.
+               처음에는 종류를 비워 두어, 첫 setMemoType 이 담아 두기를 건너뛰게 한다. */
+            _memoModal = { name, phone, orderTime, type: '', values: { ...vals }, original: { ...vals } };
             const old = document.getElementById('memo-choice-modal'); if (old) old.remove();
             const m = document.createElement('div');
             m.id = 'memo-choice-modal'; m.className = 'summary-modal-overlay';
@@ -16988,8 +17009,8 @@
                     날짜를 누르면 그날 주문이 손님별로 여기에 펼쳐집니다.
                 </div>`;
             }
-            const g = calOverdueMode ? calOverdueGroup() : data.get(calPickedDay);
-            const label = calOverdueMode ? '⚠️ 과거 미완료' : `${fmtMD(calPickedDay)} 픽업/배달`;
+            const g = calOverdueMode ? calOverdueGroup(data.get(calPickedDay)) : data.get(calPickedDay);
+            const label = `${fmtMD(calPickedDay)} 픽업/배달` + (calOverdueMode ? ' + 지난 미완료' : '');
             if (!g || !g.rows.length) {
                 return `<div style="margin-top:12px; padding:14px; text-align:center; color:var(--text-sub); font-size:12px; border:1px solid var(--border); border-radius:10px;">
                     <b>${label}</b> — 주문이 없습니다.
@@ -17087,7 +17108,7 @@
                         : '';
                     // 인원 보기의 줄은 '상품', 물건 보기의 줄은 '손님'
                     // 미완료 모아보기에서는 며칟날 것인지 앞에 적는다
-                    const dayTag = calOverdueMode ? `<b style="color:#b91c1c; margin-right:4px;">${fmtMD(calDayOf(o))}</b>` : "";
+                    const dayTag = (calOverdueMode && calDayOf(o) !== calPickedDay) ? `<b style="color:#b91c1c; margin-right:4px;">${fmtMD(calDayOf(o))}</b>` : "";
                     const lineLabel = byKind
                         ? `${o.name || '무명'} <span style="font-size:10.5px; color:var(--text-sub); font-weight:600;">${String(o.phone || '')}</span>`
                         : `${o.item || '상품명 없음'}`;
@@ -17208,10 +17229,10 @@
                                 style="flex-shrink:0; height:22px; padding:0 7px; border:1px solid ${calPhoneSort ? '#7c3aed' : 'var(--border)'};
                                        background:${calPhoneSort ? '#f5f3ff' : '#fff'}; color:${calPhoneSort ? '#7c3aed' : '#94a3b8'};
                                        border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${calPhoneSort ? '🔢 뒷번호 ✓' : '🔢 뒷번호'}</button>`}
-                        <button type="button" onclick="calToggleOverdueMode()" title="오늘 이전에 아직 안 넘긴 것만 모아 봅니다"
+                        ${byKind ? '' : `<button type="button" onclick="calToggleOverdueMode()" title="오늘 이전에 아직 안 넘긴 것만 모아 봅니다"
                             style="flex-shrink:0; height:22px; padding:0 7px; border:1px solid ${calOverdueMode ? '#b91c1c' : (calOverdueTotal ? '#fca5a5' : 'var(--border)')};
                                    background:${calOverdueMode ? '#fef2f2' : '#fff'}; color:${calOverdueMode ? '#b91c1c' : (calOverdueTotal ? '#b91c1c' : '#94a3b8')};
-                                   border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">⚠️ 미완료 ${calOverdueTotal}</button>
+                                   border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">⚠️ 미완료 ${calOverdueTotal}</button>`}
                         ${selKeys.length ? `<button type="button" onclick="calToggleAllCards('${keysJson}')"
                             style="margin-left:auto; flex-shrink:0; height:22px; padding:0 8px; border:1px solid ${allOn ? "var(--primary)" : "var(--border)"};
                                    background:${allOn ? 'var(--primary-light)' : '#fff'}; color:${allOn ? 'var(--primary)' : '#475569'};
@@ -17268,16 +17289,27 @@
         }
 
         // 날짜 묶음(g)과 같은 모양으로 만들어, 아래 카드 그리는 쪽을 그대로 쓴다
-        function calOverdueGroup() {
-            const rows = calOverdueRows();
+        /* 고른 날 주문에 '오늘 이전 미완료'를 함께 담아 하나의 묶음으로 만든다.
+           미완료만 따로 보는 것이 아니라, 그날 것을 보면서 밀린 것도 같이 챙기라는 뜻이다.
+           같은 줄이 두 번 들어가지 않게 orderKey 로 거른다. */
+        function calOverdueGroup(dayGroup) {
+            const seen = new Set();
+            const rows = [];
+            const put = o => { if (o && o.orderKey && !seen.has(o.orderKey)) { seen.add(o.orderKey); rows.push(o); } };
+            ((dayGroup && dayGroup.rows) || []).forEach(put);
+            calOverdueRows().forEach(put);
+
             const g = { rows: rows, qty: 0, amount: 0, done: 0, todo: 0, todoQty: 0, todoAmount: 0,
                         people: new Set(), kinds: new Set() };
             rows.forEach(o => {
-                const q = parseInt(o.qty || 0) || 0;
-                g.qty += q; g.amount += calAmount(o);
+                g.amount += calAmount(o);
                 g.people.add((o.name || '무명') + '_' + String(o.phone || ''));
+                if (gIsFeeRow(o)) return;              // 배달비 줄은 물건이 아니라 개수에서 뺀다
+                const q = parseInt(o.qty || 0) || 0;
+                g.qty += q;
                 g.kinds.add(String(o.item || '').trim());
-                g.todo++; g.todoQty += q; g.todoAmount += calAmount(o);
+                if (calIsDone(o)) g.done++;
+                else { g.todo++; g.todoQty += q; g.todoAmount += calAmount(o); }
             });
             return g;
         }
@@ -17296,7 +17328,7 @@
             if (calCellMode === mode) return;
             calCellMode = mode;
             calSelected.clear(); calSelItems.clear(); calItemMode = false; calOpenCards.clear();
-            if (mode === 'kinds') calWaySort = '';
+            if (mode === 'kinds') { calWaySort = ''; calOverdueMode = false; }   // 물건 보기에서는 미완료 모아보기를 쓰지 않는다
             renderOrderCalendar();
         }
         // 수령방법 정렬 — 기본 → 픽업 먼저 → 배달 먼저 로 돌아간다
@@ -17371,7 +17403,8 @@
             /* 미완료 모아보기 중에는 날짜가 여럿이라 '그날' 로 거르지 않는다.
                대신 오늘 이전 미완료 줄 전부를 바탕으로 삼는다. */
             const base = calOverdueMode ? new Set(calOverdueRows().map(o => o.orderKey)) : null;
-            const alive = o => (base ? base.has(o.orderKey) : calDayOf(o) === day)
+            const inScope = o => base ? (base.has(o.orderKey) || calDayOf(o) === day) : (calDayOf(o) === day);
+            const alive = o => inScope(o)
                 && !isSalesCanceled(o)
                 && String(o.status || '') !== '취소'
                 && !/\[취소\]/.test(String(o.item || ''));
@@ -22237,16 +22270,304 @@
             const registerSec = document.getElementById('purchase-section-register');
             const listSec = document.getElementById('purchase-section-list');
             const linkSec = document.getElementById('purchase-section-link');
+            const checkSec = document.getElementById('purchase-section-check');
 
             if (registerSec) registerSec.style.display = subTabName === 'register' ? 'block' : 'none';
             if (listSec) listSec.style.display = subTabName === 'list' ? 'block' : 'none';
             if (linkSec) linkSec.style.display = subTabName === 'link' ? 'block' : 'none';
+            if (checkSec) checkSec.style.display = subTabName === 'check' ? 'block' : 'none';
 
             if (subTabName === 'list') {
                 renderPurchaseOrdersList();
             } else if (subTabName === 'link') {
                 renderCodeLinkCandidates();
+            } else if (subTabName === 'check') {
+                initStockCheckTab();
             }
+        }
+
+        /* ================= [신규] 재고 점검 =================
+           재고가 남은 상품을 '마지막으로 언제 시켰나'와 나란히 놓고 본다.
+           경과일만 보면 20개 들여와 20개 그대로인 것과, 6개까지 줄어든 것이
+           똑같이 보인다. 그래서 소진율을 같이 세운다. */
+
+        const SC_MERGE_DAYS = 7;     // 이 안에 이어 넣은 발주는 한 번(회차)으로 묶는다 — 나눠 적은 것이 주기를 망친다
+        let scFilter = 'warn';       // warn | dead | gap | all | out
+        let scSort = 'days';         // days | cycleAsc | cycleDesc | stock
+        let scSupplier = '';         // 매입처 좁히기 ('' = 전체)
+        let scOpen = new Set();      // 펼쳐 놓은 상품코드
+
+        function scTodayMid() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+
+        // 'YYYY-MM-DD' → 오늘까지 며칠 지났나
+        function scDaysSince(iso) {
+            const s = String(iso || '').slice(0, 10);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+            const p = s.split('-');
+            const d = new Date(+p[0], +p[1] - 1, +p[2]);
+            return Math.round((scTodayMid() - d) / 86400000);
+        }
+
+        /* 상품코드별 발주 이력을 '회차'로 묶어 돌려준다.
+           한 회차 = 며칠 안에 몰아 넣은 발주들의 합 (날짜는 그 중 마지막 날). */
+        function scRoundsByCode() {
+            const all = (purchaseOrders || []).concat(purchaseArchive || []);
+            const byCode = new Map();
+            all.forEach(po => {
+                if (!po) return;
+                const c = String(po.productCode || '').trim();
+                const d = String(po.date || '').slice(0, 10);
+                if (!c || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+                if (!byCode.has(c)) byCode.set(c, []);
+                byCode.get(c).push(po);
+            });
+
+            const out = new Map();
+            byCode.forEach((list, code) => {
+                list.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+                const rounds = [];
+                list.forEach(po => {
+                    const d = String(po.date).slice(0, 10);
+                    const units = (parseInt(po.totalUnits || 0) || 0)
+                        || ((parseInt(po.qty || 0) || 0) * (parseInt(po.itemsPerBox || 0) || 1));
+                    const last = rounds[rounds.length - 1];
+                    if (last && Math.abs(scDaysSince(last.date) - scDaysSince(d)) <= SC_MERGE_DAYS) {
+                        last.date = d;                 // 늦은 날짜로 밀어 둔다
+                        last.units += units;
+                        last.rows.push(po);
+                        if (po.supplier) last.supplier = po.supplier;
+                        if (po.unitPrice) last.unitPrice = parseInt(po.unitPrice) || last.unitPrice;
+                    } else {
+                        rounds.push({ date: d, units: units, rows: [po],
+                                      supplier: po.supplier || '', unitPrice: parseInt(po.unitPrice || 0) || 0,
+                                      itemName: po.itemName || '' });
+                    }
+                });
+                out.set(code, rounds);
+            });
+            return out;
+        }
+
+        /* 점검표 한 줄 만들기 — 상품 하나 + 그 상품의 발주 회차들 */
+        function scBuildRows() {
+            const rounds = scRoundsByCode();
+            const prods = Array.isArray(uploadProducts) ? uploadProducts : [];
+            const rows = [];
+
+            prods.forEach(p => {
+                if (!p || !p.name || p.name === '배달비') return;
+                const code = String(p.productCode || '').trim();
+                if (!code) return;
+                const hist = rounds.get(code);
+                if (!hist || !hist.length) return;              // 발주 기록이 없으면 견줄 것이 없다
+
+                const stockRaw = salesRealStock(p);
+                if (stockRaw === Infinity) return;              // 무제한은 재고 개념이 없다
+                const stock = Math.max(0, parseInt(stockRaw || 0) || 0);
+
+                const last = hist[hist.length - 1];
+                const days = scDaysSince(last.date);
+                if (days === null) return;
+
+                // 회차 사이 간격 → 평균 주기 (2회차 이상일 때만)
+                const gaps = [];
+                for (let i = 1; i < hist.length; i++) {
+                    const g = scDaysSince(hist[i - 1].date) - scDaysSince(hist[i].date);
+                    if (g > 0 && g < 400) gaps.push(g);
+                }
+                const cycle = gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null;
+
+                /* 소진율 — 마지막에 들여온 수량 대비 얼마나 나갔나.
+                   남은 재고가 들여온 수보다 많으면 셈이 맞지 않는다(앞 회차가 겹쳤거나 재고를 손으로 고쳤다).
+                   그때는 0%라고 우기지 말고 '셈이 안 맞음'으로 비워 둔다 — 안 나간 것과는 다른 이야기다. */
+                const inUnits = last.units || 0;
+                const mismatch = inUnits > 0 && stock > inUnits;
+                const soldRate = (inUnits > 0 && !mismatch) ? Math.max(0, Math.min(1, (inUnits - stock) / inUnits)) : null;
+
+                /* 급한 정도(0 예사 / 1 노랑 / 2 주황 / 3 빨강)만 속으로 매긴다.
+                   자기 주기가 있으면 그 대비 몇 배 지났는지로, 없으면 30·90·180일로 본다.
+                   배수 자체는 화면에 안 쓴다 — 눈에 안 들어와 뺐다. 색으로만 알린다. */
+                const lag = cycle ? (days / cycle) : (days / 90);
+                let level;
+                if (cycle) level = lag >= 3 ? 3 : lag >= 2 ? 2 : lag >= 1.5 ? 1 : 0;
+                else       level = days >= 180 ? 3 : days >= 90 ? 2 : days >= 30 ? 1 : 0;
+
+                const dead = (soldRate === 0) && days >= 30 && stock > 0;   // 한 달 넘게 한 개도 안 나감 (지금은 표시에만 쓴다)
+
+                rows.push({
+                    code, name: p.name, prod: p, stock,
+                    lastDate: last.date, days, cycle, lag, level, dead,
+                    inUnits, soldRate, mismatch, rounds: hist,
+                    supplier: last.supplier || '', unitPrice: last.unitPrice || 0
+                });
+            });
+            return rows;
+        }
+
+        function scLevelColor(lv) {
+            return lv >= 3 ? { bg: '#fef2f2', bd: '#fecaca', fg: '#b91c1c', dot: '🔴' }
+                 : lv === 2 ? { bg: '#fff7ed', bd: '#fed7aa', fg: '#c2410c', dot: '🟠' }
+                 : lv === 1 ? { bg: '#fefce8', bd: '#fde68a', fg: '#a16207', dot: '🟡' }
+                            : { bg: '#f8fafc', bd: '#e2e8f0', fg: '#64748b', dot: '' };
+        }
+
+        async function initStockCheckTab() {
+            const box = document.getElementById('stock-check-body');
+            if (box) box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
+            try {
+                await ensureProductsLoaded();
+                // 재고 조정값이 없으면 실재고가 틀린다. 상품을 이미 들고 있어도 조정값은 따로 챙긴다.
+                if (!uploadGlobalAdjustments || Object.keys(uploadGlobalAdjustments).length === 0) {
+                    try {
+                        const res = await fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`);
+                        if (res.ok) uploadGlobalAdjustments = (await res.json()) || {};
+                    } catch (e) { console.error('재고 조정값 로드 실패:', e); }
+                }
+                await loadPurchaseArchiveIfNeeded();   // 옛 발주까지 봐야 주기가 나온다
+            } catch (e) {
+                console.error('재고 점검 준비 실패:', e);
+            }
+            renderStockCheck();
+        }
+
+        function scSetFilter(v) { scFilter = v; renderStockCheck(); }
+        function scSetSort(v) { scSort = v; renderStockCheck(); }
+        function scSetSupplier(v) { scSupplier = v || ''; renderStockCheck(); }
+        function scToggleOpen(code) {
+            if (scOpen.has(code)) scOpen.delete(code); else scOpen.add(code);
+            renderStockCheck();
+        }
+
+        function renderStockCheck() {
+            const box = document.getElementById('stock-check-body');
+            if (!box) return;
+
+            const all = scBuildRows();
+            const inStock = all.filter(r => r.stock > 0);
+
+            const nWarn = inStock.filter(r => r.level >= 2).length;
+            const nOut = all.filter(r => r.stock <= 0).length;
+
+            // 매입처 목록
+            const sups = [...new Set(inStock.map(r => r.supplier).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+
+            let list = scFilter === 'out' ? all.filter(r => r.stock <= 0)
+                     : scFilter === 'all' ? inStock
+                     : inStock.filter(r => r.level >= 2);
+            if (scSupplier) list = list.filter(r => r.supplier === scSupplier);
+
+            const cmp = {
+                days: (a, b) => b.days - a.days,
+                cycleAsc: (a, b) => (a.cycle === null) - (b.cycle === null) || ((a.cycle || 0) - (b.cycle || 0)),
+                cycleDesc: (a, b) => (a.cycle === null) - (b.cycle === null) || ((b.cycle || 0) - (a.cycle || 0)),
+                stock: (a, b) => b.stock - a.stock
+            }[scSort] || ((a, b) => b.days - a.days);
+            list = list.slice().sort(cmp);
+
+            const fbtn = (key, label, color) => `<button type="button" onclick="scSetFilter('${key}')"
+                style="height:30px; padding:0 12px; border:1.5px solid ${scFilter === key ? (color || 'var(--primary)') : 'var(--border)'};
+                       background:${scFilter === key ? (color ? color + '18' : 'var(--primary-light)') : '#fff'};
+                       color:${scFilter === key ? (color || 'var(--primary)') : '#64748b'};
+                       border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">${label}</button>`;
+
+            const sbtn = (key, label) => `<button type="button" onclick="scSetSort('${key}')"
+                style="height:26px; padding:0 9px; border:1px solid ${scSort === key ? '#7c3aed' : 'var(--border)'};
+                       background:${scSort === key ? '#f5f3ff' : '#fff'}; color:${scSort === key ? '#7c3aed' : '#94a3b8'};
+                       border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${label}</button>`;
+
+            const head = `
+                <div class="card" style="background:#fff; border-radius:16px; padding:16px; box-shadow:var(--shadow); margin-bottom:12px; border:1px solid var(--border);">
+                    <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:6px;">📦 재고 점검</div>
+                    <div style="font-size:12.5px; font-weight:700; color:#64748b; line-height:1.6;">
+                        재고가 남은 상품을 <b>마지막 발주</b>와 견줍니다.
+                        늘 시키던 간격보다 오래 비었으면 왼쪽에 🟡 🟠 🔴 로 표시합니다.<br>
+                        <b>소진율</b>은 마지막에 들여온 수량 중 얼마나 나갔는지입니다 — <b>0%면 한 개도 안 나간 것</b>입니다.<br>
+                        재고가 들여온 수보다 많으면 막대가 <b style="color:#7c3aed;">보라색</b>으로 가득 찹니다.
+                        발주를 빠뜨렸거나 재고 숫자가 틀린 것이라, 소진율을 믿을 수 없다는 뜻입니다.
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+                        ${fbtn('warn', `⚠️ 살펴볼 것 ${nWarn}`, '#c2410c')}
+                        ${fbtn('all', `전체 ${inStock.length}`)}
+                        ${fbtn('out', `⛔ 품절 ${nOut}`, '#b91c1c')}
+                        <select onchange="scSetSupplier(this.value)"
+                            style="height:30px; padding:0 8px; border:1.5px solid var(--border); border-radius:8px;
+                                   font-size:12px; font-weight:800; color:#475569; background:#fff; cursor:pointer;">
+                            <option value="">🏢 매입처 전체</option>
+                            ${sups.map(s => `<option value="${gEscapeHtml(s)}" ${scSupplier === s ? 'selected' : ''}>${gEscapeHtml(s)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div style="display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; align-items:center;">
+                        <span style="font-size:11px; font-weight:800; color:#94a3b8;">정렬</span>
+                        ${sbtn('days', '오래된 순')}
+                        ${sbtn('cycleAsc', '주기 짧은 순')}
+                        ${sbtn('cycleDesc', '주기 긴 순')}
+                        ${sbtn('stock', '재고 많은 순')}
+                    </div>
+                </div>`;
+
+            if (!list.length) {
+                box.innerHTML = head + `<div style="padding:34px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">해당하는 상품이 없습니다.</div>`;
+                return;
+            }
+
+            const cards = list.map(r => {
+                const c = scLevelColor(r.stock > 0 ? r.level : 0);
+                const pct = r.soldRate === null ? null : Math.round(r.soldRate * 100);
+                /* 막대 — 셈이 안 맞는 것은 소진율을 낼 수 없어 비어 있었는데, 빈 칸은 '0%'처럼 보여 되레 헷갈렸다.
+                   가득 채우고 보라색을 써서, 값이 없는 것이 아니라 다른 갈래임을 알린다. */
+                const barPct = r.mismatch ? 100 : (pct === null ? 0 : pct);
+                const barColor = r.mismatch ? '#7c3aed'
+                    : pct === null ? '#cbd5e1' : pct === 0 ? '#38bdf8' : pct < 40 ? '#f59e0b' : '#10b981';
+                const rateText = r.mismatch ? `재고>입고 (${r.inUnits}개 들임)`
+                    : pct === null ? '수량 모름'
+                    : pct === 0 ? `안 나감 (${r.inUnits}개 그대로)`
+                    : `소진 ${pct}% · ${r.inUnits}개 중`;
+                const open = scOpen.has(r.code);
+
+                const histHtml = !open ? '' : `
+                    <div style="margin-top:8px; padding:8px 10px; background:#f8fafc; border:1px solid var(--border); border-radius:8px;">
+                        <div style="font-size:11px; font-weight:900; color:#475569; margin-bottom:5px;">발주 이력 (최근 ${Math.min(6, r.rounds.length)}회)</div>
+                        ${r.rounds.slice(-6).reverse().map((h, i, a) => {
+                            const prev = a[i + 1];
+                            const gap = prev ? (scDaysSince(prev.date) - scDaysSince(h.date)) : null;
+                            return `<div style="display:flex; gap:8px; font-size:11.5px; font-weight:700; color:#334155; padding:2px 0;">
+                                <span style="min-width:78px;">${h.date}</span>
+                                <span style="min-width:52px; text-align:right;">${h.units.toLocaleString()}개</span>
+                                <span style="color:#94a3b8;">${h.supplier ? gEscapeHtml(h.supplier) : ''}</span>
+                                <span style="margin-left:auto; color:#94a3b8;">${gap ? `+${gap}일` : ''}</span>
+                            </div>`;
+                        }).join('')}
+                    </div>`;
+
+                return `
+                <div style="background:${c.bg}; border:1px solid ${c.bd}; border-left:4px solid ${c.fg};
+                            border-radius:10px; padding:10px 12px; margin-bottom:6px; cursor:pointer;"
+                     onclick="scToggleOpen('${r.code}')">
+                    <div style="display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;">
+                        <b style="font-size:13.5px; color:#0f172a; flex:1 1 200px; min-width:0;">${c.dot} ${gEscapeHtml(r.name)}</b>
+                        <span style="font-size:12px; font-weight:900; color:${r.stock > 0 ? '#0f172a' : '#b91c1c'};">재고 ${r.stock}개</span>
+                        <span style="font-size:12px; font-weight:900; color:${c.fg}; background:#fff;
+                                     border:1px solid ${c.bd}; border-radius:6px; padding:1px 7px;">${r.days}일 전</span>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:6px;
+                                font-size:11.5px; font-weight:700; color:#64748b;">
+                        <span>📅 ${r.lastDate}</span>
+                        <span>🔁 주기 ${r.cycle ? `${r.cycle}일` : '<span style="color:#cbd5e1;">모름</span>'} <span style="color:#cbd5e1;">(${r.rounds.length}회)</span></span>
+                        ${r.supplier ? `<span>🏢 ${gEscapeHtml(r.supplier)}</span>` : ''}
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+                        <div style="flex:1; height:7px; background:#e2e8f0; border-radius:99px; overflow:hidden; min-width:80px;">
+                            <div style="height:100%; width:${barPct}%; background:${barColor};"></div>
+                        </div>
+                        <span style="font-size:11.5px; font-weight:900; color:${barColor}; min-width:110px; text-align:right;">${rateText}</span>
+                    </div>
+                    ${histHtml}
+                </div>`;
+            }).join('');
+
+            box.innerHTML = head
+                + `<div style="font-size:11.5px; font-weight:800; color:#94a3b8; margin:0 2px 6px;">${list.length}개 · 눌러서 발주 이력 보기</div>`
+                + cards;
         }
 
         /* ---------------- [신규] 상품 ↔ 발주 식별번호 연결 후보 ---------------- */
@@ -23499,19 +23820,12 @@
             renderManualSaleCalendar();
         }
 
-        /* [수정] ‹ › 는 보고 있는 화면에 맞춰 움직인다.
-           예전에는 늘 달을 넘겨서, 하루 내역(8월 6일)을 보는 중에 눌러도 날짜가 그대로였다.
-             · 달력 보는 중  -> 지난달 / 다음달
-             · 하루 내역 보는 중 -> 전날 / 다음날 (달을 넘어가면 달력의 달도 따라간다) */
+        /* [수정] ‹ › 는 늘 달을 넘긴다.
+           속내가 달력 안에서 펼쳐지게 바뀌어, 화면이 '하루 보기'로 갈리는 일이 없어졌다.
+           달을 넘기면 펼쳐 둔 날은 접는다 (다른 달의 날을 열어 둔 채로 두면 어긋난다). */
         function msCalMove(delta) {
-            if (!msCalDetailDay) return moveManualSaleCalendar(delta);
-
-            const [y, m, d] = msCalDetailDay.split('-').map(n => parseInt(n));
-            const nd = new Date(y, m - 1, d + delta);
-            const p2 = n => String(n).padStart(2, '0');
-            msCalDetailDay = `${nd.getFullYear()}-${p2(nd.getMonth() + 1)}-${p2(nd.getDate())}`;
-            msCalMonth = msCalDetailDay.slice(0, 7);
-            renderManualSaleCalendar();
+            msCalDetailDay = '';
+            moveManualSaleCalendar(delta);
         }
 
         // 달력의 날짜 칸을 누르면 그 날짜를 입력칸에 올려 고쳐 넣게 한다
@@ -23590,20 +23904,19 @@
                 .filter(e => e.kind && String(e.date || '') === day);
         }
 
-        function openMsDayDetail(day) { msCalDetailDay = day; renderManualSaleCalendar(); }
+        /* [수정] 같은 날을 다시 누르면 접는다. 화면이 통째로 바뀌지 않고 그 줄 밑에서 열리므로,
+           닫는 길이 단추 하나뿐이면 답답하다. */
+        function openMsDayDetail(day) {
+            msCalDetailDay = (msCalDetailDay === day) ? '' : day;
+            renderManualSaleCalendar();
+        }
         function backToMsCalendar() { msCalDetailDay = ''; renderManualSaleCalendar(); }
 
-        function renderManualSaleCalendar() {
-            const box = document.getElementById('ms-cal-body');
-            const title = document.getElementById('ms-cal-title');
-            const legend = document.getElementById('ms-cal-legend');
-            if (!box) return;
-
-            // ── 하루 속내 보기 ──
-            if (msCalDetailDay) {
-                if (title) title.innerText = gMsDateLabel(msCalDetailDay);
-                if (legend) legend.style.display = 'none';
-                const day = msCalDetailDay;
+        /* [수정] 하루 속내를 '한 덩어리 HTML'로만 만들어 돌려준다.
+           예전에는 여기서 곧바로 화면을 통째로 갈아 끼웠는데, 이제는 달력을 그대로 둔 채
+           그 날짜가 든 줄 바로 밑에 끼워 넣는다. 그래야 달력을 보면서 속내를 볼 수 있다. */
+        function msDayDetailHtml(day) {
+            {
                 const sale = manualSales[day] || {};
                 const pos = parseInt(sale.pos) || 0, tr = parseInt(sale.transfer) || 0;
                 const entries = gManualEntriesOf(day);
@@ -23622,7 +23935,12 @@
                         ${btn || ''}
                     </div>`;
 
-                let html = `<button type="button" onclick="backToMsCalendar()" style="margin-bottom:10px; padding:6px 12px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">‹ 달력으로</button>`;
+                /* 펼친 자리의 머리 — 무슨 날인지와 접는 단추. 달력이 위에 그대로 있으니 '달력으로'는 필요 없다. */
+                let html = `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <b style="flex:1; font-size:13px; font-weight:900; color:#0f172a;">${gMsDateLabel(day)}</b>
+                        <span onclick="event.stopPropagation(); backToMsCalendar();" title="접기"
+                            style="flex:0 0 auto; font-size:20px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+                    </div>`;
 
                 if (pos || tr) {
                     html += `<div style="font-size:11.5px; font-weight:800; color:#0284c7; margin:4px 0 6px;">💰 매출</div>`;
@@ -23658,14 +23976,20 @@
                 }
 
                 if (!pos && !tr && !entries.length && !pos_orders.length) {
-                    html += `<div style="padding:20px 0; text-align:center; font-size:12.5px; font-weight:700; color:#cbd5e1;">이 날 적어 둔 것이 없습니다.</div>`;
+                    html += `<div style="padding:14px 0; text-align:center; font-size:12.5px; font-weight:700; color:#cbd5e1;">이 날 적어 둔 것이 없습니다.</div>`;
                 }
 
-                box.innerHTML = html;
-                return;
+                return html;
             }
+        }
 
-            // ── 달력 보기 ──
+        function renderManualSaleCalendar() {
+            const box = document.getElementById('ms-cal-body');
+            const title = document.getElementById('ms-cal-title');
+            const legend = document.getElementById('ms-cal-legend');
+            if (!box) return;
+
+            // ── 달력 보기 (하루 속내는 그 날짜가 든 줄 밑에 끼워 넣는다) ──
             if (legend) legend.style.display = '';
             if (title) title.innerText = msCalMonth.replace('-', '년 ') + '월';
 
@@ -23694,6 +24018,12 @@
             // 발주도 날짜별로 미리 모아 둔다 (매입에 함께 센다)
             const poByDay = gPurchaseByDay(msCalMonth);
 
+            /* 펼쳐 놓은 하루가 이 달에 있으면, 그 날짜가 몇 번째 줄인지 미리 셈해 둔다.
+               그 줄 마지막 칸(토요일, 또는 달의 마지막 날) 뒤에 속내를 통째로 끼워 넣는다. */
+            const openDay = (msCalDetailDay && msCalDetailDay.slice(0, 7) === msCalMonth)
+                ? parseInt(msCalDetailDay.slice(8), 10) : 0;
+            const openWeek = openDay ? Math.floor((lead + openDay - 1) / 7) : -1;
+
             let sumPos = 0, sumTr = 0, sumBuy = 0, sumExp = 0, days = 0;
             for (let d = 1; d <= lastDay; d++) {
                 const key = `${msCalMonth}-${String(d).padStart(2, '0')}`;
@@ -23708,6 +24038,7 @@
                 if (has) { sumPos += pos; sumTr += tr; sumBuy += buySum; sumExp += eb.exp; days++; }
                 const dow = (lead + d - 1) % 7;
                 const cls = `ms-cal-cell${has ? ' has' : ''}${key === todayISO ? ' today' : ''}`
+                    + (d === openDay ? ' ms-cal-open' : '')
                     + (dow === 0 ? ' ms-cal-sun' : dow === 6 ? ' ms-cal-sat' : '');
                 // 금액이 있는 날은 속내 보기로, 빈 날은 그대로 그 날짜를 적으러 간다
                 const click = has ? `openMsDayDetail('${key}')` : `pickManualSaleDay('${key}')`;
@@ -23718,6 +24049,11 @@
                     + (buySum ? `<div style="color:#d97706;">${gShortWon(buySum)}</div>` : '')
                     + (eb.exp ? `<div style="color:#dc2626;">${gShortWon(eb.exp)}</div>` : '')
                     + `</div>`;
+
+                // 이 줄이 끝나는 자리(토요일 또는 달의 마지막 날)에서 속내를 펼친다
+                if (openDay && Math.floor((lead + d - 1) / 7) === openWeek && (dow === 6 || d === lastDay)) {
+                    html += `<div class="ms-cal-detail">${msDayDetailHtml(msCalDetailDay)}</div>`;
+                }
             }
             html += `</div>`;
 
