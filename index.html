@@ -4003,6 +4003,7 @@
                 processOrdersSnapshot(data);
                 setTimeout(() => { try { cleanupOrderLogs(); } catch (e) {} }, 4000);   // [신규] 30일 지난 변경 기록 정리 (하루 한 번)
                 setTimeout(() => { try { cleanupProductLogs(); } catch (e) {} }, 6000); // [신규] 상품 변경 기록도 같은 주기로 정리
+                setTimeout(() => { try { cleanupCustomerLogs(); } catch (e) {} }, 8000); // [신규] 손님 정보 변경 기록도 30일치만
                 
             } catch (e) {
                 console.error(e);
@@ -7133,8 +7134,6 @@
                 }
                 if (old.length) console.log(`[변경 기록] ${old.length}일치 정리`);
             } catch (e) { console.warn('변경 기록 정리 실패:', e); }
-            // 손님 정보 기록도 같은 잣대로 함께 정리한다
-            cleanupCustomerLogs();
         }
 
         /* [신규] 손님 정보 변경 기록(customer_logs)도 30일치만 남긴다.
@@ -13285,11 +13284,16 @@
         }
 
         /* ================= [신규] 손님 관리 =================
-           손님 정보가 지금까지 주문 줄에만 흩어져 있어, 이름이 둘인 손님이 서른 명이나 됐다.
-           여기서는 손님 하나를 한 줄로 모아 본다.
-             · 연락처·주소는 customers 를 먼저 보고, 없으면 가장 최근 주문에서 뽑는다
-             · 주문 실적(횟수·금액·마지막 주문)은 주문 줄에서 센다
-           주문 줄은 여기서 손대지 않는다. */
+           손님 명부는 이제 '손님 정보(customers)'가 본이다. 주문 줄이 아니다.
+           주문에서 긁어 모으던 때는 이름이 둘인 손님이 서른 명이나 됐고,
+           가입만 하고 아직 안 시킨 손님은 아예 보이지도 않았다.
+
+             · 명부(누가 있나) — customers 를 그대로 쓴다
+             · 이름·주소·현관비번·성별·연령대·환불계좌 — customers 값이 곧 참값이다
+             · 주문 실적(횟수·금액·마지막 주문·배달/픽업) — 주문 줄에서 센다
+             · customers 에 없는데 주문에만 있는 번호는 '주문에만 있음'으로 따로 붙인다
+
+           주문 줄은 여기서 손대지 않는다. 주문에 찍힌 주소는 '그때 그리로 보냈다'는 기록이다. */
 
         let caRows = null;          // 셈해 둔 손님 목록
         let caQuery = '';
@@ -13311,16 +13315,22 @@
         function caBuild() {
             if (caRows) return caRows;
             const saved = window.__caSaved || {};
-            const src = (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : (rawOrders || []));
             const m = new Map();
+
+            // 1) 명부 — 손님 정보에 있는 번호를 먼저 다 깐다. 주문이 하나도 없어도 명부에는 있어야 한다.
+            Object.keys(saved).forEach(k => {
+                const key = String(k).replace(/\D/g, '');
+                if (!key) return;
+                m.set(key, { phone: key, names: new Map(), rows: [], last: '', first: 0, s: saved[k] || null });
+            });
+
+            // 2) 주문 실적 — 명부에 붙인다. 명부에 없는 번호는 '주문에만 있음'으로 새로 만든다.
+            const src = (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : (rawOrders || []));
             src.forEach(o => {
                 if (!o) return;
                 const key = String(o.firebasePhoneKey || o.phone || '').replace(/\D/g, '');
                 if (!key) return;
-                if (!m.has(key)) m.set(key, {
-                    phone: key, names: new Map(), rows: [],
-                    addr: '', addrDetail: '', entrance: '', road: '', realName: '', last: '', first: 0
-                });
+                if (!m.has(key)) m.set(key, { phone: key, names: new Map(), rows: [], last: '', first: 0, s: null });
                 const v = m.get(key);
                 v.rows.push(o);
                 const nm = String(o.name || '').trim();
@@ -13332,21 +13342,20 @@
                 if (d0 && d0.getFullYear() > 2020) { const t0 = d0.getTime(); if (!v.first || t0 < v.first) v.first = t0; }
             });
 
-            /* [버그수정] 목록을 주문에서만 만들다 보니, 가입만 하고 아직 안 시킨 손님이 안 보였다.
-               손님 정보(customers)에만 있는 번호도 빈 줄로 넣어 준다. */
-            Object.keys(saved).forEach(k => {
-                const key = String(k).replace(/\D/g, '');
-                if (!key || m.has(key)) return;
-                m.set(key, { phone: key, names: new Map(), rows: [], last: '', first: 0 });
-            });
-
             const today = new Date(); today.setHours(0, 0, 0, 0);
             const out = [];
             m.forEach(v => {
-                // 주문 줄에서 가장 최근에 적힌 값 (저장된 정보가 없을 때 쓴다)
+                const s = v.s;
+                /* 손님 정보가 본이다. 거기 값이 있으면 그걸 쓴다.
+                   비어 있을 때만 주문 줄에 적힌 값을 빌려 온다 — 이건 어디까지나 임시로 메우는 것이라
+                   따로 표시해 두었다가 카드에 옅은 글씨로 알려 준다. */
                 const recent = v.rows.slice().sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
                 const pick = f => { const h = recent.find(o => String(o[f] || '').trim()); return h ? String(h[f]).trim() : ''; };
-                const s = saved[v.phone] || null;
+                const has = f => !!String((s && s[f]) || '').trim();
+                const take = (f, orderField) => {
+                    const mine = String((s && s[f]) || '').trim();
+                    return mine || pick(orderField || f);
+                };
 
                 const nameFromOrders = [...v.names.entries()].sort((a, b) => b[1] - a[1])[0];
                 const paid = v.rows.filter(o => !gIsFeeRow(o) && !isSalesCanceled(o));
@@ -13357,18 +13366,21 @@
                 const idle = lastD ? Math.round((today - new Date(lastD.getFullYear(), lastD.getMonth(), lastD.getDate())) / 86400000) : null;
                 const wayDel = v.rows.filter(o => String(o.shippingMethod || '').includes('배달')).length;
 
+                const addr = take('address');
                 out.push({
                     phone: v.phone,
-                    name: (s && s.name) || (nameFromOrders ? nameFromOrders[0] : '무명'),
+                    name: String((s && s.name) || '').trim() || (nameFromOrders ? nameFromOrders[0] : '무명'),
                     nameCount: v.names.size,
-                    realName: (s && s.realName) || pick('kakaoRealName'),
-                    address: (s && s.address) || pick('address'),
-                    addressDetail: (s && s.addressDetail) || pick('addressDetail'),
-                    entrance: (s && s.entrance) || pick('entrance'),
-                    gender: (s && s.gender) || pick('gender'),
-                    ageGroup: (s && s.ageGroup) || pick('ageGroup'),
-                    refundAccount: (s && s.refundAccount) || '',
+                    realName: take('realName', 'kakaoRealName'),
+                    address: addr,
+                    addressDetail: take('addressDetail'),
+                    entrance: take('entrance'),
+                    gender: take('gender'),
+                    ageGroup: take('ageGroup'),
+                    refundAccount: String((s && s.refundAccount) || '').trim(),
                     saved: !!s,
+                    /* 손님 정보에는 없고 주문에서 빌려 온 칸이 있나 — 카드에 알려 주려고 센다 */
+                    borrowed: !!s && ['name', 'address', 'entrance', 'realName'].some(f => !has(f) && !!pick(f === 'realName' ? 'kakaoRealName' : f)),
                     savedAt: s && s.updatedAt ? s.updatedAt : 0,
                     /* 가입한 때 — 손님이 주문서에서 정보를 저장한 그때(createdAt)를 먼저 쓰고,
                        그게 없는 옛 손님은 첫 주문일을 가입일로 친다. */
@@ -13377,7 +13389,8 @@
                     lastChange: (s && s.lastChange) ? s.lastChange : null,   // 마지막으로 무엇을 바꿨나
                     orders: days.size, qty: paid.reduce((a, o) => a + (parseInt(o.qty || 0) || 0), 0),
                     amt, last: v.last, idle,
-                    way: wayDel > v.rows.length / 2 ? '배달' : '픽업'
+                    /* 주문이 하나도 없는 새 손님은 주소가 있으면 배달, 없으면 픽업으로 본다 */
+                    way: v.rows.length ? (wayDel > v.rows.length / 2 ? '배달' : '픽업') : (addr ? '배달' : '픽업')
                 });
             });
             caRows = out;
@@ -13458,7 +13471,7 @@
                     <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
                         <b style="font-size:14px; font-weight:900; color:#0f172a;">👤 손님 관리</b>
                         <span style="font-size:11.5px; font-weight:700; color:#94a3b8;">
-                            손님 ${all.length}명 · 정보 저장됨 ${nSaved}명 · 이름이 여럿인 손님 ${nDup}명
+                            손님 정보 ${nSaved}명 · 주문에만 있는 번호 ${all.length - nSaved}명 · 이름이 여럿인 손님 ${nDup}명
                         </span>
                     </div>
                     <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center;">
@@ -13468,7 +13481,7 @@
                         ${fbtn('new30', `🆕 새 손님 ${nNew30}`, '#7c3aed')}
                         ${fbtn('changed', `✏️ 고침 ${nChanged}`, '#0369a1')}
                         ${fbtn('idle60', `💤 두 달 넘게 ${nIdle}`, '#a16207')}
-                        ${fbtn('nosaved', `저장 안 됨 ${all.length - nSaved}`, '#64748b')}
+                        ${fbtn('nosaved', `📋 주문에만 ${all.length - nSaved}`, '#c2410c')}
                         <select onchange="caSetSort(this.value)"
                             style="height:30px; padding:0 6px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800; color:#475569; background:#fff; cursor:pointer;">
                             ${[['amt','많이 산 순'],['cnt','자주 온 순'],['joined','새로 온 순'],['changed','최근 고친 순'],['recent','최근 주문 순'],['idle','오래된 순'],['name','이름 순']]
@@ -13477,6 +13490,9 @@
                         <input type="text" value="${gEscapeHtml(caQuery)}" oninput="caSetQuery(this.value)" placeholder="🔍 이름·번호·주소"
                             style="flex:1 1 130px; min-width:110px; height:30px; padding:0 10px; border:1.5px solid #cbd5e1;
                                    border-radius:8px; font-size:12px; font-weight:700; box-sizing:border-box;">
+                        <button type="button" onclick="initCustomerAdmin()" title="손님 정보를 서버에서 다시 받아 옵니다"
+                            style="height:30px; width:34px; border:1.5px solid #cbd5e1; background:#fff; color:#64748b;
+                                   border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">🔄</button>
                     </div>
                 </div>`;
 
@@ -13511,10 +13527,11 @@
                         ${r.lastChange ? `<span style="margin-left:auto; color:#0369a1;"
                             title="${gEscapeHtml(String(r.lastChange.from || '(빈칸)'))} → ${gEscapeHtml(String(r.lastChange.to || '(빈칸)'))}">✏️ ${gEscapeHtml(String(r.lastChange.date || ''))} ${gEscapeHtml(String(r.lastChange.what || ''))} 고침</span>` : ''}
                     </div>
-                    ${r.refundAccount || r.nameCount > 1 || !r.saved ? `<div class="ca-r2" style="color:#cbd5e1;">
+                    ${r.refundAccount || r.nameCount > 1 || !r.saved || r.borrowed ? `<div class="ca-r2" style="color:#cbd5e1;">
                         ${r.refundAccount ? `<span style="color:#7c3aed; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="환불계좌">💳 ${gEscapeHtml(r.refundAccount)}</span>` : ''}
                         ${r.nameCount > 1 ? `<span style="color:#c2410c;">⚠️ 이름 ${r.nameCount}가지</span>` : ''}
-                        ${!r.saved ? `<span>정보 저장 안 됨 (주문에서 뽑음)</span>` : ''}
+                        ${!r.saved ? `<span style="color:#c2410c;">📋 손님 정보 없음 · 주문에서 뽑은 값</span>` : ''}
+                        ${r.borrowed ? `<span title="손님 정보에 비어 있어 주문에 적힌 값을 빌려 왔습니다">빈칸은 주문에서 빌려 옴</span>` : ''}
                     </div>` : ''}
                 </div>`;
             }).join('');
