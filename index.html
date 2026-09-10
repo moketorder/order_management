@@ -806,6 +806,9 @@
         .contact-mini-btn.call:hover { background: #d1fae5; }
         .contact-mini-btn.sms { border: 1.5px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; }
         .contact-mini-btn.sms:hover { background: #dbeafe; }
+        /* [신규] 손님 정보 고치기 — 전화·문자와 나란히 두되 색으로 구분한다 */
+        .contact-mini-btn.edit { border: 1.5px solid #c7d2fe; background: #eef2ff; color: #4338ca; }
+        .contact-mini-btn.edit:hover { background: #e0e7ff; }
 
         .kakao-badge {
             background: #fee500;
@@ -2618,36 +2621,30 @@
                                 <!-- [수정] 식별번호는 발주와 이어 주는 참고값일 뿐인데 한 줄을 통째로 차지하고 있었다.
                                      상품명 라벨 오른쪽 끝에 작은 표로 붙여 자리를 안 먹게 한다.
                                      번호가 아직 없는 상품(발주 전)에서는 아예 보이지 않는다. -->
-                                <!-- [수정] 식별번호 자리를 발주등록과 같은 모양으로 맞췄다.
-                                     갈래(자동·과일·사다드림)를 고르고, 번호와 그 이름을 옆에서 바로 본다. -->
+                                <!-- [수정] 갈래(자동·과일·사다드림) 나누기를 걷어냈다.
+                                     대신 식별번호에 붙는 이름을 여기서 바로 고친다. 이름은 번호 하나에 하나뿐이라,
+                                     고치면 그 번호를 쓰는 다른 상품과 지난 주문까지 한꺼번에 같은 이름이 된다. -->
                                 <label style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
                                     <span>상품명</span>
                                     <span style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                        <span style="display:inline-flex; gap:2px; background:#e2e8f0; padding:2px; border-radius:8px;">
-                                            <button type="button" id="ck-auto" onclick="setCodeKind('')"   style="padding:2px 10px; border:none; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">자동</button>
-                                            <button type="button" id="ck-F"    onclick="setCodeKind('F')"  style="padding:2px 10px; border:none; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">🍎 과일</button>
-                                            <button type="button" id="ck-S"    onclick="setCodeKind('S')"  style="padding:2px 10px; border:none; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">🛒 사다드림</button>
-                                        </span>
                                         <button type="button" onclick="openCodePicker()" title="쓰던 번호에서 고르기"
-                                            style="flex:0 0 auto; padding:2px 9px; border:1px solid #bfdbfe; background:#eff6ff; color:#2563eb; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">🔍 찾기</button>
+                                            style="flex:0 0 auto; padding:2px 9px; border:1px solid #bfdbfe; background:#eff6ff; color:#2563eb; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">🔍 번호 찾기</button>
                                         <button type="button" id="btn-code-clear" onclick="clearPickedCode()" title="번호 비우기 (저장 때 자동)"
                                             style="display:none; flex:0 0 auto; padding:2px 8px; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">✕</button>
                                     </span>
                                 </label>
 
-                                <!-- 번호와 그 이름 — 발주등록과 같은 모양. 번호는 못 고치고, 이름은 과일·사다드림일 때만 고칠 수 있다. -->
+                                <!-- 번호와 그 이름 — 발주등록과 같은 모양. 번호는 못 고치고, 이름은 고쳐서 바로 저장한다. -->
                                 <div style="display:flex; gap:6px; align-items:center; margin:6px 0 2px; flex-wrap:wrap;">
                                     <span style="flex:0 0 auto; font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
                                     <input type="text" id="productCodeView" class="form-control" placeholder="자동" readonly tabindex="-1"
                                         style="flex:0 0 92px; width:92px; height:32px; padding:5px 9px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
-                                    <input type="text" id="productCodeLabel" class="form-control" placeholder="번호 이름 (과일·사다드림만)"
-                                        style="flex:1 1 170px; min-width:140px; height:32px; padding:5px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:700; box-sizing:border-box;">
+                                    <input type="text" id="productCodeLabel" class="form-control" placeholder="식별번호 이름"
+                                        style="flex:1 1 160px; min-width:130px; height:32px; padding:5px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:700; box-sizing:border-box;">
+                                    <button type="button" id="btn-code-label-save" onclick="applyCodeLabel('productCodeView','productCodeLabel')"
+                                        title="이 번호를 쓰는 상품과 지난 주문에 모두 같은 이름이 붙습니다"
+                                        style="flex:0 0 auto; padding:0 11px; height:32px; border:1px solid #a7f3d0; background:#ecfdf5; color:#047857; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer; white-space:nowrap;">✔ 이름 저장</button>
                                     <span id="code-label-hint" style="flex:0 0 auto; font-size:11px; font-weight:700; color:#cbd5e1; white-space:nowrap;"></span>
-                                </div>
-                                <!-- 갈래를 고르면 그 갈래의 번호 목록이 여기 뜬다 -->
-                                <div id="code-kind-row" style="display:none; gap:6px; align-items:center; margin:0 0 4px; flex-wrap:wrap;">
-                                    <select id="code-kind-select" onchange="pickKindCode(this.value)"
-                                        style="flex:1 1 220px; min-width:180px; height:32px; padding:0 8px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:800; color:#475569; background:#fff; cursor:pointer;"></select>
                                 </div>
                                 <!-- [수정] 상품명 칸이 버튼 두 개에 밀려 모바일에서 너무 좁았다.
                                      이름칸은 한 줄을 다 쓰고, 버튼 두 개는 아랫줄에 반반으로 놓는다. -->
@@ -3000,10 +2997,13 @@
                                         <span style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                             <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
                                             <input type="text" id="purchase-product-code" class="form-control" placeholder="자동" readonly tabindex="-1" style="flex:0 0 100px; width:100px; height:30px; padding:5px 9px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
-                                            <!-- [신규] 그 번호가 어느 상품과 맞물리는지 보여 주는 칸. 손으로 못 고친다.
-                                                 과일(F)·사다드림(S)은 여러 상품이 한 번호를 함께 쓰므로 이름표를, 아니면 상품명을 적는다. -->
-                                            <input type="text" id="purchase-code-name" class="form-control" placeholder="상품명" readonly tabindex="-1" title=""
-                                                style="flex:1 1 180px; min-width:150px; height:30px; padding:5px 9px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
+                                            <!-- [수정] 이름을 여기서 바로 고칠 수 있게 했다. 이름은 번호 하나에 하나뿐이라,
+                                                 고치면 그 번호를 쓰는 다른 상품과 지난 주문까지 한꺼번에 같은 이름이 된다. -->
+                                            <input type="text" id="purchase-code-name" class="form-control" placeholder="식별번호 이름" title=""
+                                                style="flex:1 1 160px; min-width:130px; height:30px; padding:5px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#fff; color:#334155;">
+                                            <button type="button" onclick="applyCodeLabel('purchase-product-code','purchase-code-name')"
+                                                title="이 번호를 쓰는 상품과 지난 주문에 모두 같은 이름이 붙습니다"
+                                                style="flex:0 0 auto; padding:0 10px; height:30px; border:1px solid #a7f3d0; background:#ecfdf5; color:#047857; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer; white-space:nowrap;">✔ 이름 저장</button>
                                         </span>
                                     </div>
                                     <!-- [수정] 브라우저 기본 자동완성 목록(datalist)을 뗐다. 글씨를 칠 때마다 목록이 떠서
@@ -3229,6 +3229,26 @@
         }
         .sp-term { flex:0 0 auto; width:92px; text-align:right; font-size:11.5px; font-weight:900; white-space:nowrap; }
         .sp-qty  { flex:0 0 auto; width:92px; text-align:right; font-size:13px; font-weight:900; color:#0f172a; white-space:nowrap; }
+
+        /* [신규] 손님 관리 목록 — 숫자 칸 폭을 못박아 위아래로 줄이 맞게 한다 */
+        .ca-card {
+            border:1px solid #e2e8f0; border-left:4px solid #cbd5e1; border-radius:9px;
+            padding:8px 11px; margin-bottom:5px; background:#fff; cursor:pointer;
+        }
+        .ca-card:hover { background:#fcfdff; border-left-color:var(--primary); }
+        .ca-r1 { display:flex; align-items:baseline; gap:8px; }
+        .ca-name { flex:1; min-width:0; font-size:13px; font-weight:800; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .ca-cnt { flex:0 0 46px; text-align:right; font-size:12px; font-weight:800; color:#64748b; }
+        .ca-amt { flex:0 0 62px; text-align:right; font-size:13px; font-weight:900; color:#0f172a; }
+        .ca-r2 {
+            display:flex; align-items:center; gap:6px; margin-top:3px;
+            font-size:11px; font-weight:700; color:#94a3b8; white-space:nowrap; min-width:0;
+        }
+        @media (max-width: 640px) {
+            .ca-cnt { flex-basis:40px; }
+            .ca-amt { flex-basis:54px; font-size:12px; }
+            .ca-r2 { flex-wrap:wrap; white-space:normal; }
+        }
         .sp-r2 {
             display:flex; align-items:center; gap:9px; margin-top:3px;
             font-size:11px; font-weight:700; color:#94a3b8; white-space:nowrap;
@@ -3500,10 +3520,16 @@
         <div class="container" id="sales-container" style="max-width: 900px; margin: 0 auto;">
 
             <!-- [수정] 자료 정리 하위 탭: 판매 통계 / 매입·매출 / 아파트 관리 -->
-            <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
+            <div class="segment-control" style="display:grid; grid-template-columns:repeat(4,1fr); background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
                 <div class="segment-btn data-sub-btn active" id="btn-data-sub-sales" onclick="switchDataSubTab('sales')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📊 판매 통계</div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-profit" onclick="switchDataSubTab('profit')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📈 매입·매출</div>
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-cust" onclick="switchDataSubTab('cust')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">👤 손님 관리</div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-apart" onclick="switchDataSubTab('apart')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🏢 아파트 관리</div>
+            </div>
+
+            <!-- [신규] 손님 관리 — 손님별 연락처·주소·주문 실적을 한 자리에서 본다 -->
+            <div id="data-sub-cust" style="display:none;">
+                <div id="cust-admin-body"><!-- 동적 삽입 --></div>
             </div>
 
             <!-- [신규] 매입·매출 — 발주(매입)와 판매(매출)를 나란히 놓고 남는 돈을 본다 -->
@@ -7107,6 +7133,29 @@
                 }
                 if (old.length) console.log(`[변경 기록] ${old.length}일치 정리`);
             } catch (e) { console.warn('변경 기록 정리 실패:', e); }
+            // 손님 정보 기록도 같은 잣대로 함께 정리한다
+            cleanupCustomerLogs();
+        }
+
+        /* [신규] 손님 정보 변경 기록(customer_logs)도 30일치만 남긴다.
+           주문 기록과 똑같은 방식이라, 지우는 날도 하루 한 번으로 맞춘다. */
+        async function cleanupCustomerLogs() {
+            try {
+                const today = gLogDayKey();
+                if (localStorage.getItem('moket_custlog_clean_day') === today) return;
+                localStorage.setItem('moket_custlog_clean_day', today);
+
+                const res = await fetch(`${FIREBASE_DB_URL}customer_logs.json?shallow=true&t=${Date.now()}`);
+                if (!res.ok) return;
+                const days = Object.keys((await res.json()) || {});
+                const cut = new Date(); cut.setDate(cut.getDate() - ORDER_LOG_KEEP_DAYS);
+                const cutKey = gLogDayKey(cut);
+                const old = days.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && d < cutKey);
+                for (const d of old) {
+                    await fetch(`${FIREBASE_DB_URL}customer_logs/${d}.json`, { method: 'DELETE' });
+                }
+                if (old.length) console.log(`[손님 기록] ${old.length}일치 정리`);
+            } catch (e) { console.warn('손님 기록 정리 실패:', e); }
         }
         /* [신규] 목록을 다시 그려도 보던 자리에 그대로 있게 한다.
            renderFilteredOrders()는 목록을 통째로 새로 만들기 때문에, 배달완료·입금완료처럼
@@ -8769,39 +8818,39 @@
             }).open();
         }
 
-        /* [신규] 손님 카드에서 주소 고치기.
-           주소는 그 날 주문 한 묶음이 아니라 손님에게 딸린 것이라, 아직 안 나간 배달 주문에
-           한꺼번에 반영한다. 이미 배달·픽업이 끝난 주문은 그때 실제로 간 주소라 손대지 않는다. */
+        /* [수정] 손님 정보 고치기.
+           예전에는 배달 주문이 있어야만 열렸다. 주소가 주문 줄에만 있던 시절의 규칙인데,
+           이제 손님 정보(customers)가 따로 있으니 픽업만 하는 손님도 고칠 수 있어야 한다.
+             · 손님 정보는 언제나 저장한다
+             · 아직 안 나간 배달 주문이 있으면 거기까지 함께 고친다 (그 주소로 나가야 하니까)
+             · 이미 끝난 주문은 그때 실제로 간 주소라 손대지 않는다 */
         function editCustomerAddressAll(phoneEnc) {
             const phone = decodeURIComponent(phoneEnc || '');
             const key = String(phone).replace(/\D/g, '');
             if (!key) return;
-            let list = (rawOrders || []).filter(o => o
+            const mine = (rawOrders || []).filter(o => o
                 && String(o.firebasePhoneKey || o.phone || '').replace(/\D/g, '') === key
-                && !(o.canceled === true || o.canceled === 'true')
-                && !gIsHandedOver(o.status)
-                && String(o.shippingMethod || '').includes('배달'));
-            /* 아직 안 나간 주문이 하나도 없으면(다 배달했으면) 가장 최근 배달 주문 하나만 고친다.
-               지난 주문 주소를 통째로 바꾸면 그때 실제로 간 곳과 달라지므로 최소한만 손댄다. */
-            let 몇건 = list.length;
-            if (!list.length) {
-                const 배달 = (rawOrders || []).filter(o => o
-                    && String(o.firebasePhoneKey || o.phone || '').replace(/\D/g, '') === key
-                    && !(o.canceled === true || o.canceled === 'true')
-                    && String(o.shippingMethod || '').includes('배달')
-                    && String(o.address || '').trim());
-                if (!배달.length) { showToast('배달 주문이 없어 고칠 주소가 없습니다.'); return; }
-                배달.sort((x, y) => String(y.timestamp || '').localeCompare(String(x.timestamp || '')));
-                list = [배달[0]];
-                몇건 = 0;   // 0이면 '가장 최근 배달 주문 1건'으로 안내한다
-            }
-            const a = list[0];
+                && !(o.canceled === true || o.canceled === 'true'));
+            // 아직 안 나간 배달 주문 — 없어도 된다 (그때는 손님 정보만 고친다)
+            const list = mine.filter(o => !gIsHandedOver(o.status) && String(o.shippingMethod || '').includes('배달'));
+
+            // 창에 미리 채울 값: 손님 정보를 먼저, 없으면 가장 최근 주문에서 뽑는다
+            const recent = mine.slice().sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+            const pick = f => { const h = recent.find(o => String(o[f] || '').trim()); return h ? String(h[f]).trim() : ''; };
+
             _pickedOrderAddr = { full: '', road: '' };
-            editCustomerAddress(a.phone, list.map(o => o.orderKey).join('|@@|'),
-                a.address || '', a.addressDetail || '', a.entrance || '', 몇건);
+            fetch(`${FIREBASE_DB_URL}customers/${key}.json?t=${Date.now()}`)
+                .then(r => r.ok ? r.json() : null).catch(() => null)
+                .then(s => {
+                    editCustomerAddress(key, list.map(o => o.orderKey).join('|@@|'),
+                        (s && s.address) || pick('address'),
+                        (s && s.addressDetail) || pick('addressDetail'),
+                        (s && s.entrance) || pick('entrance'),
+                        list.length, (s && s.refundAccount) || '');
+                });
         }
 
-        function editCustomerAddress(phone, orderKeysStr, currentAddress, currentAddressDetail, currentEntrance, howMany) {
+        function editCustomerAddress(phone, orderKeysStr, currentAddress, currentAddressDetail, currentEntrance, howMany, currentRefund) {
             const existing = document.getElementById('custom-address-edit-modal');
             if (existing) existing.remove();
 
@@ -8815,15 +8864,19 @@
 
             modal.innerHTML = `
                 <div style="background: white; padding: 20px; border-radius: 16px; width: calc(100% - 32px); max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); box-sizing: border-box; margin: 16px;">
-                    <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 800; color: #1f2937; text-align: center;">🏡 배송 주소 수정</h3>
-                    <div style="margin:0 0 14px; font-size:11.5px; font-weight:700; color:#94a3b8; text-align:center;">${howMany === undefined ? '이 주문 묶음에 반영됩니다'
-                        : (howMany > 0 ? `아직 안 나간 배달 주문 ${howMany}건에 함께 반영됩니다`
-                        : '안 나간 주문이 없어 가장 최근 배달 주문 1건만 고칩니다')}</div>
+                    <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 800; color: #1f2937; text-align: center;">👤 손님 정보 수정</h3>
+                    <div style="margin:0 0 14px; font-size:11.5px; font-weight:700; color:#94a3b8; text-align:center; line-height:1.5;">
+                        손님 정보에 저장됩니다. 이미 끝난 주문은 그때 간 주소 그대로 둡니다.<br>
+                        ${howMany > 0 ? `<b style="color:#0369a1;">아직 안 나간 배달 주문 ${howMany}건</b>에도 함께 반영됩니다`
+                                      : '<span style="color:#cbd5e1;">안 나간 배달 주문이 없어 손님 정보만 고칩니다</span>'}</div>
                     <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
                         <div>
-                            <label style="display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:4px;">주소 <span style="font-weight:600; color:#cbd5e1;">— 검색해서 고르면 도로명주소까지 함께 저장됩니다</span></label>
+                            <!-- [수정] 주소는 손으로 못 적게 했다. 띄어쓰기·오타가 하나만 달라도
+                                 아파트를 못 찾아 배달 목록에서 엉뚱한 데로 묶였다. 검색으로 고른 것만 받는다. -->
+                            <label style="display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:4px;">주소 <span style="font-weight:600; color:#cbd5e1;">— 검색으로만 고칠 수 있습니다</span></label>
                             <div style="display:flex; gap:6px;">
-                                <input type="text" id="modal-address-input" value="${(currentAddress || '').replace(/"/g, '&quot;')}" style="flex:1; min-width:0; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d1d5db; border-radius:8px; font-size:14px; font-weight:600; outline:none;">
+                                <input type="text" id="modal-address-input" readonly onclick="gSearchOrderAddress()" title="눌러서 주소 검색"
+                                    value="${(currentAddress || '').replace(/"/g, '&quot;')}" style="flex:1; min-width:0; box-sizing:border-box; padding:10px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:14px; font-weight:600; outline:none; background:#f8fafc; color:#334155; cursor:pointer;">
                                 <button type="button" onclick="gSearchOrderAddress()" style="flex:0 0 auto; padding:0 12px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap;">🔍 검색</button>
                             </div>
                         </div>
@@ -8834,6 +8887,11 @@
                         <div>
                             <label style="display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:4px;">공동현관키</label>
                             <input type="text" id="modal-entrance-input" value="${(currentEntrance || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d1d5db; border-radius:8px; font-size:14px; font-weight:600; outline:none;">
+                        </div>
+                        <!-- [신규] 환불계좌 — 손님 정보에만 담는다. 주문 줄에는 안 넣는다. -->
+                        <div>
+                            <label style="display:block; font-size:12px; font-weight:700; color:#64748b; margin-bottom:4px;">환불계좌 <span style="font-weight:600; color:#cbd5e1;">— 손님 정보에만 담깁니다</span></label>
+                            <input type="text" id="modal-refund-input" placeholder="예: 카카오뱅크 3333-00-0000000 홍길동" value="${(currentRefund || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d1d5db; border-radius:8px; font-size:14px; font-weight:600; outline:none;">
                         </div>
                     </div>
                     <div style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -8855,22 +8913,24 @@
                 const newAddress = document.getElementById('modal-address-input').value.trim();
                 const newAddressDetail = document.getElementById('modal-address-detail-input').value.trim();
                 const newEntrance = document.getElementById('modal-entrance-input').value.trim();
+                const newRefund = (document.getElementById('modal-refund-input') || {}).value || '';
                 // 검색으로 고른 주소 그대로일 때만 도로명주소를 같이 담는다 (손으로 고쳤으면 장담할 수 없다)
                 const newRoad = (_pickedOrderAddr.full && newAddress === _pickedOrderAddr.full) ? _pickedOrderAddr.road : null;
                 modal.remove();
-                await saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance, newRoad);
+                await saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance, newRoad, newRefund.trim());
             };
 
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
         }
 
         // [신규] 배송 주소 저장 (해당 고객의 이 주문 묶음 전체 항목에 동일하게 반영)
-        async function saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance, newRoad) {
+        async function saveCustomerAddress(phone, orderKeysStr, newAddress, newAddressDetail, newEntrance, newRoad, newRefund) {
             const cleanPhone = String(phone || "").replace(/\D/g, "");
             const orderKeys = (orderKeysStr || "").split("|@@|").map(k => k.trim()).filter(Boolean);
-            if (orderKeys.length === 0) return;
+            // [수정] 고칠 주문이 없어도 손님 정보는 저장한다 (픽업만 하는 손님도 고칠 수 있어야 한다)
+            if (!cleanPhone) return;
 
-            showLoader("🏡 배송 주소 저장 중...");
+            showLoader("👤 손님 정보 저장 중...");
             try {
                 const updatePayload = { address: newAddress, addressDetail: newAddressDetail, entrance: newEntrance };
                 // 검색으로 고른 주소면 도로명주소도 같이 적어 둔다 (아파트를 가리는 열쇠)
@@ -8879,6 +8939,12 @@
 
                 orderKeys.forEach(orderKey => {
                     const target = rawOrders.find(it => it.orderKey === orderKey);
+
+                    /* [버그수정] 아래에서 로컬 값을 먼저 덮어쓰는 바람에, 기록의 '바뀌기 전'에도
+                       새 값이 들어가 무엇이 어떻게 바뀌었는지 알 수 없었다. 먼저 옛 값을 챙겨 둔다. */
+                    const oldAddr = (target && target.address) || '';
+                    const oldDetail = (target && target.addressDetail) || '';
+                    const oldEnt = (target && target.entrance) || '';
 
                     // 로컬 상태 즉시 반영
                     if (target) {
@@ -8894,19 +8960,80 @@
                         ? String(target.firebasePhoneKey).trim()
                         : cleanPhone;
                     if (!actualPhoneKey) return;
-                    // [신규] 주소 변경도 기록으로 남긴다
-                    promises.push(gPatchOrder(actualPhoneKey, orderKey, updatePayload, [{
+                    /* [수정] 주소·상세주소·현관 비번을 갈래별로 나눠 기록한다.
+                       예전에는 주소 한 줄만 남아, 상세주소나 현관 비번을 고친 것은 흔적이 없었다.
+                       실제로 바뀐 것만 남긴다 (안 바뀐 값까지 적으면 기록이 지저분해진다). */
+                    const base = {
                         phone: actualPhoneKey,
                         name: (target && target.name) || "",
-                        item: (target && target.item) || "",
-                        what: "주소",
-                        from: (target && target.address) || "",
-                        to: newAddress
-                    }]));
+                        item: (target && target.item) || ""
+                    };
+                    const logs = [];
+                    if (oldAddr !== newAddress) logs.push({ ...base, what: "주소", from: oldAddr, to: newAddress });
+                    if (oldDetail !== newAddressDetail) logs.push({ ...base, what: "상세주소", from: oldDetail, to: newAddressDetail });
+                    if (oldEnt !== newEntrance) logs.push({ ...base, what: "현관비번", from: oldEnt, to: newEntrance });
+                    promises.push(gPatchOrder(actualPhoneKey, orderKey, updatePayload, logs));
                 });
 
                 await Promise.all(promises);
-                showToast("🏡 배송 주소가 저장되었습니다.");
+
+                /* [신규] 손님 정보(customers)에도 같은 값을 담고, 마지막으로 무엇을 바꿨는지 한 개 남긴다.
+                   주문 줄과 따로 두어야 다음 주문부터 새 주소가 저절로 따라온다. */
+                try {
+                    const t0 = orderKeys.length ? rawOrders.find(it => it.orderKey === orderKeys[0]) : null;
+                    const ck = String((t0 && t0.firebasePhoneKey) || cleanPhone || '').replace(/\D/g, '');
+                    if (/^01\d{8,9}$/.test(ck)) {
+                        const before = await fetch(`${FIREBASE_DB_URL}customers/${ck}.json?t=${Date.now()}`)
+                            .then(r => r.ok ? r.json() : null).catch(() => null);
+                        const now = new Date();
+                        const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                        const diffs = [];
+                        const cmp = (f, label, v) => {
+                            const o = String((before && before[f]) || '').trim();
+                            if (o !== String(v || '').trim()) diffs.push({ what: label, from: o, to: String(v || '').trim() });
+                        };
+                        cmp('address', '주소', newAddress);
+                        cmp('addressDetail', '상세주소', newAddressDetail);
+                        cmp('entrance', '현관비번', newEntrance);
+                        if (newRefund !== undefined) cmp('refundAccount', '환불계좌', newRefund);
+                        if (diffs.length) {
+                            const body = {
+                                address: newAddress, addressDetail: newAddressDetail, entrance: newEntrance,
+                                phone: ck, updatedAt: now.getTime(),
+                                lastChange: { at: now.getTime(), date: stamp, what: diffs.map(d => d.what).join('·'),
+                                              from: diffs[0].from, to: diffs[0].to, by: '가게' }
+                            };
+                            if (newRoad) body.roadAddress = newRoad;
+                            if (newRefund !== undefined) body.refundAccount = newRefund;
+                            if (!before || !before.createdAt) body.createdAt = now.getTime();
+                            await fetch(`${FIREBASE_DB_URL}customers/${ck}.json`, {
+                                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                            });
+
+                            /* [신규] 손님 정보 변경 기록 — 고칠 주문이 있든 없든 늘 남긴다.
+                               예전에는 order_logs 에만 남아, 안 나간 배달 주문이 없는 손님(픽업만 하는 손님)은
+                               고쳐도 흔적이 없었다. 30일치는 customer_logs 쪽에서 관리한다. */
+                            const custName = (before && before.name) || (t0 && t0.name) || '';
+                            const logBody = {};
+                            diffs.forEach((d, i) => {
+                                logBody[`${now.getTime()}_${ck}_${i}`] = {
+                                    at: now.getTime(),
+                                    when: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+                                    phone: ck, name: custName, who: '가게',
+                                    what: d.what, from: d.from, to: d.to
+                                };
+                            });
+                            await fetch(`${FIREBASE_DB_URL}customer_logs/${stamp}.json`, {
+                                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(logBody)
+                            });
+                        }
+                    }
+                } catch (e) { console.warn('손님 정보 저장 실패(주문은 이미 반영됨):', e); }
+
+                showToast(orderKeys.length
+                    ? `👤 손님 정보를 저장했습니다. 안 나간 주문 ${orderKeys.length}건에도 반영했습니다.`
+                    : "👤 손님 정보를 저장했습니다.");
+                caRows = null;                       // 손님 관리 목록을 다시 세게 한다
                 gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
             } catch (e) {
                 console.error(e);
@@ -10908,14 +11035,14 @@
                 </div>` : '';
             const addrHtml = (custAddr || custAddrDetail) ? `
                 <div style="margin-top:5px;">
+                    <!-- [수정] 여기 있던 '✏️ 수정'을 손님 카드의 이름 옆(전화·문자 오른쪽)으로 옮겼다.
+                         주소는 손님에게 딸린 것이라, 주소 줄보다 이름 옆이 제자리다. -->
                     <div style="display:flex; align-items:center; gap:5px;">
                         <button type="button" class="cust-addr-btn" onclick="toggleCustAddrFull(this)" title="눌러서 전체 주소 보기" style="flex:1; min-width:0;">
                             <span style="flex:0 0 auto;">🏡</span>
                             <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(custAddrShort)}</span>
                             <span data-addr-caret style="flex:0 0 auto; color:#94a3b8; font-size:9px;">▶</span>
                         </button>
-                        <button type="button" onclick="editCustomerAddressAll('${encodeURIComponent(phone)}')" title="주소 고치기"
-                            style="flex:0 0 auto; padding:4px 9px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">✏️ 수정</button>
                     </div>
                     <div id="cust-addr-full" style="display:none; margin-top:4px; font-size:11.5px; font-weight:700; color:#334155; line-height:1.5; word-break:break-all;">
                         ${gEscapeHtml(custAddr)}${custAddrDetail ? `<br>${gEscapeHtml(custAddrDetail)}` : ''}
@@ -10946,7 +11073,10 @@
                             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;">
                                 <h2 style="margin:0;"><span style="font-size:12px; vertical-align:middle;">👤</span> ${name || '고객'}</h2>
                                 ${cleanPhone ? `<a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:2px 8px; border-radius:6px;">📞 전화</a>
-                                <button type="button" onclick="copyTextAndSms(decodeURIComponent('${encodeURIComponent('[모켓] '+(name||'')+'님, 안녕하세요! 😊')}'), '${cleanPhone}', '고객 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:2px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>` : ''}
+                                <button type="button" onclick="copyTextAndSms(decodeURIComponent('${encodeURIComponent('[모켓] '+(name||'')+'님, 안녕하세요! 😊')}'), '${cleanPhone}', '고객 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:2px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>
+                                <!-- [신규] 손님 정보 고치기 — 주소 줄에 있던 것을 전화·문자 옆으로 옮겼다.
+                                     아직 안 나간 배달 주문에만 반영되고, 끝난 주문은 그때 간 주소 그대로 둔다. -->
+                                <button type="button" onclick="editCustomerAddressAll('${encodeURIComponent(phone)}')" title="주소·현관 비번 고치기" style="font-size:11px; font-weight:800; color:#4338ca; background:#fff; border:1.5px solid #4338ca; padding:2px 8px; border-radius:6px; cursor:pointer;">✏️ 수정</button>` : ''}
                             </div>
                             ${idSubHtml}
                             ${addrHtml}
@@ -13140,7 +13270,7 @@
         // ===== [신규] 자료 정리 — 하위 탭 (판매 통계 / 아파트 관리) =====
         function switchDataSubTab(which) {
             // [수정] '매입·매출'이 늘어 세 갈래가 됐다. 보일 것 하나만 켜고 나머지는 끈다.
-            const keys = ['sales', 'profit', 'apart'];
+            const keys = ['sales', 'profit', 'cust', 'apart'];
             if (!keys.includes(which)) which = 'sales';
             keys.forEach(k => {
                 const sec = document.getElementById('data-sub-' + k);
@@ -13151,6 +13281,252 @@
             // [수정] 전단지 기록은 맨 위 '🧾 전단지 기록' 단추를 눌렀을 때만 띄운다 (openFlyerModal)
             if (which === 'apart') renderApartmentAdmin();
             else if (which === 'profit') renderProfitReport();
+            else if (which === 'cust') initCustomerAdmin();
+        }
+
+        /* ================= [신규] 손님 관리 =================
+           손님 정보가 지금까지 주문 줄에만 흩어져 있어, 이름이 둘인 손님이 서른 명이나 됐다.
+           여기서는 손님 하나를 한 줄로 모아 본다.
+             · 연락처·주소는 customers 를 먼저 보고, 없으면 가장 최근 주문에서 뽑는다
+             · 주문 실적(횟수·금액·마지막 주문)은 주문 줄에서 센다
+           주문 줄은 여기서 손대지 않는다. */
+
+        let caRows = null;          // 셈해 둔 손님 목록
+        let caQuery = '';
+        let caSort = 'amt';         // amt | cnt | recent | idle | name
+        let caFilter = 'all';       // all | delivery | pickup | nosaved | idle60
+
+        async function initCustomerAdmin() {
+            const box = document.getElementById('cust-admin-body');
+            if (box) box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
+            try {
+                if (typeof loadSalesArchiveFromCache === 'function') loadSalesArchiveFromCache();
+                const res = await fetch(`${FIREBASE_DB_URL}customers.json?t=${Date.now()}`);
+                window.__caSaved = (res.ok ? (await res.json()) : null) || {};
+            } catch (e) { console.error('손님 정보 불러오기 실패:', e); window.__caSaved = {}; }
+            caRows = null;
+            renderCustomerAdmin();
+        }
+
+        function caBuild() {
+            if (caRows) return caRows;
+            const saved = window.__caSaved || {};
+            const src = (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : (rawOrders || []));
+            const m = new Map();
+            src.forEach(o => {
+                if (!o) return;
+                const key = String(o.firebasePhoneKey || o.phone || '').replace(/\D/g, '');
+                if (!key) return;
+                if (!m.has(key)) m.set(key, {
+                    phone: key, names: new Map(), rows: [],
+                    addr: '', addrDetail: '', entrance: '', road: '', realName: '', last: '', first: 0
+                });
+                const v = m.get(key);
+                v.rows.push(o);
+                const nm = String(o.name || '').trim();
+                if (nm) v.names.set(nm, (v.names.get(nm) || 0) + 1);
+                const ts = String(o.timestamp || '');
+                if (ts > v.last) v.last = ts;
+                // 첫 주문 때 — 가입일이 없는 옛 손님은 이 날을 가입일로 친다
+                const d0 = parseTimestampToDate(o.timestamp);
+                if (d0 && d0.getFullYear() > 2020) { const t0 = d0.getTime(); if (!v.first || t0 < v.first) v.first = t0; }
+            });
+
+            /* [버그수정] 목록을 주문에서만 만들다 보니, 가입만 하고 아직 안 시킨 손님이 안 보였다.
+               손님 정보(customers)에만 있는 번호도 빈 줄로 넣어 준다. */
+            Object.keys(saved).forEach(k => {
+                const key = String(k).replace(/\D/g, '');
+                if (!key || m.has(key)) return;
+                m.set(key, { phone: key, names: new Map(), rows: [], last: '', first: 0 });
+            });
+
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const out = [];
+            m.forEach(v => {
+                // 주문 줄에서 가장 최근에 적힌 값 (저장된 정보가 없을 때 쓴다)
+                const recent = v.rows.slice().sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+                const pick = f => { const h = recent.find(o => String(o[f] || '').trim()); return h ? String(h[f]).trim() : ''; };
+                const s = saved[v.phone] || null;
+
+                const nameFromOrders = [...v.names.entries()].sort((a, b) => b[1] - a[1])[0];
+                const paid = v.rows.filter(o => !gIsFeeRow(o) && !isSalesCanceled(o));
+                const amt = v.rows.filter(o => !isSalesCanceled(o))
+                    .reduce((sum, o) => sum + ((parseInt(o.total || 0) || 0) || ((parseInt(o.price || 0) || 0) * (parseInt(o.qty || 0) || 0))), 0);
+                const days = new Set(paid.map(o => { const d = parseTimestampToDate(o.timestamp); return d ? d.toDateString() : ''; }).filter(Boolean));
+                const lastD = parseTimestampToDate(v.last);
+                const idle = lastD ? Math.round((today - new Date(lastD.getFullYear(), lastD.getMonth(), lastD.getDate())) / 86400000) : null;
+                const wayDel = v.rows.filter(o => String(o.shippingMethod || '').includes('배달')).length;
+
+                out.push({
+                    phone: v.phone,
+                    name: (s && s.name) || (nameFromOrders ? nameFromOrders[0] : '무명'),
+                    nameCount: v.names.size,
+                    realName: (s && s.realName) || pick('kakaoRealName'),
+                    address: (s && s.address) || pick('address'),
+                    addressDetail: (s && s.addressDetail) || pick('addressDetail'),
+                    entrance: (s && s.entrance) || pick('entrance'),
+                    gender: (s && s.gender) || pick('gender'),
+                    ageGroup: (s && s.ageGroup) || pick('ageGroup'),
+                    refundAccount: (s && s.refundAccount) || '',
+                    saved: !!s,
+                    savedAt: s && s.updatedAt ? s.updatedAt : 0,
+                    /* 가입한 때 — 손님이 주문서에서 정보를 저장한 그때(createdAt)를 먼저 쓰고,
+                       그게 없는 옛 손님은 첫 주문일을 가입일로 친다. */
+                    joined: (s && s.createdAt) ? s.createdAt : (v.first || 0),
+                    joinedIsReal: !!(s && s.createdAt),
+                    lastChange: (s && s.lastChange) ? s.lastChange : null,   // 마지막으로 무엇을 바꿨나
+                    orders: days.size, qty: paid.reduce((a, o) => a + (parseInt(o.qty || 0) || 0), 0),
+                    amt, last: v.last, idle,
+                    way: wayDel > v.rows.length / 2 ? '배달' : '픽업'
+                });
+            });
+            caRows = out;
+            return out;
+        }
+
+        // 가입한 지 며칠 됐나 (모르면 null)
+        function caJoinDays(r) {
+            if (!r || !r.joined) return null;
+            const t = new Date(); t.setHours(0, 0, 0, 0);
+            const d = new Date(r.joined); d.setHours(0, 0, 0, 0);
+            return Math.round((t - d) / 86400000);
+        }
+        function caJoinLabel(r) {
+            if (!r || !r.joined) return '모름';
+            const d = new Date(r.joined);
+            return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        function caSetQuery(v) { caQuery = String(v || '').trim(); renderCustomerAdmin(); }
+        function caSetSort(v) { caSort = v; renderCustomerAdmin(); }
+        function caSetFilter(v) { caFilter = v; renderCustomerAdmin(); }
+
+        function renderCustomerAdmin() {
+            const box = document.getElementById('cust-admin-body');
+            if (!box) return;
+            const all = caBuild();
+
+            const nSaved = all.filter(r => r.saved).length;
+            const nDup = all.filter(r => r.nameCount > 1).length;
+            const nIdle = all.filter(r => r.idle !== null && r.idle >= 60).length;
+
+            const nNew30 = all.filter(r => { const d = caJoinDays(r); return d !== null && d <= 30; }).length;
+            const nChanged = all.filter(r => r.lastChange).length;
+
+            let list = caFilter === 'delivery' ? all.filter(r => r.way === '배달')
+                     : caFilter === 'pickup' ? all.filter(r => r.way === '픽업')
+                     : caFilter === 'nosaved' ? all.filter(r => !r.saved)
+                     : caFilter === 'idle60' ? all.filter(r => r.idle !== null && r.idle >= 60)
+                     : caFilter === 'new30' ? all.filter(r => { const d = caJoinDays(r); return d !== null && d <= 30; })
+                     : caFilter === 'changed' ? all.filter(r => r.lastChange)
+                     : all;
+            // '새로 온 손님'을 고르면 늦게 온 순, '고침'을 고르면 최근 고친 순으로 세운다
+            if (caFilter === 'new30' && caSort === 'amt') caSort = 'joined';
+            if (caFilter === 'changed' && caSort === 'amt') caSort = 'changed';
+            if (caQuery) {
+                const q = fTightName(caQuery), digits = caQuery.replace(/\D/g, '');
+                list = list.filter(r => fTightName(r.name).includes(q)
+                    || fTightName(r.realName).includes(q)
+                    || fTightName(r.address).includes(q)
+                    || fTightName(r.gender).includes(q)
+                    || fTightName(r.ageGroup).includes(q)
+                    || fTightName(r.refundAccount).includes(q)
+                    || (digits && r.phone.includes(digits)));
+            }
+            const cmp = {
+                amt: (a, b) => b.amt - a.amt,
+                cnt: (a, b) => b.orders - a.orders,
+                recent: (a, b) => String(b.last).localeCompare(String(a.last)),
+                idle: (a, b) => (b.idle ?? -1) - (a.idle ?? -1),
+                name: (a, b) => a.name.localeCompare(b.name, 'ko'),
+                joined: (a, b) => (b.joined || 0) - (a.joined || 0),    // 늦게 온 손님이 위로
+                changed: (a, b) => ((b.lastChange && b.lastChange.at) || 0) - ((a.lastChange && a.lastChange.at) || 0)
+            }[caSort] || ((a, b) => b.amt - a.amt);
+            list = list.slice().sort(cmp);
+
+            const fbtn = (k, label, color) => `<button type="button" onclick="caSetFilter('${k}')"
+                style="height:30px; padding:0 12px; border:1.5px solid ${caFilter === k ? (color || 'var(--primary)') : '#cbd5e1'};
+                       background:${caFilter === k ? (color ? color + '18' : 'var(--primary-light)') : '#fff'};
+                       color:${caFilter === k ? (color || 'var(--primary)') : '#64748b'};
+                       border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">${label}</button>`;
+
+            const won = n => n >= 10000 ? `${Math.round(n / 10000).toLocaleString()}만` : n.toLocaleString();
+            const fmtPhone = p => p.length === 11 ? `${p.slice(0,3)}-${p.slice(3,7)}-${p.slice(7)}` : p;
+
+            const head = `
+                <div class="card" style="background:#fff; border-radius:14px; padding:12px 14px; box-shadow:var(--shadow); margin-bottom:10px; border:1px solid var(--border);">
+                    <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
+                        <b style="font-size:14px; font-weight:900; color:#0f172a;">👤 손님 관리</b>
+                        <span style="font-size:11.5px; font-weight:700; color:#94a3b8;">
+                            손님 ${all.length}명 · 정보 저장됨 ${nSaved}명 · 이름이 여럿인 손님 ${nDup}명
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center;">
+                        ${fbtn('all', `전체 ${all.length}`)}
+                        ${fbtn('delivery', `🛵 배달 ${all.filter(r => r.way === '배달').length}`, '#0369a1')}
+                        ${fbtn('pickup', `🏠 픽업 ${all.filter(r => r.way === '픽업').length}`, '#047857')}
+                        ${fbtn('new30', `🆕 새 손님 ${nNew30}`, '#7c3aed')}
+                        ${fbtn('changed', `✏️ 고침 ${nChanged}`, '#0369a1')}
+                        ${fbtn('idle60', `💤 두 달 넘게 ${nIdle}`, '#a16207')}
+                        ${fbtn('nosaved', `저장 안 됨 ${all.length - nSaved}`, '#64748b')}
+                        <select onchange="caSetSort(this.value)"
+                            style="height:30px; padding:0 6px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800; color:#475569; background:#fff; cursor:pointer;">
+                            ${[['amt','많이 산 순'],['cnt','자주 온 순'],['joined','새로 온 순'],['changed','최근 고친 순'],['recent','최근 주문 순'],['idle','오래된 순'],['name','이름 순']]
+                                .map(([v,l]) => `<option value="${v}" ${caSort===v?'selected':''}>${l}</option>`).join('')}
+                        </select>
+                        <input type="text" value="${gEscapeHtml(caQuery)}" oninput="caSetQuery(this.value)" placeholder="🔍 이름·번호·주소"
+                            style="flex:1 1 130px; min-width:110px; height:30px; padding:0 10px; border:1.5px solid #cbd5e1;
+                                   border-radius:8px; font-size:12px; font-weight:700; box-sizing:border-box;">
+                    </div>
+                </div>`;
+
+            if (!list.length) {
+                box.innerHTML = head + `<div style="padding:34px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">해당하는 손님이 없습니다.</div>`;
+                return;
+            }
+
+            const cards = list.slice(0, 400).map(r => {
+                const apt = r.address ? extractApartmentName(r.address) : '';
+                const addrShort = [apt, r.addressDetail].filter(Boolean).join(' ') || r.address || '';
+                return `
+                <div class="ca-card" onclick="showCustomerCardModal('${encodeURIComponent(r.phone)}','${encodeURIComponent(r.name)}')">
+                    <div class="ca-r1">
+                        <span class="ca-name">${gEscapeHtml(r.name)}${r.realName && r.realName !== r.name ? `<span style="font-weight:700; color:#94a3b8;"> (${gEscapeHtml(r.realName)})</span>` : ''}</span>
+                        <span class="ca-cnt">${r.orders}회</span>
+                        <span class="ca-amt" title="${r.amt.toLocaleString()}원">${won(r.amt)}</span>
+                    </div>
+                    <div class="ca-r2">
+                        <span>${r.way === '배달' ? '🛵' : '🏠'}</span>
+                        <span>${fmtPhone(r.phone)}</span>
+                        ${r.gender ? `<span>· ${r.gender === '여성' ? '👩' : r.gender === '남성' ? '👨' : '👤'} ${gEscapeHtml(r.gender)}</span>` : ''}
+                        ${r.ageGroup ? `<span>· 🎂 ${gEscapeHtml(r.ageGroup)}</span>` : ''}
+                        ${addrShort ? `<span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">· ${gEscapeHtml(addrShort)}</span>` : ''}
+                        ${r.entrance ? `<span style="color:#059669;">· 🚪 ${gEscapeHtml(r.entrance)}</span>` : ''}
+                        <span style="margin-left:auto; color:${r.idle !== null && r.idle >= 60 ? '#a16207' : '#cbd5e1'};">${r.idle === null ? '' : `${r.idle}일 전`}</span>
+                    </div>
+                    <div class="ca-r2">
+                        <span title="${r.joinedIsReal ? '주문서에서 정보를 저장한 날' : '가입일이 없어 첫 주문일로 갈음합니다'}"
+                            style="color:${caJoinDays(r) !== null && caJoinDays(r) <= 30 ? '#7c3aed' : '#cbd5e1'}; font-weight:${caJoinDays(r) !== null && caJoinDays(r) <= 30 ? 900 : 700};">
+                            ${caJoinDays(r) !== null && caJoinDays(r) <= 30 ? '🆕 ' : ''}가입 ${caJoinLabel(r)}${r.joinedIsReal ? '' : ' (첫 주문)'}</span>
+                        ${r.lastChange ? `<span style="margin-left:auto; color:#0369a1;"
+                            title="${gEscapeHtml(String(r.lastChange.from || '(빈칸)'))} → ${gEscapeHtml(String(r.lastChange.to || '(빈칸)'))}">✏️ ${gEscapeHtml(String(r.lastChange.date || ''))} ${gEscapeHtml(String(r.lastChange.what || ''))} 고침</span>` : ''}
+                    </div>
+                    ${r.refundAccount || r.nameCount > 1 || !r.saved ? `<div class="ca-r2" style="color:#cbd5e1;">
+                        ${r.refundAccount ? `<span style="color:#7c3aed; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="환불계좌">💳 ${gEscapeHtml(r.refundAccount)}</span>` : ''}
+                        ${r.nameCount > 1 ? `<span style="color:#c2410c;">⚠️ 이름 ${r.nameCount}가지</span>` : ''}
+                        ${!r.saved ? `<span>정보 저장 안 됨 (주문에서 뽑음)</span>` : ''}
+                    </div>` : ''}
+                </div>`;
+            }).join('');
+
+            box.innerHTML = head
+                + `<div style="display:flex; gap:8px; align-items:baseline; font-size:11px; font-weight:800; color:#cbd5e1; margin:0 4px 5px;">
+                       <span style="flex:1;">${list.length}명 · 눌러서 손님 카드 보기</span>
+                       <span style="width:46px; text-align:right;">주문</span>
+                       <span style="width:62px; text-align:right;">구매액</span>
+                   </div>`
+                + cards
+                + (list.length > 400 ? `<div style="padding:10px; text-align:center; font-size:11.5px; font-weight:800; color:#cbd5e1;">앞 400명만 보입니다. 찾기를 써 주세요.</div>` : '');
         }
 
         // 주소 한 줄을 넣어 어떻게 인식되는지 바로 확인 (지번을 새로 알았을 때 확인용)
@@ -20785,11 +21161,10 @@
                 if (!_productCode) {
                     // 저장함까지 봐야 이미 쓰는 가장 큰 번호를 안다. 안 보면 번호가 겹칠 수 있다.
                     try { await loadPurchaseArchiveIfNeeded(); } catch (e) { console.error('발주 저장함 로드 실패:', e); }
-                    // 갈래를 골랐으면 그 갈래의 새 번호를, 아니면 여느 때처럼 P 번호를 만든다
-                    _productCode = gCodeKind ? gNextCodeOf(gCodeKind) : gNextProductCode();
+                    // 이미 쓰는 가장 큰 번호 다음으로 새 번호를 만든다
+                    _productCode = gNextProductCode();
                 }
-                // [신규] 과일·사다드림 번호라면 옆 칸에 적은 이름표도 함께 저장한다
-                await saveCodeLabelIfNeeded(_productCode);
+                // (식별번호 이름은 폼의 ✔ 이름 저장 단추로 따로 저장한다)
 
                 const productObj = {
                     name: name,
@@ -21574,7 +21949,7 @@
                 || (prod.isRecommend === undefined && /^\s*\[\s*오늘의추천\s*\]/.test(String(prod.name || '')));
             selectMainTab(tabType);
 
-            gPickedCode = ''; gCodeKind = ''; paintCodeKind();   // 다른 상품을 불러왔으니 앞서 고른 것은 버린다
+            gPickedCode = '';   // 다른 상품을 불러왔으니 앞서 고른 번호는 버린다
             paintProductCodeField(prod);   // [신규] 식별번호 칸 채우기
 
             // 말머리는 체크박스가 담당하므로 입력칸에는 순수 상품명만 보여준다
@@ -21714,7 +22089,7 @@
             document.getElementById('unlimitedStock').checked = false;
             document.getElementById('productStock').disabled = false;
             pendingProductCodeFromPurchase = '';   // 발주에서 물려받던 번호도 함께 푼다
-            gPickedCode = ''; gCodeKind = ''; paintCodeKind();   // 손수 고른 번호와 갈래도 푼다
+            gPickedCode = '';                      // 손수 고른 번호도 푼다
             paintProductCodeField(null);   // [신규] 새 상품이므로 식별번호 칸을 비운다
 
             uploadEditShelf = ''; // [신규] 선반위치 기억값 초기화
@@ -23523,7 +23898,8 @@
             /* [신규] 과일(F)·사다드림(S)은 여러 상품이 한 번호를 함께 쓴다.
                번호만 봐서는 무엇인지 모르니, 이름표를 맨 앞에 세워 준다. */
             const label = gCodeLabelOf(code);
-            // 옆 칸에는 이름표를 먼저, 없으면 그 번호를 쓰는 상품 이름을 적는다
+            /* [수정] 이 칸은 이제 고칠 수 있다. 그러니 이름표가 있으면 그것만 담는다.
+               이름표가 없을 때만 상품명을 미리 채워 둔다 (그대로 저장하면 그것이 이름표가 된다). */
             const sameCoded = (Array.isArray(uploadProducts) ? uploadProducts : [])
                 .filter(p => p && String(p.productCode || '').trim() === code).map(p => p.name);
             paintName(label || sameCoded[0] || (pos[0] && pos[0].itemName) || '',
@@ -26431,10 +26807,7 @@
 
         function pickCode(code) {
             gPickedCode = String(code || '').trim();
-            // 고른 번호가 F·S 면 갈래 단추도 그쪽으로 맞춰 준다
-            gCodeKind = /^[FS]/.test(gPickedCode) ? gPickedCode[0] : '';
             closeCodePicker();
-            paintCodeKind();
             paintProductCodeField({ productCode: gPickedCode });
             const label = gCodeLabelOf(gPickedCode);
             showToast(`${gPickedCode}${label ? ' · ' + label : ''} 로 저장됩니다.`);
@@ -26473,107 +26846,53 @@
             if (view) view.title = tipTxt;
         }
 
-        /* [신규] 번호 갈래 — '' 자동(P) / 'F' 과일 / 'S' 사다드림.
-           과일·사다드림은 여러 상품이 한 번호를 함께 쓰므로, 어느 갈래에 넣을지 먼저 고르고
-           그 갈래의 번호 목록에서 고르거나 새 갈래를 만든다. */
-        let gCodeKind = '';
-
-        function gNextCodeOf(prefix) {
-            let max = 0;
-            const eat = c => { const s = String(c || '').trim();
-                if (new RegExp('^' + prefix + '[0-9]+$').test(s)) { const n = parseInt(s.slice(1), 10) || 0; if (n > max) max = n; } };
-            (Array.isArray(uploadProducts) ? uploadProducts : []).forEach(p => p && eat(p.productCode));
-            (purchaseOrders || []).forEach(po => po && eat(po.productCode));
-            (purchaseArchive || []).forEach(po => po && eat(po.productCode));
-            Object.keys(gCodeLabels || {}).forEach(eat);
-            return prefix + String(max + 1).padStart(4, '0');
-        }
-
-        function setCodeKind(kind) {
-            gCodeKind = kind || '';
-            // 갈래를 바꾸면 앞서 고른 번호는 버린다 (과일에서 사다드림으로 옮겼는데 F 번호가 남으면 안 된다)
-            if (!gCodeKind || !String(gPickedCode || '').startsWith(gCodeKind)) gPickedCode = '';
-            paintCodeKind();
-            paintProductCodeField(gPickedCode ? { productCode: gPickedCode }
-                : (uploadIsEditMode && uploadEditProductKey !== null ? uploadProducts[uploadEditProductKey] : null));
-        }
-
-        // 갈래 단추 색과 목록을 다시 그린다
-        function paintCodeKind() {
-            [['', 'ck-auto'], ['F', 'ck-F'], ['S', 'ck-S']].forEach(([k, id]) => {
-                const el = document.getElementById(id); if (!el) return;
-                const on = gCodeKind === k;
-                el.style.background = on ? '#fff' : 'transparent';
-                el.style.color = on ? '#0f172a' : '#64748b';
-                el.style.boxShadow = on ? '0 1px 3px rgba(0,0,0,.12)' : 'none';
-            });
-            const row = document.getElementById('code-kind-row');
-            const sel = document.getElementById('code-kind-select');
-            if (!row || !sel) return;
-            if (!gCodeKind) { row.style.display = 'none'; return; }
-            row.style.display = 'flex';
-
-            // 그 갈래에 이미 있는 번호들 (이름표가 붙은 것)
-            const opts = Object.entries(gCodeLabels || {})
-                .filter(([c]) => c.startsWith(gCodeKind))
-                .sort((a, b) => a[1].localeCompare(b[1], 'ko'));
-            const next = gNextCodeOf(gCodeKind);
-            sel.innerHTML = `<option value="">＋ 새 갈래 만들기 (${next})</option>`
-                + opts.map(([c, l]) => `<option value="${c}" ${gPickedCode === c ? 'selected' : ''}>${gEscapeHtml(l)} · ${c}</option>`).join('');
-        }
-
-        function pickKindCode(code) {
-            gPickedCode = String(code || '').trim();
-            paintProductCodeField(gPickedCode ? { productCode: gPickedCode } : null);
-            paintCodeKind();
-            if (!gPickedCode) {
-                const inp = document.getElementById('productCodeLabel');
-                if (inp) { inp.value = ''; inp.focus(); }
-            }
-        }
-
-        /* 번호와 이름 칸을 채운다. 이름은 과일·사다드림일 때만 고칠 수 있다. */
+        /* 번호와 그 이름 칸을 채운다. */
         function paintCodeLabelRow(code) {
             const view = document.getElementById('productCodeView');
             const inp = document.getElementById('productCodeLabel');
             const hint = document.getElementById('code-label-hint');
             const c = String(code || '').trim();
+            const ok = /^[PFS]\d+$/.test(c);
 
-            if (view) view.value = /^[PFS]\d+$/.test(c) ? c
-                : (gCodeKind ? gNextCodeOf(gCodeKind) : '');
-            if (!inp) return;
-
-            const isFS = /^[FS]\d+$/.test(c) || !!gCodeKind;
-            inp.readOnly = !isFS;
-            inp.style.background = isFS ? '#fff' : '#f1f5f9';
-            inp.placeholder = !isFS ? '번호 이름 (과일·사다드림만)'
-                : (gCodeKind === 'S' || /^S/.test(c)) ? '예: [사다드림] 빵' : '예: [과일] 백도';
-            // 번호가 정해졌으면 그 이름표를, 새 갈래를 만드는 중이면 빈칸으로 둔다
-            if (/^[FS]\d+$/.test(c)) inp.value = gCodeLabelOf(c);
-            else inp.value = '';
-
+            if (view) view.value = ok ? c : '';
+            if (inp) inp.value = ok ? gCodeLabelOf(c) : '';
             if (hint) {
-                const n = /^[FS]\d+$/.test(c)
-                    ? (Array.isArray(uploadProducts) ? uploadProducts : []).filter(p => p && String(p.productCode || '').trim() === c).length : 0;
+                // 이 번호를 함께 쓰는 상품이 몇 개인지 (이름을 고치면 그것들에 다 걸린다)
+                const n = ok ? (Array.isArray(uploadProducts) ? uploadProducts : [])
+                    .filter(p => p && String(p.productCode || '').trim() === c).length : 0;
                 hint.innerText = n > 1 ? `상품 ${n}개` : '';
             }
         }
 
-        /* 저장할 때 이름표도 함께 넣는다. 비워 두면 이름표를 지운다. */
-        async function saveCodeLabelIfNeeded(code) {
-            const c = String(code || '').trim();
-            if (!/^[FS]\d+$/.test(c)) return;
-            const inp = document.getElementById('productCodeLabel');
-            if (!inp) return;
+        /* [신규] 식별번호 이름 저장 — 상품등록·발주등록 양쪽이 함께 쓴다.
+           이름은 번호 하나에 하나뿐이라, 여기서 고치면 그 번호를 쓰는 다른 상품과
+           지난 주문 내역까지 한꺼번에 같은 이름으로 바뀐다. */
+        async function applyCodeLabel(codeElId, labelElId) {
+            const codeEl = document.getElementById(codeElId);
+            const inp = document.getElementById(labelElId);
+            if (!codeEl || !inp) return;
+            const c = String(codeEl.value || '').trim().toUpperCase();
+            if (!/^[PFS]\d+$/.test(c)) { showToast('식별번호가 없습니다. 먼저 번호를 정해 주세요.'); return; }
+
             const v = String(inp.value || '').trim();
-            if (v === gCodeLabelOf(c)) return;          // 안 바뀌었으면 건드리지 않는다
+            if (v === gCodeLabelOf(c)) { showToast('바뀐 것이 없습니다.'); return; }
             try {
-                await fetch(`${FIREBASE_DB_URL}product_code_labels.json`, {
+                const res = await fetch(`${FIREBASE_DB_URL}product_code_labels.json`, {
                     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ [c]: v || null })
                 });
+                if (!res.ok) throw new Error('저장 실패 ' + res.status);
                 if (v) gCodeLabels[c] = v; else delete gCodeLabels[c];
-            } catch (e) { console.error('번호 이름표 저장 실패:', e); }
+                // 이 번호를 함께 쓰는 상품이 몇 개인지 알려 준다 (한꺼번에 바뀌었다는 뜻)
+                const n = (Array.isArray(uploadProducts) ? uploadProducts : [])
+                    .filter(p => p && String(p.productCode || '').trim() === c).length;
+                showToast(v ? `${c} 이름을 「${v}」로 바꿨습니다${n > 1 ? ` (상품 ${n}개 함께)` : ''}.`
+                            : `${c} 이름을 지웠습니다.`);
+                if (typeof renderProductList === 'function') { try { renderProductList(); } catch (e) {} }
+            } catch (e) {
+                console.error('번호 이름 저장 실패:', e);
+                showToast('이름을 저장하지 못했습니다.');
+            }
         }
 
         // [신규] 상품관리에서 '발주'로 넘어온 상품. 발주가 저장되면 그때 생긴 번호를 이 상품에도 붙여 준다.
