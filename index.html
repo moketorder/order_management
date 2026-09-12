@@ -13019,7 +13019,9 @@
                     group: '예약판매',
                     items: [
                         { key: 'reserve', label: '공동구매', desc: '날짜별로 묶여 보이는 예약 상품' },
-                        { key: 'sada', label: '사다드림', desc: '무료배달 기준 제외 · 대행료 적용 대상' }
+                        { key: 'sada', label: '사다드림', desc: '무료배달 기준 제외 · 대행료 적용 대상' },
+                        // [신규] 철 따라 쓰는 칸. 여기로 지정한 상품이 있을 때만 주문서에 탭이 생긴다.
+                        { key: 'chuseok', label: '추석선물', desc: '추석 선물 묶음 — 지정한 상품이 있을 때만 손님 화면에 탭이 생깁니다' }
                         // [수정] '코스트코'는 고를 수 있는 목록에서 뺐다.
                         //  이미 코스트코로 지정해 둔 상품의 값(displayTab:'costco')은 건드리지 않으므로
                         //  손님 화면의 코스트코 탭은 예전처럼 동작한다.
@@ -17894,6 +17896,11 @@
                 const hasMemo = !!(String(fixedMemos[memoKeyBase] || '').trim()
                     || String(printFixedMemos[memoKeyBase] || '').trim()
                     || c.items.some(o => String(customerMemos[memoKeyBase + '_' + String(o.timestamp).replace(/\s+/g, '')] || '').trim()));
+                /* [신규] 손님이 적은 요청사항도 같은 표식으로 알린다.
+                   메모든 요청사항이든 '카드를 열어 봐야 할 것이 있다'는 뜻은 같다.
+                   표식을 둘로 나누면 눈만 바쁘다. 하나라도 있으면 📝 를 붙인다. */
+                const hasNote = c.items.some(o => String((o && o.note) || '').trim());
+                const hasAnyMemo = hasMemo || hasNote;
                 return `<div${cardClick} style="${cardStyle}${leftBar} border-radius:8px; padding:8px 10px; margin-bottom:6px;${canEdit ? ' cursor:pointer;' : ''}">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
                         <div style="font-weight:800; font-size:13px;">
@@ -17901,7 +17908,7 @@
                             <span style="font-size:11px; color:var(--text-sub); font-weight:600;">${(calPhoneSort && String(c.phone || "").length > 4) ? String(c.phone).slice(0, -4) + `<b style="color:#7c3aed; font-size:13px;">` + String(c.phone).slice(-4) + `</b>` : c.phone}</span>
                             ${overdueN ? `<span title="지난 미완료 ${overdueN}건 — 카드를 고르면 아래에 날짜가 나옵니다"
                                 style="margin-left:3px; padding:1px 6px; border-radius:20px; border:1px solid #fca5a5; background:#fef2f2; color:#b91c1c; font-size:10.5px; font-weight:800;">⚠️ 미완료 ${overdueN}건</span>` : ""}
-                            ${hasMemo ? `<span title="메모 있음 — 카드를 고르면 아래에 나옵니다" style="margin-left:3px; font-size:12px;">📝</span>` : ""}
+                            ${hasAnyMemo ? `<span title="${hasNote ? (hasMemo ? '메모·요청사항 있음' : '손님 요청사항 있음') : '메모 있음'} — 카드를 고르면 아래에 나옵니다" style="margin-left:3px; font-size:12px;">📝</span>` : ""}
                         </div>
                         <div style="font-size:12px; font-weight:900;">${c.amount.toLocaleString()}원</div>
                     </div>
