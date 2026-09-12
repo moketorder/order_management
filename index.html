@@ -11909,6 +11909,17 @@
             return `<span style="font-size:10px; font-weight:800; background:${bg}; color:${fg};`
                  + ` padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:2px;">${label}</span>`;
         }
+        /* [신규] 예약판매에서 고르는 갈래 뱃지 — 사다드림 · 신선식품.
+           상품등록에서 고르는 값(isSada · isFresh)을 그대로 보여 준다.
+           둘은 하나만 켜지므로 뱃지도 하나만 붙는다. 고른 것이 없으면 아무것도 안 붙인다. */
+        function gListKindBadge(prod){
+            const chip = (label, bg, fg) => `<span style="font-size:10px; font-weight:800; background:${bg}; color:${fg};`
+                + ` padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; gap:2px;">${label}</span>`;
+            if (prod && (prod.isSada === true || prod.isSada === 'true')) return chip('🛒 사다드림', '#fff1e8', '#c2410a');
+            if (prod && (prod.isFresh === true || prod.isFresh === 'true')) return chip('🥬 신선식품', '#eafaf2', '#047857');
+            return '';
+        }
+
         let uploadAgencyFeeTiers = [];   // 금액 구간별 대행료: [{ from: 기준금액(이상), fee: 대행료 }]
         let optionModalDraft = null;     // 모달에서 편집 중인 임시 사본 (저장 눌러야 폼에 반영)
 
@@ -19490,6 +19501,34 @@
             return true;
         }
 
+        /* [신규] 번호가 없는 상품에 번호를 붙여 준다.
+           섬네일을 상품명으로 기억하다 보니, 이름을 한 글자만 고쳐도 전에 만든 것을 못 찾았다.
+           이제 식별번호로 기억하므로, 번호가 없는 상품은 여기서 만들어 붙인다.
+           갈래는 상품등록과 같은 잣대로 정한다 — 과일은 F, 사다드림은 S, 나머지는 P. */
+        async function gEnsureProductCode(index) {
+            const prod = uploadProducts[index];
+            if (!prod) return '';
+            const cur = String(prod.productCode || '').trim();
+            if (/^[PFS]\d+$/.test(cur)) return cur;
+
+            const mk = String(prod.matchKey || '').trim();
+            const pre = (prod.isSada === true || prod.isSada === 'true') ? 'S'
+                : (mk === '과일') ? 'F' : 'P';
+            const code = gNextProductCode(pre);
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [`${index}/productCode`]: code })
+                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                prod.productCode = code;   // 화면이 들고 있는 것도 맞춰 둔다
+                return code;
+            } catch (e) {
+                console.warn('식별번호 부여 실패:', e);
+                return '';
+            }
+        }
+
         function loadSelectedProductsToGenerator() {
             const presetTargets = [];   // [신규] 전에 만든 섬네일을 찾아 붙일 대상
             if (uploadSelectedProductIndices.size === 0) return;
@@ -19535,7 +19574,9 @@
 
                     const queued = {
                         date: dateStr,
-                        srcName: prodName,      // [신규] 전에 만든 섬네일을 찾을 때 쓰는 본디 상품명
+                        code: String(prod.productCode || '').trim(),   // [신규] 기억해 두는 열쇠 (없으면 아래에서 붙여 준다)
+                        prodIdx: index,                                // 번호를 새로 붙일 때 쓴다
+                        srcName: prodName,      // 번호가 없던 옛 자료를 찾을 때 쓰는 본디 상품명
                         name: prodName,
                         price: formattedPrice,
                         imgId: imgId,
@@ -19557,9 +19598,22 @@
                 generatorActiveIdx = 0;
             }
 
-            // [신규] 전에 만든 섬네일이 있으면 꺼내 덮어씌운다.
-            //  DB를 다녀오는 동안 화면은 먼저 그려지고, 받아 온 뒤 다시 그린다.
-            applyThumbPresetsToQueue(presetTargets);
+            /* [신규] 전에 만든 섬네일이 있으면 꺼내 덮어씌운다.
+               DB를 다녀오는 동안 화면은 먼저 그려지고, 받아 온 뒤 다시 그린다.
+               번호가 없는 상품에는 먼저 번호를 붙인다 — 그래야 이번에 만든 것을 번호로 기억할 수 있다. */
+            (async () => {
+                let 새번호 = 0;
+                for (const p of presetTargets) {
+                    if (p.item.code) continue;
+                    const c = await gEnsureProductCode(p.item.prodIdx);
+                    if (c) { p.item.code = c; 새번호++; }
+                }
+                if (새번호 && typeof showToast === 'function') {
+                    showToast(`식별번호가 없던 상품 ${새번호}개에 번호를 붙였습니다.`);
+                }
+                await applyThumbPresetsToQueue(presetTargets);
+                updateGeneratorQueueUI();
+            })();
         }
 
         // ------------------ 섬네일 생성기 스크립트 ------------------
@@ -19582,8 +19636,8 @@
             return encodeURIComponent(t).replace(/\./g, '%2E');
         }
 
-        async function fetchThumbPreset(prodName) {
-            const key = thumbKey(prodName);
+        // 열쇠 하나로 꺼내 본다
+        async function fetchThumbByKey(key) {
             if (!key) return null;
             try {
                 const r = await fetch(`${FIREBASE_DB_URL}${THUMB_DB_PATH}/${encodeURIComponent(key)}.json`);
@@ -19591,6 +19645,16 @@
                 const p = await r.json();
                 return (p && typeof p === 'object') ? p : null;
             } catch (e) { return null; }
+        }
+
+        /* [수정] 열쇠를 상품명에서 식별번호로 바꿨다.
+           이름으로 담다 보니 이름을 한 글자만 고쳐도 전에 만든 것을 못 찾았다.
+           예전에 이름으로 담아 둔 것도 그대로 살려 두려고, 번호로 못 찾으면 이름으로 한 번 더 본다. */
+        async function fetchThumbPreset(code, prodName) {
+            const byCode = /^[PFS]\d+$/.test(String(code || '').trim())
+                ? await fetchThumbByKey(String(code).trim()) : null;
+            if (byCode) return byCode;
+            return await fetchThumbByKey(thumbKey(prodName));
         }
 
         /* 손으로 올린 사진은 원본 그대로면 몇 MB씩 되어 DB에 담기 버겁다.
@@ -19620,7 +19684,11 @@
         async function saveThumbPreset(item) {
             if (!item) return false;
             const src = String(item.srcName || item.name || '').trim();
-            if (!src) return false;
+            /* [수정] 담는 열쇠는 식별번호다. 번호가 없는 옛 항목만 이름으로 담는다.
+               번호로 담아야 나중에 상품명을 고쳐도 전에 만든 섬네일이 그대로 따라온다. */
+            const code = String(item.code || '').trim();
+            const key = /^[PFS]\d+$/.test(code) ? code : thumbKey(src);
+            if (!key) return false;
 
             let local = String(item.localDataUrl || '');
             if (local && local.length > 400000) {
@@ -19629,6 +19697,7 @@
             }
 
             const body = {
+                productCode: code,   // [신규] 어느 번호로 담았는지
                 prodName: src,
                 name: item.name || '',
                 price: item.price || '',
@@ -19642,7 +19711,7 @@
             };
 
             try {
-                const r = await fetch(`${FIREBASE_DB_URL}${THUMB_DB_PATH}/${encodeURIComponent(thumbKey(src))}.json`, {
+                const r = await fetch(`${FIREBASE_DB_URL}${THUMB_DB_PATH}/${encodeURIComponent(key)}.json`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -19677,7 +19746,7 @@
             if (!pairs || !pairs.length) return 0;
             let hit = 0;
             await Promise.all(pairs.map(async p => {
-                const preset = await fetchThumbPreset(p.prodName);
+                const preset = await fetchThumbPreset(p.item && p.item.code, p.prodName);
                 if (preset && applyThumbPreset(p.item, preset)) hit++;
             }));
             if (hit) {
@@ -20120,6 +20189,7 @@
             const zip = new JSZip();
             const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
             const zipFolderName = `MOKET_섬네일_${timestamp}`;
+            let _thumbSaveFailed = 0;   // [신규] 기억해 두지 못한 개수
             
             try {
                 for (let i = 0; i < generatorQueue.length; i++) {
@@ -20152,9 +20222,14 @@
                     
                     zip.file(fileName, blob);
 
-                    // [신규] 만든 섬네일을 상품명 기준으로 기억해 둔다. 다음에 그대로 꺼내 쓴다
-                    await saveThumbPreset(item);
+                    /* [신규] 만든 섬네일을 상품명 기준으로 기억해 둔다. 다음에 그대로 꺼내 쓴다.
+                       [버그수정] 담기만 하고 표식을 안 달아서, ZIP 을 받아도 목록에 🔁 가 안 붙었다.
+                        담겼는지 안 담겼는지 알 길이 없어 '기억해 두기'를 또 누르게 됐다. */
+                    const _remembered = await saveThumbPreset(item);
+                    if (_remembered) item.presetAt = new Date().toISOString();
+                    else _thumbSaveFailed++;
                 }
+                updateGeneratorQueueUI();   // 표식을 목록에 반영한다
                 
                 const content = await zip.generateAsync({ type: "blob" });
                 const link = document.createElement('a');
@@ -20164,7 +20239,9 @@
                 link.click();
                 document.body.removeChild(link);
                 
-                showToast("섬네일 ZIP 파일이 생성되었습니다!");
+                showToast(_thumbSaveFailed
+                    ? `섬네일 ZIP 을 만들었습니다. 다만 ${_thumbSaveFailed}개는 기억하지 못했습니다.`
+                    : "섬네일 ZIP 파일이 생성되었습니다! 만든 섬네일은 모두 기억해 두었습니다.");
             } catch (e) {
                 console.error(e);
                 showToast("생성 실패: " + e.toString());
@@ -20936,6 +21013,8 @@
 
                     // [신규] 보관방법 뱃지. 주문서 상품카드에 뜨는 것과 같은 색으로 맞춰 둔다.
                     const storageBadge = gListStorageBadge(prod);
+                    // [신규] 사다드림·신선식품 뱃지
+                    const kindBadge = gListKindBadge(prod);
 
                     /* [신규] 할인중 뱃지 + 할인가 표기.
                        손님 화면과 같은 값을 보여 줘야 하므로 계산도 같은 식(gDiscountedPrice)을 쓴다.
@@ -21047,7 +21126,7 @@
                                 ${prod.productCode ? `<span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${prod.productCode}</span>${gCodeLabelChip(prod.productCode)}` : ``}
                                 ${priceHtml}
                                 ${stockText ? `<span style="color: var(--text-sub);">|</span><span>${stockText}</span>` : ``}
-                                ${storageBadge}${statusBadge}${discountBadge}${optionBadge}
+                                ${kindBadge}${storageBadge}${statusBadge}${discountBadge}${optionBadge}
                             </div>
                             ${optionPanel}
                         </div>
