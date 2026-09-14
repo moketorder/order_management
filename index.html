@@ -1183,12 +1183,14 @@
                 white-space: nowrap !important;
                 text-align: center;
             }
-            #tab-admin-products .segment-control.four-cols {
+            #tab-admin-products .segment-control.four-cols,
+            #tab-admin-purchase-history .segment-control.four-cols {
                 display: grid !important;
                 grid-template-columns: repeat(4, 1fr) !important;
                 gap: 2px !important;
             }
-            #tab-admin-products .segment-control.four-cols .segment-btn {
+            #tab-admin-products .segment-control.four-cols .segment-btn,
+            #tab-admin-purchase-history .segment-control.four-cols .segment-btn {
                 padding: 10px 2px !important;
                 font-size: 11px !important;
                 white-space: nowrap !important;
@@ -2938,7 +2940,7 @@
                 
                 <!-- 하위 카테고리 탭 (발주 등록 / 발주 목록) -->
                 <div class="sub-tabs-container no-print" style="margin-bottom: 3px; padding: 0;">
-                    <div class="segment-control two-cols" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
+                    <div class="segment-control four-cols" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
                         <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-link" onclick="switchPurchaseSubTab('link')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🔗 코드 연결</div>
@@ -3248,6 +3250,22 @@
         /* [신규] 주소 줄은 따로 뗀다. 연락처 뒤에 붙여 놓으면 좁은 화면에서 줄이 접히면서
            가운뎃점만 덩그러니 남아 어디까지가 한 덩어리인지 알아보기 어려웠다. */
         .ca-addr { color:#64748b; }
+        /* [신규] 접속 기록 — 30일 줄, 시간대 막대, 요일×시간 표.
+           색은 파랑 한 가지를 밝기로만 나눈다. 구경만(옅음)과 주문함(진함)이 색약에서도 갈린다. */
+        .cv-strip { display:grid; grid-template-columns:repeat(30, 1fr); gap:2px; }
+        .cv-strip i { display:block; aspect-ratio:1 / 1; border-radius:2px; background:#e2e8f0; }
+        .cv-strip i.b, .cv-key.b { background:#93c5fd; }
+        .cv-strip i.o, .cv-key.o { background:#1d4ed8; }
+        .cv-key { display:inline-block; width:9px; height:9px; border-radius:2px; background:#e2e8f0; vertical-align:-1px; margin-right:3px; }
+        .cv-hours { display:flex; align-items:flex-end; gap:2px; height:46px; }
+        .cv-hours i { flex:1; min-width:0; background:#3b82f6; border-radius:2px 2px 0 0; }
+        .cv-hours i.z { background:#e2e8f0; }
+        .cv-axis { position:relative; height:13px; margin-top:2px; font-size:10px; font-weight:700; color:#94a3b8; }
+        .cv-axis span { position:absolute; transform:translateX(-50%); white-space:nowrap; }
+        .cv-heat { border-collapse:separate; border-spacing:2px; }
+        .cv-heat td { width:11px; min-width:11px; height:11px; padding:0; border-radius:2px; background:#f1f5f9; }
+        .cv-heat th { font-size:10px; font-weight:800; color:#94a3b8; padding:0 4px 0 0; text-align:right; }
+        .cv-heat thead th { padding:0; text-align:left; font-weight:700; }
         /* [신규] 주문 카드에 달리는 말 세 줄 — 고정메모·주문메모·요청사항.
            이름표 너비를 못박아 글 시작점을 맞춘다. 색만 줄마다 달리 준다. */
         .memo-line {
@@ -8880,7 +8898,7 @@
             const key = String(phone).replace(/\D/g, '');
             if (!key) return;
             const mine = (rawOrders || []).filter(o => o
-                && String(o.firebasePhoneKey || o.phone || '').replace(/\D/g, '') === key
+                && gCustKey(o) === key   // [변경] 카카오 번호로 모은다
                 && !(o.canceled === true || o.canceled === 'true'));
             // 아직 안 나간 배달 주문 — 없어도 된다 (그때는 손님 정보만 고친다)
             const list = mine.filter(o => !gIsHandedOver(o.status) && String(o.shippingMethod || '').includes('배달'));
@@ -9032,7 +9050,10 @@
                    주문 줄과 따로 두어야 다음 주문부터 새 주소가 저절로 따라온다. */
                 try {
                     const t0 = orderKeys.length ? rawOrders.find(it => it.orderKey === orderKeys[0]) : null;
-                    const ck = String((t0 && t0.firebasePhoneKey) || cleanPhone || '').replace(/\D/g, '');
+                    // [수정] 손님 정보의 열쇠는 카카오 번호다. 주문에 카카오 번호가 있으면 그 서랍에 쓴다.
+                    let _kk = String((t0 && t0.kakaoPhone) || '').replace(/\D/g, '');
+                    if (_kk.startsWith('82')) _kk = '0' + _kk.slice(2);
+                    const ck = /^01\d{8,9}$/.test(_kk) ? _kk : String((t0 && t0.firebasePhoneKey) || cleanPhone || '').replace(/\D/g, '');
                     if (/^01\d{8,9}$/.test(ck)) {
                         const before = await fetch(`${FIREBASE_DB_URL}customers/${ck}.json?t=${Date.now()}`)
                             .then(r => r.ok ? r.json() : null).catch(() => null);
@@ -9056,7 +9077,18 @@
                             };
                             if (newRoad) body.roadAddress = newRoad;
                             if (newRefund !== undefined) body.refundAccount = newRefund;
-                            if (!before || !before.createdAt) body.createdAt = now.getTime();
+                            // [수정] 폰에서 올린 줄(fromDevice)은 가입이 아니므로 가입일을 새로 적지 않는다
+                            if (!before || (!before.createdAt && !before.fromDevice)) body.createdAt = now.getTime();
+                            /* [신규] 칸마다 언제 누가 고쳤는지 적어 둔다.
+                               손님 기기와 견줄 때 '나중에 고친 쪽을 남긴다'의 잣대가 된다.
+                               바뀐 칸만 적는다 — 안 바뀐 칸의 시각까지 새로 찍으면 손님이 나중에 고친 것이 밀린다. */
+                            const _fieldOf = { '주소': 'address', '상세주소': 'addressDetail', '현관비번': 'entrance', '환불계좌': 'refundAccount' };
+                            diffs.forEach(d => {
+                                const fk = _fieldOf[d.what];
+                                if (!fk) return;
+                                body[`fieldAt/${fk}`] = now.getTime();
+                                body[`fieldBy/${fk}`] = '가게';
+                            });
                             await fetch(`${FIREBASE_DB_URL}customers/${ck}.json`, {
                                 method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
                             });
@@ -10960,13 +10992,21 @@
         function showCustomerCardModal(phoneEnc, nameEnc){
             const phone = decodeURIComponent(phoneEnc || '');
             const name = decodeURIComponent(nameEnc || '');
-            const targetKey = salesPersonKey({ phone, name });
-            const all = getSalesSourceOrders().filter(o => salesPersonKey(o) === targetKey && !isSalesCanceled(o));
+            /* [변경] 조회는 카카오 번호로 한다.
+               주문 카드에서 열면 연락처나 서랍 번호가 넘어온다. 그 번호로 들어온 주문을 하나 찾아
+               거기 실린 카카오 번호로 바꾼 뒤, 그 번호로 모은다. */
+            const _src = getSalesSourceOrders();
+            const _digits = String(phone).replace(/\D/g, '');
+            const _hit = _digits ? (_src.find(o => String(o.firebasePhoneKey || '').replace(/\D/g, '') === _digits)
+                                 || _src.find(o => salesNormPhone(o) === _digits)) : null;
+            const targetKey = _hit ? salesPersonKey(_hit) : salesPersonKey({ phone, name });
+            const all = _src.filter(o => salesPersonKey(o) === targetKey && !isSalesCanceled(o));
 
             /* [수정] 주문이 없으면 창을 아예 안 띄웠다. 가입만 하고 아직 안 시킨 손님은
                손님 관리에서 카드를 눌러도 아무 일이 없었다. 이제는 띄운다.
                주문에서 뽑던 값(주소·현관비번·성별 같은 것)은 손님 정보를 뒷배로 둔다. */
-            const _savedCust = (window.__caSaved || {})[String(phone).replace(/\D/g, '')] || null;
+            const _custKey = /^01\d{8,9}$/.test(targetKey) ? targetKey : _digits;
+            const _savedCust = (window.__caSaved || {})[_custKey] || null;
 
             const isDone = o => { const st = String(o.status||''); return st==='배달완료' || st==='픽업'; };
             /* [변경] 완료된 것만 세다 보니, 손님 관리 목록의 구매액과 이 카드의 총 구매액이 달랐다.
@@ -11037,6 +11077,8 @@
             else if (orderCount >= 2){ grade='🔁 재구매'; gradeColor='#2563eb'; }
 
             const cleanPhone = String(phone).replace(/\D/g,'');
+            // [신규] 전화·문자는 손님이 적은 연락처로 건다 (없으면 예전처럼 서랍 번호)
+            const telPhone = String((_savedCust && _savedCust.contactPhone) || '').replace(/\D/g,'') || cleanPhone;
             const delRatio = orderCount>0 ? Math.round(delDays.size/orderCount*100) : 0;
             // 성별·나이대 (미선택 아닌 값 우선)
             const pickAttr = (field) => {
@@ -11075,15 +11117,15 @@
             const kakaoLabel = custKakaoName
                 ? (custKakaoReal && custKakaoReal !== custKakaoName ? `${custKakaoName} (${custKakaoReal})` : custKakaoName)
                 : (custKakaoReal || '');
-            const phoneLabel = cleanPhone
-                ? (cleanPhone.length === 11
-                    ? `${cleanPhone.slice(0, 3)}-${cleanPhone.slice(3, 7)}-${cleanPhone.slice(7)}`
-                    : (cleanPhone.length === 10 ? `${cleanPhone.slice(0, 3)}-${cleanPhone.slice(3, 6)}-${cleanPhone.slice(6)}` : cleanPhone))
+            const phoneLabel = telPhone
+                ? (telPhone.length === 11
+                    ? `${telPhone.slice(0, 3)}-${telPhone.slice(3, 7)}-${telPhone.slice(7)}`
+                    : (telPhone.length === 10 ? `${telPhone.slice(0, 3)}-${telPhone.slice(3, 6)}-${telPhone.slice(6)}` : telPhone))
                 : '';
             const idSubHtml = (kakaoLabel || phoneLabel) ? `
                 <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin-top:4px; font-size:12px; font-weight:700; color:#334155;">
                     ${kakaoLabel ? `<span>💬 ${kakaoLabel}</span>` : ''}
-                    ${phoneLabel ? `<a href="tel:${cleanPhone}" style="color:#334155; text-decoration:none;">📱 ${phoneLabel}</a>` : ''}
+                    ${phoneLabel ? `<a href="tel:${telPhone}" style="color:#334155; text-decoration:none;">📱 ${phoneLabel}</a>` : ''}
                 </div>` : '';
 
             // [수정] 주소는 이름(아이디) 바로 아래, 등급(재구매 등) 줄 위에 넣는다.
@@ -11141,11 +11183,11 @@
                         <div style="min-width:0;">
                             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;">
                                 <h2 style="margin:0;"><span style="font-size:12px; vertical-align:middle;">👤</span> ${name || '고객'}</h2>
-                                ${cleanPhone ? `<a href="tel:${cleanPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:2px 8px; border-radius:6px;">📞 전화</a>
-                                <button type="button" onclick="copyTextAndSms(decodeURIComponent('${encodeURIComponent('[모켓] '+(name||'')+'님, 안녕하세요! 😊')}'), '${cleanPhone}', '고객 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:2px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>
+                                ${cleanPhone ? `<a href="tel:${telPhone}" style="font-size:11px; font-weight:800; color:var(--primary); text-decoration:none; border:1.5px solid var(--primary); padding:2px 8px; border-radius:6px;">📞 전화</a>
+                                <button type="button" onclick="copyTextAndSms(decodeURIComponent('${encodeURIComponent('[모켓] '+(name||'')+'님, 안녕하세요! 😊')}'), '${telPhone}', '고객 안내')" style="font-size:11px; font-weight:800; color:#059669; background:#fff; border:1.5px solid #059669; padding:2px 8px; border-radius:6px; cursor:pointer;">💬 문자</button>
                                 <!-- [신규] 손님 정보 고치기 — 주소 줄에 있던 것을 전화·문자 옆으로 옮겼다.
                                      아직 안 나간 배달 주문에만 반영되고, 끝난 주문은 그때 간 주소 그대로 둔다. -->
-                                <button type="button" onclick="editCustomerAddressAll('${encodeURIComponent(phone)}')" title="주소·현관 비번 고치기" style="font-size:11px; font-weight:800; color:#4338ca; background:#fff; border:1.5px solid #4338ca; padding:2px 8px; border-radius:6px; cursor:pointer;">✏️ 수정</button>` : ''}
+                                <button type="button" onclick="editCustomerAddressAll('${encodeURIComponent(_custKey)}')" title="주소·현관 비번 고치기" style="font-size:11px; font-weight:800; color:#4338ca; background:#fff; border:1.5px solid #4338ca; padding:2px 8px; border-radius:6px; cursor:pointer;">✏️ 수정</button>` : ''}
                             </div>
                             ${idSubHtml}
                             ${addrHtml}
@@ -11170,6 +11212,8 @@
                             <span>방문빈도 <b style="color:var(--text-main);">${freqText}</b></span>
                         </div>
 
+                        <div id="cust-visit-box"></div>
+
                         ${pending.length ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
                             ${salesStatChip('미완료(챙길것)', pending.length+'건 · '+pendingAmt.toLocaleString()+'원', '#dc2626')}
                         </div>` : ''}
@@ -11190,6 +11234,12 @@
                         </div>
                     </div>
                 </div>`;
+            // [신규] 접속 기록 — 받아 둔 게 없으면 받는 대로 채운다
+            {
+                const _od = new Set(all.map(o => { const d = validDate(o); return d ? caDayKey(d) : ''; }).filter(Boolean));
+                const _paint = () => { const b = modal.querySelector('#cust-visit-box'); if (b) b.innerHTML = caVisitCardHtml(caVisitStats(_custKey, _od)); };
+                if (window.__caVisits) _paint(); else gEnsureVisits().then(_paint).catch(() => { });
+            }
             // [수정] 아파트 동·호수 창(z-index 10050)에서 호수를 눌러 이 카드를 열면
             //  카드가 뒤에 깔려 보이지 않았다. 지금 떠 있는 창보다 한 칸 위로 올린다.
             //  (창을 닫으면 element 자체가 사라지므로, DOM에 남아 있는 것 = 열려 있는 것)
@@ -13452,6 +13502,7 @@
         async function initCustomerAdmin(force) {
             const box = document.getElementById('cust-admin-body');
             if (box) box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
+            const _visitsP = gEnsureVisits(!!force).catch(() => null);   // [신규] 접속 기록도 함께 받는다
             try {
                 if (typeof loadSalesArchiveFromCache === 'function') loadSalesArchiveFromCache();
 
@@ -13486,8 +13537,176 @@
                     } catch (e) { console.warn('손님 정보 캐시 저장 실패:', e); }
                 }
             } catch (e) { console.error('손님 정보 불러오기 실패:', e); window.__caSaved = {}; }
+            await _visitsP;
             caRows = null;
             renderCustomerAdmin();
+        }
+
+        /* ===== [신규] 접속 기록 (visits/{날짜}/{카카오번호}) =====
+           주문서가 손님이 들어올 때 남긴 기록을 손님관리에서 본다.
+             · 지난 날짜는 다시 바뀌지 않으므로 한 번 받으면 이 기기에 담아 두고 다시 안 받는다
+             · 오늘과 어제만 열 때마다 새로 받는다. 30일이 지난 날짜는 담아 둔 데서 지운다
+             · 가게 사람·시험 계정은 접속 셈에서 뺀다 */
+        const VISITS_CACHE_KEY = 'moket_visits_days';
+        const VISIT_LOOKBACK = 30;
+        const CA_STAFF_PHONES = new Set([
+            '01097299279', '01012345678', '01027799279',   // 모켓1234 (사장님 시험 계정)
+            '01092752181',                                 // 강성훈 · kkk · 깡깡이
+            '01044193392'                                  // 유징3392
+        ]);
+        function caDayKey(d) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        // [오늘, 어제, ...] 차례로 n일
+        function caLastDays(n) {
+            const out = [], t = new Date(); t.setHours(12, 0, 0, 0);
+            for (let i = 0; i < n; i++) { const d = new Date(t); d.setDate(t.getDate() - i); out.push(caDayKey(d)); }
+            return out;
+        }
+        let _caVisitsLoading = null;
+        function gEnsureVisits(force) {
+            if (window.__caVisits && !force) return Promise.resolve(window.__caVisits);
+            if (_caVisitsLoading) return _caVisitsLoading;
+            _caVisitsLoading = (async () => {
+                const days = caLastDays(VISIT_LOOKBACK);
+                let cache = {};
+                try { const raw = await idbGet(VISITS_CACHE_KEY); if (raw) cache = JSON.parse(raw) || {}; } catch (e) { cache = {}; }
+                const need = days.filter((d, i) => i < 2 || force || !(d in cache));
+                await Promise.all(need.map(async d => {
+                    try {
+                        const r = await fetch(`${FIREBASE_DB_URL}visits/${d}.json?t=${Date.now()}`);
+                        if (r.ok) cache[d] = (await r.json()) || {};
+                    } catch (e) { /* 못 받은 날은 다음에 다시 받는다 */ }
+                }));
+                Object.keys(cache).forEach(d => { if (!days.includes(d)) delete cache[d]; });
+                idbSet(VISITS_CACHE_KEY, JSON.stringify(cache));
+                window.__caVisits = cache;
+                return cache;
+            })().finally(() => { _caVisitsLoading = null; });
+            return _caVisitsLoading;
+        }
+
+        /* 한 손님의 최근 30일 접속. orderDays = 그 손님이 주문한 날짜 모음
+             · 구경만 = 들어왔는데 그날 주문이 없음 (주문서의 '주문함' 표시나 주문 줄로 본다)
+             · 발길 끊김 = 15~30일 전에는 3일 넘게 왔는데 최근 14일은 한 번도 안 옴 */
+        function caVisitStats(key, orderDays) {
+            const V = window.__caVisits;
+            if (!V || !key || CA_STAFF_PHONES.has(key)) return null;
+            const days = caLastDays(VISIT_LOOKBACK);
+            let last = 0, visitDays = 0, browse = 0, early = 0, recent14 = 0;
+            const hours = new Array(24).fill(0), map = {};
+            days.forEach((d, i) => {
+                const v = V[d] && V[d][key];
+                if (!v) return;
+                visitDays++;
+                const ord = v.ordered === true || !!(orderDays && orderDays.has(d));
+                map[d] = ord ? 'o' : 'b';
+                if (!ord) browse++;
+                if (i < 14) recent14++; else early++;
+                const l = Number(v.last) || 0;
+                if (l > last) last = l;
+                if (v.hours && typeof v.hours === 'object') Object.keys(v.hours).forEach(h => {
+                    const hh = parseInt(h, 10);
+                    if (hh >= 0 && hh < 24) hours[hh] += Number(v.hours[h]) || 0;
+                });
+            });
+            if (!visitDays) return null;
+            const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+            const lastDays = last ? Math.max(0, Math.round((t0 - new Date(new Date(last).setHours(0, 0, 0, 0))) / 86400000)) : null;
+            return { last, lastDays, visitDays, browse, hours, map, gone: early >= 3 && recent14 === 0 };
+        }
+        function caAgoLabel(n) { return n === 0 ? '오늘' : (n === null ? '-' : `${n}일 전`); }
+        function caHourLabel(h) { return h === 0 ? '밤 12시' : h < 12 ? `오전 ${h}시` : h === 12 ? '낮 12시' : `오후 ${h - 12}시`; }
+
+        // 손님카드 안의 접속 칸
+        function caVisitCardHtml(vs) {
+            const wrap = inner => `<div style="font-size:12px; color:var(--text-sub); background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:12px;">${inner}</div>`;
+            if (!vs) return wrap(`👀 최근 30일 접속 기록 없음`);
+            const days = caLastDays(VISIT_LOOKBACK).reverse();   // 왼쪽이 30일 전, 오른쪽이 오늘
+            const md = d => `${parseInt(d.slice(5, 7), 10)}/${parseInt(d.slice(8), 10)}`;
+            const strip = days.map(d => {
+                const k = vs.map[d] || '';
+                return `<i class="${k}" title="${md(d)} · ${k === 'o' ? '주문함' : k === 'b' ? '구경만' : '안 옴'}"></i>`;
+            }).join('');
+            const maxH = Math.max(1, ...vs.hours);
+            const peak = vs.hours.indexOf(Math.max(...vs.hours));
+            const bars = vs.hours.map((c, h) =>
+                `<i class="${c ? '' : 'z'}" style="height:${c ? Math.max(10, Math.round(c / maxH * 100)) : 4}%;" title="${h}시 · ${c}번"></i>`).join('');
+            const axis = [0, 6, 12, 18, 23].map(h => `<span style="left:${(h + 0.5) / 24 * 100}%;">${h}시</span>`).join('');
+            return wrap(`
+                <div style="display:flex; flex-wrap:wrap; gap:4px 12px; margin-bottom:8px;">
+                    <span>👀 최근 접속 <b style="color:var(--text-main);">${caAgoLabel(vs.lastDays)}</b></span>
+                    <span>30일 중 <b style="color:var(--text-main);">${vs.visitDays}일</b></span>
+                    <span>구경만 <b style="color:var(--text-main);">${vs.browse}일</b></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:10.5px; font-weight:800; color:#94a3b8; margin-bottom:4px;">
+                    <span>최근 30일</span>
+                    <span style="display:flex; gap:8px; white-space:nowrap;"><span><i class="cv-key"></i>안 옴</span><span><i class="cv-key b"></i>구경만</span><span><i class="cv-key o"></i>주문함</span></span>
+                </div>
+                <div class="cv-strip">${strip}</div>
+                <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:700; color:#94a3b8; margin-top:2px;"><span>${md(days[0])}</span><span>오늘</span></div>
+                <div style="margin:10px 0 4px; font-size:10.5px; font-weight:800; color:#94a3b8;">시간대 · 자주 오는 때 <b style="color:var(--text-main);">${caHourLabel(peak)}</b></div>
+                <div class="cv-hours">${bars}</div>
+                <div class="cv-axis">${axis}</div>`);
+        }
+
+        // 손님관리 맨 위 요약 — 오늘 접속·주문, 요일×시간대, 기기
+        let caVisitOpen = (() => { try { return localStorage.getItem('moket_ca_visit_open') === '1'; } catch (e) { return false; } })();
+        function caSetVisitOpen(v) { caVisitOpen = !!v; try { localStorage.setItem('moket_ca_visit_open', v ? '1' : '0'); } catch (e) { } }
+        function caVisitSummaryHtml(rows) {
+            const V = window.__caVisits;
+            if (!V) return '';
+            const days = caLastDays(VISIT_LOOKBACK), today = days[0];
+            const box = inner => `<details ${caVisitOpen ? 'open' : ''} ontoggle="caSetVisitOpen(this.open)" style="margin-top:10px; border-top:1px dashed #e2e8f0; padding-top:8px;">${inner}</details>`;
+            const orderDaysOf = new Map(rows.map(r => [r.phone, r.orderDays]));
+
+            const T = V[today] || {};
+            let tv = 0, to = 0;
+            Object.keys(T).forEach(k => {
+                if (CA_STAFF_PHONES.has(k)) return;
+                tv++;
+                const od = orderDaysOf.get(k);
+                if (T[k] && (T[k].ordered === true || (od && od.has(today)))) to++;
+            });
+
+            const WD = ['월', '화', '수', '목', '금', '토', '일'];
+            const grid = Array.from({ length: 7 }, () => new Array(24).fill(0));
+            const seen = new Set();   // 30일 동안 들어온 손님
+            days.forEach(d => {
+                const dayV = V[d];
+                if (!dayV) return;
+                const wd = (new Date(`${d}T12:00:00`).getDay() + 6) % 7;   // 월요일이 0
+                Object.keys(dayV).forEach(k => {
+                    if (CA_STAFF_PHONES.has(k)) return;
+                    const v = dayV[k] || {};
+                    if (v.hours && typeof v.hours === 'object') Object.keys(v.hours).forEach(h => {
+                        const hh = parseInt(h, 10);
+                        if (hh >= 0 && hh < 24) grid[wd][hh] += Number(v.hours[h]) || 0;
+                    });
+                    seen.add(k);
+                });
+            });
+            const people = seen.size;
+            const head = `<summary style="cursor:pointer; font-size:12px; font-weight:800; color:#334155;">👀 접속 요약
+                <span style="font-weight:700; color:#94a3b8;"> · 오늘 ${tv}명 접속 · ${to}명 주문 · 30일 ${people}명</span></summary>`;
+            if (!people) return box(head + `<div style="padding:8px 2px 2px; font-size:11.5px; font-weight:700; color:#94a3b8;">아직 접속 기록이 없습니다. 손님이 들어오면 쌓입니다.</div>`);
+
+            const max = Math.max(1, ...grid.map(r => Math.max(...r)));
+            const STEPS = ['#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a'];   // 적음 → 많음
+            const cell = c => c ? STEPS[Math.min(3, Math.ceil(c / max * 4) - 1)] : '';
+            const hourHead = Array.from({ length: 24 }, (_, h) => `<th>${h % 6 === 0 ? h : ''}</th>`).join('');
+            const heat = `<div style="overflow-x:auto;"><table class="cv-heat">
+                <thead><tr><th></th>${hourHead}</tr></thead>
+                <tbody>${grid.map((r, i) => `<tr><th>${WD[i]}</th>${r.map((c, h) =>
+                    `<td style="${c ? `background:${cell(c)};` : ''}" title="${WD[i]}요일 ${h}시 · ${c}번"></td>`).join('')}</tr>`).join('')}</tbody>
+            </table></div>
+            <div style="display:flex; align-items:center; gap:3px; margin-top:3px; font-size:10px; font-weight:700; color:#94a3b8;">
+                적음 ${STEPS.map(c => `<i class="cv-key" style="background:${c}; margin:0;"></i>`).join('')} 많음 <span style="margin-left:6px;">(최근 30일, 들어온 횟수)</span>
+            </div>`;
+
+            return box(head + `
+                <div style="margin-top:8px; font-size:10.5px; font-weight:800; color:#94a3b8;">요일 · 시간대</div>
+                ${heat}`);
         }
 
         function caBuild() {
@@ -13506,7 +13725,7 @@
             const src = (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : (rawOrders || []));
             src.forEach(o => {
                 if (!o) return;
-                const key = String(o.firebasePhoneKey || o.phone || '').replace(/\D/g, '');
+                const key = gCustKey(o);   // [변경] 카카오 번호로 모은다 (옮긴 손님의 옛 번호 주문도 함께)
                 if (!key) return;
                 if (!m.has(key)) m.set(key, { phone: key, names: new Map(), rows: [], last: '', first: 0, s: null });
                 const v = m.get(key);
@@ -13549,8 +13768,16 @@
                 const wayDel = v.rows.filter(o => String(o.shippingMethod || '').includes('배달')).length;
 
                 const addr = take('address');
+                // [신규] 주문한 날 모음과 최근 30일 접속
+                const orderDays = new Set(v.rows.filter(o => !isSalesCanceled(o)).map(o => {
+                    const d = parseTimestampToDate(o.timestamp);
+                    return (d && d.getFullYear() >= 2000) ? caDayKey(d) : '';
+                }).filter(Boolean));
+                const visit = caVisitStats(v.phone, orderDays);
+                const days30 = caLastDays(VISIT_LOOKBACK);
                 out.push({
                     phone: v.phone,
+                    tel: String((s && s.contactPhone) || '').replace(/\D/g, '') || v.phone,   // [신규] 전화·문자는 손님이 적은 연락처로
                     name: String((s && s.name) || '').trim() || (nameFromOrders ? nameFromOrders[0] : '무명'),
                     nameCount: v.names.size,
                     realName: take('realName', 'kakaoRealName'),
@@ -13569,6 +13796,9 @@
                     joined: (s && s.createdAt) ? s.createdAt : (v.first || 0),
                     joinedIsReal: !!(s && s.createdAt),
                     lastChange: (s && s.lastChange) ? s.lastChange : null,   // 마지막으로 무엇을 바꿨나
+                    orderDays, visit,
+                    // 구경만 — 최근 30일에 3일 넘게 들어왔는데 한 번도 안 샀다
+                    browser: !!visit && visit.visitDays >= 3 && visit.browse === visit.visitDays && !days30.some(d => orderDays.has(d)),
                     orders: days.size, qty: paid.reduce((a, o) => a + (parseInt(o.qty || 0) || 0), 0),
                     amt, last: v.last, idle,
                     /* 주문이 하나도 없는 새 손님은 주소가 있으면 배달, 없으면 픽업으로 본다 */
@@ -13596,7 +13826,21 @@
            많이 산 손님만 보다가 '한 번도 안 산 손님'을 찾을 때가 있어, 거꾸로도 볼 수 있어야 한다. */
         let caSortDir = 'desc';   // desc = 많은 순(기본), asc = 적은 순
 
-        function caSetQuery(v) { caQuery = String(v || '').trim(); renderCustomerAdmin(); }
+        /* [버그수정] 한 글자 칠 때마다 화면을 통째로 다시 그려서, 찾기 칸까지 새로 만들어졌다.
+           그러면 커서가 빠지고 한글 조합(ㄱ→가→각)도 끊겨 글을 이어 칠 수가 없었다.
+             · 찾기 칸은 그대로 두고 아래 목록만 바꿔 그린다
+             · 한글을 조합하는 동안에는 아무것도 안 한다 (조합이 끝나면 그때 찾는다)
+             · 너무 자주 그리지 않게 조금 기다렸다 찾는다 */
+        let caComposing = false;
+        let caQueryTimer = null;
+        function caSetQuery(v) {
+            if (caComposing) return;
+            clearTimeout(caQueryTimer);
+            caQueryTimer = setTimeout(() => {
+                caQuery = String(v || '').trim();
+                renderCustomerAdmin(true);
+            }, 120);
+        }
         function caSetSort(v) { caSort = v; caSortDir = 'desc'; renderCustomerAdmin(); }
 
         // 머리글을 누를 때 — 같은 칸을 다시 누르면 방향만 뒤집는다
@@ -13607,7 +13851,7 @@
         }
         function caSetFilter(v) { caFilter = v; renderCustomerAdmin(); }
 
-        function renderCustomerAdmin() {
+        function renderCustomerAdmin(listOnly) {
             const box = document.getElementById('cust-admin-body');
             if (!box) return;
             const all = caBuild();
@@ -13617,6 +13861,8 @@
 
             const nNew30 = all.filter(r => { const d = caJoinDays(r); return d !== null && d <= 30; }).length;
             const nChanged = all.filter(r => r.lastChange).length;
+            const nBrowse = all.filter(r => r.browser).length;              // [신규]
+            const nGone = all.filter(r => r.visit && r.visit.gone).length;   // [신규]
 
             let list = caFilter === 'delivery' ? all.filter(r => r.way === '배달')
                      : caFilter === 'pickup' ? all.filter(r => r.way === '픽업')
@@ -13624,6 +13870,8 @@
                      : caFilter === 'idle60' ? all.filter(r => r.idle !== null && r.idle >= 60)
                      : caFilter === 'new30' ? all.filter(r => { const d = caJoinDays(r); return d !== null && d <= 30; })
                      : caFilter === 'changed' ? all.filter(r => r.lastChange)
+                     : caFilter === 'browse' ? all.filter(r => r.browser)
+                     : caFilter === 'gone' ? all.filter(r => r.visit && r.visit.gone)
                      : all;
             // '새로 온 손님'을 고르면 늦게 온 순, '고침'을 고르면 최근 고친 순으로 세운다
             if (caFilter === 'new30' && caSort === 'amt') caSort = 'joined';
@@ -13636,7 +13884,7 @@
                     || fTightName(r.gender).includes(q)
                     || fTightName(r.ageGroup).includes(q)
                     || fTightName(r.refundAccount).includes(q)
-                    || (digits && r.phone.includes(digits)));
+                    || (digits && (r.phone.includes(digits) || r.tel.includes(digits))));
             }
             const cmp = {
                 amt: (a, b) => b.amt - a.amt,
@@ -13645,7 +13893,9 @@
                 idle: (a, b) => (b.idle ?? -1) - (a.idle ?? -1),
                 name: (a, b) => a.name.localeCompare(b.name, 'ko'),
                 joined: (a, b) => (b.joined || 0) - (a.joined || 0),    // 늦게 온 손님이 위로
-                changed: (a, b) => ((b.lastChange && b.lastChange.at) || 0) - ((a.lastChange && a.lastChange.at) || 0)
+                changed: (a, b) => ((b.lastChange && b.lastChange.at) || 0) - ((a.lastChange && a.lastChange.at) || 0),
+                visit: (a, b) => ((b.visit && b.visit.last) || 0) - ((a.visit && a.visit.last) || 0),   // [신규] 최근 접속 순
+                vcnt: (a, b) => ((b.visit && b.visit.visitDays) || 0) - ((a.visit && a.visit.visitDays) || 0)   // [신규] 접속 많은 순
             }[caSort] || ((a, b) => b.amt - a.amt);
             // [신규] '적은 순'이면 견주는 차례를 뒤집는다
             const cmpDir = (caSortDir === 'asc') ? ((a, b) => cmp(b, a)) : cmp;
@@ -13675,25 +13925,31 @@
                         ${fbtn('new30', `🆕 새 손님 ${nNew30}`, '#7c3aed')}
                         ${fbtn('changed', `✏️ 고침 ${nChanged}`, '#0369a1')}
                         ${fbtn('idle60', `💤 두 달 넘게 ${nIdle}`, '#a16207')}
+                        ${(nBrowse || caFilter === 'browse') ? fbtn('browse', `👀 구경만 ${nBrowse}`, '#1d4ed8') : ''}
+                        ${(nGone || caFilter === 'gone') ? fbtn('gone', `🚪 발길 끊김 ${nGone}`, '#be123c') : ''}
                         ${/* [수정] 늘 0이라 자리만 차지한다. 어긋난 것이 생겼을 때만 내보인다. */
                           (all.length - nSaved > 0 || caFilter === 'nosaved')
                             ? fbtn('nosaved', `📋 주문에만 ${all.length - nSaved}`, '#c2410c') : ''}
                         <select onchange="caSetSort(this.value)"
                             style="height:30px; padding:0 6px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800; color:#475569; background:#fff; cursor:pointer;">
-                            ${[['amt','많이 산 순'],['cnt','자주 온 순'],['joined','새로 온 순'],['changed','최근 고친 순'],['recent','최근 주문 순'],['idle','오래된 순'],['name','이름 순']]
+                            ${[['amt','많이 산 순'],['cnt','자주 온 순'],['joined','새로 온 순'],['changed','최근 고친 순'],['recent','최근 주문 순'],['idle','오래된 순'],['visit','최근 접속 순'],['vcnt','접속 많은 순'],['name','이름 순']]
                                 .map(([v,l]) => `<option value="${v}" ${caSort===v?'selected':''}>${l}</option>`).join('')}
                         </select>
-                        <input type="text" value="${gEscapeHtml(caQuery)}" oninput="caSetQuery(this.value)" placeholder="🔍 이름·번호·주소"
+                        <input type="text" id="ca-search" value="${gEscapeHtml(caQuery)}" oninput="caSetQuery(this.value)" oncompositionstart="caComposing=true" oncompositionend="caComposing=false; caSetQuery(this.value)" placeholder="🔍 이름·번호·주소"
                             style="flex:1 1 130px; min-width:110px; height:30px; padding:0 10px; border:1.5px solid #cbd5e1;
                                    border-radius:8px; font-size:12px; font-weight:700; box-sizing:border-box;">
                         <button type="button" onclick="initCustomerAdmin(true)" title="손님 정보를 서버에서 다시 받아 옵니다"
                             style="height:30px; width:34px; border:1.5px solid #cbd5e1; background:#fff; color:#64748b;
                                    border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">🔄</button>
                     </div>
+                    ${caVisitSummaryHtml(all)}
                 </div>`;
 
             if (!list.length) {
-                box.innerHTML = head + `<div style="padding:34px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">해당하는 손님이 없습니다.</div>`;
+                const emptyHtml = `<div style="padding:34px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">해당하는 손님이 없습니다.</div>`;
+                const listBox = document.getElementById('ca-list');
+                if (listOnly && listBox) { listBox.innerHTML = emptyHtml; return; }
+                box.innerHTML = head + `<div id="ca-list">${emptyHtml}</div>`;
                 return;
             }
 
@@ -13709,7 +13965,7 @@
                     </div>
                     <div class="ca-r2">
                         <span>${r.way === '배달' ? '🛵' : '🏠'}</span>
-                        <span>${fmtPhone(r.phone)}</span>
+                        <span>${fmtPhone(r.tel)}</span>
                         ${r.gender ? `<span>· ${r.gender === '여성' ? '👩' : r.gender === '남성' ? '👨' : '👤'} ${gEscapeHtml(r.gender)}</span>` : ''}
                         ${r.ageGroup ? `<span>· 🎂 ${gEscapeHtml(r.ageGroup)}</span>` : ''}
                         <span style="margin-left:auto; flex:0 0 auto; color:${r.idle !== null && r.idle >= 60 ? '#a16207' : '#cbd5e1'};">${r.idle === null ? '' : `${r.idle}일 전`}</span>
@@ -13725,6 +13981,11 @@
                         ${r.lastChange ? `<span style="margin-left:auto; color:#0369a1;"
                             title="${gEscapeHtml(String(r.lastChange.from || '(빈칸)'))} → ${gEscapeHtml(String(r.lastChange.to || '(빈칸)'))}">✏️ ${gEscapeHtml(String(r.lastChange.date || ''))} ${gEscapeHtml(String(r.lastChange.what || ''))} 고침</span>` : ''}
                     </div>
+                    ${r.visit ? `<div class="ca-r2" style="color:#64748b;">
+                        <span>👀 접속 ${caAgoLabel(r.visit.lastDays)}</span>
+                        <span>· 30일 중 ${r.visit.visitDays}일</span>
+                        ${r.visit.browse ? `<span>· 구경만 ${r.visit.browse}일</span>` : ''}
+                    </div>` : ''}
                     ${r.refundAccount || !r.saved || r.borrowed ? `<div class="ca-r2" style="color:#cbd5e1;">
                         ${r.refundAccount ? `<span style="color:#7c3aed; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="환불계좌">💳 ${gEscapeHtml(r.refundAccount)}</span>` : ''}
                         ${!r.saved ? `<span style="color:#c2410c;">📋 손님 정보 없음 · 주문에서 뽑은 값</span>` : ''}
@@ -13733,7 +13994,7 @@
                 </div>`;
             }).join('');
 
-            box.innerHTML = head
+            const listHtml = ''
                 /* [신규] 머리글을 눌러서도 세울 수 있게 한다.
                    위 고르는 칸을 찾아 내리는 것보다, 보고 있는 칸 이름을 바로 누르는 쪽이 빠르다. */
                 + (() => {
@@ -13750,6 +14011,11 @@
                 })()
                 + cards
                 + (list.length > 400 ? `<div style="padding:10px; text-align:center; font-size:11.5px; font-weight:800; color:#cbd5e1;">앞 400명만 보입니다. 찾기를 써 주세요.</div>` : '');
+
+            // 찾기로 불렸으면 목록 칸만 바꾼다. 찾기 칸은 손대지 않아 커서와 한글 조합이 이어진다.
+            const listBox = document.getElementById('ca-list');
+            if (listOnly && listBox) { listBox.innerHTML = listHtml; return; }
+            box.innerHTML = head + `<div id="ca-list">${listHtml}</div>`;
         }
 
         // 주소 한 줄을 넣어 어떻게 인식되는지 바로 확인 (지번을 새로 알았을 때 확인용)
@@ -15228,8 +15494,36 @@
             return k;
         }
 
+        /* [신규] 손님을 가리는 번호 — 조회는 모두 카카오 번호로 한다.
+           주문에 적힌 연락처는 손님이 고칠 수 있어 같은 사람이 여러 번호로 갈라졌다.
+             1) 주문에 실린 카카오 번호
+             2) 없으면 주문이 담긴 서랍 번호 (카카오 로그인 이전 손님)
+             3) 그것도 없으면 적힌 연락처
+           카카오 번호 서랍으로 옮긴 손님(movedFrom)은 옛 번호를 새 번호로 읽는다.
+           문자 보낼 번호는 여기가 아니라 연락처(salesNormPhone)를 쓴다. */
+        let _gMovedSrc = null, _gMovedMap = {};
+        function gMovedAlias(){
+            const saved = window.__caSaved || null;
+            if (saved === _gMovedSrc) return _gMovedMap;
+            _gMovedSrc = saved; _gMovedMap = {};
+            if (saved) Object.keys(saved).forEach(k => {
+                const mf = saved[k] && saved[k].movedFrom;
+                if (mf && typeof mf === 'object') Object.keys(mf).forEach(old => {
+                    const ok = String(old).replace(/\D/g, '');
+                    if (ok && !saved[ok]) _gMovedMap[ok] = String(k).replace(/\D/g, '');
+                });
+            });
+            return _gMovedMap;
+        }
+        function gCustKey(o){
+            if (!o || typeof o !== 'object') return salesNormPhone(o);
+            let k = salesNormPhone(String(o.kakaoPhone || '')) || salesNormPhone(String(o.firebasePhoneKey || '')) || salesNormPhone(o);
+            const mv = gMovedAlias();
+            if (k && mv[k]) k = mv[k];
+            return k;
+        }
         function salesPersonKey(o){
-            return salesNormPhone(o) || ('명:' + String(o.name || '무명'));  // 못 살리면 이름 기준
+            return gCustKey(o) || ('명:' + String(o.name || '무명'));  // 못 살리면 이름 기준
         }
 
         // [신규] 보관함(orders_archive)을 rawOrders와 동일한 형태로 평탄화 (status는 플래그로 계산)
@@ -19522,6 +19816,7 @@
                 });
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 prod.productCode = code;   // 화면이 들고 있는 것도 맞춰 둔다
+                updatePublishedProductsTimestamp();   // [버그수정] 번호가 바뀌었다고 알린다. 안 알리면 주문서가 옛 상품을 계속 쓰고, 새 주문에 옛 번호가 적힌다
                 return code;
             } catch (e) {
                 console.warn('식별번호 부여 실패:', e);
@@ -24264,6 +24559,7 @@
                     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
                 });
                 if (!res.ok) throw new Error('저장 실패 ' + res.status);
+                updatePublishedProductsTimestamp();   // [버그수정] 번호가 바뀌었다고 알린다. 안 알리면 주문서가 옛 상품을 계속 쓰고, 새 주문에 옛 번호가 적힌다
                 targets.forEach(c => {
                     const code = String(c.hits[0].po.productCode || '').trim();
                     if (uploadProducts[c.idx] && /^[PFS]\d+$/.test(code)) uploadProducts[c.idx].productCode = code;
@@ -24317,6 +24613,7 @@
                 });
                 if (!res.ok) throw new Error('저장 실패 ' + res.status);
                 if (uploadProducts[c.idx]) uploadProducts[c.idx].productCode = newCode;
+                updatePublishedProductsTimestamp();   // [버그수정] 번호가 바뀌었다고 알린다. 안 알리면 주문서가 옛 상품을 계속 쓰고, 새 주문에 옛 번호가 적힌다
                 showToast(`연결 완료 — ${newCode}`);
                 await renderCodeLinkCandidates();
                 if (typeof renderProductsList === 'function') renderProductsList();
@@ -24683,6 +24980,7 @@
                     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
                 });
                 if (!res.ok) throw new Error('상품 식별번호 저장 실패 ' + res.status);
+                updatePublishedProductsTimestamp();   // [버그수정] 번호가 바뀌었다고 알린다. 안 알리면 주문서가 옛 상품을 계속 쓰고, 새 주문에 옛 번호가 적힌다
 
                 console.log(`[상품 식별번호] 발주와 연결 ${linked}건, 새 번호 ${created}건`);
                 if (!silent) showToast(`식별번호 부여 완료 — 발주 연결 ${linked}건, 신규 ${created}건`);
@@ -24999,6 +25297,7 @@
                                 body: JSON.stringify({ [`${_pi}/productCode`]: productCode })
                             });
                             _p.productCode = productCode;
+                            updatePublishedProductsTimestamp();   // [버그수정] 번호가 바뀌었다고 알린다. 안 알리면 주문서가 옛 상품을 계속 쓰고, 새 주문에 옛 번호가 적힌다
                         } catch (e) { console.warn('상품에 식별번호 연결 실패:', e); }
                     }
                 }
