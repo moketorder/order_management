@@ -3253,6 +3253,55 @@
         /* [신규] 접속 기록 — 30일 줄, 시간대 막대, 요일×시간 표.
            색은 파랑 한 가지를 밝기로만 나눈다. 구경만(옅음)과 주문함(진함)이 색약에서도 갈린다. */
         .cv-strip { display:grid; grid-template-columns:repeat(30, 1fr); gap:2px; }
+        /* [신규] 기간 단추 · 90일 주 단위 달력 · 구매 흐름 · 날짜별 줄 */
+        .cv-per { height:22px; padding:0 8px; border:1px solid #cbd5e1; background:#fff; color:#64748b; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; }
+        .cv-per.on { border-color:#1d4ed8; background:#eff6ff; color:#1d4ed8; }
+        .cv-per-wrap { display:inline-flex; gap:3px; vertical-align:middle; margin:0 4px; flex-wrap:wrap; }
+        /* [신규] 날짜 고르기 — 단추 위에 투명한 달력 칸을 겹쳐, 누르면 달력이 뜬다 */
+        .cv-date { position:relative; display:inline-flex; align-items:center; overflow:hidden; }
+        .cv-date input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; border:0; padding:0; margin:0; font-size:16px; }
+        /* [신규] 하루 시간대 겹친 막대 — 옅은 막대=접속자 수, 겹친 진한 막대=주문자 수 (같은 눈금). 진한 막대는 좁게 그려 높이가 같아도 보인다 */
+        .cv-ov { display:flex; align-items:flex-end; gap:2px; height:56px; border-bottom:1px solid #e2e8f0; }
+        .cv-ov span { flex:1; min-width:0; height:100%; position:relative; display:flex; align-items:flex-end; justify-content:center; }
+        .cv-ov .v { position:absolute; left:0; right:0; bottom:0; background:#93c5fd; border-radius:2px 2px 0 0; }
+        .cv-ov .o { position:relative; width:55%; background:#1e3a8a; border-radius:2px 2px 0 0; }
+        /* 시간이 바뀌는 줄 — 위에 얇은 실선 */
+        .cv-who.hour-start { border-top:1px solid #cbd5e1; }
+        .cv-who { display:flex; align-items:baseline; gap:8px; padding:5px 2px; border-top:1px dashed #e2e8f0; font-size:11.5px; font-weight:700; color:#475569; cursor:pointer; }
+        .cv-who:hover { background:#eff6ff; }
+        .cv-who-t { flex:0 0 40px; color:#94a3b8; font-variant-numeric:tabular-nums; }
+        .cv-who-n { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#0f172a; }
+        /* 오른쪽 수치는 칸 폭을 못박아 위아래로 줄을 맞춘다: 조회 n/전체 │ 주문 │ 금액 */
+        .cv-who-c1 { flex:0 0 58px; min-width:0; overflow:hidden; text-align:left; color:#64748b; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .cv-who-c2 { flex:0 0 104px; min-width:0; overflow:hidden; text-align:left; color:#94a3b8; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .cv-who.ord .cv-who-c2 { color:#1d4ed8; font-weight:800; }
+        /* 🛒 자리를 늘 비워 두어 '주문' 글자가 줄마다 같은 곳에서 시작하게 */
+        .cv-who-c2 .cv-ic { display:inline-block; width:17px; }
+        @media (max-width: 640px) { .cv-who { gap:6px; } .cv-who-c1 { flex-basis:54px; } .cv-who-c2 { flex-basis:96px; } }
+        .cv-cal { flex:1; min-width:0; display:grid; grid-auto-flow:column; grid-template-rows:repeat(7, auto); grid-auto-columns:minmax(0, 1fr); gap:2px; }
+        .cv-cal i { display:block; aspect-ratio:1 / 1; border-radius:2px; background:#e2e8f0; }
+        .cv-cal i.b { background:#93c5fd; }
+        .cv-cal i.o { background:#1d4ed8; }
+        .cv-cal-wd { display:grid; grid-template-rows:repeat(7, 1fr); gap:2px; font-size:9px; font-weight:700; color:#94a3b8; }
+        .cv-cal-wd span { display:flex; align-items:center; line-height:1; }
+        .cv-flow { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:6px; margin-top:10px; }
+        .cv-flow div { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:6px 8px; display:flex; flex-direction:column; gap:1px; min-width:0; }
+        .cv-flow span { font-size:10.5px; font-weight:700; color:#94a3b8; }
+        .cv-flow b { font-size:13px; font-weight:900; color:#0f172a; white-space:nowrap; }
+        .cv-flow em { font-style:normal; font-size:10px; font-weight:700; color:#94a3b8; }
+        .cv-day { display:flex; align-items:baseline; gap:8px; padding:5px 2px; border-top:1px dashed #e2e8f0; font-size:11.5px; font-weight:700; color:#475569; }
+        .cv-day.ord { cursor:pointer; }
+        .cv-day.ord:hover { background:#eff6ff; }
+        .cv-day-d { flex:0 0 66px; color:#334155; }
+        .cv-day-t { flex:1; min-width:0; }
+        .cv-day-o { flex:0 0 auto; color:#94a3b8; }
+        .cv-day.ord .cv-day-o { color:#1d4ed8; font-weight:800; }
+        @media (max-width: 640px) {
+            .cv-flow b { font-size:12px; }
+            /* 폰 폭에서 요일×시간 표가 칸 밖으로 밀려 가로 스크롤이 생기지 않게 칸을 줄인다 */
+            table.cv-heat { border-spacing:1px; }
+            table.cv-heat td { width:9px; min-width:9px; height:9px; }
+        }
         .cv-strip i { display:block; aspect-ratio:1 / 1; border-radius:2px; background:#e2e8f0; }
         .cv-strip i.b, .cv-key.b { background:#93c5fd; }
         .cv-strip i.o, .cv-key.o { background:#1d4ed8; }
@@ -7960,7 +8009,17 @@
 
         // [신규] 캐시된 보관함 주문을 rawOrders에 병합(중복 제외). 실시간 리스너가 rawOrders를 재생성해도 검색 가능하게 유지.
         function mergeArchiveIntoRawOrders() {
-            if (!isArchiveLoaded || !archivedOrdersCache.length) return;
+            if (!isArchiveLoaded) return;
+            /* [버그수정] 보관함을 새로 받았는데 서버에서 지운 주문이 목록에 남았다.
+               더하기만 하고 빼지는 않았기 때문이다. 새 보관함에 없는 보관 주문은 먼저 걷어 낸다. */
+            {
+                const keep = new Set(archivedOrdersCache.map(a => String(a.phone) + '|' + String(a.orderKey)));
+                for (let i = rawOrders.length - 1; i >= 0; i--) {
+                    const o = rawOrders[i];
+                    if (o && o.isArchived && !keep.has(String(o.phone) + '|' + String(o.orderKey))) rawOrders.splice(i, 1);
+                }
+            }
+            if (!archivedOrdersCache.length) return;
             const seen = new Set(rawOrders.map(o => String(o.phone) + '|' + String(o.orderKey)));
             let added = false;
             archivedOrdersCache.forEach(a => {
@@ -11236,9 +11295,27 @@
                 </div>`;
             // [신규] 접속 기록 — 받아 둔 게 없으면 받는 대로 채운다
             {
-                const _od = new Set(all.map(o => { const d = validDate(o); return d ? caDayKey(d) : ''; }).filter(Boolean));
-                const _paint = () => { const b = modal.querySelector('#cust-visit-box'); if (b) b.innerHTML = caVisitCardHtml(caVisitStats(_custKey, _od)); };
-                if (window.__caVisits) _paint(); else gEnsureVisits().then(_paint).catch(() => { });
+                // [수정] 접속과 견주는 날은 '주문한 날'(주문 시각)이다. 판매 통계의 픽업일 기준을 따르면 주문한 날이 구경만으로 보였다
+                // 접속 기록을 모으기 시작한 뒤의 주문만 (그 전 주문은 접속과 견줄 수 없다)
+                const _ordDay = o => { const t = parseTimestampToDate(o.timestamp); return caAfterVisitStart(t) ? caDayKey(t) : ''; };
+                const _od = new Set(all.filter(o => !gIsFeeRow(o)).map(_ordDay).filter(Boolean));   // 배달비만 남은 날은 주문한 날로 안 친다
+                const _os = new Map();   // 날짜|10분 칸 → { n, amt }
+                const _oa = new Map(), _oc = new Map(), _ocSeen = new Set();   // 날짜별 주문 금액 · 주문 건수 (한 번에 넣은 것을 1건, 배달비 뺌)
+                all.forEach(o => {
+                    if (gIsFeeRow(o)) return;
+                    const k = _ordDay(o); if (!k) return;
+                    _oa.set(k, (_oa.get(k) || 0) + (parseInt(o.total || 0) || 0));
+                    const id = k + '|' + String(o.timestamp);
+                    const _t = parseTimestampToDate(o.timestamp);
+                    const sk = k + '|' + `${String(_t.getHours()).padStart(2, '0')}${Math.floor(_t.getMinutes() / 10)}0`;
+                    if (!_os.has(sk)) _os.set(sk, { n: 0, amt: 0 });
+                    _os.get(sk).amt += parseInt(o.total || 0) || 0;
+                    if (!_ocSeen.has(id)) { _ocSeen.add(id); _oc.set(k, (_oc.get(k) || 0) + 1); _os.get(sk).n++; }
+                });
+                const _paint = () => { const b = modal.querySelector('#cust-visit-box'); if (b) b.innerHTML = caVisitCardHtml(caVisitStats(_custKey, _od), _oa, _oc, _os); };
+                window.__caCardPaint = _paint;   // 카드 안에서 기간을 바꾸면 다시 그린다
+                if (window.__caVisits) _paint();
+                gEnsureVisits().then(_paint).catch(() => { });
             }
             // [수정] 아파트 동·호수 창(z-index 10050)에서 호수를 눌러 이 카드를 열면
             //  카드가 뒤에 깔려 보이지 않았다. 지금 떠 있는 창보다 한 칸 위로 올린다.
@@ -13502,9 +13579,12 @@
         async function initCustomerAdmin(force) {
             const box = document.getElementById('cust-admin-body');
             if (box) box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
-            const _visitsP = gEnsureVisits(!!force).catch(() => null);   // [신규] 접속 기록도 함께 받는다
+            const _visitsP = gEnsureVisits(!!force).catch(() => null);   // [신규] 접속 기록 — 🔄 를 눌렀을 때만 새로 받는다
             try {
-                if (typeof loadSalesArchiveFromCache === 'function') loadSalesArchiveFromCache();
+                /* [수정] 🔄 를 누르면 보관함 주문도 서버 표식과 견줘 바뀌었으면 새로 받는다.
+                   예전에는 기기에 담아 둔 보관함만 써서, 서버에서 지운 주문이 손님관리에 '주문에만'으로 남았다. */
+                if (force && typeof refreshSalesArchive === 'function') { try { await refreshSalesArchive(false); } catch (e) { } }
+                else if (typeof loadSalesArchiveFromCache === 'function') loadSalesArchiveFromCache();
 
                 let 서버표식 = null;
                 if (!force) {
@@ -13538,6 +13618,7 @@
                 }
             } catch (e) { console.error('손님 정보 불러오기 실패:', e); window.__caSaved = {}; }
             await _visitsP;
+            caApplyJoinSlots();   // [신규] 손님 정보를 받은 뒤 가입 시각을 접속 칸으로 보탠다
             caRows = null;
             renderCustomerAdmin();
         }
@@ -13545,14 +13626,15 @@
         /* ===== [신규] 접속 기록 (visits/{날짜}/{카카오번호}) =====
            주문서가 손님이 들어올 때 남긴 기록을 손님관리에서 본다.
              · 지난 날짜는 다시 바뀌지 않으므로 한 번 받으면 이 기기에 담아 두고 다시 안 받는다
-             · 오늘과 어제만 열 때마다 새로 받는다. 30일이 지난 날짜는 담아 둔 데서 지운다
+             · 🔄 를 누르면 오늘·어제를 새로 받는다. 90일이 지난 날짜는 담아 둔 데서 지운다
+             · 기간(오늘·7일·30일·90일)을 고르면 손님관리의 접속 숫자가 모두 그 기간으로 바뀐다
              · 가게 사람·시험 계정은 접속 셈에서 뺀다 */
         const VISITS_CACHE_KEY = 'moket_visits_days';
-        const VISIT_LOOKBACK = 30;
+        const VISIT_LOOKBACK = 30;     // 구경만·발길 끊김을 가리는 고정 잣대
+        const VISIT_KEEP_DAYS = 90;    // 기기에 담아 두는 날수
         const CA_STAFF_PHONES = new Set([
-            '01097299279', '01012345678', '01027799279',   // 모켓1234 (사장님 시험 계정)
-            '01092752181',                                 // 강성훈 · kkk · 깡깡이
-            '01044193392'                                  // 유징3392
+            '01097299279', '01027799279',   // 모켓1234 (사장님 시험 계정)
+            '01092752181'                   // 강성훈 · kkk · 깡깡이
         ]);
         function caDayKey(d) {
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -13563,150 +13645,626 @@
             for (let i = 0; i < n; i++) { const d = new Date(t); d.setDate(t.getDate() - i); out.push(caDayKey(d)); }
             return out;
         }
+
+        // [신규] 보는 기간 — 손님관리의 접속 숫자 전체에 같이 쓴다. 마지막으로 고른 기간을 기억한다
+        const CA_PERIODS = [[1, '오늘'], [7, '7일'], [30, '30일'], [90, '90일']];
+        const VISIT_START = '2026-09-14';   // 접속 기록을 모으기 시작한 날
+        /* [신규] 서버에 쌓인 첫 접속 기록 시각 (2026-09-14 20:54:22).
+           접속과 견주는 주문은 이 뒤 것만 센다. 그 전 주문은 접속 기록이 없어 '접속 0번 · 주문 N건'처럼 어긋나 보였다.
+           판매 통계·주문 내역·손님관리의 구매액은 그대로 전부 센다. */
+        const VISIT_START_TS = 1789386862344;
+        function caAfterVisitStart(t) { return !!(t && !isNaN(t.getTime()) && t.getTime() >= VISIT_START_TS); }
+        let caVisitPeriod = (() => {
+            try { const v = parseInt(localStorage.getItem('moket_ca_visit_period'), 10); return [1, 7, 30, 90].includes(v) ? v : 30; } catch (e) { return 30; }
+        })();
+        let caVisitDate = '';   // [신규] 달력으로 고른 하루 ('' 이면 기간으로 본다). 기억하지 않는다
+        let caDayWhoFilter = 'all';   // 그날 온 손님 목록 거르기: all | ord | browse
+
+        function caMdLabel(d) {
+            const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+            return `${parseInt(d.slice(5, 7), 10)}/${parseInt(d.slice(8), 10)} (${DOW[new Date(`${d}T12:00:00`).getDay()]})`;
+        }
+        function caPeriodLabel(p) { const hit = CA_PERIODS.find(x => x[0] === p); return hit ? hit[1] : `${p}일`; }
+        // 지금 보는 날들 [최근 날, …] 과 그 이름
+        function caSelDays() { return caVisitDate ? [caVisitDate] : caLastDays(caVisitPeriod); }
+        function caSelLabel() { return caVisitDate ? caMdLabel(caVisitDate) : caPeriodLabel(caVisitPeriod); }
+        function caIsOneDay() { return !!caVisitDate || caVisitPeriod === 1; }
+
+        function caPeriodBtns() {
+            const today = caLastDays(1)[0];
+            const btns = CA_PERIODS.map(([p, l]) => `<button type="button" class="cv-per${!caVisitDate && p === caVisitPeriod ? ' on' : ''}"
+                onclick="event.preventDefault(); event.stopPropagation(); caSetVisitPeriod(${p})">${l}</button>`).join('');
+            const dateBtn = `<label class="cv-per cv-date${caVisitDate ? ' on' : ''}" title="날짜 고르기">📅 ${caVisitDate ? caMdLabel(caVisitDate) : '날짜'}
+                <input type="date" min="${VISIT_START}" max="${today}" value="${caVisitDate || today}"
+                    onclick="event.stopPropagation(); try { this.showPicker(); } catch (e) { }"
+                    onchange="caSetVisitDate(this.value)"></label>`;
+            return btns + dateBtn;
+        }
+        function caAfterSelChange() {
+            caRows = null;
+            if (document.getElementById('ca-list')) renderCustomerAdmin();
+            if (typeof window.__caCardPaint === 'function' && document.getElementById('cust-visit-box')) window.__caCardPaint();
+        }
+        function caSetVisitPeriod(p) {
+            caVisitPeriod = [1, 7, 30, 90].includes(p) ? p : 30;
+            caVisitDate = '';
+            try { localStorage.setItem('moket_ca_visit_period', String(caVisitPeriod)); } catch (e) { }
+            gEnsureVisits().catch(() => null).then(caAfterSelChange);
+        }
+        function caSetVisitDate(d) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))) return;
+            const today = caLastDays(1)[0];
+            if (d > today) d = today;
+            caVisitDate = d;
+            gEnsureVisitDay(d).catch(() => null).then(caAfterSelChange);
+        }
+        /* [신규] 가입한 때를 그날의 접속 칸으로 보탠다.
+           처음 로그인하는 손님은 로그인 뒤 상품 확인이 없어서 그 방문의 칸이 안 남는다.
+           대신 가입하면 손님 정보에 가입 시각(createdAt)이 초까지 남으니, 그 시각의 10분 칸을 접속으로 친다.
+             · 화면에서 볼 때만 합친다. 서버의 접속 기록과 기기 캐시에는 넣지 않는다 (값을 'join' 으로 두어 가려낸다)
+             · 접속 기록을 모으기 전(VISIT_START_TS) 가입과 가게 사람은 뺀다
+             · 다시 로그인하는 옛 손님은 가입 기록이 새로 생기지 않으니 해당하지 않는다 */
+        function caApplyJoinSlots() {
+            const V = window.__caVisits, saved = window.__caSaved;
+            if (!V || !saved) return;
+            Object.keys(saved).forEach(k => {
+                const t = Number(saved[k] && saved[k].createdAt);
+                if (!t || t < VISIT_START_TS || CA_STAFF_PHONES.has(k)) return;
+                const dt = new Date(t), d = caDayKey(dt);
+                if (!V[d] || typeof V[d] !== 'object') return;   // 받아 둔 날이 아니면 넘어간다
+                const slot = `${String(dt.getHours()).padStart(2, '0')}${Math.floor(dt.getMinutes() / 10)}0`;
+                const v = V[d][k] || (V[d][k] = {});
+                const sl = v.slots || (v.slots = {});
+                if (!sl[slot]) sl[slot] = 'join';
+            });
+        }
+        // 기기에 담을 때는 가입으로 보탠 칸을 뺀다
+        function caVisitsForSave(src) {
+            const out = {};
+            Object.keys(src || {}).forEach(d => {
+                const day = {};
+                Object.keys(src[d] || {}).forEach(k => {
+                    const v = src[d][k] || {};
+                    const sl = {};
+                    Object.keys(v.slots || {}).forEach(x => { if (v.slots[x] !== 'join') sl[x] = v.slots[x]; });
+                    const rest = Object.assign({}, v);
+                    delete rest.slots;
+                    if (Object.keys(sl).length) rest.slots = sl;
+                    if (Object.keys(rest).length) day[k] = rest;
+                });
+                out[d] = day;
+            });
+            return out;
+        }
+
+        // 고른 하루치가 없으면 그날만 받는다 (90일보다 오래된 날은 기기에 담지 않고 이번에만 쓴다)
+        async function gEnsureVisitDay(d) {
+            await gEnsureVisits().catch(() => null);
+            const V = window.__caVisits || (window.__caVisits = {});
+            if (d in V) return V;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}visits/${d}.json?t=${Date.now()}`);
+                if (r.ok) V[d] = (await r.json()) || {};
+                if (caLastDays(VISIT_KEEP_DAYS).includes(d)) idbSet(VISITS_CACHE_KEY, JSON.stringify(caVisitsForSave(V)));
+            } catch (e) { /* 못 받으면 빈 날로 보인다 */ }
+            caApplyJoinSlots();
+            return V;
+        }
+
         let _caVisitsLoading = null;
-        function gEnsureVisits(force) {
-            if (window.__caVisits && !force) return Promise.resolve(window.__caVisits);
+        /* 새로 받는 것은 🔄 를 눌렀을 때(refresh)뿐이다.
+             · 탭을 열 때는 담아 둔 것을 쓰고, 한 번도 안 받은 날짜만 받는다 (90일을 처음 고르면 그때 더 받는다)
+             · 🔄 를 누르면 오늘·어제를 새로 받는다 (지난 날짜는 바뀌지 않으므로 다시 안 받는다) */
+        function gEnsureVisits(refresh) {
+            const days = caLastDays(Math.max(VISIT_LOOKBACK, caVisitPeriod));
+            if (window.__caVisits && !refresh && days.every(d => d in window.__caVisits)) return Promise.resolve(window.__caVisits);
             if (_caVisitsLoading) return _caVisitsLoading;
             _caVisitsLoading = (async () => {
-                const days = caLastDays(VISIT_LOOKBACK);
-                let cache = {};
-                try { const raw = await idbGet(VISITS_CACHE_KEY); if (raw) cache = JSON.parse(raw) || {}; } catch (e) { cache = {}; }
-                const need = days.filter((d, i) => i < 2 || force || !(d in cache));
+                let cache = window.__caVisits ? Object.assign({}, window.__caVisits) : null;
+                if (!cache) {
+                    cache = {};
+                    try { const raw = await idbGet(VISITS_CACHE_KEY); if (raw) cache = JSON.parse(raw) || {}; } catch (e) { cache = {}; }
+                }
+                const need = days.filter((d, i) => (refresh && i < 2) || !(d in cache));
+                if (refresh && caVisitDate && !need.includes(caVisitDate)) need.push(caVisitDate);
                 await Promise.all(need.map(async d => {
                     try {
                         const r = await fetch(`${FIREBASE_DB_URL}visits/${d}.json?t=${Date.now()}`);
                         if (r.ok) cache[d] = (await r.json()) || {};
                     } catch (e) { /* 못 받은 날은 다음에 다시 받는다 */ }
                 }));
-                Object.keys(cache).forEach(d => { if (!days.includes(d)) delete cache[d]; });
-                idbSet(VISITS_CACHE_KEY, JSON.stringify(cache));
-                window.__caVisits = cache;
+                const keep = caLastDays(VISIT_KEEP_DAYS);
+                const toSave = {};
+                Object.keys(cache).forEach(d => { if (keep.includes(d)) toSave[d] = cache[d]; });
+                idbSet(VISITS_CACHE_KEY, JSON.stringify(caVisitsForSave(toSave)));
+                window.__caVisits = cache;   // 오래된 날을 골라 받아 둔 것은 이번 화면에서만 쓴다
+                caApplyJoinSlots();
                 return cache;
             })().finally(() => { _caVisitsLoading = null; });
             return _caVisitsLoading;
         }
 
-        /* 한 손님의 최근 30일 접속. orderDays = 그 손님이 주문한 날짜 모음
-             · 구경만 = 들어왔는데 그날 주문이 없음 (주문서의 '주문함' 표시나 주문 줄로 본다)
-             · 발길 끊김 = 15~30일 전에는 3일 넘게 왔는데 최근 14일은 한 번도 안 옴 */
+        /* [변경] 접속은 10분 칸으로 담긴다 (visits/{날짜}/{번호}.slots = { "2130": 1, … }).
+           옛 기록(시간 단위 hours)이 섞여 있으면 그 시간의 첫 칸(HH00)으로 본다. */
+        function caSlotsOf(v) {
+            const set = new Set();
+            if (v && v.slots && typeof v.slots === 'object') Object.keys(v.slots).forEach(k => { if (/^\d{3}0$/.test(k)) set.add(k); });
+            if (v && v.hours && typeof v.hours === 'object') Object.keys(v.hours).forEach(h => {
+                const hh = String(parseInt(h, 10)).padStart(2, '0');
+                if (!/^\d{2}$/.test(hh) || [...set].some(k => k.startsWith(hh))) return;
+                set.add(hh + '00');
+            });
+            if (!set.size && v && (v.first || v.last)) {
+                const t = new Date(Number(v.first) || Number(v.last));
+                set.add(`${String(t.getHours()).padStart(2, '0')}${Math.floor(t.getMinutes() / 10)}0`);
+            }
+            return [...set].sort();
+        }
+        // 연속한 10분 칸을 묶은 '방문' 수 (0900·0910·0920 → 1번)
+        function caVisitRuns(slots) {
+            let runs = 0, prev = -99;
+            slots.forEach(k => { const m = parseInt(k.slice(0, 2), 10) * 6 + parseInt(k[2], 10); if (m !== prev + 1) runs++; prev = m; });
+            return runs;
+        }
+        function caVisitCount(v) { return Math.max(1, caVisitRuns(caSlotsOf(v))); }
+        // 시간마다 그 시간에 접속한 칸이 있었으면 1번으로 센다
+        function caAddHours(v, fn) {
+            const seen = new Set();
+            caSlotsOf(v).forEach(k => { const hh = parseInt(k.slice(0, 2), 10); if (!seen.has(hh)) { seen.add(hh); fn(hh, 1); } });
+        }
+        // [신규] 10분 칸 도우미
+        function caSlotIdx(k) { return parseInt(k.slice(0, 2), 10) * 6 + parseInt(k[2], 10); }
+        function caSlotTime(idx) { return `${String(Math.floor(idx / 6)).padStart(2, '0')}:${idx % 6}0`; }
+        // 연속한 칸 묶음 → [{ from:'21:00', to:'21:20', slots:2 }, …]
+        function caRunsOf(slots) {
+            const out = [];
+            slots.forEach(k => {
+                const i = caSlotIdx(k), last = out[out.length - 1];
+                if (last && i === last.end + 1) { last.end = i; last.slots++; }
+                else out.push({ start: i, end: i, slots: 1 });
+            });
+            return out.map(r => ({ from: caSlotTime(r.start), to: caSlotTime(r.end + 1), slots: r.slots, startIdx: r.start, endIdx: r.end }));
+        }
+        /* [신규] 주문이 나온 조회 — 주문 시각(10분 칸)이 들어 있는 조회. 딱 맞는 게 없으면 그 앞의 가장 가까운 조회,
+           그것도 없으면 그날 첫 조회. 시간대별 주문 건수는 '그 조회가 시작한 시간'에 넣는다. */
+        function caOrderRunIdx(runs, slotKey) {
+            const oi = caSlotIdx(slotKey);
+            let ri = runs.findIndex(r => oi >= r.startIdx && oi <= r.endIdx);
+            if (ri < 0) { ri = 0; runs.forEach((r, i) => { if (r.startIdx <= oi) ri = i; }); }
+            return ri;
+        }
+        // 주문을 넣을 시간 — 그날 조회가 없으면 주문한 시각의 시간
+        function caOrderHour(runs, slotKey) {
+            if (!runs || !runs.length) return parseInt(slotKey.slice(0, 2), 10);
+            return Math.floor(runs[caOrderRunIdx(runs, slotKey)].startIdx / 6);
+        }
+        function caRunsLabel(slots, limit) {
+            const runs = caRunsOf(slots), lim = limit || 3;
+            const shown = runs.slice(0, lim).map(r => `${r.from}~${r.to}`).join(' · ');
+            return runs.length > lim ? `${shown} 외 ${runs.length - lim}번` : shown;
+        }
+        function caWeekIdx(d) { return (new Date(`${d}T12:00:00`).getDay() + 6) % 7; }   // 월요일이 0
+
+        /* 한 손님의 접속 모음. orderDays = 그 손님이 주문한 날짜 모음
+             · 고른 기간(또는 고른 하루): 며칠·몇 번·구경만·시간대·요일×시간·날짜별 줄·추세·구매 흐름
+             · 고정 잣대 (기간과 상관없음)
+                 구경만 = 최근 30일에 3일 넘게 들어왔는데 한 번도 안 샀다
+                 발길 끊김 = 15~30일 전에는 3일 넘게 왔는데 최근 14일은 한 번도 안 옴 */
         function caVisitStats(key, orderDays) {
             const V = window.__caVisits;
             if (!V || !key || CA_STAFF_PHONES.has(key)) return null;
-            const days = caLastDays(VISIT_LOOKBACK);
-            let last = 0, visitDays = 0, browse = 0, early = 0, recent14 = 0;
-            const hours = new Array(24).fill(0), map = {};
-            days.forEach((d, i) => {
+            // [수정] 주문한 날은 취소되지 않은 실제 주문으로만 본다. 접속 기록의 주문함 표시는 주문을 취소해도 남아서 쓰지 않는다
+            const isOrd = (d, v) => !!(orderDays && orderDays.has(d));
+            const cnt = v => caVisitCount(v);   // 방문 수 (연속 칸 묶음)
+
+            // 마지막 접속 — 담아 둔 날 전부에서 본다. 가까운 접속일도 함께 모은다
+            let last = 0;
+            const visitedDays = [];
+            Object.keys(V).forEach(d => {
+                const v = V[d] && V[d][key];
+                if (!v) return;
+                visitedDays.push(d);
+                // 마지막으로 있던 때 — 그날 마지막 10분 칸 (칸이 없는 옛 기록은 그날 낮 12시로 친다)
+                const _sl = caSlotsOf(v), _ls = _sl[_sl.length - 1];
+                last = Math.max(last, _ls ? new Date(`${d}T${_ls.slice(0, 2)}:${_ls.slice(2)}:00`).getTime() : new Date(`${d}T12:00:00`).getTime());
+            });
+            if (!visitedDays.length) return null;
+            visitedDays.sort();
+
+            // 고정 잣대
+            let v30 = 0, b30 = 0, early = 0, recent14 = 0;
+            caLastDays(VISIT_LOOKBACK).forEach((d, i) => {
+                const v = V[d] && V[d][key];
+                if (!v) return;
+                v30++;
+                if (!isOrd(d, v)) b30++;
+                if (i < 14) recent14++; else early++;
+            });
+
+            // 고른 기간
+            const P = caVisitPeriod;
+            const days = caSelDays();   // [최근 날, …]
+            const hours = new Array(24).fill(0);
+            const grid = Array.from({ length: 7 }, () => new Array(24).fill(0));
+            const map = {}, rows = [];
+            let visitDays = 0, count = 0, browse = 0, orderedDays = 0, slotCount = 0;
+            days.forEach(d => {
                 const v = V[d] && V[d][key];
                 if (!v) return;
                 visitDays++;
-                const ord = v.ordered === true || !!(orderDays && orderDays.has(d));
+                const c = cnt(v);
+                count += c;
+                const ord = isOrd(d, v);
                 map[d] = ord ? 'o' : 'b';
-                if (!ord) browse++;
-                if (i < 14) recent14++; else early++;
-                const l = Number(v.last) || 0;
-                if (l > last) last = l;
-                if (v.hours && typeof v.hours === 'object') Object.keys(v.hours).forEach(h => {
-                    const hh = parseInt(h, 10);
-                    if (hh >= 0 && hh < 24) hours[hh] += Number(v.hours[h]) || 0;
-                });
+                if (ord) orderedDays++; else browse++;
+                const wd = caWeekIdx(d);
+                caRunsOf(caSlotsOf(v)).forEach(r => { const hh = Math.floor(r.startIdx / 6); hours[hh]++; grid[wd][hh]++; });   // [변경] 그래프는 조회 건수 (시작한 시간)
+                const sl = caSlotsOf(v);
+                slotCount += sl.length;
+                rows.push({ d, count: c, ord, slots: sl });
             });
-            if (!visitDays) return null;
+
+            // 추세 — 기간을 반으로 나눠 최근 절반과 앞 절반의 횟수를 견준다 (하루를 볼 때는 없음)
+            let trend = null;
+            if (!caVisitDate && P >= 7) {
+                const half = Math.floor(P / 2);
+                let recent = 0, prev = 0;
+                days.forEach((d, i) => {
+                    const v = V[d] && V[d][key];
+                    if (!v) return;
+                    if (i < half) recent += cnt(v); else if (i < half * 2) prev += cnt(v);
+                });
+                trend = { recent, prev, half };
+            }
+
+            // 구매 흐름 — 주문한 날 앞에 구경만 한 날이 며칠이었나 (기간 안, 오래된 날부터)
+            const runs = [];
+            let run = 0;
+            days.slice().reverse().forEach(d => {
+                if (map[d] === 'b') run++;
+                else if (map[d] === 'o') { runs.push(run); run = 0; }
+            });
+            const avgBefore = runs.length ? runs.reduce((x, y) => x + y, 0) / runs.length : null;
+            const lastOrdIdx = days.findIndex(d => map[d] === 'o');
+            let afterOrder = 0;
+            if (lastOrdIdx > 0) days.slice(0, lastOrdIdx).forEach(d => { const v = V[d] && V[d][key]; if (v) afterOrder += cnt(v); });
+
+            // 고른 하루에 안 왔으면 앞뒤로 가장 가까운 접속일
+            let nearBefore = '', nearAfter = '';
+            if (caIsOneDay() && !visitDays) {
+                const sel = days[0];
+                visitedDays.forEach(d => { if (d < sel) nearBefore = d; else if (d > sel && !nearAfter) nearAfter = d; });
+            }
+
             const t0 = new Date(); t0.setHours(0, 0, 0, 0);
-            const lastDays = last ? Math.max(0, Math.round((t0 - new Date(new Date(last).setHours(0, 0, 0, 0))) / 86400000)) : null;
-            return { last, lastDays, visitDays, browse, hours, map, gone: early >= 3 && recent14 === 0 };
+            const lastDays = Math.max(0, Math.round((t0 - new Date(new Date(last).setHours(0, 0, 0, 0))) / 86400000));
+            return {
+                last, lastDays, P, visitDays, count, slotCount, browse, orderedDays, hours, grid, map, rows, trend,
+                avgBefore, afterOrder, hasOrderInPeriod: lastOrdIdx !== -1, nearBefore, nearAfter,
+                v30: { visitDays: v30, browse: b30 }, gone: early >= 3 && recent14 === 0
+            };
         }
         function caAgoLabel(n) { return n === 0 ? '오늘' : (n === null ? '-' : `${n}일 전`); }
         function caHourLabel(h) { return h === 0 ? '밤 12시' : h < 12 ? `오전 ${h}시` : h === 12 ? '낮 12시' : `오후 ${h - 12}시`; }
 
-        // 손님카드 안의 접속 칸
-        function caVisitCardHtml(vs) {
-            const wrap = inner => `<div style="font-size:12px; color:var(--text-sub); background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:12px;">${inner}</div>`;
-            if (!vs) return wrap(`👀 최근 30일 접속 기록 없음`);
-            const days = caLastDays(VISIT_LOOKBACK).reverse();   // 왼쪽이 30일 전, 오른쪽이 오늘
-            const md = d => `${parseInt(d.slice(5, 7), 10)}/${parseInt(d.slice(8), 10)}`;
-            const strip = days.map(d => {
-                const k = vs.map[d] || '';
-                return `<i class="${k}" title="${md(d)} · ${k === 'o' ? '주문함' : k === 'b' ? '구경만' : '안 옴'}"></i>`;
-            }).join('');
-            const maxH = Math.max(1, ...vs.hours);
-            const peak = vs.hours.indexOf(Math.max(...vs.hours));
-            const bars = vs.hours.map((c, h) =>
-                `<i class="${c ? '' : 'z'}" style="height:${c ? Math.max(10, Math.round(c / maxH * 100)) : 4}%;" title="${h}시 · ${c}번"></i>`).join('');
+        // 시간대 막대 (24칸). tip(h, c) = 막대에 마우스를 두면 뜨는 글
+        function caHourBarsHtml(hours, tip) {
+            const maxH = Math.max(1, ...hours);
+            const bars = hours.map((c, h) =>
+                `<i class="${c ? '' : 'z'}" style="height:${c ? Math.max(10, Math.round(c / maxH * 100)) : 4}%;" title="${tip ? tip(h, c) : `${h}시 · ${c}번`}"></i>`).join('');
             const axis = [0, 6, 12, 18, 23].map(h => `<span style="left:${(h + 0.5) / 24 * 100}%;">${h}시</span>`).join('');
-            return wrap(`
-                <div style="display:flex; flex-wrap:wrap; gap:4px 12px; margin-bottom:8px;">
-                    <span>👀 최근 접속 <b style="color:var(--text-main);">${caAgoLabel(vs.lastDays)}</b></span>
-                    <span>30일 중 <b style="color:var(--text-main);">${vs.visitDays}일</b></span>
-                    <span>구경만 <b style="color:var(--text-main);">${vs.browse}일</b></span>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:10.5px; font-weight:800; color:#94a3b8; margin-bottom:4px;">
-                    <span>최근 30일</span>
-                    <span style="display:flex; gap:8px; white-space:nowrap;"><span><i class="cv-key"></i>안 옴</span><span><i class="cv-key b"></i>구경만</span><span><i class="cv-key o"></i>주문함</span></span>
-                </div>
-                <div class="cv-strip">${strip}</div>
-                <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:700; color:#94a3b8; margin-top:2px;"><span>${md(days[0])}</span><span>오늘</span></div>
-                <div style="margin:10px 0 4px; font-size:10.5px; font-weight:800; color:#94a3b8;">시간대 · 자주 오는 때 <b style="color:var(--text-main);">${caHourLabel(peak)}</b></div>
-                <div class="cv-hours">${bars}</div>
-                <div class="cv-axis">${axis}</div>`);
+            return `<div class="cv-hours">${bars}</div><div class="cv-axis">${axis}</div>`;
         }
 
-        // 손님관리 맨 위 요약 — 오늘 접속·주문, 요일×시간대, 기기
-        let caVisitOpen = (() => { try { return localStorage.getItem('moket_ca_visit_open') === '1'; } catch (e) { return false; } })();
-        function caSetVisitOpen(v) { caVisitOpen = !!v; try { localStorage.setItem('moket_ca_visit_open', v ? '1' : '0'); } catch (e) { } }
-        function caVisitSummaryHtml(rows) {
-            const V = window.__caVisits;
-            if (!V) return '';
-            const days = caLastDays(VISIT_LOOKBACK), today = days[0];
-            const box = inner => `<details ${caVisitOpen ? 'open' : ''} ontoggle="caSetVisitOpen(this.open)" style="margin-top:10px; border-top:1px dashed #e2e8f0; padding-top:8px;">${inner}</details>`;
-            const orderDaysOf = new Map(rows.map(r => [r.phone, r.orderDays]));
+        /* [신규] 하루 시간대 겹친 막대. visitors·orderers: 시간마다 사람 수(24칸), tip(h) = 마우스를 두면 뜨는 글
+           둘을 같은 눈금으로 그린다 — 둘 중 큰 값에 맞춰 넘치지 않게 한다 (요약: 조회 건수·주문 건수) */
+        function caOverlayBarsHtml(visitors, orderers, tip, labels, note) {
+            const lab = labels || ['조회자', '주문자'];
+            const max = Math.max(1, ...visitors, ...orderers);
+            const pct = c => c ? Math.max(8, Math.round(c / max * 100)) : 0;
+            const cols = visitors.map((v, h) => `<span title="${tip(h)}"><i class="v" style="height:${pct(v)}%;"></i><i class="o" style="height:${pct(orderers[h])}%;"></i></span>`).join('');
+            const axis = [0, 6, 12, 18, 23].map(h => `<span style="left:${(h + 0.5) / 24 * 100}%;">${h}시</span>`).join('');
+            const legend = `<div style="display:flex; gap:10px; margin-top:2px; font-size:10px; font-weight:700; color:#94a3b8;">
+                <span><i class="cv-key" style="background:#93c5fd;"></i>${lab[0]}</span><span><i class="cv-key" style="background:#1e3a8a;"></i>${lab[1]}</span><span>(${note ? note + ' · ' : ''}마우스를 두면 자세히)</span></div>`;
+            return `<div class="cv-ov">${cols}</div><div class="cv-axis">${axis}</div>${legend}`;
+        }
 
-            const T = V[today] || {};
-            let tv = 0, to = 0;
-            Object.keys(T).forEach(k => {
-                if (CA_STAFF_PHONES.has(k)) return;
-                tv++;
-                const od = orderDaysOf.get(k);
-                if (T[k] && (T[k].ordered === true || (od && od.has(today)))) to++;
-            });
-
+        // 요일×시간 표 (파랑 한 가지를 밝기로 네 단계). tip(wd, h, c) = 칸에 마우스를 두면 뜨는 글
+        function caHeatHtml(grid, note, tip) {
             const WD = ['월', '화', '수', '목', '금', '토', '일'];
-            const grid = Array.from({ length: 7 }, () => new Array(24).fill(0));
-            const seen = new Set();   // 30일 동안 들어온 손님
-            days.forEach(d => {
-                const dayV = V[d];
-                if (!dayV) return;
-                const wd = (new Date(`${d}T12:00:00`).getDay() + 6) % 7;   // 월요일이 0
-                Object.keys(dayV).forEach(k => {
-                    if (CA_STAFF_PHONES.has(k)) return;
-                    const v = dayV[k] || {};
-                    if (v.hours && typeof v.hours === 'object') Object.keys(v.hours).forEach(h => {
-                        const hh = parseInt(h, 10);
-                        if (hh >= 0 && hh < 24) grid[wd][hh] += Number(v.hours[h]) || 0;
-                    });
-                    seen.add(k);
-                });
-            });
-            const people = seen.size;
-            const head = `<summary style="cursor:pointer; font-size:12px; font-weight:800; color:#334155;">👀 접속 요약
-                <span style="font-weight:700; color:#94a3b8;"> · 오늘 ${tv}명 접속 · ${to}명 주문 · 30일 ${people}명</span></summary>`;
-            if (!people) return box(head + `<div style="padding:8px 2px 2px; font-size:11.5px; font-weight:700; color:#94a3b8;">아직 접속 기록이 없습니다. 손님이 들어오면 쌓입니다.</div>`);
-
             const max = Math.max(1, ...grid.map(r => Math.max(...r)));
             const STEPS = ['#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a'];   // 적음 → 많음
             const cell = c => c ? STEPS[Math.min(3, Math.ceil(c / max * 4) - 1)] : '';
             const hourHead = Array.from({ length: 24 }, (_, h) => `<th>${h % 6 === 0 ? h : ''}</th>`).join('');
-            const heat = `<div style="overflow-x:auto;"><table class="cv-heat">
+            return `<div style="overflow-x:auto;"><table class="cv-heat">
                 <thead><tr><th></th>${hourHead}</tr></thead>
                 <tbody>${grid.map((r, i) => `<tr><th>${WD[i]}</th>${r.map((c, h) =>
-                    `<td style="${c ? `background:${cell(c)};` : ''}" title="${WD[i]}요일 ${h}시 · ${c}번"></td>`).join('')}</tr>`).join('')}</tbody>
+                    `<td style="${c ? `background:${cell(c)};` : ''}" title="${tip ? tip(i, h, c) : `${WD[i]}요일 ${h}시 · ${c}번`}"></td>`).join('')}</tr>`).join('')}</tbody>
             </table></div>
             <div style="display:flex; align-items:center; gap:3px; margin-top:3px; font-size:10px; font-weight:700; color:#94a3b8;">
-                적음 ${STEPS.map(c => `<i class="cv-key" style="background:${c}; margin:0;"></i>`).join('')} 많음 <span style="margin-left:6px;">(최근 30일, 들어온 횟수)</span>
+                적음 ${STEPS.map(c => `<i class="cv-key" style="background:${c}; margin:0;"></i>`).join('')} 많음 <span style="margin-left:6px;">(${note})</span>
+            </div>`;
+        }
+
+        // 접속 칸에서 주문한 날을 누르면 — 판매 통계 기준(픽업일)과 상관없이 그날 '주문한' 것을 보여 준다
+        function caShowDayOrdersByOrderTime(d) {
+            const keep = salesDateBasis;
+            salesDateBasis = 'order';
+            try { showCustDayOrders(d); } finally { salesDateBasis = keep; }
+        }
+
+        // 손님카드 안의 접속 칸. orderAmt = 날짜별 주문 금액
+        function caVisitCardHtml(vs, orderAmt, orderCnt, orderSlots) {
+            const P = caVisitPeriod, SL = caSelLabel(), oneDay = caIsOneDay();
+            const wrap = inner => `<div style="font-size:12px; color:var(--text-sub); background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:9px 11px; margin-bottom:12px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                    <b style="font-size:12.5px; font-weight:900; color:#334155;">👀 상품 조회</b>
+                    <span class="cv-per-wrap" style="margin:0;">${caPeriodBtns()}</span>
+                </div>${inner}</div>`;
+            if (!vs) return wrap(`<div style="font-weight:700; color:#94a3b8;">상품 조회 기록 없음</div>`);
+            const B = t => `<b style="color:var(--text-main);">${t}</b>`;
+            const md = d => `${parseInt(d.slice(5, 7), 10)}/${parseInt(d.slice(8), 10)}`;
+            const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+            const dow = d => DOW[new Date(`${d}T12:00:00`).getDay()];
+            const ordTag = (d, ord) => {
+                const amt = orderAmt && orderAmt.get(d), oc = orderCnt && orderCnt.get(d);
+                return ord ? `🛒 주문 ${oc || 1}건${amt ? ' ' + amt.toLocaleString() + '원' : ''} ▶` : '구경만';
+            };
+            const periodOrders = orderCnt ? caSelDays().reduce((sum, d) => sum + (orderCnt.get(d) || 0), 0) : 0;
+
+            // 첫 줄
+            let trendHtml = '';
+            if (vs.trend && (vs.trend.recent || vs.trend.prev)) {
+                const diff = vs.trend.recent - vs.trend.prev;
+                trendHtml = `<span title="최근 ${vs.trend.half}일과 그 전 ${vs.trend.half}일의 상품 조회 횟수를 견줌">추세 ${B(diff > 0 ? `↑ ${diff}건` : diff < 0 ? `↓ ${-diff}건` : '→ 같음')}</span>`;
+            }
+            const top = `<div style="display:flex; flex-wrap:wrap; gap:4px 12px; margin-bottom:8px;">
+                <span>최근 조회 ${B(caAgoLabel(vs.lastDays))}</span>
+                ${oneDay ? '' : `<span>${SL} 중 ${B(vs.visitDays + '일')} · 조회 ${B(vs.count + '건')} · 주문 ${B(periodOrders + '건')}</span>
+                <span>구경만 ${B(vs.browse + '일')}</span>`}
+                ${trendHtml}
             </div>`;
 
-            return box(head + `
+            // 하루를 볼 때 — 그날 한 줄 + 그날 시간대
+            if (oneDay) {
+                const r = vs.rows[0];
+                if (!r) {
+                    const near = [vs.nearBefore && `${caMdLabel(vs.nearBefore)}`, vs.nearAfter && `${caMdLabel(vs.nearAfter)}`].filter(Boolean).join(' · ');
+                    return wrap(top + `<div style="font-weight:700; color:#94a3b8;">${caVisitDate ? `${SL}은 조회 없음` : '오늘은 아직 조회 없음'}</div>
+                        ${near ? `<div style="margin-top:4px; font-weight:700; color:#94a3b8;">가까운 조회: ${B(near)}</div>` : ''}`);
+                }
+                const line = `<div class="cv-day${r.ord ? ' ord' : ''}" style="border-top:none;"${r.ord ? ` onclick="caShowDayOrdersByOrderTime('${r.d}')" title="이 날 주문 보기"` : ''}>
+                    <span class="cv-day-d">${md(r.d)} (${dow(r.d)})</span>
+                    <span class="cv-day-t">${caRunsLabel(r.slots)}</span>
+                    <span>조회 ${r.count}건</span>
+                    <span class="cv-day-o">${ordTag(r.d, r.ord)}</span>
+                </div>`;
+                // 시간대로 본다 — 그 시간에 들어왔나, 주문이 있었나
+                const oh = new Array(24).fill(0).map(() => ({ n: 0, amt: 0 }));
+                const dayRuns = caRunsOf(r.slots);
+                if (orderSlots) orderSlots.forEach((x, key) => { const [dd, k] = key.split('|'); if (dd === r.d) { const hh = caOrderHour(dayRuns, k); oh[hh].n += x.n; oh[hh].amt += x.amt; } });
+                const tipH = (h, c) => `${h}시 · ${c ? '조회함' : '조회 없음'}${oh[h].n ? ` · 주문 ${oh[h].n}건 (${oh[h].amt.toLocaleString()}원)` : ''}`;
+                // 한 사람이라 사람 수 대신 — 옅은 막대: 그 시간에 접속한 10분 칸 수, 진한 막대: 주문 건수
+                const slotH = new Array(24).fill(0);   // 그 시간에 시작한 조회 건수
+                caRunsOf(r.slots).forEach(x => { slotH[Math.floor(x.startIdx / 6)]++; });
+                const tipC = h => `${h}시 · 조회 ${slotH[h]}건${oh[h].n ? ` │ 주문 ${oh[h].n}건 (${oh[h].amt.toLocaleString()}원)` : ''}`;
+                return wrap(top + line + `<div style="margin:10px 0 4px; font-size:10.5px; font-weight:800; color:#94a3b8;">시간대</div>
+                    ${caOverlayBarsHtml(slotH, oh.map(x => x.n), tipC, ['조회', '주문'])}`);
+            }
+
+            // 기간을 볼 때 — 달력 (7·30일 칸줄, 90일 주 단위)
+            const days = caSelDays().slice().reverse();   // 왼쪽(위)이 오래된 날
+            const tip = d => `${md(d)} (${dow(d)}) · ${vs.map[d] === 'o' ? '주문함' : vs.map[d] === 'b' ? '구경만' : '조회 없음'}`;
+            const legend = `<span style="display:flex; gap:8px; white-space:nowrap;"><span><i class="cv-key"></i>조회 없음</span><span><i class="cv-key b"></i>구경만</span><span><i class="cv-key o"></i>주문함</span></span>`;
+            let body;
+            if (P <= 30) {
+                body = `<div class="cv-strip" style="grid-template-columns:repeat(${P}, minmax(0, ${P <= 7 ? '28px' : '1fr'}));">${days.map(d => `<i class="${vs.map[d] || ''}" title="${tip(d)}"></i>`).join('')}</div>
+                    <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:700; color:#94a3b8; margin-top:2px; ${P <= 7 ? `max-width:${P * 30}px;` : ''}"><span>${md(days[0])}</span><span>오늘</span></div>`;
+            } else {
+                const lead = caWeekIdx(days[0]);
+                const cells = Array(lead).fill('<i style="visibility:hidden;"></i>')
+                    .concat(days.map(d => `<i class="${vs.map[d] || ''}" title="${tip(d)}"></i>`));
+                body = `<div style="display:flex; gap:4px;">
+                        <div class="cv-cal-wd">${['월', '', '수', '', '금', '', '일'].map(w => `<span>${w}</span>`).join('')}</div>
+                        <div class="cv-cal">${cells.join('')}</div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:700; color:#94a3b8; margin-top:2px; padding-left:14px;"><span>${md(days[0])}</span><span>오늘</span></div>`;
+            }
+            const cal = `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:10.5px; font-weight:800; color:#94a3b8; margin-bottom:4px;"><span>최근 ${SL}</span>${legend}</div>${body}`;
+
+            // 구매 흐름
+            const rate = vs.visitDays ? Math.round(vs.orderedDays / vs.visitDays * 100) : 0;
+            const flow = vs.visitDays ? `<div class="cv-flow">
+                <div><span>조회한 날 중 주문</span><b>${rate}%</b><em>${vs.orderedDays}/${vs.visitDays}일</em></div>
+                <div><span>주문 전 구경</span><b>${vs.avgBefore === null ? '-' : `평균 ${Math.round(vs.avgBefore * 10) / 10}일`}</b><em>${vs.avgBefore === null ? '기간 안 주문 없음' : '주문 앞 구경한 날'}</em></div>
+                <div><span>마지막 주문 뒤</span><b>${vs.hasOrderInPeriod ? `${vs.afterOrder}번` : '-'}</b><em>${vs.hasOrderInPeriod ? '다시 조회한 횟수' : '기간 안 주문 없음'}</em></div>
+            </div>` : '';
+
+            // 시간대 막대 · 요일×시간 표
+            let timeHtml = '';
+            if (vs.count) {
+                const peak = vs.hours.indexOf(Math.max(...vs.hours));
+                timeHtml = `<div style="margin:10px 0 4px; font-size:10.5px; font-weight:800; color:#94a3b8;">시간대 · 자주 조회하는 때 ${B(caHourLabel(peak))}</div>
+                    ${caHourBarsHtml(vs.hours, (h, c) => `${h}시 · 조회 ${c}건`)}
+                    <div style="margin:10px 0 4px; font-size:10.5px; font-weight:800; color:#94a3b8;">요일 · 시간대</div>${caHeatHtml(vs.grid, `${SL}, 조회 건수`, (i, h, c) => `${['월', '화', '수', '목', '금', '토', '일'][i]}요일 ${h}시 · 조회 ${c}건`)}`;
+            }
+
+            // 날짜별 줄 — 최근 14일치까지
+            const LIMIT = 14;
+            const lines = vs.rows.slice(0, LIMIT).map(r => `<div class="cv-day${r.ord ? ' ord' : ''}"${r.ord ? ` onclick="caShowDayOrdersByOrderTime('${r.d}')" title="이 날 주문 보기"` : ''}>
+                    <span class="cv-day-d">${md(r.d)} (${dow(r.d)})</span>
+                    <span class="cv-day-t">${caRunsLabel(r.slots)}</span>
+                    <span>조회 ${r.count}건</span>
+                    <span class="cv-day-o">${ordTag(r.d, r.ord)}</span>
+                </div>`).join('');
+            const daysHtml = vs.rows.length
+                ? `<div style="margin:10px 0 2px; font-size:10.5px; font-weight:800; color:#94a3b8;">날짜별</div>${lines}
+                   ${vs.rows.length > LIMIT ? `<div style="padding-top:4px; font-size:10.5px; font-weight:700; color:#94a3b8;">그 전 ${vs.rows.length - LIMIT}일은 줄였습니다</div>` : ''}`
+                : `<div style="margin-top:8px; font-weight:700; color:#94a3b8;">${SL} 동안 조회 없음</div>`;
+            return wrap(top + cal + flow + timeHtml + daysHtml);
+        }
+
+        /* 주문 모음 — 고른 날들 안의 주문을 손님·날짜·요일×시간으로 센다 (가게 사람·취소·배달비 뺌)
+           한 번 주문(같은 손님·같은 주문 시각)을 1건으로 친다 */
+        function caOrdersInDays(days) {
+            const daySet = new Set(days);
+            const orders = new Map();   // 손님|주문시각 → { key, d, wd, h, amt }
+            (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : (rawOrders || [])).forEach(o => {
+                if (!o || isSalesCanceled(o) || gIsFeeRow(o)) return;
+                const t = parseTimestampToDate(o.timestamp);
+                if (!caAfterVisitStart(t)) return;   // 접속 기록을 모으기 전 주문은 뺀다
+                const d = caDayKey(t);
+                if (!daySet.has(d)) return;
+                const key = gCustKey(o);
+                if (!key || CA_STAFF_PHONES.has(key)) return;
+                const id = key + '|' + String(o.timestamp);
+                if (!orders.has(id)) orders.set(id, { key, d, wd: (t.getDay() + 6) % 7, h: t.getHours(), slot: `${String(t.getHours()).padStart(2, '0')}${Math.floor(t.getMinutes() / 10)}0`, amt: 0 });
+                orders.get(id).amt += parseInt(o.total || 0) || 0;
+            });
+            return [...orders.values()];
+        }
+
+        // 손님관리 맨 위 요약 — 기간(또는 고른 하루) 동안 접속·주문·횟수
+        let caVisitOpen = (() => { try { return localStorage.getItem('moket_ca_visit_open') === '1'; } catch (e) { return false; } })();
+        function caSetVisitOpen(v) { caVisitOpen = !!v; try { localStorage.setItem('moket_ca_visit_open', v ? '1' : '0'); } catch (e) { } }
+        function caSetDayWhoFilter(v) { caDayWhoFilter = v; renderCustomerAdmin(); }
+        function caVisitSummaryHtml(rows) {
+            const V = window.__caVisits;
+            if (!V) return '';
+            const SL = caSelLabel(), oneDay = caIsOneDay();
+            const days = caSelDays();
+            const orderDaysOf = new Map(rows.map(r => [r.phone, r.orderDaysV]));
+            const nameOf = new Map(rows.map(r => [r.phone, r.name]));
+            const ords = caOrdersInDays(days);
+
+            // [변경] 칸마다 '몇 명 몇 건' — 명: 서로 다른 손님, 건: 그 시간에 시작한 조회 (이어진 10분 칸 묶음 1개 = 1건)
+            const gridWho = Array.from({ length: 7 }, () => new Array(24).fill(0).map(() => new Set()));
+            const grid = Array.from({ length: 7 }, () => new Array(24).fill(0));   // 건수 (칸 색도 건수로)
+            const hours = new Array(24).fill(0);      // 하루 볼 때: 그 시간에 조회를 시작한 사람 수
+            const hoursCnt = new Array(24).fill(0);   // 하루 볼 때: 그 시간에 시작한 조회 건수
+            const hoursWho = new Array(24).fill(0).map(() => new Set());
+            const seen = new Set(), ordered = new Set();
+            const who = [];
+            const slotPeople = new Map();   // 하루 볼 때: 10분 칸 → 접속한 사람 수
+            let total = 0;
+            days.forEach(d => {
+                const dayV = V[d];
+                if (!dayV) return;
+                const wd = caWeekIdx(d);
+                Object.keys(dayV).forEach(k => {
+                    if (CA_STAFF_PHONES.has(k)) return;
+                    const v = dayV[k] || {};
+                    seen.add(k);
+                    const c = caVisitCount(v);   // 방문 수 (연속 칸 묶음)
+                    total += c;
+                    const od = orderDaysOf.get(k);
+                    const ord = !!(od && od.has(d));   // 취소되지 않은 실제 주문으로만 본다
+                    if (ord) ordered.add(k);
+                    // 명·건 모두 '조회를 시작한 시간'으로 센다 — 그래야 한 칸에서 명이 건보다 많아지는 일이 없다
+                    caRunsOf(caSlotsOf(v)).forEach(r => {
+                        const hh = Math.floor(r.startIdx / 6);
+                        grid[wd][hh]++; hoursCnt[hh]++;
+                        if (!gridWho[wd][hh].has(k)) gridWho[wd][hh].add(k);
+                        if (!hoursWho[hh].has(k)) { hoursWho[hh].add(k); hours[hh]++; }
+                    });
+                    if (oneDay) {
+                        const sl = caSlotsOf(v);
+                        who.push({ k, d, count: c, ord, slots: sl });
+                        sl.forEach(x => slotPeople.set(x, (slotPeople.get(x) || 0) + 1));
+                    }
+                });
+            });
+
+            // 주문 수 — 요일×시간, 시간대별, 손님별 금액
+            const oGrid = Array.from({ length: 7 }, () => new Array(24).fill(0).map(() => ({ n: 0, amt: 0, who: new Set() })));
+            const oHours = new Array(24).fill(0).map(() => ({ n: 0, amt: 0, who: new Set() }));
+            const amtOf = new Map(), cntOf = new Map();
+            const oSlots = new Map();   // 10분 칸 → { n, amt, who }
+            // [변경] 시간대별 주문은 그 주문이 나온 조회가 시작한 시간에 넣는다 (아래 조회한 손님 목록과 같은 셈)
+            const runsOf = new Map();   // 날짜|손님 → 그날 조회 묶음
+            days.forEach(d => { const dayV = V[d]; if (dayV) Object.keys(dayV).forEach(k => runsOf.set(`${d}|${k}`, caRunsOf(caSlotsOf(dayV[k] || {})))); });
+            ords.forEach(o => {
+                if (!oSlots.has(o.slot)) oSlots.set(o.slot, { n: 0, amt: 0, who: new Set() });
+                { const x = oSlots.get(o.slot); x.n++; x.amt += o.amt; x.who.add(o.key); }
+                const oh = caOrderHour(runsOf.get(`${o.d}|${o.key}`), o.slot);
+                oGrid[o.wd][oh].n++; oGrid[o.wd][oh].amt += o.amt; oGrid[o.wd][oh].who.add(o.key);
+                oHours[oh].n++; oHours[oh].amt += o.amt; oHours[oh].who.add(o.key);
+                cntOf.set(o.key, (cntOf.get(o.key) || 0) + 1);
+                amtOf.set(o.key, (amtOf.get(o.key) || 0) + o.amt);
+            });
+            const WD = ['월', '화', '수', '목', '금', '토', '일'];
+            const ordTip = x => x.n ? ` │ 주문 ${x.who.size}명 · ${x.n}건 (${x.amt.toLocaleString()}원)` : ' │ 주문 없음';
+
+            const ctl = `<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <b style="font-size:12px; font-weight:800; color:#334155;">👀 상품 조회</b>
+                <span class="cv-per-wrap" style="margin:0;">${caPeriodBtns()}</span>
+            </div>`;
+            const box = (text, body) => `<div style="margin-top:10px; border-top:1px dashed #e2e8f0; padding-top:8px;">${ctl}
+                <details ${caVisitOpen ? 'open' : ''} ontoggle="caSetVisitOpen(this.open)" style="margin-top:6px;">
+                    <summary style="cursor:pointer; font-size:12px; font-weight:800; color:#334155;">요약 <span style="font-weight:700; color:#94a3b8;">· ${text}</span></summary>
+                    ${body}
+                </details></div>`;
+            // 접속은 들어온 손님 기준, 주문은 그 기간의 전체 주문 기준 (칸 글과 같은 잣대)
+            // 접속·주문 모두 '사람 수 → 횟수' 차례로 맞춘다
+            const text = `${SL} · 조회 ${seen.size}명 · ${total}건 │ 주문 ${new Set(ords.map(o => o.key)).size}명 · ${ords.length}건`;
+            if (!seen.size) return box(text, `<div style="padding:8px 2px 2px; font-size:11.5px; font-weight:700; color:#94a3b8;">${SL} 동안 상품 조회 기록이 없습니다.</div>`);
+
+            // 하루를 볼 때 — 그날 시간대 막대 + 그날 온 손님 목록
+            if (oneDay) {
+                /* [변경] 온 손님 — 사람별이 아니라 시간대별로 묶는다. 방문 한 번이 한 줄이고, 방문이 시작된 시간대 아래에 들어간다.
+                   오른쪽에 '방문 이번/그날 전체'와 그 방문에 주문이 있었는지를 적는다 (시각은 적지 않는다).
+                   주문은 주문 시각이 들어 있는 방문에 붙인다. 딱 맞는 방문이 없으면 그 앞의 가장 가까운 방문에 붙인다. */
+                const visitRows = [];
+                who.forEach(w => {
+                    const runs = caRunsOf(w.slots);
+                    if (!runs.length) return;
+                    const perRun = runs.map(() => ({ n: 0, amt: 0 }));
+                    ords.filter(o => o.key === w.k).forEach(o => {
+                        const ri = caOrderRunIdx(runs, o.slot);
+                        perRun[ri].n++; perRun[ri].amt += o.amt;
+                    });
+                    const ordTotal = perRun.reduce((sum, x) => sum + x.n, 0);   // 이 손님의 오늘 총 주문 건수 (취소 뺀 것)
+                    let ordSeen = 0;   // 앞 조회들에서 나온 주문 수 — 이 줄의 주문이 그날 몇 번째인지 매기려고
+                    runs.forEach((r, i) => {
+                        const ordFrom = ordSeen + 1;
+                        ordSeen += perRun[i].n;
+                        visitRows.push({ k: w.k, hour: Math.floor(r.startIdx / 6), startIdx: r.startIdx, nth: i + 1, total: runs.length, n: perRun[i].n, amt: perRun[i].amt, ordTotal, ordFrom, ordTo: ordSeen });
+                    });
+                });
+                const chip = (v, l, c) => `<button type="button" class="cv-per${caDayWhoFilter === v ? ' on' : ''}" onclick="caSetDayWhoFilter('${v}')">${l} ${c}</button>`;
+                const nOrdRows = visitRows.filter(r => r.n).length;
+                const shownRows = visitRows.filter(r => caDayWhoFilter === 'ord' ? r.n : caDayWhoFilter === 'browse' ? !r.n : true);
+                // 시작 시각 순서로 한 줄씩. 시간이 바뀌는 줄 위에만 얇은 실선을 긋는다 (시간대 머리줄은 두지 않는다)
+                let prevHour = null, prevTime = '';
+                const lines = shownRows.sort((x, y) => x.startIdx - y.startIdx).map(r => {
+                    const nm = nameOf.get(r.k) || r.k;
+                    const hourStart = prevHour !== null && r.hour !== prevHour;
+                    prevHour = r.hour;
+                    // 바로 위 줄과 시각이 같으면 비워 둔다 (그 시각의 첫 줄에만 적는다)
+                    const tm = caSlotTime(r.startIdx);
+                    const tmShown = tm === prevTime ? '' : tm;
+                    prevTime = tm;
+                    return `<div class="cv-who${r.n ? ' ord' : ''}${hourStart ? ' hour-start' : ''}" onclick="showCustomerCardModal('${encodeURIComponent(r.k)}','${encodeURIComponent(nm)}')" title="손님 카드 보기">
+                        <span class="cv-who-t">${tmShown}</span>
+                        <span class="cv-who-n">${gEscapeHtml(nm)}</span>
+                        <span class="cv-who-c1">조회 ${r.nth}/${r.total}</span>
+                        <span class="cv-who-c2"><span class="cv-ic">${r.n ? '🛒' : ''}</span>${r.n ? `주문 ${Array.from({ length: r.ordTo - r.ordFrom + 1 }, (_, i) => r.ordFrom + i).join('·')}/${r.ordTotal}` : '주문 없음'}</span>
+                    </div>`;
+                }).join('');
+                return box(text, `
+                    <div style="margin-top:8px; font-size:10.5px; font-weight:800; color:#94a3b8;">시간대</div>
+                    ${caOverlayBarsHtml(hoursCnt, oHours.map(x => x.n), h => `${h}시 · 조회 ${hours[h]}명 · ${hoursCnt[h]}건${ordTip(oHours[h])}`, ['조회 건수', '주문 건수'], '시작한 시간 기준')}
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap; margin:10px 0 2px;">
+                        <span style="font-size:10.5px; font-weight:800; color:#94a3b8;">조회한 손님 (조회 순)</span>
+                        <span style="display:inline-flex; gap:3px;">${chip('all', '전체', visitRows.length)}${chip('ord', '주문', nOrdRows)}${chip('browse', '주문 없음', visitRows.length - nOrdRows)}</span>
+                    </div>
+                    <div style="max-height:320px; overflow-y:auto;">${lines || `<div style="padding:6px 2px; font-size:11.5px; font-weight:700; color:#94a3b8;">해당하는 손님이 없습니다.</div>`}</div>`);
+            }
+
+            // 기간을 볼 때 — 요일×시간 표 (칸에 마우스를 두면 접속과 주문을 함께 보여 준다)
+            return box(text, `
                 <div style="margin-top:8px; font-size:10.5px; font-weight:800; color:#94a3b8;">요일 · 시간대</div>
-                ${heat}`);
+                ${caHeatHtml(grid, `${SL}, 조회 건수 · 시작한 시간 기준`, (i, h, c) => `${WD[i]}요일 ${h}시 · 조회 ${gridWho[i][h].size}명 · ${c}건${ordTip(oGrid[i][h])}`)}`);
         }
 
         function caBuild() {
@@ -13773,8 +14331,19 @@
                     const d = parseTimestampToDate(o.timestamp);
                     return (d && d.getFullYear() >= 2000) ? caDayKey(d) : '';
                 }).filter(Boolean));
-                const visit = caVisitStats(v.phone, orderDays);
+                // 접속과 견주는 주문한 날 — 접속 기록을 모으기 시작한 뒤 것만. (구경만 거르기의 '한 번도 안 샀다'는 위 orderDays 로 전부 본다)
+                const orderDaysV = new Set(v.rows.filter(o => !isSalesCanceled(o) && !gIsFeeRow(o)).map(o => {
+                    const d = parseTimestampToDate(o.timestamp);
+                    return caAfterVisitStart(d) ? caDayKey(d) : '';
+                }).filter(Boolean));
+                const visit = caVisitStats(v.phone, orderDaysV);
                 const days30 = caLastDays(VISIT_LOOKBACK);
+                // 고른 기간(또는 하루) 안의 주문 건수 — 한 번에 넣은 것을 1건 (배달비 뺌)
+                const selSet = new Set(caSelDays());
+                const selOrders = new Set(v.rows.filter(o => !isSalesCanceled(o) && !gIsFeeRow(o)).map(o => {
+                    const t = parseTimestampToDate(o.timestamp);
+                    return (caAfterVisitStart(t) && selSet.has(caDayKey(t))) ? String(o.timestamp) : '';
+                }).filter(Boolean)).size;
                 out.push({
                     phone: v.phone,
                     tel: String((s && s.contactPhone) || '').replace(/\D/g, '') || v.phone,   // [신규] 전화·문자는 손님이 적은 연락처로
@@ -13796,9 +14365,9 @@
                     joined: (s && s.createdAt) ? s.createdAt : (v.first || 0),
                     joinedIsReal: !!(s && s.createdAt),
                     lastChange: (s && s.lastChange) ? s.lastChange : null,   // 마지막으로 무엇을 바꿨나
-                    orderDays, visit,
+                    orderDays, orderDaysV, visit, selOrders,
                     // 구경만 — 최근 30일에 3일 넘게 들어왔는데 한 번도 안 샀다
-                    browser: !!visit && visit.visitDays >= 3 && visit.browse === visit.visitDays && !days30.some(d => orderDays.has(d)),
+                    browser: !!visit && visit.v30.visitDays >= 3 && visit.v30.browse === visit.v30.visitDays && !days30.some(d => orderDays.has(d)),
                     orders: days.size, qty: paid.reduce((a, o) => a + (parseInt(o.qty || 0) || 0), 0),
                     amt, last: v.last, idle,
                     /* 주문이 하나도 없는 새 손님은 주소가 있으면 배달, 없으면 픽업으로 본다 */
@@ -13895,7 +14464,8 @@
                 joined: (a, b) => (b.joined || 0) - (a.joined || 0),    // 늦게 온 손님이 위로
                 changed: (a, b) => ((b.lastChange && b.lastChange.at) || 0) - ((a.lastChange && a.lastChange.at) || 0),
                 visit: (a, b) => ((b.visit && b.visit.last) || 0) - ((a.visit && a.visit.last) || 0),   // [신규] 최근 접속 순
-                vcnt: (a, b) => ((b.visit && b.visit.visitDays) || 0) - ((a.visit && a.visit.visitDays) || 0)   // [신규] 접속 많은 순
+                vcnt: (a, b) => (((b.visit && b.visit.visitDays) || 0) - ((a.visit && a.visit.visitDays) || 0))
+                    || (((b.visit && b.visit.count) || 0) - ((a.visit && a.visit.count) || 0))   // [신규] 접속 많은 순 (고른 기간)
             }[caSort] || ((a, b) => b.amt - a.amt);
             // [신규] '적은 순'이면 견주는 차례를 뒤집는다
             const cmpDir = (caSortDir === 'asc') ? ((a, b) => cmp(b, a)) : cmp;
@@ -13932,7 +14502,7 @@
                             ? fbtn('nosaved', `📋 주문에만 ${all.length - nSaved}`, '#c2410c') : ''}
                         <select onchange="caSetSort(this.value)"
                             style="height:30px; padding:0 6px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800; color:#475569; background:#fff; cursor:pointer;">
-                            ${[['amt','많이 산 순'],['cnt','자주 온 순'],['joined','새로 온 순'],['changed','최근 고친 순'],['recent','최근 주문 순'],['idle','오래된 순'],['visit','최근 접속 순'],['vcnt','접속 많은 순'],['name','이름 순']]
+                            ${[['amt','많이 산 순'],['cnt','자주 온 순'],['joined','새로 온 순'],['changed','최근 고친 순'],['recent','최근 주문 순'],['idle','오래된 순'],['visit','최근 조회 순'],['vcnt','조회 많은 순'],['name','이름 순']]
                                 .map(([v,l]) => `<option value="${v}" ${caSort===v?'selected':''}>${l}</option>`).join('')}
                         </select>
                         <input type="text" id="ca-search" value="${gEscapeHtml(caQuery)}" oninput="caSetQuery(this.value)" oncompositionstart="caComposing=true" oncompositionend="caComposing=false; caSetQuery(this.value)" placeholder="🔍 이름·번호·주소"
@@ -13982,9 +14552,10 @@
                             title="${gEscapeHtml(String(r.lastChange.from || '(빈칸)'))} → ${gEscapeHtml(String(r.lastChange.to || '(빈칸)'))}">✏️ ${gEscapeHtml(String(r.lastChange.date || ''))} ${gEscapeHtml(String(r.lastChange.what || ''))} 고침</span>` : ''}
                     </div>
                     ${r.visit ? `<div class="ca-r2" style="color:#64748b;">
-                        <span>👀 접속 ${caAgoLabel(r.visit.lastDays)}</span>
-                        <span>· 30일 중 ${r.visit.visitDays}일</span>
-                        ${r.visit.browse ? `<span>· 구경만 ${r.visit.browse}일</span>` : ''}
+                        <span>👀 조회 ${caAgoLabel(r.visit.lastDays)}</span>
+                        ${r.visit.visitDays ? `<span>· ${caIsOneDay() ? `${caVisitDate ? caMdLabel(caVisitDate) : '오늘'} 조회 ${r.visit.count}건` : `${caPeriodLabel(caVisitPeriod)} 중 ${r.visit.visitDays}일 · 조회 ${r.visit.count}건`}</span>` : ''}
+                        ${r.selOrders ? `<span>· 주문 ${r.selOrders}건</span>` : ''}
+                        ${r.visit.browse && !caIsOneDay() ? `<span>· 구경만 ${r.visit.browse}일</span>` : ''}
                     </div>` : ''}
                     ${r.refundAccount || !r.saved || r.borrowed ? `<div class="ca-r2" style="color:#cbd5e1;">
                         ${r.refundAccount ? `<span style="color:#7c3aed; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="환불계좌">💳 ${gEscapeHtml(r.refundAccount)}</span>` : ''}
