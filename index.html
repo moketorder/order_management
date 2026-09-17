@@ -2697,7 +2697,7 @@
             <div class="segment-btn admin-nav-btn active" data-tab="orders" onclick="switchAdminTab('orders')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 주문 관리</div>
             <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🛒 상품 관리 <span id="product-count" style="display: none;">(0)</span></div>
             <div class="segment-btn admin-nav-btn" data-tab="purchase-history" onclick="switchAdminTab('purchase-history')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🚚 발주 관리</div>
-            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 자료 정리</div>
+            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🏪 가게 관리</div>
             <!-- [숨김] 섬네일 탭 — 버튼만 숨기고 기능(tab-admin-thumbnail-generator, switchAdminTab)은 그대로 유지 -->
             <div class="segment-btn admin-nav-btn" data-tab="thumbnail-generator" onclick="switchAdminTab('thumbnail-generator')" style="display:none; text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🎨 섬네일</div>
         </div>
@@ -3866,6 +3866,17 @@
             #cal-action-sheet button { font-size: 11px !important; padding: 0 6px !important; min-width: 56px !important; height: 32px !important; white-space: nowrap; }
         }
         .orders-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+        /* [신규] 휴대폰에서 세부 탭이 5개 이상이면 한 칸에 욱여넣지 않고 좌우로 밀어 본다 (대분류 탭은 그대로) */
+        @media (max-width: 640px) {
+            .segment-control:has(> .segment-btn:nth-child(5)):not(:has(.admin-nav-btn)) {
+                display: flex !important; overflow-x: auto; scroll-snap-type: x proximity;
+                -webkit-overflow-scrolling: touch; scrollbar-width: none; gap: 2px;
+            }
+            .segment-control:has(> .segment-btn:nth-child(5)):not(:has(.admin-nav-btn))::-webkit-scrollbar { display: none; }
+            .segment-control:has(> .segment-btn:nth-child(5)):not(:has(.admin-nav-btn)) > .segment-btn {
+                flex: 0 0 auto; padding: 10px 14px !important; white-space: nowrap; scroll-snap-align: start;
+            }
+        }
         /* [신규] 자료 정리 하위탭(판매 통계 / 아파트 관리) — 위 탭들과 같은 선택 표시 */
         .data-sub-btn { color:var(--text-sub); }
         .data-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
@@ -3921,11 +3932,18 @@
         <div class="container" id="sales-container" style="max-width: 900px; margin: 0 auto;">
 
             <!-- [수정] 자료 정리 하위 탭: 판매 통계 / 매입·매출 / 아파트 관리 -->
-            <div class="segment-control" style="display:grid; grid-template-columns:repeat(4,1fr); background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
+            <!-- [수정] '자료 정리' → '가게 관리'. 주문서에 있던 사장님 설정(배달·영업일·손님 화면)을 '일반 관리'로 옮겨 왔다 -->
+            <div class="segment-control" style="display:grid; grid-template-columns:repeat(5,1fr); background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
                 <div class="segment-btn data-sub-btn active" id="btn-data-sub-sales" onclick="switchDataSubTab('sales')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📊 판매 통계</div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-profit" onclick="switchDataSubTab('profit')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📈 매입·매출</div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-cust" onclick="switchDataSubTab('cust')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">👤 손님 관리</div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-apart" onclick="switchDataSubTab('apart')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🏢 아파트 관리</div>
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-general" onclick="switchDataSubTab('general')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">⚙️ 일반 관리</div>
+            </div>
+
+            <!-- [신규] 일반 관리 — 배달·배달비, 토요일·임시 휴무일, 상품목록 공개·로그인 강제 -->
+            <div id="data-sub-general" style="display:none;">
+                <div id="general-admin-body"><!-- 동적 삽입 --></div>
             </div>
 
             <!-- [신규] 손님 관리 — 손님별 연락처·주소·주문 실적을 한 자리에서 본다 -->
@@ -4667,6 +4685,96 @@
         let ordersByPhone = {};        // [증분 동기화] 전화번호(1단계 자식) 단위 orders 원본 트리 — 변경분만 갱신
         let _ordersRenderTimer = null; // 초기 버스트/연속 변경을 모아 1회만 렌더하기 위한 디바운스 타이머
 
+        /* ===== [신규] 재고 의심 알림 =====
+           재고 변동(global_stock·option_stock)은 손님 주문서가 주문·취소 때 쓰므로 누구나 쓸 수 있게 열려 있다.
+           규칙이 이상한 값은 막지만, 작게 여러 번 바꾸는 장난은 막지 못한다. 그래서 알리기만 한다 (고치지는 않는다).
+             · 주문관리가 켜져 있는 동안 재고 변동을 실시간으로 지켜본다
+             · 바뀐 앞뒤 2분 안에 주문이 들어오거나 바뀐 일이 없고,
+               이 화면이나 다른 가게 기기가 상품을 고친 일(상품 갱신 표시)도 없으면 → 의심으로 알린다
+             · 기록은 이 기기에 최근 30건까지 남고, '일반 관리'에서 본다
+           주문관리가 꺼져 있던 동안의 변화는 알 수 없다. */
+        const STOCK_SUSPECT_KEY = 'moket_stock_suspects';
+        const _orderEventTimes = [];
+        const _myStockWrites = new Map();   // 이 화면이 쓴 재고 칸 → 시각
+        let _productsTouchedAt = 0;          // 상품 갱신 표시가 바뀐 시각 (가게 사람이 상품·재고를 고침)
+        function gNoteOrderEvent() {
+            const now = Date.now();
+            _orderEventTimes.push(now);
+            while (_orderEventTimes.length && now - _orderEventTimes[0] > 10 * 60 * 1000) _orderEventTimes.shift();
+        }
+        // 이 화면이 재고를 고칠 때는 알림에서 뺀다
+        (function watchMyStockWrites() {
+            const orig = window.fetch;
+            window.fetch = function (input, init) {
+                const url = typeof input === 'string' ? input : '';
+                const m = init && String(init.method || '').toUpperCase();
+                if (m && m !== 'GET' && /\/(global_stock|option_stock)(\/|\.json)/.test(url)) {
+                    if (/\/(global_stock|option_stock)\.json/.test(url)) _myStockWrites.set('*', Date.now());   // 통째로 고침
+                    else _myStockWrites.set(decodeURIComponent(url.split(/\/(?:global_stock|option_stock)\//)[1].split('.json')[0]), Date.now());
+                }
+                return orig.apply(this, arguments);
+            };
+        })();
+        function gStockSuspects() {
+            try { return JSON.parse(localStorage.getItem(STOCK_SUSPECT_KEY) || '[]') || []; } catch (e) { return []; }
+        }
+        function gStartStockWatch() {
+            if ((window.gStaffMe || {}).role !== 'store') return;
+            const WIN = 2 * 60 * 1000;
+            const seen = { global_stock: null, option_stock: null };
+            const near = (arr, t) => arr.some(x => Math.abs(x - t) <= WIN);
+            const judge = (node, key, before, after, at) => {
+                if (typeof before !== 'number' && before !== undefined) return;    // 무제한 등 가게가 정한 값에서 바뀐 것
+                if (typeof after !== 'number') return;                              // 지우기·무제한은 가게만 할 수 있다
+                const mine = _myStockWrites.get(key) || 0, mineAll = _myStockWrites.get('*') || 0;
+                if (Math.abs(mine - at) <= WIN || Math.abs(mineAll - at) <= WIN) return;
+                if (Math.abs(_productsTouchedAt - at) <= WIN) return;
+                if (near(_orderEventTimes, at)) return;
+                const rec = { at, node, key, before: before === undefined ? null : before, after };
+                const list = gStockSuspects();
+                list.unshift(rec);
+                try { localStorage.setItem(STOCK_SUSPECT_KEY, JSON.stringify(list.slice(0, 30))); } catch (e) { }
+                const name = String(key).replace(/^\d{4}_\d{2}_\d{2}_+/, '').replace(/_+/g, ' ').slice(0, 24);
+                showToast(`⚠️ 주문 없이 재고가 바뀌었습니다: ${name} (${before === undefined ? '없음' : before} → ${after})`);
+                const b = document.getElementById('gen-stock-suspects');
+                if (b) gPaintStockSuspects();
+            };
+            ['global_stock', 'option_stock'].forEach(node => {
+                const ref = rtdb.ref(node);
+                ref.once('value').then(snap => {
+                    seen[node] = snap.val() || {};
+                    ref.on('child_changed', s => {
+                        const at = Date.now(), before = seen[node][s.key], after = s.val();
+                        seen[node][s.key] = after;
+                        setTimeout(() => judge(node, s.key, before, after, at), WIN);   // 주문이 조금 늦게 올라와도 기다렸다 판단
+                    });
+                    ref.on('child_added', s => {
+                        if (s.key in seen[node]) return;
+                        const at = Date.now(), after = s.val();
+                        seen[node][s.key] = after;
+                        setTimeout(() => judge(node, s.key, undefined, after, at), WIN);
+                    });
+                    ref.on('child_removed', s => { delete seen[node][s.key]; });
+                }).catch(e => console.warn('재고 지켜보기 실패:', e));
+            });
+            let _firstTouch = true;   // 처음 붙을 때 한 번 오는 값은 바뀐 게 아니다
+            rtdb.ref('published_products_last_updated').on('value', () => { if (_firstTouch) { _firstTouch = false; return; } _productsTouchedAt = Date.now(); });
+        }
+        function gPaintStockSuspects() {
+            const box = document.getElementById('gen-stock-suspects');
+            if (!box) return;
+            const list = gStockSuspects();
+            const when = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+            box.innerHTML = list.length
+                ? list.map(r => `<div style="display:flex; gap:8px; align-items:baseline; padding:6px 0; border-top:1px solid #f1f5f9; font-size:12px;">
+                        <span style="flex:0 0 auto; font-weight:800; color:#94a3b8;">${when(r.at)}</span>
+                        <span style="flex:1; min-width:0; font-weight:800; color:#334155; word-break:break-all;">${gEscapeHtml(String(r.key).replace(/_+/g, ' '))}${r.node === 'option_stock' ? ' <span style="color:#94a3b8;">(옵션)</span>' : ''}</span>
+                        <span style="flex:0 0 auto; font-weight:900; color:#dc2626; white-space:nowrap;">${r.before === null ? '없음' : r.before} → ${r.after}</span>
+                    </div>`).join('') + `<button type="button" onclick="if(confirm('재고 의심 기록을 지울까요?')){localStorage.removeItem('${STOCK_SUSPECT_KEY}'); gPaintStockSuspects();}" style="margin-top:8px; height:32px; padding:0 12px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">기록 지우기</button>`
+                : `<div style="font-size:12px; font-weight:700; color:#94a3b8;">의심스러운 재고 변화가 없습니다.</div>`;
+        }
+        if (window.gStaffReady) window.gStaffReady.then(() => setTimeout(gStartStockWatch, 3000));
+
         async function attachRealtimeListeners() {
             /* [신규] 실시간 연동(웹소켓)은 fetch 길목을 안 거친다. 가게 로그인·허락이 끝난 뒤에 붙여야
                규칙이 잠긴 뒤에도 '권한 없음'으로 끊기지 않고, 허락 전에 자료가 새지도 않는다. */
@@ -4701,8 +4809,9 @@
                 if (syncTextEl) syncTextEl.innerText = "연동 실패";
                 if (syncDotEl) syncDotEl.style.backgroundColor = "var(--red)";
             };
-            _ordersRef.on('child_added',   (snap) => { ordersByPhone[snap.key] = snap.val(); _applyOrdersDelta(); }, _ordersErr);
-            _ordersRef.on('child_changed', (snap) => { ordersByPhone[snap.key] = snap.val(); _applyOrdersDelta(); }, _ordersErr);
+            // [신규] 주문이 들어오거나 바뀐 시각 — 재고 의심 알림이 "주문 때문에 바뀐 재고인가"를 가릴 때 쓴다
+            _ordersRef.on('child_added',   (snap) => { ordersByPhone[snap.key] = snap.val(); if (isRealtimeFirstLoadDone) gNoteOrderEvent(); _applyOrdersDelta(); }, _ordersErr);
+            _ordersRef.on('child_changed', (snap) => { ordersByPhone[snap.key] = snap.val(); gNoteOrderEvent(); _applyOrdersDelta(); }, _ordersErr);
             _ordersRef.on('child_removed', (snap) => { delete ordersByPhone[snap.key]; _applyOrdersDelta(); }, _ordersErr);
 
             // 안전장치: orders가 비어 child_added가 한 번도 오지 않아도 로더/초기 렌더가 멈추지 않게 처리
@@ -13965,21 +14074,226 @@
             }
         }
 
-        // ===== [신규] 자료 정리 — 하위 탭 (판매 통계 / 아파트 관리) =====
+        /* [신규] 좌우로 밀리는 세부 탭을 마우스로도 움직인다 (터치는 원래 된다)
+             · 휠을 굴리면 좌우로
+             · 누른 채 끌면 좌우로 (끈 뒤에는 그 클릭으로 탭이 바뀌지 않게 한다) */
+        (function segmentMouseScroll() {
+            const SEL = '.segment-control';
+            const scrollable = el => el && el.scrollWidth > el.clientWidth + 1;
+            document.addEventListener('wheel', e => {
+                const el = e.target.closest && e.target.closest(SEL);
+                if (!scrollable(el) || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+                el.scrollLeft += e.deltaY;
+                e.preventDefault();
+            }, { passive: false });
+            let drag = null, eatClick = false;
+            document.addEventListener('pointerdown', e => {
+                if (e.pointerType !== 'mouse' || e.button !== 0) return;
+                const el = e.target.closest && e.target.closest(SEL);
+                if (!scrollable(el)) return;
+                drag = { el, x: e.clientX, left: el.scrollLeft, moved: false };
+            });
+            document.addEventListener('pointermove', e => {
+                if (!drag) return;
+                const dx = e.clientX - drag.x;
+                if (!drag.moved && Math.abs(dx) > 5) { drag.moved = true; drag.el.style.scrollSnapType = 'none'; drag.el.style.cursor = 'grabbing'; }
+                if (drag.moved) drag.el.scrollLeft = drag.left - dx;
+            });
+            document.addEventListener('pointerup', () => {
+                if (!drag) return;
+                if (drag.moved) { eatClick = true; drag.el.style.scrollSnapType = ''; drag.el.style.cursor = ''; setTimeout(() => { eatClick = false; }, 0); }
+                drag = null;
+            });
+            document.addEventListener('click', e => { if (eatClick) { e.stopPropagation(); e.preventDefault(); eatClick = false; } }, true);
+        })();
+
+        // ===== [신규] 가게 관리(옛 자료 정리) — 하위 탭 (판매 통계 / 매입·매출 / 손님 관리 / 아파트 관리 / 일반 관리) =====
         function switchDataSubTab(which) {
             // [수정] '매입·매출'이 늘어 세 갈래가 됐다. 보일 것 하나만 켜고 나머지는 끈다.
-            const keys = ['sales', 'profit', 'cust', 'apart'];
+            const keys = ['sales', 'profit', 'cust', 'apart', 'general'];
             if (!keys.includes(which)) which = 'sales';
             keys.forEach(k => {
                 const sec = document.getElementById('data-sub-' + k);
                 if (sec) sec.style.display = (k === which) ? 'block' : 'none';
                 const btn = document.getElementById('btn-data-sub-' + k);
                 if (btn) btn.classList.toggle('active', k === which);
+                if (btn && k === which) try { btn.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { }
             });
             // [수정] 전단지 기록은 맨 위 '🧾 전단지 기록' 단추를 눌렀을 때만 띄운다 (openFlyerModal)
             if (which === 'apart') renderApartmentAdmin();
             else if (which === 'profit') renderProfitReport();
             else if (which === 'cust') initCustomerAdmin();
+            else if (which === 'general') renderGeneralAdmin(true);
+        }
+
+        /* ================= [신규] 일반 관리 (주문서 '사장님 설정'을 옮겨 옴) =================
+           주문서 관리자 모드에서 하던 가게 설정을 여기서 한다. 손님 주문서는 이 값을 읽기만 한다.
+             · 배달       : 배달 켜기/끄기(delivery_status), 배달비(delivery_fee, 없으면 3,000원)
+             · 영업일     : 토요일 영업/휴무(saturday_as_weekday), 임시 휴무일(public_holidays — 지난 날은 저장할 때 뺀다)
+             · 손님 화면  : 상품목록 공개/숨김(product_list_enabled, 없으면 공개), 로그인 강제/끄기(login_entry_enabled, 없으면 강제)
+           주문서는 상품목록·토요일은 1분마다, 배달·휴무일·로그인은 열 때 다시 읽는다. */
+        let _gen = null;
+        let _genHoliday = { month: null, draft: [] };
+
+        function gGenPruneHolidays(list) {
+            const t = new Date();
+            const today = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+            return [...new Set((Array.isArray(list) ? list : String(list || '').split(','))
+                .map(s => String(s || '').trim())
+                .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s) && s >= today))].sort();
+        }
+
+        async function renderGeneralAdmin(reload) {
+            const box = document.getElementById('general-admin-body');
+            if (!box) return;
+            if (reload || !_gen) {
+                box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
+                const get = async p => { try { const r = await fetch(`${FIREBASE_DB_URL}${p}.json?t=${Date.now()}`); return r.ok ? await r.json() : null; } catch (e) { return null; } };
+                const [d, fee, sat, hol, pl, lg] = await Promise.all(['delivery_status', 'delivery_fee', 'saturday_as_weekday', 'public_holidays', 'product_list_enabled', 'login_entry_enabled'].map(get));
+                _gen = {
+                    delivery: d === true,
+                    fee: (fee === null || isNaN(parseInt(fee))) ? 3000 : parseInt(fee),
+                    sat: sat === true,
+                    holidays: gGenPruneHolidays(hol || []),
+                    productList: pl === null ? true : !!pl,
+                    login: lg === null ? true : lg === true
+                };
+                const t = new Date();
+                _genHoliday = { month: new Date(t.getFullYear(), t.getMonth(), 1), draft: _gen.holidays.slice() };
+            }
+            const G = _gen;
+            const card = (title, body) => `<div class="card" style="background:#fff; border-radius:14px; padding:14px 16px; box-shadow:var(--shadow); margin-bottom:12px; border:1px solid var(--border);">
+                <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:10px;">${title}</div>${body}</div>`;
+            // 켜기/끄기 두 칸 — 주문 달력의 인원/물건과 같은 모양
+            const seg = (key, on, labels) => `<span style="display:inline-flex; gap:3px; background:#e2e8f0; padding:3px; border-radius:10px;">
+                ${[[true, labels[0]], [false, labels[1]]].map(([v, l]) => `<button type="button" onclick="gGenSet('${key}', ${v})"
+                    style="height:32px; padding:0 14px; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;
+                           background:${on === v ? '#fff' : 'transparent'}; color:${on === v ? 'var(--primary)' : 'var(--text-sub)'};
+                           box-shadow:${on === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'};">${l}</button>`).join('')}
+            </span>`;
+            const row = (label, right, note) => `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:8px 0; border-top:1px solid #f1f5f9;">
+                <div><div style="font-size:13px; font-weight:800; color:#334155;">${label}</div>${note ? `<div style="font-size:11px; font-weight:700; color:#94a3b8; margin-top:2px;">${note}</div>` : ''}</div>${right}</div>`;
+
+            // [수정] 차례: 영업일 → 배달 → 손님 화면
+            box.innerHTML =
+                card('🗓️ 영업일',
+                    row('토요일', seg('sat', G.sat, ['영업', '휴무']), G.sat ? '토요일도 평일처럼 주문을 받습니다' : '토요일은 일요일처럼 쉽니다')
+                    + `<div style="padding:10px 0 0; border-top:1px solid #f1f5f9;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                            <div style="font-size:13px; font-weight:800; color:#334155;">임시 휴무일</div>
+                            <span id="gen-hol-dirty" style="font-size:11.5px; font-weight:800; color:#c2410c;"></span>
+                        </div>
+                        <div id="gen-hol-cal"></div>
+                        <button type="button" onclick="gGenSaveHolidays()" style="width:100%; height:40px; margin-top:10px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:900; cursor:pointer;">휴무일 저장</button>
+                    </div>`)
+                + card('🚚 배달',
+                    row('배달 주문', seg('delivery', G.delivery, ['켜기', '끄기']), G.delivery ? '손님이 배달 주문을 할 수 있습니다' : '배달 주문 단추가 막혀 있습니다')
+                    + row('배달비', `<span style="display:inline-flex; align-items:center; gap:6px;">
+                        <input id="gen-fee" type="number" min="0" step="100" value="${G.fee}" style="width:110px; height:34px; padding:0 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:800; text-align:right; box-sizing:border-box;">
+                        <span style="font-size:13px; font-weight:800; color:#475569;">원</span>
+                        <button type="button" onclick="gGenSaveFee()" style="height:34px; padding:0 12px; border:none; background:var(--primary); color:#fff; border-radius:8px; font-size:12.5px; font-weight:900; cursor:pointer;">저장</button>
+                    </span>`, `지금 ${G.fee.toLocaleString()}원`))
+                + card('📱 손님 화면',
+                    row('상품목록', seg('productList', G.productList, ['공개', '숨김']), G.productList ? '손님에게 상품이 보입니다' : '손님에게 상품이 안 보입니다 (가게 사람만 봄)')
+                    + row('로그인', seg('login', G.login, ['강제', '끄기']), G.login ? '카카오 로그인해야 주문서가 열립니다' : '로그인 없이 주문서를 볼 수 있습니다'))
+                + card('⚠️ 재고 의심 기록',
+                    `<div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin:-4px 0 6px; line-height:1.5;">주문관리가 켜져 있는 동안, 주문도 상품 수정도 없이 재고 숫자가 바뀌면 여기에 남깁니다 (이 기기, 최근 30건).</div>
+                    <div id="gen-stock-suspects"></div>`);
+            gGenPaintHolidays();
+            gPaintStockSuspects();
+        }
+
+        const GEN_KEYS = { delivery: ['delivery_status', '배달'], sat: ['saturday_as_weekday', '토요일'], productList: ['product_list_enabled', '상품목록'], login: ['login_entry_enabled', '로그인'] };
+        async function gGenSet(key, value) {
+            const [path, label] = GEN_KEYS[key] || [];
+            if (!path || !_gen || _gen[key] === value) return;
+            if (key === 'login' && !value && !confirm('로그인을 끄면 로그인 없이 주문서를 볼 수 있습니다. 끌까요?')) return;
+            if (key === 'productList' && !value && !confirm('상품목록을 숨기면 손님에게 상품이 하나도 안 보입니다. 숨길까요?')) return;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}${path}.json`, { method: 'PUT', body: JSON.stringify(value) });
+                if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                _gen[key] = value;
+                showToast(`${label} 설정을 바꿨습니다.`);
+            } catch (e) { showToast(`${label} 설정을 바꾸지 못했습니다: ${e.message}`); }
+            renderGeneralAdmin(false);
+        }
+
+        async function gGenSaveFee() {
+            const v = parseInt((document.getElementById('gen-fee') || {}).value, 10);
+            if (isNaN(v) || v < 0) return showToast('배달비를 바르게 적어 주세요.');
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}delivery_fee.json`, { method: 'PUT', body: JSON.stringify(v) });
+                if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                _gen.fee = v;
+                showToast(`배달비를 ${v.toLocaleString()}원으로 저장했습니다.`);
+            } catch (e) { showToast('배달비를 저장하지 못했습니다: ' + e.message); }
+            renderGeneralAdmin(false);
+        }
+
+        function gGenMoveMonth(d) {
+            const m = _genHoliday.month;
+            _genHoliday.month = new Date(m.getFullYear(), m.getMonth() + d, 1);
+            gGenPaintHolidays();
+        }
+        function gGenToggleHoliday(key) {
+            const i = _genHoliday.draft.indexOf(key);
+            if (i >= 0) _genHoliday.draft.splice(i, 1); else _genHoliday.draft.push(key);
+            _genHoliday.draft.sort();
+            gGenPaintHolidays();
+        }
+        function gGenPaintHolidays() {
+            const box = document.getElementById('gen-hol-cal');
+            if (!box || !_gen) return;
+            const m = _genHoliday.month, y = m.getFullYear(), mo = m.getMonth();
+            const t = new Date();
+            const today = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+            const first = new Date(y, mo, 1).getDay(), last = new Date(y, mo + 1, 0).getDate();
+            let cells = '';
+            for (let i = 0; i < first; i++) cells += '<span></span>';
+            for (let d = 1; d <= last; d++) {
+                const key = `${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const dow = new Date(y, mo, d).getDay();
+                const past = key < today;
+                const off = _genHoliday.draft.includes(key);
+                const regular = dow === 0 || (dow === 6 && !_gen.sat);   // 정기 휴무 (일요일, 토요일 휴무일 때 토요일)
+                let bg = '#fff', fg = dow === 0 ? '#ef4444' : dow === 6 ? '#3b82f6' : '#334155', bd = '#e2e8f0';
+                if (off) { bg = '#ef4444'; fg = '#fff'; bd = '#ef4444'; }
+                else if (regular) { bg = '#f1f5f9'; fg = '#94a3b8'; }
+                if (past) { fg = '#e2e8f0'; bg = '#fff'; bd = '#f8fafc'; }
+                if (key === today) bd = '#16a34a';
+                cells += `<button type="button" ${past ? 'disabled' : `onclick="gGenToggleHoliday('${key}')"`} title="${regular && !off ? '정기 휴무일' : ''}"
+                    style="height:38px; border:1.5px solid ${bd}; background:${bg}; color:${fg}; border-radius:9px; font-size:13px; font-weight:${off ? 900 : 700}; cursor:${past ? 'default' : 'pointer'}; padding:0;">${d}</button>`;
+            }
+            const draft = _genHoliday.draft.filter(k => k >= today);
+            const dirty = JSON.stringify(draft) !== JSON.stringify(_gen.holidays);
+            const dirtyEl = document.getElementById('gen-hol-dirty');
+            if (dirtyEl) dirtyEl.innerText = dirty ? '저장 전' : '';
+            box.innerHTML = `
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                    <button type="button" onclick="gGenMoveMonth(-1)" style="width:34px; height:32px; border:1.5px solid #e2e8f0; background:#fff; border-radius:8px; font-size:15px; font-weight:900; cursor:pointer;">‹</button>
+                    <b style="flex:1; text-align:center; font-size:14px; color:#0f172a;">${y}년 ${mo + 1}월</b>
+                    <button type="button" onclick="gGenMoveMonth(1)" style="width:34px; height:32px; border:1.5px solid #e2e8f0; background:#fff; border-radius:8px; font-size:15px; font-weight:900; cursor:pointer;">›</button>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; max-width:420px; margin:0 auto;">
+                    ${['일', '월', '화', '수', '목', '금', '토'].map((w, i) => `<span style="text-align:center; font-size:11px; font-weight:800; color:${i === 0 ? '#ef4444' : i === 6 ? '#3b82f6' : '#94a3b8'};">${w}</span>`).join('')}
+                    ${cells}
+                </div>
+                <div style="font-size:11px; font-weight:700; color:#94a3b8; margin-top:6px; text-align:center;">날짜를 누르면 휴무일(빨강)로 바뀝니다 · 회색은 정기 휴무 (${_gen.sat ? '일요일' : '토·일요일'})</div>
+                <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
+                    ${draft.length ? draft.map(k => `<span onclick="gGenToggleHoliday('${k}')" style="display:inline-flex; align-items:center; gap:4px; background:#fef2f2; border:1px solid #fecaca; color:#dc2626; font-size:11.5px; font-weight:800; padding:4px 9px; border-radius:999px; cursor:pointer;">${k.slice(5).replace('-', '/')} <span style="color:#fca5a5;">✕</span></span>`).join('')
+                        : `<span style="font-size:12px; font-weight:700; color:#cbd5e1;">임시 휴무일이 없습니다</span>`}
+                </div>`;
+        }
+        async function gGenSaveHolidays() {
+            const list = gGenPruneHolidays(_genHoliday.draft);   // 지난 날은 저장하지 않는다
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}public_holidays.json`, { method: 'PUT', body: JSON.stringify(list) });
+                if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                _gen.holidays = list;
+                _genHoliday.draft = list.slice();
+                showToast(`임시 휴무일 ${list.length}일을 저장했습니다.`);
+            } catch (e) { showToast('휴무일을 저장하지 못했습니다: ' + e.message); }
+            gGenPaintHolidays();
         }
 
         /* ================= [신규] 손님 관리 =================
