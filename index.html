@@ -4793,6 +4793,8 @@
                 _ordersRenderTimer = setTimeout(() => {
                     _ordersRenderTimer = null;
                     processOrdersSnapshot(ordersByPhone);
+                    // [신규] 주문 달력이 열려 있으면 같이 새로 그린다 (상태를 바꾼 뒤 옛 값이 남아 다시 눌러야 바뀌던 것)
+                    if (isRealtimeFirstLoadDone && typeof calRefreshIfOpen === 'function') gKeepScroll(calRefreshIfOpen);
                     if (!isRealtimeFirstLoadDone) {
                         isRealtimeFirstLoadDone = true;
                         hideLoader();
@@ -12241,6 +12243,36 @@
         }
 
         // 6.5 선택된 주문 카드 인쇄 헬퍼
+        /* [신규] 미입금 결제 바코드 (EAN-13).
+           번호 = '29' + 금액 10자리 + 확인숫자. 예) 23,500원 → 290000023500 + 확인숫자
+           토스 POS에 같은 번호·같은 금액의 상품을 등록해 두면, 손님이 찍어서 그 금액을 결제한다.
+           (토스 POS가 스스로 붙이는 번호는 2000000000… 으로 시작해 겹치지 않는다) */
+        function gPayBarcodeNumber(amount) {
+            const d12 = '29' + String(Math.max(0, Math.round(amount))).padStart(10, '0').slice(-10);
+            let s = 0;
+            for (let i = 0; i < 12; i++) s += (+d12[i]) * (i % 2 ? 3 : 1);
+            return d12 + ((10 - s % 10) % 10);
+        }
+        function gEan13Svg(code) {
+            const L = ['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
+            const G = ['0100111','0110011','0011011','0100001','0011101','0111001','0000101','0010001','0001001','0010111'];
+            const R = ['1110010','1100110','1101100','1000010','1011100','1001110','1010000','1000100','1001000','1110100'];
+            const P = ['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+            const p = P[+code[0]];
+            let bits = '101';
+            for (let i = 1; i <= 6; i++) bits += (p[i - 1] === 'L' ? L : G)[+code[i]];
+            bits += '01010';
+            for (let i = 7; i <= 12; i++) bits += R[+code[i]];
+            bits += '101';
+            const m = 1.6, h = 44, q = 10;   // 한 칸 너비·높이·양옆 여백(칸 수)
+            let rects = '';
+            for (let i = 0; i < bits.length; i++) if (bits[i] === '1') rects += `<rect x="${(q + i) * m}" y="0" width="${m}" height="${h}"/>`;
+            const w = (bits.length + q * 2) * m;
+            return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h + 13}" viewBox="0 0 ${w} ${h + 13}" style="display:block;">`
+                + `<g fill="#000">${rects}</g>`
+                + `<text x="${w / 2}" y="${h + 11}" text-anchor="middle" font-size="11" font-family="monospace" fill="#000">${code}</text></svg>`;
+        }
+
         function printSelectedCards() {
             try {
                 if (selectedItems.size === 0) {
@@ -12353,6 +12385,9 @@
                     const printItems = gOffsetFeeRows(customer.items)
                         .slice()
                         .sort((a, b) => (gIsFeeRow(a) ? 1 : 0) - (gIsFeeRow(b) ? 1 : 0));
+                    // [신규] 미입금 합계 — 결제 바코드에 쓴다 (배달비 차감처럼 마이너스 줄도 그대로 더한다)
+                    const _unpaidSum = printItems.filter(it => !(it.paid === true || it.paid === "true" || String(it.paid).toUpperCase() === "TRUE"))
+                        .reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0);
                     printItems.forEach(it => {
                         let statusBadge = '';
                         
@@ -12376,8 +12411,10 @@
                     printHtml += `
                                 </tbody>
                             </table>
-                            <div class="card-footer">
-                                합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원
+                            <div class="card-footer" style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
+                                <!-- [신규] 픽업 주문이면 미입금 합계를 결제 바코드로 (0원이면 안 그린다) -->
+                                ${(!isDelivery && _unpaidSum > 0) ? `<div style="text-align:left; font-size:11px; font-weight:700;">${gEan13Svg(gPayBarcodeNumber(_unpaidSum))}미입금 ${_unpaidSum.toLocaleString()}원</div>` : '<span></span>'}
+                                <span>합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원</span>
                             </div>
                             ${isDelivery ? `
                                 <div class="print-pickup-notice">
@@ -20324,6 +20361,10 @@
                         // 주문 내역과 같이, 저장에 성공한 것만 화면 쪽 값을 고친다
                         if (res && res.ok) {
                             Object.assign(o, patchBody);
+                            /* [신규] 저장을 기다리는 사이 실시간 연동이 주문 목록(rawOrders)을 새로 만들었을 수 있다.
+                               그러면 o 는 옛 목록의 줄이라 고쳐도 화면에 안 나온다 → 지금 목록의 같은 줄도 고친다 */
+                            const _cur = (rawOrders || []).find(x => x !== o && x.orderKey === o.orderKey && String(x.firebasePhoneKey || x.phone || '') === String(o.firebasePhoneKey || o.phone || ''));
+                            if (_cur) Object.assign(_cur, patchBody);
                             syncStatusToGoogleSheets(o.phone, o.timestamp, o.item, newStatus);
                             if (newStatus !== '배달완료') {
                                 fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(phoneKey)}/${encodeURIComponent(o.orderKey)}.json`, { method: 'DELETE' })
