@@ -9206,7 +9206,11 @@
 
         // [신규] 주문관리에서 취소↔활성 전이 시 전역 재고 조정(복구/재차감).
         // 상품의 실제 matchKey 기준 키로 계산해야 실재고에 반영됨. 취소상태 변화가 있을 때만 조정 → 중복 복구 방지.
+        /* [변경 2026-09-18] 주문관리에서는 주문 상태(취소·노쇼·취소 해제)로 재고를 돌리거나 줄이지 않는다.
+           상품 목록을 불러오기 전에 취소하면 엉뚱한 칸에 재고가 쌓였고, 지난 날짜 주문이 지금 판매분 재고에 더해졌다.
+           재고는 손님 주문서(주문·취소)와 상품관리에서 직접 고칠 때만 바뀐다. 아래 본문은 남겨 두되 쓰지 않는다. */
         async function applyStockDeltaForCancel(order, wasCanceled, willBeCanceled){
+            return;
             try {
                 wasCanceled = !!wasCanceled; willBeCanceled = !!willBeCanceled;
                 if (wasCanceled === willBeCanceled) return;                 // 취소상태 변화 없음 → 조정 안 함
