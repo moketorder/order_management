@@ -8103,6 +8103,7 @@
                      · unpickedMap : 손님별 '지난 미픽업' 건수
                      · pairMap     : 손님+날짜+수령방법별 건수 (픽업·배달이 함께 있는지 볼 때) */
                 const unpickedMap = new Map();
+                const noShowMap = new Map();   // [신규] 손님별 노쇼 날짜 모음
                 const pairMap = new Map();
                 {
                     const todayKey = gTodayKey();
@@ -8111,6 +8112,10 @@
                         const ph = String(it.phone || '').replace(/\D/g, '');
                         if (!ph) return;
                         const canceled = (it.canceled === true || it.canceled === "true" || String(it.canceled).toUpperCase() === "TRUE");
+                        if (canceled && it.noShow) {
+                            if (!noShowMap.has(ph)) noShowMap.set(ph, new Set());
+                            noShowMap.get(ph).add(getOrderDateInfo(it).dateStr || String(it.timestamp || ''));
+                        }
                         if (canceled) return;
                         const ds = getOrderDateInfo(it).dateStr;
                         if (!ds || ds === '기타') return;
@@ -8209,7 +8214,7 @@
                         let badgeClass = "status-ready";
                         let badgeLabel = "🔘 대기";
 
-                        if (isCanceled) { badgeClass = "status-canceled"; badgeLabel = "🔴 취소"; }
+                        if (isCanceled) { badgeClass = "status-canceled"; badgeLabel = it.noShow ? "⛔ 노쇼" : "🔴 취소"; }   // [신규] 노쇼는 노쇼로
                         else if (status === '입고') { badgeClass = "status-stocked"; badgeLabel = "🟡 입고 완료"; }
                         else if (status === '픽업') { badgeClass = "status-pickup_done"; badgeLabel = "🟣 픽업 완료"; }
                         else if (status === '배달완료') { badgeClass = "status-delivery_done"; badgeLabel = "🟢 배달 완료"; }
@@ -8333,6 +8338,7 @@
                     const orderKeysStr = customerItems.map(it => it.orderKey).join('|@@|');
                     // [신규] 이 손님이 지난 날짜에 안 찾아간 것이 몇 건인지 (없으면 딱지를 안 붙인다)
                     const unpickedCount = unpickedMap.get(_pairPhone) || 0;   // [성능] 미리 세어 둔 표에서 꺼낸다
+                    const noShowCount = noShowMap.has(_pairPhone) ? noShowMap.get(_pairPhone).size : 0;   // [신규]
 
                     card.innerHTML = `
                         <div class="card-header">
@@ -8354,6 +8360,7 @@
                                              오늘 물건을 건네면서 지난 것도 함께 챙겨 줄 수 있다.
                                              오른쪽 끝으로 밀어 두어 이름·연락처와 섞이지 않게 한다. -->
                                         <span style="margin-left:auto; display:inline-flex; gap:5px; align-items:center; flex-shrink:0;">
+                                            ${noShowCount > 0 ? `<span title="노쇼 기록" style="flex-shrink:0; font-size:11px; font-weight:800; padding:3px 8px; border-radius:5px; border:1.5px solid #fdba74; background:#fff7ed; color:#c2410c; white-space:nowrap;">⛔ 노쇼 ${noShowCount}회</span>` : ''}
                                             ${unpickedCount > 0 ? `
                                                 <button type="button" class="no-print"
                                                     onclick="openUnpickedModal('${encodeURIComponent(customer.phone || '')}','${encodeURIComponent(customer.name || '')}')"
@@ -9170,7 +9177,7 @@
                 return { canceled: true, deliveryPhoto: null, deliveryPhotoExists: null, deliveryPhotoTime: null };
             }
             
-            const patchBody = { status: status, canceled: false };
+            const patchBody = { status: status, canceled: false, noShow: null };   // [신규] 취소가 풀리면 노쇼 표시도 풀린다
             if (status === '입고' || status === '입고완료') {
                 patchBody.isStocked = true;
                 patchBody.received = false;
@@ -10350,7 +10357,7 @@
         function gStatusLabelOf(o) {
             if (!o) return '';
             const c = (o.canceled === true || o.canceled === 'true' || String(o.canceled).toUpperCase() === 'TRUE');
-            if (c) return '취소';
+            if (c) return o.noShow ? '노쇼' : '취소';
             const rec = String(o.received || ''), del = String(o.delivered || '');
             if (o.delivered === true || del === '배달완료') return '배달완료';
             if (rec === '픽업완료' || o.received === true) return '픽업완료';
@@ -10358,7 +10365,7 @@
             return '대기';
         }
 
-        async function updateSingleItemStatus(phone, orderKey, newStatus) {
+        async function updateSingleItemStatus(phone, orderKey, newStatus, extra) {   // [신규] extra — 함께 적을 값 (노쇼 표시)
             showLoader("상태 업데이트 중...");
             const cleanPhone = String(phone || "").replace(/\D/g, "");
             const target = rawOrders.find(it => (it.phone === phone || String(it.phone).replace(/\D/g, "") === cleanPhone) && it.orderKey === orderKey) || rawOrders.find(it => it.orderKey === orderKey);
@@ -10366,8 +10373,9 @@
             // [버그수정] 실제 저장 경로(firebasePhoneKey)에만 PATCH (여러 번호 변형에 PATCH하면 유령 undefined 주문 생성됨)
             const actualPhoneKey = (target && target.firebasePhoneKey) ? String(target.firebasePhoneKey).trim() : cleanPhone;
 
+            const _label = (extra && extra.noShow) ? '노쇼' : newStatus;
             try {
-                const patchBody = getStatusPatchBody(newStatus);
+                const patchBody = Object.assign(getStatusPatchBody(newStatus), extra || {});
                 const promises = [];
                 if (actualPhoneKey) {
                     // [신규] 상태 변경도 기록으로 남긴다 (📜 변경 기록)
@@ -10377,7 +10385,7 @@
                         item: (target && target.item) || '',
                         what: '상태',
                         from: gStatusLabelOf(target),
-                        to: newStatus
+                        to: _label
                     }]));
                     if (newStatus !== '배달완료') {
                         fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(actualPhoneKey)}/${orderKey}.json`, {
@@ -10387,7 +10395,7 @@
                 }
                 
                 await Promise.all(promises);
-                showToast(`상태를 [${newStatus}]로 변경 완료했습니다.`);
+                showToast(`상태를 [${_label}]로 변경 완료했습니다.`);
                 
                 // 로컬 데이터 갱신
                 const _wasCanceledS = target && (target.canceled === true || target.canceled === "true" || String(target.canceled).toUpperCase() === "TRUE");
@@ -11617,6 +11625,8 @@
             const _wAt = Number(((window.__caSaved || {})[targetKey] || {}).withdrawnAt) || 0;
             const all = _src.filter(o => salesPersonKey(o) === targetKey && !isSalesCanceled(o)
                 && (!_wAt || (parseTimestampToDate(o.timestamp) || 0) - 0 >= _wAt));
+            const _noShowN = gNoShowDays(_src.filter(o => salesPersonKey(o) === targetKey
+                && (!_wAt || (parseTimestampToDate(o.timestamp) || 0) - 0 >= _wAt))).size;   // [신규] 노쇼 횟수
 
             /* [수정] 주문이 없으면 창을 아예 안 띄웠다. 가입만 하고 아직 안 시킨 손님은
                손님 관리에서 카드를 눌러도 아무 일이 없었다. 이제는 띄운다.
@@ -11809,6 +11819,7 @@
                             ${addrHtml}
                             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:5px 8px; margin-top:6px;">
                                 <span style="font-size:12px; font-weight:800; color:${gradeColor};">${grade}</span>
+                                ${_noShowN ? `<span style="font-size:12px; font-weight:800; color:#c2410c;">⛔ 노쇼 ${_noShowN}회</span>` : ''}
                                 ${gender ? `<span style="font-size:12px; font-weight:700; color:#334155;">${genderIcon} ${gender}</span>` : ''}
                                 ${ageGroup ? `<span style="font-size:12px; font-weight:700; color:#334155;">🎂 ${ageGroup}</span>` : ''}
                             </div>
@@ -11946,6 +11957,7 @@
                             ${isDelivery
                                 ? `<button type="button" onclick="overdueUpdateStatus('${refsEnc}','배달완료')" style="flex:1 1 0; font-size:12px; font-weight:800; color:#fff; background:#059669; border:none; padding:7px 4px; border-radius:6px; cursor:pointer;">🟢 배달완료</button>`
                                 : `<button type="button" onclick="overdueUpdateStatus('${refsEnc}','픽업')" style="flex:1 1 0; font-size:12px; font-weight:800; color:#fff; background:#7c3aed; border:none; padding:7px 4px; border-radius:6px; cursor:pointer;">🟣 픽업완료</button>`}
+                            <button type="button" onclick="overdueUpdateStatus('${refsEnc}','노쇼')" style="flex:1 1 0; font-size:12px; font-weight:800; color:#fff; background:#c2410c; border:none; padding:7px 4px; border-radius:6px; cursor:pointer;">⛔ 노쇼</button>
                             <button type="button" onclick="overdueUpdateStatus('${refsEnc}','취소')" style="flex:1 1 0; font-size:12px; font-weight:800; color:#fff; background:#dc2626; border:none; padding:7px 4px; border-radius:6px; cursor:pointer;">🔴 취소</button>
                         </div>
                         ${itemsHtml}
@@ -11985,10 +11997,13 @@
             let refs = [];
             try { refs = JSON.parse(decodeURIComponent(refsEnc)); } catch(e){}
             if (!refs.length) return;
-            if (newStatus === '취소' && !confirm('이 고객의 미완료 건을 취소 처리할까요?')) return;
+            // [신규] 노쇼 — 취소처럼 매출에서 빼고 노쇼로 적는다 (손님 주문서에는 '강제취소')
+            const isNoShow = (newStatus === '노쇼');
+            const st = isNoShow ? '취소' : newStatus;
+            if (st === '취소' && !confirm(isNoShow ? '이 고객의 미완료 건을 노쇼 처리할까요?' : '이 고객의 미완료 건을 취소 처리할까요?')) return;
             showLoader(`[${newStatus === '픽업' ? '픽업완료' : newStatus}]로 변경 중...`);
             try {
-                const patchBody = getStatusPatchBody(newStatus);
+                const patchBody = Object.assign(getStatusPatchBody(st), isNoShow ? { noShow: Date.now() } : {});
                 // [신규] 미완료 목록에서 바꾼 것도 기록으로 남긴다
                 await Promise.all(refs.map(r => {
                     const t0 = (rawOrders || []).find(o => (o.firebasePhoneKey === r.pk || String(o.phone || "").replace(/\D/g, "") === String(r.pk).replace(/\D/g, "")) && o.orderKey === r.ok);
@@ -12003,10 +12018,11 @@
                     if (t){
                         const _wasCanceledO = (t.canceled === true || t.canceled === "true" || String(t.canceled).toUpperCase() === "TRUE");
                         Object.assign(t, patchBody);
-                        await applyStockDeltaForCancel(t, _wasCanceledO, newStatus === '취소');
+                        await applyStockDeltaForCancel(t, _wasCanceledO, st === '취소');
                     }
                 }
                 showToast(`[${newStatus === '픽업' ? '픽업완료' : newStatus}]로 변경했습니다.`);
+                if (isNoShow) caRows = null;   // 손님 관리 노쇼 횟수를 다시 센다
                 gKeepScroll(renderFilteredOrders);   // [수정] 보던 자리 그대로 두기
                 closeSummaryModal();
                 setTimeout(showOverdueModal, 80); // 모달 새로고침(처리된 건은 목록에서 빠짐)
@@ -15382,8 +15398,10 @@
                     const t = parseTimestampToDate(o.timestamp);
                     return (caAfterVisitStart(t) && selSet.has(caDayKey(t))) ? String(o.timestamp) : '';
                 }).filter(Boolean)).size;
+                const _ns = gNoShowDays(v.rows);   // [신규] 노쇼 날짜
                 out.push({
                     phone: v.phone,
+                    noShow: _ns.size, noShowLast: [..._ns].sort().pop() || '',
                     tel: String((s && s.contactPhone) || '').replace(/\D/g, '') || v.phone,   // [신규] 전화·문자는 손님이 적은 연락처로
                     name: String((s && s.name) || '').trim() || (nameFromOrders ? nameFromOrders[0] : '무명'),
                     nameCount: v.names.size,
@@ -15470,6 +15488,7 @@
             const nChanged = all.filter(r => r.lastChange).length;
             const nBrowse = all.filter(r => r.browser).length;              // [신규]
             const nGone = all.filter(r => r.visit && r.visit.gone).length;   // [신규]
+            const nNoShow = all.filter(r => r.noShow).length;   // [신규]
             const WD = (window.__caWithdrawn || []).slice().sort((a, b) => b.at - a.at);   // [신규] 탈퇴 목록
 
             let list = caFilter === 'delivery' ? all.filter(r => r.way === '배달')
@@ -15480,6 +15499,7 @@
                      : caFilter === 'changed' ? all.filter(r => r.lastChange)
                      : caFilter === 'browse' ? all.filter(r => r.browser)
                      : caFilter === 'gone' ? all.filter(r => r.visit && r.visit.gone)
+                     : caFilter === 'noshow' ? all.filter(r => r.noShow)
                      : all;
             // '새로 온 손님'을 고르면 늦게 온 순, '고침'을 고르면 최근 고친 순으로 세운다
             if (caFilter === 'new30' && caSort === 'amt') caSort = 'joined';
@@ -15509,6 +15529,7 @@
             // [신규] '적은 순'이면 견주는 차례를 뒤집는다
             const cmpDir = (caSortDir === 'asc') ? ((a, b) => cmp(b, a)) : cmp;
             list = list.slice().sort(cmpDir);
+            if (caFilter === 'noshow') list.sort((a, b) => (b.noShow - a.noShow) || String(b.noShowLast).localeCompare(String(a.noShowLast)));   // [신규] 노쇼 많은 순
 
             const fbtn = (k, label, color) => `<button type="button" onclick="caSetFilter('${k}')"
                 style="height:30px; padding:0 12px; border:1.5px solid ${caFilter === k ? (color || 'var(--primary)') : '#cbd5e1'};
@@ -15536,6 +15557,7 @@
                         ${fbtn('idle60', `💤 두 달 넘게 ${nIdle}`, '#a16207')}
                         ${(nBrowse || caFilter === 'browse') ? fbtn('browse', `👀 구경만 ${nBrowse}`, '#1d4ed8') : ''}
                         ${(nGone || caFilter === 'gone') ? fbtn('gone', `🚪 발길 끊김 ${nGone}`, '#be123c') : ''}
+                        ${(nNoShow || caFilter === 'noshow') ? fbtn('noshow', `⛔ 노쇼 ${nNoShow}`, '#c2410c') : ''}
                         ${(WD.length || caFilter === 'withdrawn') ? fbtn('withdrawn', `🚫 탈퇴 ${WD.length}`, '#64748b') : ''}
                         ${/* [수정] 늘 0이라 자리만 차지한다. 어긋난 것이 생겼을 때만 내보인다. */
                           (all.length - nSaved > 0 || caFilter === 'nosaved')
@@ -15590,6 +15612,7 @@
                 <div class="ca-card" onclick="showCustomerCardModal('${encodeURIComponent(r.phone)}','${encodeURIComponent(r.name)}')">
                     <div class="ca-r1">
                         <span class="ca-name">${gEscapeHtml(r.name)}${r.realName && r.realName !== r.name ? `<span style="font-weight:700; color:#94a3b8;"> (${gEscapeHtml(r.realName)})</span>` : ''}</span>
+                        ${r.noShow ? `<span style="flex:0 0 auto; font-size:11px; font-weight:800; color:#c2410c;" title="마지막 노쇼 ${gEscapeHtml(r.noShowLast)}">⛔ 노쇼 ${r.noShow}회</span>` : ''}
                         <span class="ca-cnt">${r.orders}회</span>
                         <span class="ca-amt" title="${r.amt.toLocaleString()}원">${won(r.amt)}</span>
                     </div>
@@ -17102,6 +17125,10 @@
         function sortSalesRanking(key){ toggleSalesSort(salesRankSort, key, key === 'name' ? 'asc' : 'desc'); renderSalesRanking(); }
 
         function isSalesCanceled(o){ return (o && (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE")); }
+        // [신규] 노쇼 — 가게가 '노쇼'로 마무리한 줄 (취소와 같이 매출에서 빠진다)
+        function gIsNoShow(o){ return !!(o && o.noShow) && isSalesCanceled(o); }
+        // 손님의 노쇼 횟수 — 같은 날짜는 한 번으로 센다
+        function gNoShowDays(rows){ const s = new Set(); (rows || []).forEach(o => { if (gIsNoShow(o)) s.add(getOrderDateInfo(o).dateStr || String(o.timestamp || '')); }); return s; }
         function isSalesPaid(o){ return (o && (o.paid === true || o.paid === "true" || o.paid === "True" || o.isPaid === true || o.isPaid === "true")); }
         // 배달 판별 — 주문현황(showTodaySummary)과 동일: shippingMethod가 '배달주문'이거나, '매장픽업'이 아니고 주소가 있으면 배달
         function isSalesDelivery(o){ return (o.shippingMethod === '배달주문' || (o.shippingMethod !== '매장픽업' && o.address && String(o.address).trim() !== '')); }
@@ -20729,6 +20756,7 @@
                            취소는 되돌리기 어려워 두 번 눌러야 되게 했다 (이 화면에서는 confirm 창이 안 뜬다). */
                         const kEnc = encodeURIComponent(it.orderKey || '');
                         const armed = (_unpickCancelArmed === String(it.orderKey || ''));
+                        const nsArmed = (_unpickNoShowArmed === String(it.orderKey || ''));
                         return `
                             <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 2px; border-top:1px dashed #f1f5f9;">
                                 <span style="flex:0 0 auto; font-size:10.5px; font-weight:800; padding:2px 6px; border-radius:4px; ${isDel ? 'background:#ede9fe; color:#6d28d9;' : 'background:#e0f2fe; color:#0369a1;'}">${isDel ? '배달' : '픽업'}</span>
@@ -20738,6 +20766,8 @@
                                 <span style="flex:0 0 auto; display:inline-flex; gap:5px; margin-left:auto;">
                                     <button type="button" onclick="unpickedMarkDone('${phoneEnc}','${nameEnc}','${kEnc}',${isDel})"
                                         style="padding:4px 9px; border-radius:7px; border:1.5px solid #16a34a; background:#16a34a; color:#fff; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${isDel ? '배달완료' : '픽업완료'}</button>
+                                    <button type="button" onclick="unpickedNoShow('${phoneEnc}','${nameEnc}','${kEnc}')"
+                                        style="padding:4px 9px; border-radius:7px; border:1.5px solid ${nsArmed ? '#7c2d12' : '#fdba74'}; background:${nsArmed ? '#7c2d12' : '#fff'}; color:${nsArmed ? '#fff' : '#c2410c'}; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${nsArmed ? '정말 노쇼?' : '노쇼'}</button>
                                     <button type="button" onclick="unpickedCancel('${phoneEnc}','${nameEnc}','${kEnc}')"
                                         style="padding:4px 9px; border-radius:7px; border:1.5px solid ${armed ? '#dc2626' : '#fecaca'}; background:${armed ? '#dc2626' : '#fff'}; color:${armed ? '#fff' : '#dc2626'}; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">${armed ? '정말 취소?' : '취소'}</button>
                                 </span>
@@ -20812,6 +20842,29 @@
 
             _unpickCancelArmed = '';
             await updateSingleItemStatus(phone, key, '취소');
+            if (document.getElementById('unpicked-modal')) openUnpickedModal(phoneEnc, nameEnc);
+        }
+
+        /* [신규] 노쇼 — 취소처럼 매출에서 빼고 '노쇼'로 적어 둔다. 손님 주문서에는 '강제취소'로 보인다.
+           되돌리려면 상태를 다른 것으로 바꾸면 된다 (그때 노쇼 표시도 함께 풀린다). 취소처럼 두 번 눌러야 된다. */
+        let _unpickNoShowArmed = '';
+        async function unpickedNoShow(phoneEnc, nameEnc, orderKeyEnc) {
+            const phone = decodeURIComponent(phoneEnc || '');
+            const key = decodeURIComponent(orderKeyEnc || '');
+            if (!phone || !key) return;
+            if (_unpickNoShowArmed !== key) {
+                _unpickNoShowArmed = key;
+                openUnpickedModal(phoneEnc, nameEnc);
+                setTimeout(() => {
+                    if (_unpickNoShowArmed !== key) return;
+                    _unpickNoShowArmed = '';
+                    if (document.getElementById('unpicked-modal')) openUnpickedModal(phoneEnc, nameEnc);
+                }, 5000);
+                return;
+            }
+            _unpickNoShowArmed = '';
+            await updateSingleItemStatus(phone, key, '취소', { noShow: Date.now() });
+            caRows = null;   // 손님 관리 노쇼 횟수를 다시 센다
             if (document.getElementById('unpicked-modal')) openUnpickedModal(phoneEnc, nameEnc);
         }
 
