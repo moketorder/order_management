@@ -2901,7 +2901,7 @@
                                     <span style="display: inline-flex; align-items: center; gap: 8px;">
                                         <span>📦 상품명</span>
                                         <button type="button" onclick="openCodePicker()" title="쓰던 번호에서 고르기"
-                                            style="padding:4px 10px; background:#eff6ff; color:#2563eb; border:1.5px solid #bfdbfe; border-radius:7px; font-size:12px; font-weight:800; cursor:pointer;">🔍 번호 찾기</button>
+                                            style="height:30px; padding:0 10px; box-sizing:border-box; background:#eff6ff; color:#2563eb; border:1.5px solid #bfdbfe; border-radius: 8px; font-size:12px; font-weight:800; cursor:pointer;">🔍 번호 찾기</button>
                                     </span>
                                     <!-- [수정] 상품등록 칸이 발주등록보다 좁아 식별번호 쪽이 통째로 아랫줄로 떨어졌다.
                                          이름 칸이 줄어들며 한 줄에 들어가게 한다. 휴대폰처럼 정말 좁을 때만 내려간다. -->
@@ -2909,6 +2909,9 @@
                                         <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
                                         <input type="text" id="productCodeView" class="form-control" placeholder="자동" readonly tabindex="-1"
                                             style="flex:0 0 100px; width:100px; height:30px; padding:5px 9px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
+                                        <!-- [신규] 과세·면세는 식별번호에 딸린 값이다. 누를 때마다 바뀌고, 저장하면 그 번호에 적힌다 (결제 바코드를 나눌 때 쓴다) -->
+                                        <button type="button" id="btn-tax-type" onclick="toggleFormTaxFree()" title="눌러서 과세·면세 바꾸기"
+                                            style="flex:0 0 auto; height:30px; padding:0 10px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; background:#f1f5f9; color:#64748b; border:1.5px solid #e2e8f0;">과세</button>
                                         <!-- [신규] 번호가 '자동'일 때 붙을 갈래. 분류를 보고 알아서 골라 두지만, 눌러서 바꿀 수 있다 -->
                                         <span id="product-code-prefix" style="display:inline-flex; gap:3px;">
                                             <button type="button" data-pre="P" onclick="setProductCodePrefix('P')" title="저장하면 새 일반 번호(P)가 붙습니다" style="height:30px; min-width:34px; padding:0 8px; border-radius:8px; font-size:12px; font-weight:900; cursor:pointer;">P</button>
@@ -2920,8 +2923,8 @@
                                         <input type="text" id="productCodeLabel" class="form-control" placeholder="식별번호 이름"
                                             style="flex:1 1 120px; min-width:90px; height:30px; padding:5px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#fff; color:#334155;">
                                         <button type="button" id="btn-code-label-save" onclick="applyCodeLabel('productCodeView','productCodeLabel')"
-                                            title="이 번호를 쓰는 상품과 지난 주문에 모두 같은 이름이 붙습니다"
-                                            style="flex:0 0 auto; padding:0 10px; height:30px; border:1px solid #a7f3d0; background:#ecfdf5; color:#047857; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer; white-space:nowrap;">✔ 이름 저장</button>
+                                            title="이 번호의 이름과 과세·면세를 저장합니다. 이 번호를 쓰는 상품과 지난 주문에 모두 같이 붙습니다"
+                                            style="flex:0 0 auto; padding:0 10px; height:30px; border:1px solid #a7f3d0; background:#ecfdf5; color:#047857; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer; white-space:nowrap;">✔ 저장</button>
                                         <span id="code-label-hint" style="flex:0 0 auto; display:none; font-size:11px; font-weight:700; color:#cbd5e1; white-space:nowrap;"></span>
                                     </span>
                                 </div>
@@ -12244,11 +12247,11 @@
 
         // 6.5 선택된 주문 카드 인쇄 헬퍼
         /* [신규] 미입금 결제 바코드 (EAN-13).
-           번호 = '29' + 금액 10자리 + 확인숫자. 예) 23,500원 → 290000023500 + 확인숫자
+           번호 = '29' + 금액 10자리 + 확인숫자. 면세는 '28' 로 시작한다 (과세·면세를 한 번에 찍어 카드 한 번으로 결제) 예) 23,500원 → 290000023500 + 확인숫자
            토스 POS에 같은 번호·같은 금액의 상품을 등록해 두면, 손님이 찍어서 그 금액을 결제한다.
            (토스 POS가 스스로 붙이는 번호는 2000000000… 으로 시작해 겹치지 않는다) */
-        function gPayBarcodeNumber(amount) {
-            const d12 = '29' + String(Math.max(0, Math.round(amount))).padStart(10, '0').slice(-10);
+        function gPayBarcodeNumber(amount, prefix) {
+            const d12 = (prefix || '29') + String(Math.max(0, Math.round(amount))).padStart(10, '0').slice(-10);
             let s = 0;
             for (let i = 0; i < 12; i++) s += (+d12[i]) * (i % 2 ? 3 : 1);
             return d12 + ((10 - s % 10) % 10);
@@ -12264,7 +12267,7 @@
             bits += '01010';
             for (let i = 7; i <= 12; i++) bits += R[+code[i]];
             bits += '101';
-            const m = 1.6, h = 44, q = 10;   // 한 칸 너비·높이·양옆 여백(칸 수)
+            const m = 1.1, h = 36, q = 4;    // 한 칸 너비·높이·양옆 여백(칸 수)
             let rects = '';
             for (let i = 0; i < bits.length; i++) if (bits[i] === '1') rects += `<rect x="${(q + i) * m}" y="0" width="${m}" height="${h}"/>`;
             const w = (bits.length + q * 2) * m;
@@ -12273,8 +12276,16 @@
                 + `<text x="${w / 2}" y="${h + 11}" text-anchor="middle" font-size="11" font-family="monospace" fill="#000">${code}</text></svg>`;
         }
 
-        function printSelectedCards() {
+        async function printSelectedCards() {
             try {
+                // [신규] 과세·면세를 가리려면 상품 목록과 면세 표가 있어야 한다
+                if (!uploadProducts || !uploadProducts.length) { try { await loadProductsFromServer(); } catch (e) { } }
+                await gLoadTaxFree();
+                /* [신규] 처음 뽑는 결제 바코드 — POS에 새로 등록해야 하므로 미입금 앞에 * 를 붙인다.
+                   뽑은 번호는 settings/pay_barcodes/{번호} 에 적어 두고, 다음부터는 * 가 안 붙는다. */
+                let _knownBars = {};
+                try { const r = await fetch(`${FIREBASE_DB_URL}settings/pay_barcodes.json?shallow=true&t=${Date.now()}`); _knownBars = (r.ok ? await r.json() : null) || {}; } catch (e) { }
+                const _newBars = {};
                 if (selectedItems.size === 0) {
                     showToast("선택된 주문 항목이 없습니다.");
                     return;
@@ -12319,7 +12330,23 @@
 
                 let printHtml = '';
 
-                Object.values(grouped).forEach(customer => {
+                /* [신규] 픽업 주문은 과세·면세 상품을 종이 두 장으로 나눠 뽑는다 (한쪽만 있으면 한 장).
+                   장마다 그 장의 미입금 결제 바코드가 하나씩 붙는다. 배달비·모르는 상품은 과세 장으로 간다. */
+                const _itemFree = it => {
+                    if (gIsFeeRow(it)) return false;
+                    let code = String(it.productCode || '').trim();
+                    if (!code) { const p = (uploadProducts || []).find(p => p && p.name === String(it.item || '').trim()); code = p ? String(p.productCode || '').trim() : ''; }
+                    return gIsTaxFreeCode(code);
+                };
+                const _printParts = [];
+                Object.values(grouped).forEach(c => {
+                    if (c.shippingMethod === '배달주문') { _printParts.push(c); return; }
+                    const free = c.items.filter(_itemFree), tax = c.items.filter(it => !_itemFree(it));
+                    if (!free.length || !tax.length) { _printParts.push(Object.assign({}, c, { taxLabel: free.length ? '면세' : '' })); return; }
+                    _printParts.push(Object.assign({}, c, { items: tax, taxLabel: '과세', taxPair: true }));
+                    _printParts.push(Object.assign({}, c, { items: free, taxLabel: '면세', taxPair: true }));
+                });
+                _printParts.forEach(customer => {
                     const isDelivery = customer.shippingMethod === '배달주문';
                     const badgeClass = isDelivery ? 'shipping-delivery' : 'shipping-pickup';
                     
@@ -12346,6 +12373,8 @@
                             <div class="card-header">
                                 <div class="customer-info">
                                     <div class="shipping-type ${badgeClass}">${displayMethod}</div>
+                                    ${customer.taxLabel ? `<div class="shipping-type" style="margin-left:4px;">${customer.taxLabel}</div>` : ''}
+                                    ${customer.taxPair ? `<span style="margin-left:6px; font-size:12px; font-weight:800;">${customer.taxLabel === '과세' ? '면세' : '과세'} 상품도 챙겨 주세요</span>` : ''}
                                     <h2>${customer.name} (☎ ${displayPhone})</h2>
                                     ${isDelivery ? `
                                         <div class="address-text">
@@ -12388,6 +12417,25 @@
                     // [신규] 미입금 합계 — 결제 바코드에 쓴다 (배달비 차감처럼 마이너스 줄도 그대로 더한다)
                     const _unpaidSum = printItems.filter(it => !(it.paid === true || it.paid === "true" || String(it.paid).toUpperCase() === "TRUE"))
                         .reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0);
+                    // [신규] 미입금을 과세·면세로 나눈다. 배달비·모르는 상품은 과세로 본다
+                    let _unpaidFree = 0;
+                    printItems.forEach(it => {
+                        if (it.paid === true || it.paid === "true" || String(it.paid).toUpperCase() === "TRUE") return;
+                        if (gIsFeeRow(it)) return;
+                        let code = String(it.productCode || '').trim();
+                        if (!code) { const p = (uploadProducts || []).find(p => p && p.name === String(it.item || '').trim()); code = p ? String(p.productCode || '').trim() : ''; }
+                        if (gIsTaxFreeCode(code)) _unpaidFree += parseInt(String(it.total || 0).replace(/,/g, "")) || 0;
+                    });
+                    const _unpaidTax = _unpaidSum - _unpaidFree;
+                    const _barNums = (!isDelivery && _unpaidSum > 0)
+                        ? [[_unpaidTax, '29'], [_unpaidFree, '28']].filter(x => x[0] > 0).map(([amt, pre]) => gPayBarcodeNumber(amt, pre)) : [];
+                    const _isNewBar = _barNums.some(n => !_knownBars[n]);
+                    _barNums.forEach(n => { if (!_knownBars[n]) _newBars[n] = Date.now(); });
+                    const _payBars = (!isDelivery && _unpaidSum > 0)
+                        ? [[_unpaidTax, '29', '과세'], [_unpaidFree, '28', '면세']].filter(x => x[0] > 0)
+                            .map(([amt, pre]) => `${gEan13Svg(gPayBarcodeNumber(amt, pre))}`)
+                            .join('<div style="height:5px;"></div>')
+                        : '';
                     printItems.forEach(it => {
                         let statusBadge = '';
                         
@@ -12411,10 +12459,14 @@
                     printHtml += `
                                 </tbody>
                             </table>
-                            <div class="card-footer" style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
-                                <!-- [신규] 픽업 주문이면 미입금 합계를 결제 바코드로 (0원이면 안 그린다) -->
-                                ${(!isDelivery && _unpaidSum > 0) ? `<div style="text-align:left; font-size:11px; font-weight:700;">${gEan13Svg(gPayBarcodeNumber(_unpaidSum))}미입금 ${_unpaidSum.toLocaleString()}원</div>` : '<span></span>'}
-                                <span>합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원</span>
+                            <!-- [수정] 픽업 주문이면 왼쪽에 미입금 결제 바코드, 오른쪽에 미입금·합계 금액을 위아래로 둔다.
+                                 좁은 화면용 규칙(.card-footer 세로 쌓기)이 종이에도 걸려 바코드와 금액이 위아래로 흩어졌다 → 가로로 못박는다. -->
+                            <div class="card-footer" style="display:flex; flex-direction:row; flex-wrap:nowrap; align-items:center; justify-content:space-between; gap:10px;">
+                                ${_payBars ? `<div style="flex:0 0 auto;">${_payBars}</div>` : ''}
+                                ${(!isDelivery && _unpaidSum > 0) ? `<div style="flex:1 1 auto; text-align:right; white-space:nowrap; line-height:1.25;">
+                                    <div style="font-size:15px; margin-bottom:3px;">합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원</div>
+                                    <div style="font-size:15px;">${_isNewBar ? '*' : ''}미입금: ${_unpaidSum.toLocaleString()}원</div>
+                                </div>` : `<div style="flex:1 1 auto; text-align:right; white-space:nowrap;">합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원</div>`}
                             </div>
                             ${isDelivery ? `
                                 <div class="print-pickup-notice">
@@ -12426,6 +12478,11 @@
                 });
 
                 // 3. 현재 창의 인쇄 영역을 활용하여 인쇄 처리 (팝업 차단 및 모바일/PC 브라우저 호환성 에러 완벽 해결)
+                // [신규] 이번에 처음 뽑은 결제 바코드를 적어 둔다
+                if (Object.keys(_newBars).length) {
+                    fetch(`${FIREBASE_DB_URL}settings/pay_barcodes.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_newBars) })
+                        .catch(e => console.warn('결제 바코드 기록 실패:', e));
+                }
                 let printArea = document.getElementById("print-area");
                 if (!printArea) {
                     printArea = document.createElement("div");
@@ -12659,6 +12716,53 @@
             if (prod && (prod.isSada === true || prod.isSada === 'true')) return chip('🛒 사다드림', '#fff1e8', '#c2410a');
             if (prod && (prod.isFresh === true || prod.isFresh === 'true')) return chip('🥬 신선식품', '#eafaf2', '#047857');
             return '';
+        }
+
+        /* [신규] 과세·면세 — 식별번호(productCode)별로 면세인 것만 적어 둔다 (settings/tax_free/{번호} = true).
+           번호에 거는 까닭: 상품을 다시 올려도 번호는 이어지므로 한 번 정하면 계속 간다.
+           적혀 있지 않으면 과세로 본다. 결제 바코드를 과세·면세로 나눌 때 쓴다. */
+        let gTaxFree = null;
+        async function gLoadTaxFree(force) {
+            if (gTaxFree && !force) return gTaxFree;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}settings/tax_free.json?t=${Date.now()}`);
+                gTaxFree = (r.ok ? await r.json() : null) || {};
+            } catch (e) { gTaxFree = gTaxFree || {}; }
+            return gTaxFree;
+        }
+        function gIsTaxFreeCode(code) { return !!(code && gTaxFree && gTaxFree[code]); }
+        function gTaxBadge(prod) {
+            const code = String((prod && prod.productCode) || '').trim();
+            if (!code) return '';
+            const free = gIsTaxFreeCode(code);
+            return `<span onclick="gToggleTaxFree('${code}', event)" title="눌러서 과세·면세 바꾸기"`
+                + ` style="font-size:10px; font-weight:800; background:${free ? '#ecfdf5' : '#f1f5f9'}; color:${free ? '#047857' : '#64748b'};`
+                + ` padding:2px 6px; border-radius:4px; cursor:pointer; user-select:none;">${free ? '면세' : '과세'}</span>`;
+        }
+        // [신규] 상품등록 칸의 과세·면세. 손대지 않았으면 저장 때 건드리지 않는다 (번호에 이미 정해 둔 값을 지키려고)
+        let uploadFormTaxFree = false, uploadFormTaxTouched = false;
+        function paintFormTaxFree() {
+            const b = document.getElementById('btn-tax-type');
+            if (!b) return;
+            b.innerText = uploadFormTaxFree ? '면세' : '과세';
+            b.style.background = uploadFormTaxFree ? '#ecfdf5' : '#f1f5f9';
+            b.style.color = uploadFormTaxFree ? '#047857' : '#64748b';
+            b.style.borderColor = uploadFormTaxFree ? '#a7f3d0' : '#e2e8f0';
+        }
+        function toggleFormTaxFree() { uploadFormTaxFree = !uploadFormTaxFree; uploadFormTaxTouched = true; paintFormTaxFree(); }
+        async function gToggleTaxFree(code, ev) {
+            if (ev) ev.stopPropagation();
+            await gLoadTaxFree();
+            const free = !gIsTaxFreeCode(code);
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}settings/tax_free/${encodeURIComponent(code)}.json`, free
+                    ? { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true' }
+                    : { method: 'DELETE' });
+                if (!r.ok) throw new Error(r.status);
+                if (free) gTaxFree[code] = true; else delete gTaxFree[code];
+                showToast(`${code} → ${free ? '면세' : '과세'}`);
+                if (typeof renderProductsList === 'function') gKeepScroll(renderProductsList);
+            } catch (e) { showToast('바꾸지 못했습니다.'); }
         }
 
         let uploadAgencyFeeTiers = [];   // 금액 구간별 대행료: [{ from: 기준금액(이상), fee: 대행료 }]
@@ -22778,6 +22882,7 @@
                 await loadShelves();   // [신규] 선반 목록을 먼저 받아 둔다 (탭·드롭다운·그룹 제목이 모두 이걸 쓴다)
                 await loadOptionStock();   // [신규] 옵션 항목별 재고 (상품 목록의 옵션 뱃지가 쓴다)
                 await gLoadCodeLabels();   // [신규] 번호 이름표 (F·S 번호 옆에 무엇인지 붙여 준다)
+                await gLoadTaxFree(true);   // [신규] 과세·면세 표
                 const [res, stockRes] = await Promise.all([
                     fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`),
                     fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 재고 로드 실패:", e); return { ok: false }; })
@@ -23150,7 +23255,7 @@
                                 ${prod.productCode ? `<span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${prod.productCode}</span>${gCodeLabelChip(prod.productCode)}` : ``}
                                 ${priceHtml}
                                 ${stockText ? `<span style="color: var(--text-sub);">|</span><span>${stockText}</span>` : ``}
-                                ${kindBadge}${storageBadge}${statusBadge}${discountBadge}${optionBadge}
+                                ${gTaxBadge(prod)}${kindBadge}${storageBadge}${statusBadge}${discountBadge}${optionBadge}
                             </div>
                             ${optionPanel}
                         </div>
@@ -23608,6 +23713,17 @@
                         gCodeLabels[_productCode] = _lab;
                     }
                 } catch (e) { console.warn('식별번호 이름 저장 실패(상품 저장에는 지장 없음):', e); }
+
+                // [신규] 과세·면세를 눌러 바꿨으면 이 번호에 적는다
+                if (uploadFormTaxTouched && /^[PFS]\d+$/.test(_productCode)) {
+                    try {
+                        await fetch(`${FIREBASE_DB_URL}settings/tax_free/${encodeURIComponent(_productCode)}.json`, uploadFormTaxFree
+                            ? { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true' }
+                            : { method: 'DELETE' });
+                        await gLoadTaxFree();
+                        if (uploadFormTaxFree) gTaxFree[_productCode] = true; else delete gTaxFree[_productCode];
+                    } catch (e) { console.warn('과세·면세 저장 실패(상품 저장에는 지장 없음):', e); }
+                }
 
                 const productObj = {
                     name: name,
@@ -24390,6 +24506,7 @@
                 || (prod.isSada === undefined && /^\s*\[\s*사다드림\s*\]/.test(String(prod.name || '')));
             // [신규] 신선식품 여부 복원 (사다드림이면 신선식품은 꺼진 것으로 본다)
             uploadIsFresh = !uploadEditIsSada && (prod.isFresh === true || prod.isFresh === 'true');
+            uploadFormTaxFree = gIsTaxFreeCode(String(prod.productCode || '').trim()); uploadFormTaxTouched = false; paintFormTaxFree();   // [신규]
             // [신규] 오늘의추천 여부 복원 (같은 방식)
             uploadEditIsRecommend = (prod.isRecommend === true || prod.isRecommend === 'true')
                 || (prod.isRecommend === undefined && /^\s*\[\s*오늘의추천\s*\]/.test(String(prod.name || '')));
@@ -24541,6 +24658,7 @@
             uploadEditShelf = ''; // [신규] 선반위치 기억값 초기화
             uploadEditIsSada = false; // [신규] 사다드림 체크 기억값 초기화
             uploadIsFresh = false;    // [신규] 신선식품 선택도 함께 초기화
+            uploadFormTaxFree = false; uploadFormTaxTouched = false; paintFormTaxFree();   // [신규] 과세·면세도 처음으로
             uploadStorageType = '';   // [신규] 보관방법 버튼도 해제
             paintStorageType();
             uploadEditIsRecommend = false; // [신규] 오늘의추천 체크 기억값 초기화
@@ -29640,6 +29758,8 @@
             const ok = /^[PFS]\d+$/.test(c);
 
             if (view) view.value = ok ? c : '';
+            // [신규] 번호를 고르거나 바꾸면 그 번호의 과세·면세를 보여 준다 (직접 눌러 바꾼 뒤라면 그대로)
+            if (typeof uploadFormTaxTouched !== 'undefined' && !uploadFormTaxTouched) { uploadFormTaxFree = ok ? gIsTaxFreeCode(c) : false; paintFormTaxFree(); }
             /* [수정] 이름표가 걸린 번호만 이름이 떴다. 이름표가 없는 번호(주로 P)는 칸이 비어
                '이름을 못 불러왔나' 싶었다. 이제 그 번호가 무슨 물건인지 옅은 글씨로 보여 준다.
                옅은 글씨는 저장되지 않는다. 이름표로 삼으려면 직접 적어야 한다. */
@@ -29681,6 +29801,20 @@
             if (!/^[PFS]\d+$/.test(c)) { showToast('식별번호가 없습니다. 먼저 번호를 정해 주세요.'); return; }
 
             const v = String(inp.value || '').trim();
+            // [신규] 상품등록 칸이면 과세·면세도 함께 저장한다 (번호에 딸린 값)
+            const taxChanged = (codeElId === 'productCodeView' && typeof uploadFormTaxTouched !== 'undefined' && uploadFormTaxTouched);
+            if (taxChanged) {
+                try {
+                    await gLoadTaxFree();
+                    const r = await fetch(`${FIREBASE_DB_URL}settings/tax_free/${encodeURIComponent(c)}.json`, uploadFormTaxFree
+                        ? { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true' }
+                        : { method: 'DELETE' });
+                    if (!r.ok) throw new Error(r.status);
+                    if (uploadFormTaxFree) gTaxFree[c] = true; else delete gTaxFree[c];
+                    uploadFormTaxTouched = false;
+                    if (v === gCodeLabelOf(c)) { showToast(`${c} → ${uploadFormTaxFree ? '면세' : '과세'}로 저장했습니다.`); return; }
+                } catch (e) { showToast('과세·면세를 저장하지 못했습니다.'); return; }
+            }
             if (v === gCodeLabelOf(c)) { showToast('바뀐 것이 없습니다.'); return; }
             try {
                 const res = await fetch(`${FIREBASE_DB_URL}product_code_labels.json`, {
