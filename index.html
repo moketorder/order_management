@@ -9665,9 +9665,11 @@
                     let _kk = String((t0 && t0.kakaoPhone) || '').replace(/\D/g, '');
                     if (_kk.startsWith('82')) _kk = '0' + _kk.slice(2);
                     const ck = /^01\d{8,9}$/.test(_kk) ? _kk : String((t0 && t0.firebasePhoneKey) || cleanPhone || '').replace(/\D/g, '');
-                    if (/^01\d{8,9}$/.test(ck)) {
-                        const before = await fetch(`${FIREBASE_DB_URL}customers/${ck}.json?t=${Date.now()}`)
-                            .then(r => r.ok ? r.json() : null).catch(() => null);
+                    const before = /^01\d{8,9}$/.test(ck)
+                        ? await fetch(`${FIREBASE_DB_URL}customers/${ck}.json?t=${Date.now()}`).then(r => r.ok ? r.json() : null).catch(() => null)
+                        : null;
+                    // [신규] 탈퇴한 손님이면 손님 정보에는 쓰지 않는다 (주문 줄만 고친다)
+                    if (/^01\d{8,9}$/.test(ck) && !(before && before.withdrawn)) {
                         const now = new Date();
                         const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                         const diffs = [];
@@ -11611,7 +11613,10 @@
             const _hit = _digits ? (_src.find(o => String(o.firebasePhoneKey || '').replace(/\D/g, '') === _digits)
                                  || _src.find(o => salesNormPhone(o) === _digits)) : null;
             const targetKey = _hit ? salesPersonKey(_hit) : salesPersonKey({ phone, name });
-            const all = _src.filter(o => salesPersonKey(o) === targetKey && !isSalesCanceled(o));
+            // [신규] 탈퇴한 때보다 앞선 주문은 손님 카드에 보이지 않는다
+            const _wAt = Number(((window.__caSaved || {})[targetKey] || {}).withdrawnAt) || 0;
+            const all = _src.filter(o => salesPersonKey(o) === targetKey && !isSalesCanceled(o)
+                && (!_wAt || (parseTimestampToDate(o.timestamp) || 0) - 0 >= _wAt));
 
             /* [수정] 주문이 없으면 창을 아예 안 띄웠다. 가입만 하고 아직 안 시킨 손님은
                손님 관리에서 카드를 눌러도 아무 일이 없었다. 이제는 띄운다.
@@ -15296,10 +15301,18 @@
             const saved = window.__caSaved || {};
             const m = new Map();
 
+            /* [신규] 탈퇴 — 탈퇴한 손님은 번호와 탈퇴한 때만 남아 있다(개인정보는 지웠다). 명부 대신 탈퇴 목록에 둔다.
+               탈퇴한 때보다 앞선 주문은 손님 관리에서 보이지 않게 뺀다 (다시 가입한 손님도 새 손님처럼 본다).
+               주문 기록 자체는 주문·매출 쪽에 그대로 남는다. */
+            const W = new Map();
+            window.__caWithdrawn = [];
             // 1) 명부 — 손님 정보에 있는 번호를 먼저 다 깐다. 주문이 하나도 없어도 명부에는 있어야 한다.
             Object.keys(saved).forEach(k => {
                 const key = String(k).replace(/\D/g, '');
                 if (!key) return;
+                const _s = saved[k] || null;
+                if (_s && Number(_s.withdrawnAt)) W.set(key, Number(_s.withdrawnAt));
+                if (_s && _s.withdrawn) { window.__caWithdrawn.push({ phone: key, at: Number(_s.withdrawnAt) || 0 }); return; }
                 m.set(key, { phone: key, names: new Map(), rows: [], last: '', first: 0, s: saved[k] || null });
             });
 
@@ -15309,6 +15322,7 @@
                 if (!o) return;
                 const key = gCustKey(o);   // [변경] 카카오 번호로 모은다 (옮긴 손님의 옛 번호 주문도 함께)
                 if (!key) return;
+                if (W.has(key)) { const tw = parseTimestampToDate(o.timestamp); if (!tw || tw.getTime() < W.get(key)) return; }   // [신규] 탈퇴 전 주문
                 if (!m.has(key)) m.set(key, { phone: key, names: new Map(), rows: [], last: '', first: 0, s: null });
                 const v = m.get(key);
                 v.rows.push(o);
@@ -15456,6 +15470,7 @@
             const nChanged = all.filter(r => r.lastChange).length;
             const nBrowse = all.filter(r => r.browser).length;              // [신규]
             const nGone = all.filter(r => r.visit && r.visit.gone).length;   // [신규]
+            const WD = (window.__caWithdrawn || []).slice().sort((a, b) => b.at - a.at);   // [신규] 탈퇴 목록
 
             let list = caFilter === 'delivery' ? all.filter(r => r.way === '배달')
                      : caFilter === 'pickup' ? all.filter(r => r.way === '픽업')
@@ -15521,6 +15536,7 @@
                         ${fbtn('idle60', `💤 두 달 넘게 ${nIdle}`, '#a16207')}
                         ${(nBrowse || caFilter === 'browse') ? fbtn('browse', `👀 구경만 ${nBrowse}`, '#1d4ed8') : ''}
                         ${(nGone || caFilter === 'gone') ? fbtn('gone', `🚪 발길 끊김 ${nGone}`, '#be123c') : ''}
+                        ${(WD.length || caFilter === 'withdrawn') ? fbtn('withdrawn', `🚫 탈퇴 ${WD.length}`, '#64748b') : ''}
                         ${/* [수정] 늘 0이라 자리만 차지한다. 어긋난 것이 생겼을 때만 내보인다. */
                           (all.length - nSaved > 0 || caFilter === 'nosaved')
                             ? fbtn('nosaved', `📋 주문에만 ${all.length - nSaved}`, '#c2410c') : ''}
@@ -15541,6 +15557,23 @@
             /* [수정] 상품 조회는 손님 관리와 다른 이야기라 카드를 따로 뗐다. 맨 위에 두고,
                손님 관리 머리(칩·검색)는 그 아래 목록과 붙여 둔다. */
             const visitCard = `<div class="card" style="background:#fff; border-radius:14px; padding:12px 14px; box-shadow:var(--shadow); margin-bottom:10px; border:1px solid var(--border);">${caVisitSummaryHtml(all)}</div>`;
+
+            // [신규] 탈퇴 목록 — 번호와 탈퇴한 날만 (개인정보·주문내역은 보이지 않는다)
+            if (caFilter === 'withdrawn') {
+                const dg = caQuery.replace(/\D/g, '');
+                const rows = WD.filter(w => !dg || w.phone.includes(dg));
+                const ymd = t => { if (!t) return ''; const d = new Date(t); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`; };
+                const wHtml = rows.length
+                    ? `<div class="card" style="background:#fff; border-radius:14px; padding:6px 14px; box-shadow:var(--shadow); border:1px solid var(--border);">`
+                      + rows.map(w => `<div style="display:flex; justify-content:space-between; gap:10px; padding:9px 2px; border-bottom:1px solid #f1f5f9; font-size:13px; font-weight:800; color:#475569;">
+                            <span>${fmtPhone(w.phone)}</span><span style="color:#94a3b8; font-weight:700;">${ymd(w.at)} 탈퇴</span></div>`).join('')
+                      + `</div>`
+                    : `<div style="padding:34px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">탈퇴한 손님이 없습니다.</div>`;
+                const wBox = document.getElementById('ca-list');
+                if (listOnly && wBox) { wBox.innerHTML = wHtml; return; }
+                box.innerHTML = visitCard + head + `<div id="ca-list">${wHtml}</div>`;
+                return;
+            }
 
             if (!list.length) {
                 const emptyHtml = `<div style="padding:34px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">해당하는 손님이 없습니다.</div>`;
