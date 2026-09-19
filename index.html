@@ -12741,6 +12741,7 @@
         }
         // [신규] 상품등록 칸의 과세·면세. 손대지 않았으면 저장 때 건드리지 않는다 (번호에 이미 정해 둔 값을 지키려고)
         let uploadFormTaxFree = false, uploadFormTaxTouched = false;
+        let uploadFormTaxAuto = false;   // [신규] 새 번호에 기본값(과일=면세)을 넣었는지 — 저장 때 새 번호에 적는다
         function paintFormTaxFree() {
             const b = document.getElementById('btn-tax-type');
             if (!b) return;
@@ -23715,7 +23716,7 @@
                 } catch (e) { console.warn('식별번호 이름 저장 실패(상품 저장에는 지장 없음):', e); }
 
                 // [신규] 과세·면세를 눌러 바꿨으면 이 번호에 적는다
-                if (uploadFormTaxTouched && /^[PFS]\d+$/.test(_productCode)) {
+                if ((uploadFormTaxTouched || (uploadFormTaxAuto && !_existingProd && !gPickedCode)) && /^[PFS]\d+$/.test(_productCode)) {
                     try {
                         await fetch(`${FIREBASE_DB_URL}settings/tax_free/${encodeURIComponent(_productCode)}.json`, uploadFormTaxFree
                             ? { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true' }
@@ -29738,6 +29739,13 @@
                 });
             }
             view.placeholder = `자동 (${pre})`;
+            // [신규] 새 번호(자동)이고 과세·면세를 손대지 않았으면, 과일은 면세·그 밖은 과세를 기본으로 둔다
+            if (typeof uploadFormTaxTouched !== 'undefined' && !uploadFormTaxTouched) {
+                const _cat = String((document.getElementById('categoryValue') || {}).value || '').trim();
+                uploadFormTaxFree = (uploadCurrentTab === 'fruit' && (_cat === '과일' || _cat === '야채'));
+                uploadFormTaxAuto = true;
+                paintFormTaxFree();
+            }
             if (pre !== 'P') view.classList.add('auto-' + pre);
             view.title = pre === 'F' ? '저장하면 새 과일 번호(F)가 붙습니다.'
                 : pre === 'S' ? '저장하면 새 사다드림 번호(S)가 붙습니다.'
