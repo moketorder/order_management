@@ -2905,13 +2905,10 @@
                                     </span>
                                     <!-- [수정] 상품등록 칸이 발주등록보다 좁아 식별번호 쪽이 통째로 아랫줄로 떨어졌다.
                                          이름 칸이 줄어들며 한 줄에 들어가게 한다. 휴대폰처럼 정말 좁을 때만 내려간다. -->
-                                    <span style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; flex: 1 1 460px; min-width: 0;">
-                                        <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
+                                    <span class="code-row-right" style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; flex: 1 1 200px; min-width: 0;">
+                                        <span class="code-row-label" style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
                                         <input type="text" id="productCodeView" class="form-control" placeholder="자동" readonly tabindex="-1"
                                             style="flex:0 0 100px; width:100px; height:30px; padding:5px 9px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
-                                        <!-- [신규] 과세·면세는 식별번호에 딸린 값이다. 누를 때마다 바뀌고, 저장하면 그 번호에 적힌다 (결제 바코드를 나눌 때 쓴다) -->
-                                        <button type="button" id="btn-tax-type" onclick="toggleFormTaxFree()" title="눌러서 과세·면세 바꾸기"
-                                            style="flex:0 0 auto; height:30px; padding:0 10px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; background:#f1f5f9; color:#64748b; border:1.5px solid #e2e8f0;">과세</button>
                                         <!-- [신규] 번호가 '자동'일 때 붙을 갈래. 분류를 보고 알아서 골라 두지만, 눌러서 바꿀 수 있다 -->
                                         <span id="product-code-prefix" style="display:inline-flex; gap:3px;">
                                             <button type="button" data-pre="P" onclick="setProductCodePrefix('P')" title="저장하면 새 일반 번호(P)가 붙습니다" style="height:30px; min-width:34px; padding:0 8px; border-radius:8px; font-size:12px; font-weight:900; cursor:pointer;">P</button>
@@ -2938,7 +2935,7 @@
                             <!-- [수정] 가격·상세옵션·재고가 각각 줄을 차지하던 것을 한 줄 세 칸으로 합쳤다. -->
                             <div class="form-group">
                                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
-                                    <label style="margin-bottom:0;">가격(원)  ·  재고  ·  상세옵션</label>
+                                    <label style="margin-bottom:0;">가격(원)  ·  과세·재고  ·  상세옵션</label>
                                     <label class="switch-container" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
                                         <input type="checkbox" id="unlimitedStock" onchange="toggleUnlimitedStock()" style="cursor:pointer; width:16px; height:16px;">
                                         <span style="font-size:12px; font-weight:700; color:var(--text-sub); user-select:none;">재고 무제한</span>
@@ -2946,7 +2943,7 @@
                                 </div>
                                 <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px; align-items:stretch;">
                                     <input type="number" id="productPrice" class="form-control" placeholder="가격" min="0" required style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
-                                    <input type="number" id="productStock" class="form-control" placeholder="재고" min="0" required style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; min-width:0;"><button type="button" id="btn-tax-type" onclick="toggleFormTaxFree()" title="눌러서 과세·면세 바꾸기" style="width:100%; min-width:0; height:45px; box-sizing:border-box; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; background:#f1f5f9; color:#64748b; border:1.5px solid #e2e8f0;">과세</button><input type="number" id="productStock" class="form-control" placeholder="재고" min="0" required style="width:100%; min-width:0; height:45px; box-sizing:border-box;"></div>
                                     <button type="button" id="btn-detail-option" class="price-option-btn" onclick="openDetailOptionSetting()" style="width:100%; min-width:0; height:45px; box-sizing:border-box; padding:0 8px; overflow:hidden; text-overflow:ellipsis;">상세옵션</button>
                                 </div>
                             </div>
@@ -3871,14 +3868,35 @@
         .orders-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
         /* [신규] 휴대폰에서 세부 탭이 5개 이상이면 한 칸에 욱여넣지 않고 좌우로 밀어 본다 (대분류 탭은 그대로) */
         @media (max-width: 640px) {
-            .segment-control:has(> .segment-btn:nth-child(5)):not(:has(.admin-nav-btn)) {
+            .segment-control:has(> .segment-btn:nth-child(5)):not(:has(.admin-nav-btn)):not(:has(.data-sub-btn)) {
                 display: flex !important; overflow-x: auto; scroll-snap-type: x proximity;
                 -webkit-overflow-scrolling: touch; scrollbar-width: none; gap: 2px;
             }
-            .segment-control:has(> .segment-btn:nth-child(5)):not(:has(.admin-nav-btn))::-webkit-scrollbar { display: none; }
-            .segment-control:has(> .segment-btn:nth-child(5)):not(:has(.admin-nav-btn)) > .segment-btn {
+            .segment-control:has(> .segment-btn:nth-child(5)):not(:has(.admin-nav-btn)):not(:has(.data-sub-btn))::-webkit-scrollbar { display: none; }
+            .segment-control:has(> .segment-btn:nth-child(5)):not(:has(.admin-nav-btn)):not(:has(.data-sub-btn)) > .segment-btn {
                 flex: 0 0 auto; padding: 10px 14px !important; white-space: nowrap; scroll-snap-align: start;
             }
+        }
+        /* [신규] 폰에서는 선택옵션 항목을 두 줄로 — 첫 줄 항목명, 둘째 줄 금액·수량·삭제 */
+        @media (max-width: 480px) {
+            .opt-item-head { display: none !important; }
+            .opt-item-row > .opt-item-name { flex: 1 1 100% !important; }
+            .opt-item-row > input[data-opt-role="item-price"] { flex: 1 1 0 !important; width: auto !important; min-width: 0 !important; }
+            .opt-item-row > input[data-opt-role="item-stock"] { flex: 1 1 0 !important; width: auto !important; min-width: 0 !important; }
+            .opt-item-row { margin-bottom: 10px !important; }
+        }
+        /* [신규] 폰에서 상품명·번호 찾기·식별번호가 한 줄에 들어가게 — 긴 이름표와 이름칸은 아랫줄로 */
+        @media (max-width: 480px) {
+            .code-row-label { display: none !important; }
+            #productCodeView { flex: 0 0 62px !important; width: 62px !important; padding-left: 5px !important; padding-right: 5px !important; font-size: 11.5px !important; }
+            #product-code-prefix > button { min-width: 26px !important; padding: 0 3px !important; font-size: 11px !important; }
+            .code-row-right { display: contents !important; }
+            #btn-code-label-save { flex: 0 0 auto !important; }
+            #productCodeLabel { flex: 1 1 100% !important; }
+        }
+        /* [신규] 폰에서 가게 관리 하위탭 다섯 개가 한 줄에 들어가게 글씨를 조금 줄인다 */
+        @media (max-width: 480px) {
+            .data-sub-btn { font-size: 11px !important; padding-left: 2px !important; padding-right: 2px !important; white-space: nowrap; }
         }
         /* [신규] 자료 정리 하위탭(판매 통계 / 아파트 관리) — 위 탭들과 같은 선택 표시 */
         .data-sub-btn { color:var(--text-sub); }
@@ -3937,11 +3955,11 @@
             <!-- [수정] 자료 정리 하위 탭: 판매 통계 / 매입·매출 / 아파트 관리 -->
             <!-- [수정] '자료 정리' → '가게 관리'. 주문서에 있던 사장님 설정(배달·영업일·손님 화면)을 '일반 관리'로 옮겨 왔다 -->
             <div class="segment-control" style="display:grid; grid-template-columns:repeat(5,1fr); background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
-                <div class="segment-btn data-sub-btn active" id="btn-data-sub-sales" onclick="switchDataSubTab('sales')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📊 판매 통계</div>
+                <div class="segment-btn data-sub-btn active" id="btn-data-sub-sales" onclick="switchDataSubTab('sales')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📊 통계</div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-profit" onclick="switchDataSubTab('profit')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📈 매입·매출</div>
-                <div class="segment-btn data-sub-btn" id="btn-data-sub-cust" onclick="switchDataSubTab('cust')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">👤 손님 관리</div>
-                <div class="segment-btn data-sub-btn" id="btn-data-sub-apart" onclick="switchDataSubTab('apart')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🏢 아파트 관리</div>
-                <div class="segment-btn data-sub-btn" id="btn-data-sub-general" onclick="switchDataSubTab('general')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">⚙️ 일반 관리</div>
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-cust" onclick="switchDataSubTab('cust')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">👤 손님</div>
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-apart" onclick="switchDataSubTab('apart')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🏢 아파트</div>
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-general" onclick="switchDataSubTab('general')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">⚙️ 일반</div>
             </div>
 
             <!-- [신규] 일반 관리 — 배달·배달비, 토요일·임시 휴무일, 상품목록 공개·로그인 강제 -->
@@ -13406,7 +13424,7 @@
                     <!-- [수정] 항목마다 금액에 더해 남은 수량도 적을 수 있게 했다.
                          수량이 정해진 상품(빵처럼 종류별로 몇 개씩만 되는 것)을 다루려면 필요하다.
                          칸 이름을 머리글로 달아 어느 칸이 무엇인지 보이게 한다. -->
-                    <div style="display: flex; gap: 6px; align-items: center; font-size: 11px; font-weight: 800; color: var(--text-sub); margin-bottom: 6px;">
+                    <div class="opt-item-head" style="display: flex; gap: 6px; align-items: center; font-size: 11px; font-weight: 800; color: var(--text-sub); margin-bottom: 6px;">
                         <span style="flex: 1 1 auto;">선택 항목</span>
                         <span style="flex: 0 0 84px; text-align: right;">금액</span>
                         <span style="flex: 0 0 72px; text-align: right;">수량</span>
@@ -13417,8 +13435,8 @@
                     // 수량은 '안 적으면 제한 없음'이다. 0과 구분해야 하므로 빈 문자열로 둔다.
                     const stockVal = (it.stock === undefined || it.stock === null || it.stock === '') ? '' : (parseInt(it.stock) || 0);
                     html += `
-                    <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
-                        <input type="text" data-opt-role="item-name" data-gi="${gi}" data-ii="${ii}" value="${escapeAttrValue(it.name)}" placeholder="항목명 (예: 사과)"
+                    <div class="opt-item-row" style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;">
+                        <input class="opt-item-name" type="text" data-opt-role="item-name" data-gi="${gi}" data-ii="${ii}" value="${escapeAttrValue(it.name)}" placeholder="항목명 (예: 사과)"
                             style="flex: 1 1 auto; min-width: 0; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 600; outline: none;">
                         <input type="number" data-opt-role="item-price" data-gi="${gi}" data-ii="${ii}" value="${parseInt(it.price) || 0}" min="0"
                             style="flex: 0 0 84px; width: 84px; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
@@ -13938,7 +13956,8 @@
            그 방법을 아는 사람만 쓸 수 있어서 여기서 바로 지울 수 있게 했다. */
         function makeDisplayTabBtn() {
             const wrap = document.createElement('div');
-            wrap.style.cssText = 'display:grid; grid-template-columns:2fr 1fr; gap:5px; width:100%; min-width:0;';
+            // [수정] 분류탭 단추와 ✕ 를 바깥 줄의 칸으로 그대로 내보낸다 (세 칸이 똑같은 너비가 되게)
+            wrap.style.cssText = "display:contents;";
 
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -21365,7 +21384,7 @@
                 // [신규] 왼쪽=날짜(폭 축소), 오른쪽=사다드림 체크박스 배치
                 const row = document.createElement('div');
                 // [수정] flex로는 날짜칸·고르는칸의 고유 폭 때문에 세 칸이 균등해지지 않았다. 격자로 못 박는다.
-                row.style.cssText = 'display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; align-items:stretch;';
+                row.style.cssText = "display:grid; grid-template-columns:repeat(3, minmax(0,1fr)) 44px; gap:8px; align-items:stretch;";
 
                 /* [수정] 날짜칸이 'YYYY-MM-DD'를 다 못 보여 주고 잘렸다. 연도는 거의 안 바뀌므로
                    화면에는 '8/23(토)'만 보여 준다. 브라우저가 정하는 날짜칸 표시 형식은 바꿀 수 없어서,
@@ -21459,7 +21478,7 @@
                 document.getElementById('categoryLabel').innerText = "보관 분류  ·  위치(선반)  ·  분류탭";
                 // [신규] 왼쪽=보관분류(냉동/냉장/상온), 오른쪽=선반위치(장소) 반반 배치
                 const row = document.createElement('div');
-                row.style.cssText = 'display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; align-items:stretch;';
+                row.style.cssText = "display:grid; grid-template-columns:repeat(3, minmax(0,1fr)) 44px; gap:8px; align-items:stretch;";
 
                 const select = document.createElement('select');
                 select.id = 'categoryValue';
@@ -21502,7 +21521,7 @@
                 document.getElementById('categoryLabel').innerText = "분류  ·  오늘의추천  ·  분류탭";
                 // [신규] 왼쪽=분류, 오른쪽=오늘의추천 체크 (공동구매 탭의 사다드림 버튼과 같은 모양)
                 const row = document.createElement('div');
-                row.style.cssText = 'display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; align-items:stretch;';
+                row.style.cssText = "display:grid; grid-template-columns:repeat(3, minmax(0,1fr)) 44px; gap:8px; align-items:stretch;";
 
                 const select = document.createElement('select');
                 select.id = 'categoryValue';
@@ -21549,7 +21568,7 @@
             else if (tab === 'costco') {
                 document.getElementById('categoryLabel').innerText = "코스트코 소분류  ·  분류탭";
                 const row = document.createElement('div');
-                row.style.cssText = 'display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; align-items:stretch;';
+                row.style.cssText = "display:grid; grid-template-columns:repeat(2, minmax(0,1fr)) 44px; gap:8px; align-items:stretch;";
                 const select = document.createElement('select');
                 select.id = 'categoryValue';
                 select.className = 'form-control';
