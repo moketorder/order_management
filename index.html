@@ -12249,6 +12249,7 @@
         /* [신규] 미입금 결제 바코드 (EAN-13).
            번호 = '29' + 금액 10자리 + 확인숫자. 면세는 '28' 로 시작한다 (과세·면세를 한 번에 찍어 카드 한 번으로 결제) 예) 23,500원 → 290000023500 + 확인숫자
            토스 POS에 같은 번호·같은 금액의 상품을 등록해 두면, 손님이 찍어서 그 금액을 결제한다.
+           [참고] 키오스크 카메라로 찾으려면 그 상품의 카테고리가 '고객용 채널 노출' 켜짐이어야 한다 (스캐너는 상관없다).
            (토스 POS가 스스로 붙이는 번호는 2000000000… 으로 시작해 겹치지 않는다) */
         function gPayBarcodeNumber(amount, prefix) {
             const d12 = (prefix || '29') + String(Math.max(0, Math.round(amount))).padStart(10, '0').slice(-10);
@@ -13121,13 +13122,8 @@
             uploadUseDiscount = !!optionModalDraft.useDiscount;
             uploadDiscountRate = draftRate;
 
-            /* [신규] 할인 상품은 '오늘의 상품' 탭에만 걸리게 분류탭을 강제로 맞춘다.
-               특가는 그날 하루 미는 상품이라 다른 탭에 흩어져 있으면 눈에 안 띈다.
-               (끌 때는 되돌리지 않는다. 어디에 두고 싶은지는 사장님이 정할 몫이다.) */
-            if (uploadUseDiscount && uploadDiscountRate > 0 && uploadDisplayTab !== 'today-reserve') {
-                uploadDisplayTab = 'today-reserve';
-                if (typeof updateDisplayTabUI === 'function') updateDisplayTabUI();
-            }
+            /* [삭제 2026-09-20] 할인(특가)을 켜면 분류탭을 '오늘의 상품'으로 바꾸던 것 — 과일을 등록할 때
+               고르지도 않은 분류탭이 걸려 있어 뺐다. 분류탭은 사장님이 고른 대로만 간다. */
 
             updateDetailOptionButtonUI();
             updatePriceFieldForAmountLimit();
@@ -14316,11 +14312,12 @@
             if (reload || !_gen) {
                 box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
                 const get = async p => { try { const r = await fetch(`${FIREBASE_DB_URL}${p}.json?t=${Date.now()}`); return r.ok ? await r.json() : null; } catch (e) { return null; } };
-                const [d, fee, sat, hol, pl, lg] = await Promise.all(['delivery_status', 'delivery_fee', 'saturday_as_weekday', 'public_holidays', 'product_list_enabled', 'login_entry_enabled'].map(get));
+                const [d, fee, sat, sun, hol, pl, lg] = await Promise.all(["delivery_status", "delivery_fee", "saturday_as_weekday", "sunday_as_weekday", "public_holidays", "product_list_enabled", "login_entry_enabled"].map(get));
                 _gen = {
                     delivery: d === true,
                     fee: (fee === null || isNaN(parseInt(fee))) ? 3000 : parseInt(fee),
                     sat: sat === true,
+                    sun: sun === true,   // [신규] 일요일 영업 (적혀 있지 않으면 휴무)
                     holidays: gGenPruneHolidays(hol || []),
                     productList: pl === null ? true : !!pl,
                     login: lg === null ? true : lg === true
@@ -14345,6 +14342,7 @@
             box.innerHTML =
                 card('🗓️ 영업일',
                     row('토요일', seg('sat', G.sat, ['영업', '휴무']), G.sat ? '토요일도 평일처럼 주문을 받습니다' : '토요일은 일요일처럼 쉽니다')
+                    + row("일요일", seg("sun", G.sun, ["영업", "휴무"]), G.sun ? "일요일도 평일처럼 주문을 받습니다" : "일요일은 쉽니다")
                     + `<div style="padding:10px 0 0; border-top:1px solid #f1f5f9;">
                         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
                             <div style="font-size:13px; font-weight:800; color:#334155;">임시 휴무일</div>
@@ -14370,7 +14368,7 @@
             gPaintStockSuspects();
         }
 
-        const GEN_KEYS = { delivery: ['delivery_status', '배달'], sat: ['saturday_as_weekday', '토요일'], productList: ['product_list_enabled', '상품목록'], login: ['login_entry_enabled', '로그인'] };
+        const GEN_KEYS = { delivery: ['delivery_status', '배달'], sat: ["saturday_as_weekday", "토요일"], sun: ["sunday_as_weekday", "일요일"], productList: ['product_list_enabled', '상품목록'], login: ['login_entry_enabled', '로그인'] };
         async function gGenSet(key, value) {
             const [path, label] = GEN_KEYS[key] || [];
             if (!path || !_gen || _gen[key] === value) return;
@@ -14422,7 +14420,7 @@
                 const dow = new Date(y, mo, d).getDay();
                 const past = key < today;
                 const off = _genHoliday.draft.includes(key);
-                const regular = dow === 0 || (dow === 6 && !_gen.sat);   // 정기 휴무 (일요일, 토요일 휴무일 때 토요일)
+                const regular = (dow === 0 && !_gen.sun) || (dow === 6 && !_gen.sat);   // 정기 휴무 (일요일·토요일 — 영업으로 켜 두면 뺀다)
                 let bg = '#fff', fg = dow === 0 ? '#ef4444' : dow === 6 ? '#3b82f6' : '#334155', bd = '#e2e8f0';
                 if (off) { bg = '#ef4444'; fg = '#fff'; bd = '#ef4444'; }
                 else if (regular) { bg = '#f1f5f9'; fg = '#94a3b8'; }
@@ -14445,7 +14443,7 @@
                     ${['일', '월', '화', '수', '목', '금', '토'].map((w, i) => `<span style="text-align:center; font-size:11px; font-weight:800; color:${i === 0 ? '#ef4444' : i === 6 ? '#3b82f6' : '#94a3b8'};">${w}</span>`).join('')}
                     ${cells}
                 </div>
-                <div style="font-size:11px; font-weight:700; color:#94a3b8; margin-top:6px; text-align:center;">날짜를 누르면 휴무일(빨강)로 바뀝니다 · 회색은 정기 휴무 (${_gen.sat ? '일요일' : '토·일요일'})</div>
+                <div style="font-size:11px; font-weight:700; color:#94a3b8; margin-top:6px; text-align:center;">날짜를 누르면 휴무일(빨강)로 바뀝니다 · 회색은 정기 휴무 (${[_gen.sun ? '' : '일요일', _gen.sat ? '' : '토요일'].filter(Boolean).join('·') || '없음'})</div>
                 <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
                     ${draft.length ? draft.map(k => `<span onclick="gGenToggleHoliday('${k}')" style="display:inline-flex; align-items:center; gap:4px; background:#fef2f2; border:1px solid #fecaca; color:#dc2626; font-size:11.5px; font-weight:800; padding:4px 9px; border-radius:999px; cursor:pointer;">${k.slice(5).replace('-', '/')} <span style="color:#fca5a5;">✕</span></span>`).join('')
                         : `<span style="font-size:12px; font-weight:700; color:#cbd5e1;">임시 휴무일이 없습니다</span>`}
@@ -23745,11 +23743,8 @@
                     showReserve: showReserve,
                     showWeekly: showWeekly,
                     // [신규] 주문서에서 이 상품이 들어갈 탭. 빈 값이면 기존 방식(이름·분류로 판단)을 그대로 쓴다.
-                    // [수정] 할인(특가) 상품은 저장할 때 한 번 더 '오늘의 상품'으로 못박는다.
-                    //  상세옵션을 저장한 뒤 분류탭을 다시 바꿔 놓았더라도 특가는 이 탭에 있어야 한다.
-                    displayTab: (uploadUseDiscount && uploadDiscountRate > 0)
-                        ? 'today-reserve'
-                        : (uploadDisplayTab || ""),
+                    // [수정 2026-09-20] 특가라고 '오늘의 상품'으로 못박던 것을 뺐다. 고른 분류탭 그대로 저장한다.
+                    displayTab: (uploadDisplayTab || ""),
                     // [신규] 사다드림 여부. 상품명 말머리 대신 이 값으로 판단한다.
                     isSada: _isSadaChecked,
                     // [신규] 신선식품 여부 (공동구매 칸에서 고른 값). 지금은 저장만 한다.
