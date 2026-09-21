@@ -12361,7 +12361,8 @@
                 Object.values(grouped).forEach(c => {
                     if (c.shippingMethod === '배달주문') { _printParts.push(c); return; }
                     const free = c.items.filter(_itemFree), tax = c.items.filter(it => !_itemFree(it));
-                    if (!free.length || !tax.length) { _printParts.push(Object.assign({}, c, { taxLabel: free.length ? '면세' : '' })); return; }
+                    // 한 종류뿐이면 한 장 — 과세·면세 표시는 두 장으로 나뉠 때만 붙인다 (면세만이면 합계금액 앞에 * 로 알린다)
+                    if (!free.length || !tax.length) { _printParts.push(Object.assign({}, c, { taxLabel: '', taxFreeOnly: free.length > 0 })); return; }
                     _printParts.push(Object.assign({}, c, { items: tax, taxLabel: '과세', taxPair: true }));
                     _printParts.push(Object.assign({}, c, { items: free, taxLabel: '면세', taxPair: true }));
                 });
@@ -12393,7 +12394,13 @@
                                 <div class="customer-info">
                                     <div class="shipping-type ${badgeClass}">${displayMethod}</div>
                                     ${customer.taxLabel ? `<div class="shipping-type" style="margin-left:4px;">${customer.taxLabel}</div>` : ''}
-                                    ${customer.taxPair ? `<span style="margin-left:6px; font-size:12px; font-weight:800;">${customer.taxLabel === '과세' ? '면세' : '과세'} 상품도 챙겨 주세요</span>` : ''}
+                                    ${(() => {
+                                        /* [신규] 챙길 것 안내 — 과세·면세로 나뉜 짝 종이, 지난 미픽업을 두 줄로 알린다 */
+                                        const lines = [];
+                                        if (customer.taxPair) lines.push(`${customer.taxLabel === '과세' ? '면세' : '과세'} 상품도 챙겨 주세요`);
+                                        if (!isDelivery && gPastUnpickedOf(customer.phone).length) lines.push('미픽업 상품이 있습니다');
+                                        return lines.length ? `<span style="display:inline-block; vertical-align:middle; margin-left:6px; font-size:12px; font-weight:800; line-height:1.35;">${lines.map(l => '▪ ' + l).join('<br>')}</span>` : '';
+                                    })()}
                                     <h2>${customer.name} (☎ ${displayPhone})</h2>
                                     ${isDelivery ? `
                                         <div class="address-text">
@@ -12483,9 +12490,9 @@
                             <div class="card-footer" style="display:flex; flex-direction:row; flex-wrap:nowrap; align-items:center; justify-content:space-between; gap:10px;">
                                 ${_payBars ? `<div style="flex:0 0 auto;">${_payBars}</div>` : ''}
                                 ${(!isDelivery && _unpaidSum > 0) ? `<div style="flex:1 1 auto; text-align:right; white-space:nowrap; line-height:1.25;">
-                                    <div style="font-size:15px; margin-bottom:3px;">합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원</div>
-                                    <div style="font-size:15px;">${_isNewBar ? '*' : ''}미입금: ${_unpaidSum.toLocaleString()}원</div>
-                                </div>` : `<div style="flex:1 1 auto; text-align:right; white-space:nowrap;">합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원</div>`}
+                                    <div style="font-size:15px; margin-bottom:3px;">${customer.taxFreeOnly ? '*' : ''}합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원</div>
+                                    <div style="font-size:15px;">${_isNewBar ? '*' : ''}결제금액: ${_unpaidSum.toLocaleString()}원</div>
+                                </div>` : `<div style="flex:1 1 auto; text-align:right; white-space:nowrap;">${customer.taxFreeOnly ? '*' : ''}합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원</div>`}
                             </div>
                             ${isDelivery ? `
                                 <div class="print-pickup-notice">
@@ -14331,12 +14338,13 @@
             if (reload || !_gen) {
                 box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
                 const get = async p => { try { const r = await fetch(`${FIREBASE_DB_URL}${p}.json?t=${Date.now()}`); return r.ok ? await r.json() : null; } catch (e) { return null; } };
-                const [d, fee, sat, sun, hol, pl, lg] = await Promise.all(["delivery_status", "delivery_fee", "saturday_as_weekday", "sunday_as_weekday", "public_holidays", "product_list_enabled", "login_entry_enabled"].map(get));
+                const [d, fee, sat, sun, hol, pl, lg, ts] = await Promise.all(["delivery_status", "delivery_fee", "saturday_as_weekday", "sunday_as_weekday", "public_holidays", "product_list_enabled", "login_entry_enabled", "today_sale"].map(get));
                 _gen = {
                     delivery: d === true,
                     fee: (fee === null || isNaN(parseInt(fee))) ? 3000 : parseInt(fee),
                     sat: sat === true,
                     sun: sun === true,   // [신규] 일요일 영업 (적혀 있지 않으면 휴무)
+                    ts: (ts && typeof ts === 'object') ? ts : { auto: true, open: '00:00', close: '15:00' },   // [신규] 당일판매 시간
                     holidays: gGenPruneHolidays(hol || []),
                     productList: pl === null ? true : !!pl,
                     login: lg === null ? true : lg === true
@@ -14370,6 +14378,7 @@
                         <div id="gen-hol-cal"></div>
                         <button type="button" onclick="gGenSaveHolidays()" style="width:100%; height:40px; margin-top:10px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:900; cursor:pointer;">휴무일 저장</button>
                     </div>`)
+                + card('🕒 당일판매', gGenTodaySaleHtml(G, row))
                 + card('🚚 배달',
                     row('배달 주문', seg('delivery', G.delivery, ['켜기', '끄기']), G.delivery ? '손님이 배달 주문을 할 수 있습니다' : '배달 주문 단추가 막혀 있습니다')
                     + row('배달비', `<span style="display:inline-flex; align-items:center; gap:6px;">
@@ -14385,6 +14394,106 @@
                     <div id="gen-stock-suspects"></div>`);
             gGenPaintHolidays();
             gPaintStockSuspects();
+        }
+
+        /* [신규] 당일판매 여는·마감 시각 + 지금 열기/닫기.
+           주문서가 읽는 값: today_sale = { auto, open, close, manual('open'|'closed'), manualDate }
+             · 자동 켜짐 : 여는 시각~마감 시각에만 열린다. '지금 열기/닫기'는 누른 그날만 간다
+             · 자동 꺼짐 : '지금 열기/닫기'로 정한 대로 바꿀 때까지 간다
+           휴무일(일요일·토요일·임시 휴무일)은 여기와 상관없이 쉰다. */
+        function gGenTsYmd() { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; }
+        function gGenTsHM(s, def) { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '')); return m ? (+m[1]) * 60 + (+m[2]) : def; }
+        function gGenTsManual(ts) {
+            if (!ts || (ts.manual !== 'open' && ts.manual !== 'closed')) return null;
+            if (ts.auto !== false) {
+                // [수정] 강제 열기·닫기는 다음 자동 시각(여는 시각 또는 마감 시각)까지만 간다
+                if (ts.manualUntil) { if (Date.now() >= Number(ts.manualUntil)) return null; }
+                else if (ts.manualDate !== gGenTsYmd()) return null;   // 예전 방식으로 저장된 값
+            }
+            return ts.manual;
+        }
+        // 지금 다음으로 오는 자동 시각 (여는 시각·마감 시각 중 가장 가까운 것)
+        function gGenTsNextSwitch(ts) {
+            const now = new Date(), cands = [];
+            [0, 1].forEach(add => [gGenTsHM(ts.open, 0), gGenTsHM(ts.close, 900)].forEach(mins => {
+                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + add, Math.floor(mins / 60), mins % 60, 0, 0);
+                if (d > now) cands.push(d.getTime());
+            }));
+            return Math.min(...cands);
+        }
+        function gGenTsUntilLabel(ms) {
+            const d = new Date(ms), t = new Date();
+            const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            return (d.getDate() === t.getDate() && d.getMonth() === t.getMonth()) ? `${hm}까지` : `내일 ${hm}까지`;
+        }
+        function gGenTsOpenNow(ts) {
+            const m = gGenTsManual(ts);
+            if (m) return m === 'open';
+            if (ts.auto === false) return true;
+            const t = new Date(), now = t.getHours() * 60 + t.getMinutes();
+            return now >= gGenTsHM(ts.open, 0) && now < gGenTsHM(ts.close, 900);
+        }
+        function gGenTodaySaleHtml(G, row) {
+            const ts = G.ts || {};
+            const auto = ts.auto !== false;
+            const manual = gGenTsManual(ts);
+            const open = gGenTsOpenNow(ts);
+            // forced=true 면 손으로 누른 상태 — 색을 꽉 채워 자동 상태(흰 바탕)와 구분한다
+            const btn = (label, on, js, color, forced) => `<button type="button" onclick="${js}"
+                style="height:32px; padding:0 14px; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;
+                       background:${on ? (forced ? (color || 'var(--primary)') : '#fff') : 'transparent'};
+                       color:${on ? (forced ? '#fff' : (color || 'var(--primary)')) : 'var(--text-sub)'};
+                       box-shadow:${on ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'};">${label}</button>`;
+            const box = inner => `<span style="display:inline-flex; gap:3px; background:#e2e8f0; padding:3px; border-radius:10px;">${inner}</span>`;
+            const timeIn = (id, v) => `<input id="${id}" type="time" value="${v}" style="height:34px; padding:0 8px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:800; color:#334155;">`;
+            /* [수정] 자동 켜기/끄기와 지금 열기/닫기를 한 줄로 묶었다: [열기] [닫기] [자동]
+                 · 열기·닫기 : 시간과 상관없이 그대로 간다 (다른 걸 고를 때까지)
+                 · 자동      : 아래 시간대로 저절로 열리고 닫힌다 */
+            const mode = auto ? 'auto' : (open ? 'open' : 'closed');
+            return row('운영', box(btn('열기', mode === 'open', "gGenTsMode('open')", '#16a34a')
+                        + btn('닫기', mode === 'closed', "gGenTsMode('closed')", '#dc2626')
+                        + btn('자동', mode === 'auto', "gGenTsMode('auto')")),
+                    mode === 'auto'
+                        ? `지금 <b style="color:${open ? '#16a34a' : '#dc2626'};">${open ? '열림' : '닫힘'}</b> · 정한 시간에 저절로 열고 닫습니다`
+                        : `늘 <b style="color:${open ? '#16a34a' : '#dc2626'};">${open ? '열림' : '닫힘'}</b> · 시간과 상관없이 바꿀 때까지 그대로입니다`)
+                + (mode === 'auto' ? row('시간', `<span style="display:inline-flex; align-items:center; gap:6px;">${timeIn('gen-ts-open', ts.open || '00:00')}<span style="font-weight:800; color:#94a3b8;">~</span>${timeIn('gen-ts-close', ts.close || '15:00')}
+                        <button type="button" onclick="gGenTsSaveTimes()" style="height:34px; padding:0 12px; border:none; background:var(--primary); color:#fff; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">저장</button></span>`,
+                    '여는 시각 ~ 마감 시각 · 휴무일은 따로 쉽니다') : '');
+        }
+        // [신규] 운영 방식 고르기 — 열기·닫기는 계속, 자동은 시간대로
+        function gGenTsMode(m) {
+            if (m === 'auto') return gGenTsPatch({ auto: true, manual: null, manualDate: null, manualUntil: null }, '정한 시간에 저절로 열고 닫습니다.');
+            gGenTsPatch({ auto: false, manual: m, manualDate: gGenTsYmd(), manualUntil: null }, m === 'open' ? '당일판매를 열었습니다.' : '당일판매를 닫았습니다.');
+        }
+        async function gGenTsPatch(patch, msg) {
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}today_sale.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
+                if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                _gen.ts = Object.assign({}, _gen.ts || {}, patch);
+                Object.keys(patch).forEach(k => { if (patch[k] === null) delete _gen.ts[k]; });
+                showToast(msg);
+                renderGeneralAdmin();
+            } catch (e) { showToast('당일판매 설정을 바꾸지 못했습니다: ' + e.message); }
+        }
+        function gGenTsAuto(v) {
+            const ts = _gen.ts || {};
+            if ((ts.auto !== false) === v) return;
+            // 자동을 끌 때는 지금 상태를 그대로 이어 간다 (열려 있었으면 계속 열림)
+            if (!v) gGenTsPatch({ auto: false, manual: gGenTsOpenNow(ts) ? 'open' : 'closed', manualDate: gGenTsYmd() }, '자동 열기·닫기를 껐습니다.');
+            else gGenTsPatch({ auto: true, manual: null, manualDate: null, manualUntil: null }, '자동 열기·닫기를 켰습니다.');
+        }
+        function gGenTsManualSet(v) {
+            if (v === null) return gGenTsPatch({ manual: null, manualDate: null, manualUntil: null }, '정한 시간대로 돌아갑니다.');
+            const ts = _gen.ts || {};
+            const until = (ts.auto !== false) ? gGenTsNextSwitch(ts) : null;   // 자동이면 다음 자동 시각까지
+            gGenTsPatch({ manual: v, manualDate: gGenTsYmd(), manualUntil: until },
+                (v === 'open' ? '당일판매를 열었습니다.' : '당일판매를 닫았습니다.') + (until ? ` (${gGenTsUntilLabel(until)})` : ''));
+        }
+        function gGenTsSaveTimes() {
+            const o = (document.getElementById('gen-ts-open') || {}).value || '', c = (document.getElementById('gen-ts-close') || {}).value || '';
+            if (!/^\d{2}:\d{2}$/.test(o) || !/^\d{2}:\d{2}$/.test(c)) { showToast('시각을 넣어 주세요.'); return; }
+            if (gGenTsHM(o, 0) >= gGenTsHM(c, 0)) { showToast('마감 시각이 여는 시각보다 늦어야 합니다.'); return; }
+            gGenTsPatch({ open: o, close: c }, `당일판매 ${o} ~ ${c}로 저장했습니다.`);
         }
 
         const GEN_KEYS = { delivery: ['delivery_status', '배달'], sat: ["saturday_as_weekday", "토요일"], sun: ["sunday_as_weekday", "일요일"], productList: ['product_list_enabled', '상품목록'], login: ['login_entry_enabled', '로그인'] };
