@@ -12453,7 +12453,9 @@
                     const _unpaidTax = _unpaidSum - _unpaidFree;
                     const _barNums = (!isDelivery && _unpaidSum > 0)
                         ? [[_unpaidTax, '29'], [_unpaidFree, '28']].filter(x => x[0] > 0).map(([amt, pre]) => gPayBarcodeNumber(amt, pre)) : [];
-                    const _isNewBar = _barNums.some(n => !_knownBars[n]);
+                    // [신규] 10,000~99,900원(100원 단위)은 토스에 한꺼번에 등록해 두었다 — * 를 붙이지 않는다
+                    const _preRegistered = n => { const a = parseInt(String(n).slice(2, 12), 10) || 0; return a >= 10000 && a <= 99900 && a % 100 === 0; };
+                    const _isNewBar = _barNums.some(n => !_knownBars[n] && !_preRegistered(n));
                     _barNums.forEach(n => { if (!_knownBars[n]) _newBars[n] = Date.now(); });
                     const _payBars = (!isDelivery && _unpaidSum > 0)
                         ? [[_unpaidTax, '29', '과세'], [_unpaidFree, '28', '면세']].filter(x => x[0] > 0)
