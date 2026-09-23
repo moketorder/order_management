@@ -13764,6 +13764,55 @@
             
             return isUpdated;
         }
+        /* [신규] 지난 날짜 상품 자동 숨김.
+           픽업·배송일이 지난 상품은 손님 화면에 어차피 안 나오는데 목록에는 남아 있어서,
+           손님 폰이 들어올 때마다 함께 받아 갔다 (지금 112개, 115KB). 날짜가 지나면 hide 를 켜 둔다.
+             · 주문관리 상품 목록에는 그대로 보인다 (숨김 표시만 붙는다)
+             · 매주 노출 상품(showWeekly)은 날짜가 저절로 다음 주로 밀리므로 건드리지 않는다
+             · 날짜가 없는 상시판매·현장판매는 해당 없다
+             · 하루에 한 번만 돈다 */
+        async function gAutoHidePastProducts(data) {
+            try {
+                if (!data) return 0;
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                const dayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                if (localStorage.getItem('moket_autohide_day') === dayKey) return 0;
+
+                const patch = {};
+                let n = 0;
+                Object.keys(data).forEach(key => {
+                    const p = data[key];
+                    if (!p || !String(p.name || '').trim()) return;
+                    if (p.hide === true || p.hide === 'true') return;                      // 이미 숨김
+                    if (p.showWeekly === true || p.showWeekly === 'true') return;          // 매주 상품은 날짜가 밀린다
+                    const s = String(p.matchKey || p.date || '').trim().replace(/[.\/]/g, '-');
+                    const dm = s.match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|^(\d{1,2})-(\d{1,2})$/);
+                    if (!dm) return;                                                       // 날짜가 없는 상품은 그대로 둔다
+                    let y, m, d;
+                    if (dm[1]) { y = parseInt(dm[1]); if (y < 100) y += 2000; m = parseInt(dm[2]); d = parseInt(dm[3]); }
+                    else { y = today.getFullYear(); m = parseInt(dm[4]); d = parseInt(dm[5]); }
+                    const t = new Date(y, m - 1, d); t.setHours(0, 0, 0, 0);
+                    if (isNaN(t.getTime()) || t >= today) return;                          // 오늘·앞날은 둔다
+                    patch[`${key}/hide`] = true;
+                    patch[`${key}/showToday`] = false;
+                    patch[`${key}/showReserve`] = false;
+                    p.hide = true; p.showToday = false; p.showReserve = false;             // 지금 그리는 목록에도 바로 맞춘다
+                    n++;
+                });
+
+                if (!n) { localStorage.setItem('moket_autohide_day', dayKey); return 0; }
+                const ok = await fbPatchProducts(patch);
+                if (!ok) return 0;                                                          // 실패하면 다음에 다시 해 본다
+                localStorage.setItem('moket_autohide_day', dayKey);
+                updatePublishedProductsTimestamp();
+                showToast(`날짜가 지난 상품 ${n}개를 숨겼습니다.`);
+                return n;
+            } catch (e) {
+                console.error('지난 상품 자동 숨김 실패:', e);
+                return 0;
+            }
+        }
+
         let uploadIsEditMode = false;
         let uploadEditProductKey = null;
         let uploadEditProductRef = null; // [하드닝] 수정 대상 상품을 순번 대신 이름+분류+날짜로 식별
@@ -23392,6 +23441,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 
                 // [신규] 매주 노출 상품 자동 날짜 갱신 처리
                 checkAndRunWeeklyProductsAutoUpdate(data);
+
+                // [신규] 날짜가 지난 상품은 숨겨 둔다 (손님이 받는 목록을 가볍게)
+                gAutoHidePastProducts(data);
 
                 if (stockRes && stockRes.ok) {
                     uploadGlobalAdjustments = await stockRes.json() || {};
