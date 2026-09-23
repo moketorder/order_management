@@ -13779,6 +13779,7 @@
                 if (localStorage.getItem('moket_autohide_day') === dayKey) return 0;
 
                 const patch = {};
+                const logs = [];
                 let n = 0;
                 Object.keys(data).forEach(key => {
                     const p = data[key];
@@ -13797,6 +13798,7 @@
                     patch[`${key}/showToday`] = false;
                     patch[`${key}/showReserve`] = false;
                     p.hide = true; p.showToday = false; p.showReserve = false;             // 지금 그리는 목록에도 바로 맞춘다
+                    logs.push({ idx: key, name: String(p.name || ''), what: '노출', from: '노출', to: '숨김', how: '자동(날짜 지남)' });
                     n++;
                 });
 
@@ -13805,6 +13807,8 @@
                 if (!ok) return 0;                                                          // 실패하면 다음에 다시 해 본다
                 localStorage.setItem('moket_autohide_day', dayKey);
                 updatePublishedProductsTimestamp();
+                // 자동으로 끈 것도 기록에 남긴다 (손으로 끈 것과 구분되어야 원인을 가릴 수 있다)
+                if (typeof gLogProductChange === 'function') gLogProductChange(logs);
                 showToast(`날짜가 지난 상품 ${n}개를 숨겼습니다.`);
                 return n;
             } catch (e) {
@@ -18150,15 +18154,37 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
 
         // [신규] 매일 15시 이후, 그날 노출(showToday=true)된 과일/야채 상품을 자동 숨김 처리 (다음날 6시에 수동 재노출)
-        async function autoHideFruitsAfterCutoff(){
+        /* [신규] 사람이 안 챙겨도 도는 자동 숨김 둘을 한 자리에 모았다.
+           · 15시 과일 마감   · 날짜가 지난 상품
+           상품 목록은 한 번만 받아 둘이 같이 본다 (301KB짜리라 두 번 받으면 아깝다).
+           할 일이 없으면 아예 받지 않는다 — 5분마다 도는 것이라 이 문지기가 중요하다. */
+        async function gAutoHideRun() {
+            try {
+                const now = new Date();
+                const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                const needFruit = now.getHours() >= 15 && localStorage.getItem('moket_fruit_autohide_date') !== todayStr;
+                const needPast = localStorage.getItem('moket_autohide_day') !== todayStr;
+                if (!needFruit && !needPast) return;
+                const res = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
+                if (!res.ok) return;
+                const data = await res.json() || {};
+                if (needFruit) await autoHideFruitsAfterCutoff(data);
+                if (needPast) await gAutoHidePastProducts(data);
+            } catch (e) { console.error('자동 숨김 실패:', e); }
+        }
+
+        async function autoHideFruitsAfterCutoff(preloaded){
             try {
                 const now = new Date();
                 if (now.getHours() < 15) return; // 15시 전이면 대기
                 const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
                 if (localStorage.getItem('moket_fruit_autohide_date') === todayStr) return; // 오늘 이미 처리됨
-                const res = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
-                if (!res.ok) return;
-                const data = await res.json() || {};
+                let data = preloaded;   // [수정] 위에서 받아 둔 목록이 있으면 그걸 쓴다 (두 번 받지 않는다)
+                if (!data) {
+                    const res = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
+                    if (!res.ok) return;
+                    data = await res.json() || {};
+                }
                 const targets = [];
                 for (const key in data){
                     const p = data[key]; if (!p) continue;
@@ -25560,8 +25586,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             hydrateArchiveFromCache();       // [신규] 보관함 공유 캐시로 과거자료 준비(네트워크 X)
             attachRealtimeListeners();
             autoRefreshArchiveWeekly();       // [신규] 마지막 갱신 7일 넘으면 자동 1회 갱신
-            autoHideFruitsAfterCutoff();      // [신규] 15시 이후 그날 노출 과일 자동 숨김
-            setInterval(autoHideFruitsAfterCutoff, 5 * 60 * 1000); // 앱을 켜둔 채 15시를 넘겨도 잡히게 5분마다 체크
+            gAutoHideRun();                   // [수정] 15시 과일 마감 + 날짜 지난 상품 숨김 (상품 목록은 한 번만 받는다)
+            setInterval(gAutoHideRun, 5 * 60 * 1000); // 앱을 켜둔 채 15시나 자정을 넘겨도 잡히게 5분마다 체크
             
             // URL 파라미터 체크하여 탭 자동 활성화 (구버전 리다이렉션 및 신규 3탭 대응)
             const urlParams = new URLSearchParams(window.location.search);
