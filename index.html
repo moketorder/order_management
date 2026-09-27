@@ -3459,6 +3459,12 @@
                             </div>
                             <input type="text" id="code-list-search" oninput="renderCodeList()" class="form-control" placeholder="🔍 번호(P0013) 또는 이름으로 검색" style="width:100%; box-sizing:border-box; padding:9px 12px; border-radius:8px; font-size:13px; font-weight:700; border:1.5px solid #cbd5e1;">
                             <div id="code-list-count" style="display:none; justify-content:space-between; align-items:center; gap:8px; width:100%; box-sizing:border-box; margin-top:10px; padding:8px 11px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:12px; font-weight:800; color:#475569;"></div>
+                            <!-- [신규] 두 개 이상 고르면 하나로 합칠 수 있다 -->
+                            <div id="code-merge-bar" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding:9px 11px; background:#fff7ed; border:1.5px solid #fed7aa; border-radius:8px;">
+                                <span id="code-merge-text" style="flex:1; min-width:0; font-size:12.5px; font-weight:800; color:#c2410c;"></span>
+                                <button type="button" onclick="openCodeMerge()" style="flex:0 0 auto; padding:7px 12px; border:none; border-radius:7px; background:#c2410c; color:#fff; font-size:12px; font-weight:800; cursor:pointer;">합치기</button>
+                                <button type="button" onclick="clearCodeSelection()" style="flex:0 0 auto; padding:7px 10px; border:1.5px solid #fed7aa; border-radius:7px; background:#fff; color:#c2410c; font-size:12px; font-weight:800; cursor:pointer;">선택 해제</button>
+                            </div>
                         </div>
                         <div id="code-list-rows"><!-- 동적 삽입 --></div>
                     </div>
@@ -27619,6 +27625,106 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             return [...map.values()].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true }));
         }
 
+        /* [신규] 합칠 번호 고르기.
+           같은 물건인데 번호가 둘로 갈린 경우(이름을 바꿔 새 번호가 붙었을 때 등)를 하나로 모은다. */
+        let codeSelected = new Set();
+
+        function toggleCodeSelect(code) {
+            if (codeSelected.has(code)) codeSelected.delete(code); else codeSelected.add(code);
+            renderCodeList();
+        }
+        function clearCodeSelection() {
+            codeSelected.clear();
+            renderCodeList();
+        }
+        function paintCodeMergeBar() {
+            const bar = document.getElementById('code-merge-bar');
+            const txt = document.getElementById('code-merge-text');
+            if (!bar) return;
+            const n = codeSelected.size;
+            bar.style.display = (n >= 1) ? 'flex' : 'none';
+            if (txt) txt.innerText = (n >= 2)
+                ? `${n}개 선택됨 — 하나로 합칩니다`
+                : `${n}개 선택됨 — 합치려면 2개 이상 골라 주세요`;
+        }
+
+        /* 고른 번호들을 하나로 합친다.
+           남길 번호를 정하고, 나머지 번호를 쓰는 상품·발주를 모두 남길 번호로 바꾼다.
+           (이름표는 남길 번호 것을 쓰고, 없으면 사라지는 번호의 이름표를 물려받는다) */
+        async function openCodeMerge() {
+            const codes = [...codeSelected];
+            if (codes.length < 2) { showToast('2개 이상 골라 주세요.'); return; }
+
+            const all = gCollectCodes();
+            const info = codes.map(c => all.find(e => e.code === c)).filter(Boolean);
+            const menu = info.map((e, i) => `${i + 1}. ${e.code}${e.label ? ` (${e.label})` : ''} — 상품 ${e.products.length}개 · 발주 ${e.poCount}건`).join('\n');
+            const pick = prompt(`어느 번호로 합칠까요?\n남길 번호의 순번을 적어 주세요.\n\n${menu}`, '1');
+            if (pick === null) return;
+            const idx = parseInt(pick, 10) - 1;
+            if (isNaN(idx) || idx < 0 || idx >= info.length) { showToast('순번을 다시 적어 주세요.'); return; }
+
+            const keep = info[idx].code;
+            const drop = codes.filter(c => c !== keep);
+            const dropSet = new Set(drop);
+
+            // 바뀔 것들을 미리 세어 보여 준다
+            const prodHits = (uploadProducts || []).map((p, i) => ({ p, i }))
+                .filter(({ p }) => p && dropSet.has(String(p.productCode || '').trim()));
+            const poHits = (purchaseOrders || []).filter(po => po && dropSet.has(String(po.productCode || '').trim()));
+            const arcHits = (purchaseArchive || []).filter(po => po && dropSet.has(String(po.productCode || '').trim()));
+
+            if (!confirm(`'${keep}' 하나로 합칩니다.\n\n없어지는 번호: ${drop.join(', ')}\n바뀌는 상품: ${prodHits.length}개\n바뀌는 발주: ${poHits.length + arcHits.length}건\n\n되돌리기 어렵습니다. 진행할까요?`)) return;
+
+            showLoader('🔗 번호 합치는 중...');
+            try {
+                const jobs = [];
+
+                // 1) 상품
+                if (prodHits.length) {
+                    const patch = {};
+                    prodHits.forEach(({ i }) => { patch[`${i}/productCode`] = keep; });
+                    jobs.push(fbPatchProducts(patch));
+                }
+                // 2) 발주 (현재 + 저장함) — 한 건씩 그 칸만 고친다
+                poHits.forEach(po => jobs.push(fbPutRetry(`${FIREBASE_DB_URL}purchase_orders/${po.id}/productCode.json`, keep)));
+                arcHits.forEach(po => jobs.push(fbPutRetry(`${FIREBASE_DB_URL}purchase_orders_archive/${po.id}/productCode.json`, keep)));
+
+                // 3) 이름표 — 남길 번호에 없으면 사라지는 번호 것을 물려받는다
+                let keepLabel = gCodeLabelOf(keep);
+                if (!keepLabel) {
+                    const inherited = drop.map(c => gCodeLabelOf(c)).find(l => l);
+                    if (inherited) {
+                        keepLabel = inherited;
+                        jobs.push(fbPutRetry(`${FIREBASE_DB_URL}product_code_labels/${encodeURIComponent(keep)}.json`, inherited));
+                    }
+                }
+                drop.forEach(c => jobs.push(
+                    fetch(`${FIREBASE_DB_URL}product_code_labels/${encodeURIComponent(c)}.json`, { method: 'DELETE' })
+                        .then(r => r.ok).catch(() => false)));
+
+                const results = await Promise.all(jobs);
+                if (results.some(ok => ok === false)) throw new Error('일부 저장에 실패했습니다');
+
+                // 화면이 들고 있는 값도 맞춰 둔다
+                prodHits.forEach(({ p }) => { p.productCode = keep; });
+                poHits.concat(arcHits).forEach(po => { po.productCode = keep; });
+                if (keepLabel) gCodeLabels[keep] = keepLabel;
+                drop.forEach(c => { delete gCodeLabels[c]; });
+                updatePublishedProductsTimestamp();
+
+                hideLoader();
+                codeSelected.clear();
+                showToast(`'${keep}' 하나로 합쳤습니다. (상품 ${prodHits.length}개 · 발주 ${poHits.length + arcHits.length}건)`);
+                renderCodeList();
+            } catch (e) {
+                hideLoader();
+                console.error('번호 합치기 실패:', e);
+                showToast('번호 합치기 실패: ' + e.toString()
+                    + '\n일부만 바뀌었을 수 있으니 목록을 확인해 주세요.');
+                renderCodeList();
+            }
+        }
+
         function renderCodeList() {
             const box = document.getElementById('code-list-rows');
             const countBox = document.getElementById('code-list-count');
@@ -27635,6 +27741,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 countBox.innerHTML = `<span>${q ? '검색 결과' : '전체'} <b style="color:var(--primary);">${rows.length}개</b></span>`
                     + `<span>이름표 있음 <b>${rows.filter(e => e.label).length}개</b></span>`;
             }
+            paintCodeMergeBar();
 
             if (rows.length === 0) {
                 box.innerHTML = `<div style="text-align:center; padding:40px 20px; color:var(--text-sub); font-size:13px; font-weight:700;">${q ? '찾는 번호가 없습니다.' : '아직 만들어진 식별번호가 없습니다.'}</div>`;
@@ -27646,7 +27753,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             box.innerHTML = rows.map(e => {
                 const [bg, fg] = preColor[pre(e.code)] || preColor.P;
                 const names = e.products.slice(0, 2).join(' · ') + (e.products.length > 2 ? ` 외 ${e.products.length - 2}개` : '');
-                return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px; background:#fff; border:1px solid var(--border); border-radius:10px;">
+                const on = codeSelected.has(e.code);
+                return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px; background:${on ? '#fff7ed' : '#fff'}; border:1px solid ${on ? '#fed7aa' : 'var(--border)'}; border-radius:10px;">
+                    <input type="checkbox" onchange="toggleCodeSelect('${e.code}')" ${on ? 'checked' : ''} title="합칠 번호 고르기" style="flex:0 0 auto; width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#c2410c; cursor:pointer;">
                     <span style="flex:0 0 auto; padding:4px 9px; border-radius:6px; background:${bg}; color:${fg}; font-size:12px; font-weight:900;">${e.code}</span>
                     <span style="flex:1; min-width:0;">
                         <span style="display:block; font-size:13px; font-weight:800; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.label ? gEscapeHtml(e.label) : `<span style="color:#cbd5e1;">이름표 없음</span>`}</span>
