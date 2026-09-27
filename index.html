@@ -3219,7 +3219,7 @@
                     <div class="segment-control four-cols" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
                         <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
-                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-link" onclick="switchPurchaseSubTab('link')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🔗 코드 연결</div>
+                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-link" onclick="switchPurchaseSubTab('link')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🔗 코드 관리</div>
                         <!-- [신규] 품목 분석 — 재고 점검과 잘 나가는 품목을 한 자리에 둔다 -->
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-check" onclick="switchPurchaseSubTab('check')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 품목 분석</div>
                     </div>
@@ -3442,8 +3442,29 @@
                     </div>
                 </div>
 
-                <!-- [신규] 하위 섹션 3: 코드 연결 — 이름이 비슷한 상품↔발주를 눌러서 같은 식별번호로 잇는다 -->
+                <!-- [신규] 하위 섹션 3: 코드 관리 — 코드 목록(보고 고치기) / 코드 연결(상품↔발주 잇기) -->
                 <div id="purchase-section-link" class="purchase-sub-section" style="display: none;">
+                    <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin:0 0 10px;">
+                        <div class="segment-btn pcode-sub-btn active" id="btn-pcode-list" onclick="switchCodeSubTab('list')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">🏷️ 코드 목록</div>
+                        <div class="segment-btn pcode-sub-btn" id="btn-pcode-link" onclick="switchCodeSubTab('link')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">🔗 코드 연결</div>
+                    </div>
+
+                    <!-- 코드 목록 -->
+                    <div id="code-list-body">
+                        <div class="card" style="background:#ffffff; border-radius:16px; padding:16px; box-shadow:var(--shadow); margin-bottom:16px; border:1px solid var(--border);">
+                            <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:6px;">🏷️ 식별번호 목록</div>
+                            <div style="font-size:12.5px; font-weight:700; color:#64748b; line-height:1.6; margin-bottom:10px;">
+                                상품·발주를 묶는 번호입니다. <b>이름표</b>를 적어 두면 상품 이름이 바뀌어도
+                                발주 목록·품목 분석에서 그 이름으로 보입니다.
+                            </div>
+                            <input type="text" id="code-list-search" oninput="renderCodeList()" class="form-control" placeholder="🔍 번호(P0013) 또는 이름으로 검색" style="width:100%; box-sizing:border-box; padding:9px 12px; border-radius:8px; font-size:13px; font-weight:700; border:1.5px solid #cbd5e1;">
+                            <div id="code-list-count" style="display:none; justify-content:space-between; align-items:center; gap:8px; width:100%; box-sizing:border-box; margin-top:10px; padding:8px 11px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:12px; font-weight:800; color:#475569;"></div>
+                        </div>
+                        <div id="code-list-rows"><!-- 동적 삽입 --></div>
+                    </div>
+
+                    <!-- 코드 연결 -->
+                    <div id="code-link-body" style="display:none;">
                     <div class="card" style="background:#ffffff; border-radius:16px; padding:16px; box-shadow:var(--shadow); margin-bottom:16px; border:1px solid var(--border);">
                         <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:6px;">🔗 상품 ↔ 발주 식별번호 연결</div>
                         <div style="font-size:12.5px; font-weight:700; color:#64748b; line-height:1.6;">
@@ -3457,7 +3478,25 @@
                             <span id="code-link-count-badge" style="background:#f1f5f9; color:#475569; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:800;">후보 0건</span>
                         </div>
                     </div>
+
+                    <!-- [신규] 번호가 아직 없는 상품 보기. 평소엔 접혀 있고 눌러야 펴진다. -->
+                    <div class="card" style="background:#ffffff; border-radius:16px; padding:0; box-shadow:var(--shadow); margin-bottom:16px; border:1px solid var(--border); overflow:hidden;">
+                        <button type="button" id="btn-nocode-toggle" onclick="toggleNoCodeList()" style="width:100%; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:8px; background:none; border:none; font-family:inherit; font-size:14px; font-weight:900; color:#0f172a; cursor:pointer; text-align:left;">
+                            <span>🈳 번호 없는 상품 <span id="nocode-count" style="margin-left:4px; font-size:12px; font-weight:800; color:#dc2626;"></span></span>
+                            <span id="nocode-caret" style="color:#94a3b8; font-size:11px;">▼</span>
+                        </button>
+                        <div id="nocode-body" style="display:none; padding:0 16px 14px;">
+                            <div style="font-size:12.5px; font-weight:700; color:#64748b; line-height:1.6; margin-bottom:10px;">
+                                아직 발주에 넣은 적이 없어 번호가 안 붙은 상품들입니다.
+                                <b>번호 주기</b>를 누르면 그 자리에서 번호가 생깁니다.
+                            </div>
+                            <input type="text" id="nocode-search" oninput="renderNoCodeList()" class="form-control" placeholder="🔍 상품명으로 검색" style="width:100%; box-sizing:border-box; padding:9px 12px; border-radius:8px; font-size:13px; font-weight:700; border:1.5px solid #cbd5e1; margin-bottom:10px;">
+                            <div id="nocode-rows"><!-- 동적 삽입 --></div>
+                        </div>
+                    </div>
+
                     <div id="code-link-list"><!-- 동적 삽입 --></div>
+                    </div>
                 </div>
 
                 <!-- 하위 섹션 4: 품목 분석 — 재고 점검(무엇이 남았나)과 잘 나가는 품목(무엇이 나가나)을 나란히 둔다 -->
@@ -12733,9 +12772,37 @@
         let uploadDiscountRate = 0;      // 할인율 (%, 1~100)
         // [신규] 할인 방식·금액과 두 가지 선택
         let uploadDiscountType = 'rate';   // 'rate'(%) | 'amount'(원)
-        let uploadDiscountAmount = 0;      // 금액 할인 (원)
-        let uploadSaleToToday = true;      // 할인하면 '오늘의 상품'에 넣을지
-        let uploadSaleBadge = true;        // '[땡처리 특가]' 문구를 붙일지
+        let uploadDiscountAmount = 0;      // 금액 할인 (원) — 저장은 항상 '깎는 금액'으로 통일한다
+        /* [신규] 원 할인에서 숫자를 무엇으로 적을지. 저장되는 값(할인 금액)은 셋 다 같고, 적는 방법만 다르다.
+            · cut   : 깎을 금액을 적는다        (판매가 12,000 · 2,500 적음 → 9,500에 팔림)
+            · final : 팔 금액을 적는다          (판매가 12,000 · 9,500 적음 → 2,500 할인)
+            · list  : 정상가를 적는다           (지금 9,500에 팔고 있고 12,000 적음 → 판매가가 12,000이 되고 2,500 할인)
+           list는 판매가 칸의 값 자체를 정상가로 올린다. 그래야 손님 화면에 정상가가 그어져 보인다. */
+        let uploadDiscountAmountMode = 'cut';   // 'cut' | 'final' | 'list'
+        const DISCOUNT_AMOUNT_MODES = [
+            ['cut', '깎을 금액', '적은 금액만큼 판매가에서 뺍니다.'],
+            ['final', '팔 금액', '판매가와의 차액만큼 할인합니다. 판매가는 그대로 둡니다.'],
+            ['list', '정상가', '적은 금액이 판매가(정상가)가 되고, 지금 판매가와의 차액만큼 할인합니다.']
+        ];
+        // 저장된 값(판매가·할인금액)에서 각 방식의 입력칸에 보일 숫자를 되돌린다
+        function gDiscAmountInputValue(mode, price, amount) {
+            const p = Math.max(0, parseInt(price) || 0);
+            const a = Math.max(0, parseInt(amount) || 0);
+            if (mode === 'final') return Math.max(0, p - a);
+            if (mode === 'list') return p;          // list는 판매가가 곧 정상가다
+            return a;
+        }
+        // 입력칸 숫자를 '깎는 금액'으로 바꾼다. list는 판매가도 함께 바뀌므로 새 판매가를 같이 돌려준다.
+        function gDiscAmountFromInput(mode, price, input) {
+            const p = Math.max(0, parseInt(price) || 0);
+            const v = Math.max(0, parseInt(input) || 0);
+            if (mode === 'final') return { amount: Math.max(0, p - v), price: p };
+            if (mode === 'list') return { amount: Math.max(0, v - p), price: Math.max(p, v) };
+            return { amount: v, price: p };
+        }
+        // [수정] 둘 다 기본은 꺼짐. 켤 일보다 안 켤 일이 많아 매번 지우는 게 번거로웠다.
+        let uploadSaleToToday = false;     // 할인하면 '오늘의 상품'에 넣을지
+        let uploadSaleBadge = false;       // '[땡처리 특가]' 문구를 붙일지
         // 할인이 걸렸는지 (방식에 맞는 값이 0보다 큰지)
         function gDiscHas(type, rate, amount) { return type === 'amount' ? (parseInt(amount) || 0) > 0 : (parseInt(rate) || 0) > 0; }
         // 방식까지 보고 깎은 값 (금액 할인은 그대로 빼고 0 아래로는 안 간다)
@@ -12935,7 +13002,7 @@
             // [신규] 할인은 상품마다 다르므로 기본값으로 물려주지 않는다. 새 상품은 항상 꺼진 채로 시작.
             uploadUseDiscount = false;
             uploadDiscountRate = 0;
-            uploadDiscountType = 'rate'; uploadDiscountAmount = 0; uploadSaleToToday = true; uploadSaleBadge = true;
+            uploadDiscountType = 'rate'; uploadDiscountAmount = 0; uploadSaleToToday = false; uploadSaleBadge = false; uploadDiscountAmountMode = 'cut';   // [수정] 새 상품은 둘 다 꺼진 채로 시작
 
             uploadMaxPerPerson = parseInt(pl.max) || 0;
             uploadMinAmount = parseInt(al.min) || 0;
@@ -13105,6 +13172,8 @@
                 discountRate: uploadDiscountRate,
                 discountType: uploadDiscountType,
                 discountAmount: uploadDiscountAmount,
+                discountAmountMode: uploadDiscountAmountMode,   // [신규] 원 할인 입력 방식 (깎을 금액/팔 금액/정상가)
+                discountNewPrice: 0,
                 saleToToday: uploadSaleToToday,
                 saleBadge: uploadSaleBadge
             };
@@ -13212,8 +13281,19 @@
             uploadDiscountRate = draftRate;
             uploadDiscountType = optionModalDraft.discountType === 'amount' ? 'amount' : 'rate';
             uploadDiscountAmount = draftAmt;
-            uploadSaleToToday = optionModalDraft.saleToToday !== false;
-            uploadSaleBadge = optionModalDraft.saleBadge !== false;
+            uploadDiscountAmountMode = ['cut', 'final', 'list'].includes(optionModalDraft.discountAmountMode)
+                ? optionModalDraft.discountAmountMode : 'cut';
+            /* [신규] '정상가' 방식으로 적었으면 판매가 칸을 그 정상가로 올린다.
+               손님 화면은 판매가를 그어 놓고 할인가를 보여주므로, 정상가가 판매가 자리에 있어야 맞다.
+               (확인을 눌렀을 때만 바꾼다 — 취소하면 판매가는 그대로) */
+            if (uploadUseDiscount && uploadDiscountType === 'amount' && uploadDiscountAmountMode === 'list') {
+                const np = Math.max(0, parseInt(optionModalDraft.discountNewPrice) || 0);
+                const priceEl = document.getElementById('productPrice');
+                if (np > 0 && priceEl && priceEl.type === 'number') priceEl.value = np;
+            }
+            // [수정] 적어 두지 않았으면 '꺼짐'으로 본다 (예전에는 안 적으면 켜진 것으로 봤다)
+            uploadSaleToToday = (optionModalDraft.saleToToday === true);
+            uploadSaleBadge = (optionModalDraft.saleBadge === true);
 
             /* [삭제 2026-09-20] 할인(특가)을 켜면 분류탭을 '오늘의 상품'으로 바꾸던 것 — 과일을 등록할 때
                고르지도 않은 분류탭이 걸려 있어 뺐다. 분류탭은 사장님이 고른 대로만 간다. */
@@ -13270,8 +13350,13 @@
             // [신규] 할인율 (0~100 밖으로는 못 나가게 자른다)
             const discEl = document.querySelector('#product-option-modal-body [data-discount-role="rate"]');
             if (discEl) optionModalDraft.discountRate = Math.min(100, Math.max(0, parseInt(discEl.value) || 0));
+            // [수정] 적은 숫자를 방식에 맞게 '깎는 금액'으로 바꿔 담는다 (정상가 방식은 판매가도 함께 정해진다)
             const amtEl = document.querySelector('#product-option-modal-body [data-discount-role="amount"]');
-            if (amtEl) optionModalDraft.discountAmount = Math.max(0, parseInt(amtEl.value) || 0);
+            if (amtEl) {
+                const conv = gDiscAmountFromInput(optionModalDraft.discountAmountMode, gFormPrice(), amtEl.value);
+                optionModalDraft.discountAmount = conv.amount;
+                optionModalDraft.discountNewPrice = conv.price;   // '정상가' 방식일 때 판매가를 이 값으로 올린다
+            }
             const todayEl = document.querySelector('#product-option-modal-body [data-discount-role="today"]');
             if (todayEl) optionModalDraft.saleToToday = !!todayEl.checked;
             const badgeEl = document.querySelector('#product-option-modal-body [data-discount-role="badge"]');
@@ -13292,6 +13377,11 @@
             renderDetailOptionBody();
         }
 
+        // 폼의 판매가 칸 값 (할인 계산의 밑값)
+        function gFormPrice() {
+            return Math.max(0, parseInt((document.getElementById('productPrice') || {}).value) || 0);
+        }
+
         // [신규] 할인 방식 (퍼센트·금액)
         function setDraftDiscountType(t) {
             syncDetailOptionDraft();
@@ -13299,17 +13389,27 @@
             optionModalDraft.discountType = (t === 'amount') ? 'amount' : 'rate';
             renderDetailOptionBody();
         }
+
+        /* [신규] 원 할인에서 숫자를 무엇으로 적을지 (깎을 금액 / 팔 금액 / 정상가).
+           저장되는 값은 늘 '깎는 금액'이라, 방식을 바꿔도 지금 할인폭은 그대로 두고
+           입력칸 숫자만 그 방식에 맞게 바꿔 보여 준다. */
+        function setDraftDiscountAmountMode(m) {
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.discountAmountMode = ['cut', 'final', 'list'].includes(m) ? m : 'cut';
+            renderDetailOptionBody();
+        }
         // 할인율을 고치면 예상 가격을 다시 그린다
         function refreshDiscountPreview() {
             syncDetailOptionDraft();
             if (!optionModalDraft) return;
             const box = document.getElementById('discount-preview');
-            if (box) box.innerHTML = gDiscountPreviewHtml(optionModalDraft.discountRate, optionModalDraft.discountType, optionModalDraft.discountAmount);
+            if (box) box.innerHTML = gDiscountPreviewHtml(optionModalDraft.discountRate, optionModalDraft.discountType, optionModalDraft.discountAmount, optionModalDraft.discountNewPrice);
         }
 
         /* 판매가 칸에 적힌 금액을 그대로 가져와 할인가를 보여준다.
            금액 옵션을 켠 상품은 판매가 칸이 잠기고 0으로 저장되므로, 그때는 계산할 밑값이 없다고 알린다. */
-        function gDiscountPreviewHtml(rate, type, amount) {
+        function gDiscountPreviewHtml(rate, type, amount, newPrice) {
             const r = Math.min(100, Math.max(0, parseInt(rate) || 0));
             const isAmt = (type === 'amount');
             const lab = gDiscLabel(type, r, amount);
@@ -13318,7 +13418,8 @@
             if (uploadUseOptions && uploadUseAmountLimit) {
                 return `<div style="${dim}">금액 옵션을 쓰는 상품이라 판매가가 따로 없습니다.<br>주문자가 고른 옵션 합계에서 <b>${lab}</b>이 깎입니다.</div>`;
             }
-            const price = parseInt((document.getElementById('productPrice') || {}).value) || 0;
+            // [수정] '정상가' 방식은 판매가가 그 값으로 올라가므로, 미리보기도 올라간 판매가 기준으로 보여 준다
+            const price = (isAmt && newPrice > 0) ? newPrice : gFormPrice();
             if (price <= 0) return `<div style="${dim}">판매가를 먼저 적으면 <b>${lab}</b> 깎은 금액이 여기에 나옵니다.</div>`;
             const now = gDiscApply(price, type, r, amount);
             const cut = price - now;
@@ -13386,11 +13487,11 @@
         function addDetailOptionGroup() {
             syncDetailOptionDraft();
             if (!optionModalDraft) return;
-            /* [수정] '수량 선택 허용'을 켠 채로 시작한다.
-               거의 모든 상품이 항목마다 개수를 고를 수 있어야 해서, 만들 때마다 켜 주는 일이 잦았다.
-               필요 없으면 그 자리에서 끄면 된다. (여러 개 선택일 때만 화면에 나온다)
+            /* [수정] '여러 개 선택'과 '수량 선택 허용'을 켠 채로 시작한다.
+               거의 모든 상품이 항목을 여러 개 고르고 개수까지 정할 수 있어야 해서,
+               만들 때마다 두 가지를 바꿔 주는 일이 잦았다. 필요 없으면 그 자리에서 되돌리면 된다.
                이미 저장된 상품의 값은 건드리지 않는다 — 새로 만드는 옵션에만 해당한다. */
-            optionModalDraft.groups.push({ name: "", selectType: 'single', allowQty: true, items: [{ name: "", price: 0, stock: "" }] });
+            optionModalDraft.groups.push({ name: "", selectType: 'multi', allowQty: true, items: [{ name: "", price: 0, stock: "" }] });
             renderDetailOptionBody();
         }
 
@@ -13678,7 +13779,7 @@
                                     ${[['rate', '%'], ['amount', '원']].map(([k, l]) => `<button type="button" onclick="setDraftDiscountType('${k}')" style="height:30px; padding:0 12px; border:none; border-radius:6px; font-size:12px; font-weight:800; cursor:pointer; background:${(optionModalDraft.discountType === 'amount' ? 'amount' : 'rate') === k ? '#fff' : 'transparent'}; color:${(optionModalDraft.discountType === 'amount' ? 'amount' : 'rate') === k ? '#dc2626' : 'var(--text-sub)'};">${l} 할인</button>`).join('')}
                                 </span>
                                 ${optionModalDraft.discountType === 'amount'
-                                    ? `<input type="number" data-discount-role="amount" value="${parseInt(optionModalDraft.discountAmount) || 0}" min="0" step="100" placeholder="예: 1000" oninput="refreshDiscountPreview()"
+                                    ? `<input type="number" data-discount-role="amount" value="${gDiscAmountInputValue(optionModalDraft.discountAmountMode, gFormPrice(), optionModalDraft.discountAmount) || ''}" min="0" step="100" placeholder="예: 1000" oninput="refreshDiscountPreview()"
                                         style="flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; font-weight: 800; outline: none; text-align: right;">
                                        <span style="flex: 0 0 auto; font-size: 13px; font-weight: 800; color: var(--text-sub);">원</span>`
                                     : `<input type="number" data-discount-role="rate" value="${parseInt(optionModalDraft.discountRate) || 0}" min="0" max="100" step="1" placeholder="예: 10"
@@ -13686,18 +13787,30 @@
                                     style="flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; font-weight: 800; outline: none; text-align: right;">
                                        <span style="flex: 0 0 auto; font-size: 13px; font-weight: 800; color: var(--text-sub);">%</span>`}
                             </div>
+
+                            <!-- [신규] 원 할인일 때, 그 숫자를 무엇으로 적을지 고른다 -->
+                            ${optionModalDraft.discountType === 'amount' ? `
+                            <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:5px; margin-top:9px;">
+                                ${DISCOUNT_AMOUNT_MODES.map(([k, l, d]) => `<button type="button" onclick="setDraftDiscountAmountMode('${k}')" title="${d}"
+                                    style="min-width:0; padding:8px 4px; border-radius:7px; font-family:inherit; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+                                    border:1.5px solid ${optionModalDraft.discountAmountMode === k ? '#dc2626' : 'var(--border)'};
+                                    background:${optionModalDraft.discountAmountMode === k ? '#fef2f2' : '#fff'};
+                                    color:${optionModalDraft.discountAmountMode === k ? '#dc2626' : 'var(--text-sub)'};">${l}</button>`).join('')}
+                            </div>
+                            <div style="margin-top:6px; font-size:11px; font-weight:700; color:var(--text-sub); line-height:1.5;">${(DISCOUNT_AMOUNT_MODES.find(m => m[0] === optionModalDraft.discountAmountMode) || DISCOUNT_AMOUNT_MODES[0])[2]}</div>
+                            ` : ''}
                         </div>
 
                         <div style="margin-top: 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius-sub); padding: 10px 12px;">
                             <div style="font-size: 11px; font-weight: 800; color: #dc2626; margin-bottom: 6px;">예상 가격</div>
-                            <div id="discount-preview">${gDiscountPreviewHtml(optionModalDraft.discountRate, optionModalDraft.discountType, optionModalDraft.discountAmount)}</div>
+                            <div id="discount-preview">${gDiscountPreviewHtml(optionModalDraft.discountRate, optionModalDraft.discountType, optionModalDraft.discountAmount, optionModalDraft.discountNewPrice)}</div>
                         </div>
                         <!-- [신규] 할인할 때 함께 할 것 (고를 수 있다) -->
                         <div style="margin-top: 10px; display:flex; flex-direction:column; gap:6px; background:#fff; border:1.5px solid var(--border); border-radius: var(--radius-sub); padding: 10px 12px;">
                             <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-main); cursor:pointer;">
-                                <input type="checkbox" data-discount-role="today" ${optionModalDraft.saleToToday !== false ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> 당일판매 '오늘의 상품'에 넣기</label>
+                                <input type="checkbox" data-discount-role="today" ${optionModalDraft.saleToToday === true ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> 당일판매 '오늘의 상품'에 넣기</label>
                             <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-main); cursor:pointer;">
-                                <input type="checkbox" data-discount-role="badge" ${optionModalDraft.saleBadge !== false ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> '[땡처리 특가]' 문구 붙이기</label>
+                                <input type="checkbox" data-discount-role="badge" ${optionModalDraft.saleBadge === true ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> '[땡처리 특가]' 문구 붙이기</label>
                         </div>
                         <div style="font-size: 11px; font-weight: 600; color: var(--text-sub); margin-top: 8px; line-height: 1.5;">${optionModalDraft.discountType === 'amount' ? '판매가에서 적은 금액을 그대로 뺍니다.' : '할인가는 100원 단위로 버립니다. (예: 9,537원 → 9,500원)'}</div>
                     </div>
@@ -24361,6 +24474,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     discountRate: uploadDiscountRate,
                     discountType: uploadDiscountType,
                     discountAmount: uploadDiscountAmount,
+                    discountAmountMode: uploadDiscountAmountMode,   // [신규] 원 할인을 어떻게 적었는지 (다시 열 때 같은 방식으로 보여 주려고 저장)
                     saleToToday: uploadSaleToToday,
                     saleBadge: uploadSaleBadge,
                     updatedAt: Date.now()
@@ -24614,7 +24728,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         async function markAsSoldOut(index) {
             const prod = uploadProducts[index];
             if (!prod) { showToast("상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요."); renderProductsList(); return; }
-            if (!confirm(`'${prod.name}' 상품을 품절 처리하시겠습니까?`)) return;
+            /* [신규] 상시판매 상품은 품절 처리하면 손님 화면에서도 함께 내린다.
+               상시판매는 매대에 물건이 없으면 그냥 없는 것이고, 품절 표시만 남겨 두면
+               손님이 계속 보고 문의하게 된다. (날짜가 정해진 공동구매·당일 과일은
+               '그날 품절'이라는 표시가 의미가 있어 예전처럼 보이는 채로 둔다) */
+            const isOnsiteProd = !!gOnsiteTabCatOfList(prod);
+            if (!confirm(isOnsiteProd
+                ? `'${prod.name}' 상품을 품절 처리하시겠습니까?\n\n상시판매 상품이라 손님 화면에서도 숨김 처리됩니다.`
+                : `'${prod.name}' 상품을 품절 처리하시겠습니까?`)) return;
 
             showLoader("🔴 품절 처리 중...");
             try {
@@ -24622,6 +24743,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 updatedList[index] = {
                     ...prod,
                     stock: 0,
+                    ...(isOnsiteProd ? { showToday: false, showReserve: false, hide: true } : {}),
                     updatedAt: Date.now()
                 };
 
@@ -24636,7 +24758,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
                 uploadProducts = updatedList;
 
-                showToast("상품이 품절 처리되었습니다.");
+                showToast(isOnsiteProd ? "품절 처리하고 손님 화면에서 숨겼습니다." : "상품이 품절 처리되었습니다.");
                 await loadProductsFromServer();
                 buildManageCategoryTabs();
                 buildSubTabs();
@@ -25001,13 +25123,30 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             prod.updatedAt = Date.now();
             if (clearAdj) uploadGlobalAdjustments[adjKey] = 0;
 
+            /* [신규] 상시판매 상품은 품절 처리하면 숨김까지 되므로, 재고를 다시 채우면 자동으로 다시 내건다.
+               안 그러면 재고만 넣고 노출 버튼을 안 눌러 손님 화면에 계속 안 보이는 일이 생긴다.
+               (숨겨 둔 상품에만 해당 — 이미 보이는 상품은 건드리지 않는다) */
+            const _wasShown = { today: prod.showToday, reserve: prod.showReserve, hide: prod.hide };
+            const doReveal = !!gOnsiteTabCatOfList(prod)
+                && (wantUnlimited || newStock > 0)
+                && !gIsProductShown(prod);
+            if (doReveal) {
+                prod.showToday = true;
+                prod.showReserve = true;
+                prod.hide = false;
+            }
+
             let saved = false;
             try {
                 // [수정] 이 상품의 재고 칸만 고친다 (예전에는 목록 전체를 PUT해 남의 변경까지 되돌렸다)
-                const jobs = [fbPatchProducts({
+                const jobs = [fbPatchProducts(Object.assign({
                     [`${index}/stock`]: prod.stock,
                     [`${index}/updatedAt`]: prod.updatedAt
-                })];
+                }, doReveal ? {
+                    [`${index}/showToday`]: true,
+                    [`${index}/showReserve`]: true,
+                    [`${index}/hide`]: false
+                } : {}))];
                 if (clearAdj) jobs.push(fbPutRetry(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, 0));
                 const results = await Promise.all(jobs);
                 if (results.some(ok => !ok)) throw new Error(`저장 실패(재시도 후)`);
@@ -25016,13 +25155,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             } catch (e) {
                 prod.stock = prevStock;
                 if (clearAdj) uploadGlobalAdjustments[adjKey] = prevAdj;
+                if (doReveal) { prod.showToday = _wasShown.today; prod.showReserve = _wasShown.reserve; prod.hide = _wasShown.hide; }
                 console.error('재고 변경 실패:', e);
                 showToast('재고 변경 실패: ' + e.toString());
             }
             // [수정] 렌더링 예외가 저장 성공을 실패로 되돌리지 않도록 try 밖에서 처리
             if (saved) {
                 updatePublishedProductsTimestamp();
-                showToast(`'${prod.name}' 재고 → ${wantUnlimited ? '무제한' : newStock}`);
+                showToast(`'${prod.name}' 재고 → ${wantUnlimited ? '무제한' : newStock}`
+                    + (doReveal ? ' · 다시 노출했습니다' : ''));
             }
             renderProductsList();
         }
@@ -25176,8 +25317,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             uploadDiscountRate = Math.min(100, Math.max(0, parseInt(prod.discountRate) || 0));
             uploadDiscountType = prod.discountType === 'amount' ? 'amount' : 'rate';
             uploadDiscountAmount = Math.max(0, parseInt(prod.discountAmount) || 0);
-            uploadSaleToToday = !(prod.saleToToday === false || prod.saleToToday === 'false');
-            uploadSaleBadge = !(prod.saleBadge === false || prod.saleBadge === 'false');
+            // [신규] 원 할인 입력 방식 복원 (없으면 예전 상품이므로 깎을 금액 방식)
+            uploadDiscountAmountMode = ["cut", "final", "list"].includes(prod.discountAmountMode) ? prod.discountAmountMode : "cut";
+            // [수정] 적혀 있지 않으면 꺼진 것으로 본다 (기본이 꺼짐으로 바뀌었다)
+            uploadSaleToToday = (prod.saleToToday === true || prod.saleToToday === "true");
+            uploadSaleBadge = (prod.saleBadge === true || prod.saleBadge === "true");
             // [신규] 보관방법 — 저장된 값이 없으면 분류(matchKey)에서 읽어 온다.
             //  예전 상품은 storage 없이 matchKey만 '냉동' 식으로 갖고 있어서, 그래야 버튼이 비어 보이지 않는다.
             uploadStorageType = (() => {
@@ -25914,7 +26058,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (subTabName === 'list') {
                 renderPurchaseOrdersList();
             } else if (subTabName === 'link') {
-                renderCodeLinkCandidates();
+                // [수정] 코드 관리는 두 갈래(코드 목록 / 코드 연결). 이름표를 받아 둔 뒤 보던 쪽으로 연다.
+                gLoadCodeLabels().then(() => switchCodeSubTab(codeSubTab));
             } else if (subTabName === 'check') {
                 switchCheckSubTab(pchkSubTab);   // 지난번에 보던 쪽(재고 점검 / 잘 나가는 품목)으로 연다
             }
@@ -26892,6 +27037,69 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             return out;
         }
 
+        /* ===== [신규] 번호 없는 상품 보기 =====
+           발주에 한 번도 안 넣은 상품은 번호가 없다. 그러면 발주 목록·품목 분석에서
+           이름으로만 묶여, 이름을 고치는 순간 옛 기록과 끊어진다.
+           여기서 한눈에 보고 그 자리에서 번호를 붙일 수 있게 한다. */
+        let noCodeOpen = false;
+
+        function toggleNoCodeList() {
+            noCodeOpen = !noCodeOpen;
+            const body = document.getElementById('nocode-body');
+            const caret = document.getElementById('nocode-caret');
+            if (body) body.style.display = noCodeOpen ? 'block' : 'none';
+            if (caret) caret.textContent = noCodeOpen ? '▲' : '▼';
+            if (noCodeOpen) renderNoCodeList();
+        }
+
+        // 번호가 없는 상품들 (배달비 같은 내부 항목은 뺀다)
+        function gNoCodeProducts() {
+            return (uploadProducts || [])
+                .map((p, index) => ({ p, index }))
+                .filter(({ p }) => p && String(p.name || '').trim() && p.name !== '배달비'
+                    && !/^[PFS]\d+$/.test(String(p.productCode || '').trim()));
+        }
+
+        function renderNoCodeList() {
+            const box = document.getElementById('nocode-rows');
+            const countEl = document.getElementById('nocode-count');
+            const all = gNoCodeProducts();
+            if (countEl) countEl.innerText = all.length ? `${all.length}개` : '';
+            if (!box) return;
+
+            const q = String((document.getElementById('nocode-search') || {}).value || '').trim().toLowerCase();
+            const rows = !q ? all : all.filter(({ p }) => String(p.name || '').toLowerCase().includes(q));
+
+            if (rows.length === 0) {
+                box.innerHTML = `<div style="text-align:center; padding:26px 16px; color:var(--text-sub); font-size:13px; font-weight:700;">${q ? '찾는 상품이 없습니다.' : '✅ 모든 상품에 번호가 붙어 있습니다.'}</div>`;
+                return;
+            }
+
+            box.innerHTML = rows.map(({ p, index }) => `
+                <div style="display:flex; align-items:center; gap:10px; padding:9px 11px; margin-bottom:6px; background:#f8fafc; border:1px solid var(--border); border-radius:9px;">
+                    <span style="flex:1; min-width:0;">
+                        <span style="display:block; font-size:13px; font-weight:800; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(p.name)}</span>
+                        <span style="display:block; margin-top:2px; font-size:11px; font-weight:700; color:var(--text-sub);">${gEscapeHtml(String(p.matchKey || '분류 없음'))}</span>
+                    </span>
+                    <button type="button" onclick="giveProductCode(${index})" style="flex:0 0 auto; padding:6px 10px; border:1.5px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; border-radius:7px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">번호 주기</button>
+                </div>`).join('');
+        }
+
+        // 그 자리에서 번호를 붙인다 (갈래는 상품 성격에 따라 P·F·S로 자동)
+        async function giveProductCode(index) {
+            const prod = (uploadProducts || [])[index];
+            if (!prod) { showToast('상품을 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.'); return; }
+            showLoader('🏷️ 번호 부여 중...');
+            const code = await gEnsureProductCode(index);
+            hideLoader();
+            if (code) {
+                showToast(`'${prod.name}' → ${code}`);
+                renderNoCodeList();
+            } else {
+                showToast('번호를 붙이지 못했습니다. 잠시 후 다시 시도해 주세요.');
+            }
+        }
+
         async function renderCodeLinkCandidates() {
             const box = document.getElementById('code-link-list');
             const badge = document.getElementById('code-link-count-badge');
@@ -26914,6 +27122,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             codeLinkCandidates = findCodeLinkCandidates();
             resetBulkLinkButton();   // 다시 그릴 때 '한 번 더 누르기' 상태가 남지 않게 되돌린다
             if (badge) badge.innerText = `후보 ${codeLinkCandidates.length}건`;
+            renderNoCodeList();   // [신규] 접혀 있어도 '번호 없는 상품 N개'는 보이게 개수를 채운다
 
             if (codeLinkCandidates.length === 0) {
                 box.innerHTML = `<div class="card" style="background:#fff; border-radius:16px; padding:40px 20px; text-align:center; border:1px solid var(--border);">
@@ -27368,6 +27577,115 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function gCodeLabelOf(code) {
             return String((gCodeLabels || {})[String(code || '').trim()] || '').trim();
         }
+        /* ===== [신규] 코드 관리 — 코드 목록 / 코드 연결 두 갈래 ===== */
+        let codeSubTab = 'list';
+        function switchCodeSubTab(which) {
+            codeSubTab = (which === 'link') ? 'link' : 'list';
+            const listBox = document.getElementById('code-list-body');
+            const linkBox = document.getElementById('code-link-body');
+            if (listBox) listBox.style.display = (codeSubTab === 'list') ? 'block' : 'none';
+            if (linkBox) linkBox.style.display = (codeSubTab === 'link') ? 'block' : 'none';
+            document.querySelectorAll('.pcode-sub-btn').forEach(b => {
+                b.classList.toggle('active', b.id === 'btn-pcode-' + codeSubTab);
+            });
+            if (codeSubTab === 'list') renderCodeList();
+            else renderCodeLinkCandidates();
+        }
+
+        /* 지금 쓰이는 식별번호를 모두 모은다.
+           번호는 상품·발주·이름표 세 곳에 흩어져 있다. (지금 안 파는 옛 물건은 이름표에만 남아 있다) */
+        function gCollectCodes() {
+            const map = new Map();   // code → { code, label, products[], poCount, lastDate }
+            const touch = (c) => {
+                const code = String(c || '').trim();
+                if (!/^[PFS]\d+$/.test(code)) return null;
+                if (!map.has(code)) map.set(code, { code, label: gCodeLabelOf(code), products: [], poCount: 0, lastDate: '' });
+                return map.get(code);
+            };
+            Object.keys(gCodeLabels || {}).forEach(touch);
+            (uploadProducts || []).forEach(p => {
+                const e = p && touch(p.productCode);
+                if (e && p.name) e.products.push(p.name);
+            });
+            (purchaseOrders || []).concat(purchaseArchive || []).forEach(po => {
+                const e = po && touch(po.productCode);
+                if (!e) return;
+                e.poCount++;
+                const d = String(po.date || '').trim();
+                if (/^\d{4}-\d{2}-\d{2}$/.test(d) && d > e.lastDate) e.lastDate = d;
+                if (!e.label && !e.products.length && po.itemName) e.products.push(String(po.itemName));
+            });
+            // 갈래(P·F·S)끼리 묶어 번호순
+            return [...map.values()].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true }));
+        }
+
+        function renderCodeList() {
+            const box = document.getElementById('code-list-rows');
+            const countBox = document.getElementById('code-list-count');
+            if (!box) return;
+            const q = String((document.getElementById('code-list-search') || {}).value || '').trim().toLowerCase();
+            const all = gCollectCodes();
+            const rows = !q ? all : all.filter(e =>
+                e.code.toLowerCase().includes(q)
+                || e.label.toLowerCase().includes(q)
+                || e.products.some(n => String(n).toLowerCase().includes(q)));
+
+            if (countBox) {
+                countBox.style.display = 'flex';
+                countBox.innerHTML = `<span>${q ? '검색 결과' : '전체'} <b style="color:var(--primary);">${rows.length}개</b></span>`
+                    + `<span>이름표 있음 <b>${rows.filter(e => e.label).length}개</b></span>`;
+            }
+
+            if (rows.length === 0) {
+                box.innerHTML = `<div style="text-align:center; padding:40px 20px; color:var(--text-sub); font-size:13px; font-weight:700;">${q ? '찾는 번호가 없습니다.' : '아직 만들어진 식별번호가 없습니다.'}</div>`;
+                return;
+            }
+
+            const pre = c => c[0];
+            const preColor = { P: ['#eff6ff', '#1d4ed8'], F: ['#fefce8', '#a16207'], S: ['#fff7ed', '#c2410c'] };
+            box.innerHTML = rows.map(e => {
+                const [bg, fg] = preColor[pre(e.code)] || preColor.P;
+                const names = e.products.slice(0, 2).join(' · ') + (e.products.length > 2 ? ` 외 ${e.products.length - 2}개` : '');
+                return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px; background:#fff; border:1px solid var(--border); border-radius:10px;">
+                    <span style="flex:0 0 auto; padding:4px 9px; border-radius:6px; background:${bg}; color:${fg}; font-size:12px; font-weight:900;">${e.code}</span>
+                    <span style="flex:1; min-width:0;">
+                        <span style="display:block; font-size:13px; font-weight:800; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.label ? gEscapeHtml(e.label) : `<span style="color:#cbd5e1;">이름표 없음</span>`}</span>
+                        <span style="display:block; margin-top:2px; font-size:11px; font-weight:700; color:var(--text-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${names ? gEscapeHtml(names) : '연결된 상품 없음'}${e.poCount ? ` · 발주 ${e.poCount}건${e.lastDate ? ` (최근 ${e.lastDate})` : ''}` : ''}</span>
+                    </span>
+                    <button type="button" onclick="editCodeLabel('${e.code}')" title="이름표 고치기" style="flex:0 0 auto; padding:6px 10px; border:1.5px solid var(--border); background:#fff; color:#475569; border-radius:7px; font-size:12px; font-weight:800; cursor:pointer;">수정</button>
+                </div>`;
+            }).join('');
+        }
+
+        /* 이름표만 고친다. 번호(code) 자체는 상품·발주·주문 기록이 모두 물고 있어 바꾸지 않는다.
+           번호를 옮겨 붙이는 일은 옆의 '코드 연결'에서 한다. */
+        async function editCodeLabel(code) {
+            const cur = gCodeLabelOf(code);
+            const next = prompt(`'${code}' 이름표를 적어 주세요.\n(비우고 확인하면 이름표가 지워집니다)`, cur);
+            if (next === null) return;
+            const label = String(next).trim();
+            if (label === cur) return;
+
+            showLoader('🏷️ 이름표 저장 중...');
+            try {
+                const url = `${FIREBASE_DB_URL}product_code_labels/${encodeURIComponent(code)}.json`;
+                const res = await fetch(url, {
+                    method: label ? 'PUT' : 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: label ? JSON.stringify(label) : null
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                if (label) gCodeLabels[code] = label; else delete gCodeLabels[code];
+                hideLoader();
+                showToast(label ? `'${code}' 이름표를 '${label}'로 바꿨습니다.` : `'${code}' 이름표를 지웠습니다.`);
+                renderCodeList();
+            } catch (e) {
+                hideLoader();
+                console.error('이름표 저장 실패:', e);
+                showToast('이름표 저장 실패: ' + e.toString());
+            }
+        }
+
         /* 번호 옆에 붙일 작은 딱지. 이름표가 없으면 아무것도 안 만든다 (P 번호는 상품 이름이 옆에 있다). */
         function gCodeLabelChip(code) {
             const l = gCodeLabelOf(code);
