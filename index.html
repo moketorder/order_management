@@ -1555,11 +1555,13 @@
             .batch-action-bar.show {
                 transform: translateY(0);
             }
-            /* [수정] 2칸 4줄이라 버튼 줄이 화면 아래를 크게 덮었다.
-               한 칸을 절반으로 줄여 4칸 2줄로 담는다. */
+            /* [수정 2026-09-30] 버튼이 늘어서(7개) 4칸 2줄로는 비좁다.
+               세로 2줄로 두고, 왼쪽 위(1번)부터 아래로, 다 차면 오른쪽 다음 칸으로 순서대로 채운다. */
             .batch-buttons {
                 display: grid;
-                grid-template-columns: repeat(4, minmax(0, 1fr));
+                grid-auto-flow: column;
+                grid-template-rows: repeat(2, 1fr);
+                grid-auto-columns: minmax(0, 1fr);
                 gap: 4px;
             }
             .btn-batch {
@@ -2729,7 +2731,11 @@
          올라가는 시각이 지났는데 아직 카톡에 안 올린 상품이 있으면 여기 뜬다. -->
     <div id="announce-banner" class="no-print" style="display:none; max-width:1200px; margin:10px auto 0; padding:0 15px; box-sizing:border-box;">
         <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:14px; padding:12px 14px;">
-            <div style="font-size:13px; font-weight:900; color:#92400e; margin-bottom:8px;">🔔 카톡에 올릴 상품이 있어요</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                <div style="font-size:13px; font-weight:900; color:#92400e;" id="announce-banner-title">🔔 카톡에 올릴 상품이 있어요</div>
+                <!-- [신규] 지금 바쁘면 잠깐 접어 둔다. 끝난 게 아니라서 새로고침하면 다시 펼쳐진 채로 뜬다. -->
+                <button type="button" onclick="toggleAnnounceBannerCollapsed()" id="announce-banner-toggle" style="flex:0 0 auto; height:26px; padding:0 10px; border:1px solid #fde68a; background:#fff; color:#92400e; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">숨기기</button>
+            </div>
             <div id="announce-banner-list" style="display:flex; flex-direction:column; gap:8px;"></div>
         </div>
     </div>
@@ -2909,12 +2915,13 @@
                             <!-- 대분류 세그먼트 -->
                             <div class="form-group">
                                 <label>대분류 탭</label>
-                                <div class="segment-control" style="display: grid; grid-template-columns: repeat(3, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px;">
-                                    <!-- [수정] 상품목록 대분류와 같은 이름·순서로 맞춘다. 안쪽 값(fruit/onsite/reserve)은
-                                         저장된 자료와 연결돼 있어 그대로 쓴다. -->
-                                    <div class="segment-btn active" data-tab="fruit" onclick="selectMainTab('fruit')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 당일판매</div>
+                                <div class="segment-control" id="upload-main-seg" style="display: grid; grid-template-columns: repeat(2, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px;">
+                                    <!-- [수정 2026-09-30] 당일판매·예약판매를 '공동구매' 하나로 합쳤다. 날짜가 오늘이면 당일, 뒷날이면 예약.
+                                         안쪽 값은 저장된 자료와 이어져 있어 그대로 쓴다 (공동구매 = reserve).
+                                         '예전 당일'은 날짜 없이 올라간 옛 과일·야채를 고칠 때만 나타난다. -->
+                                    <div class="segment-btn active" data-tab="reserve" onclick="selectMainTab('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 공동구매</div>
                                     <div class="segment-btn" data-tab="onsite" onclick="selectMainTab('onsite')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📦 상시판매</div>
-                                    <div class="segment-btn" data-tab="reserve" onclick="selectMainTab('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 예약판매</div>
+                                    <div class="segment-btn" data-tab="fruit" onclick="selectMainTab('fruit')" style="display:none; text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 예전 당일</div>
                                 </div>
                             </div>
 
@@ -3087,9 +3094,9 @@
                                     <!-- 사진이 있을 때 '사진 첨부하기' 칸이 들어올 자리 (다운로드 버튼 바로 위) -->
                                     <div id="upload-zone-slot"></div>
 
-                                    <!-- [수정] 사진 다운로드는 목록을 펼쳤을 때만 보이게 이 안으로 옮겼다.
+                                    <!-- [수정 2026-09-30] 다운로드 대신 카톡으로 바로 보내기 — 목록을 펼쳤을 때만 보이게 이 안에 둔다.
                                          (접혀 있을 때 버튼만 덩그러니 남아 무엇에 대한 것인지 알기 어려웠다) -->
-                                    <button type="button" id="btn-download-images" onclick="downloadProductImages()" style="display: none; width: 100%; height: 50px; box-sizing: border-box; margin-top: 10px; background: white; border: 1.5px solid #0284c7; color: #0284c7; border-radius: var(--radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">⬇️ 사진 다운로드</button>
+                                    <button type="button" id="btn-download-images" onclick="shareProductImages()" style="display: none; width: 100%; height: 50px; box-sizing: border-box; margin-top: 10px; background: #FEE500; border: 1.5px solid #ca8a04; color: #191919; border-radius: var(--radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">💬 카톡으로 보내기</button>
                                 </div>
                             </div>
 
@@ -3121,12 +3128,11 @@
                 <!-- 구버전 tab-manage 컨테이너 복원 -->
                 <div id="tab-manage" class="tab-content active">
                     <!-- 배송 유형 대분류 필터 탭 -->
-                    <div class="segment-control" id="manage-delivery-type-tabs" style="margin-bottom: 12px; display: grid; grid-template-columns: 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px;">
-                        <!-- [수정] 이름을 당일판매 · 상시판매 · 예약판매로 바꾸고 순서도 이대로 둔다.
-                             안쪽 값(today/inventory/reserve)은 저장된 자료와 연결돼 있어 그대로 쓴다. -->
-                        <div class="segment-btn active" data-manage-delivery-type="today" onclick="selectManageDeliveryType('today')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 당일판매</div>
+                    <div class="segment-control" id="manage-delivery-type-tabs" style="margin-bottom: 12px; display: grid; grid-template-columns: 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px;">
+                        <!-- [수정 2026-09-30] 당일판매·예약판매를 '공동구매' 하나로 합쳤다 (날짜 탭 + 종류 줄로 본다).
+                             안쪽 값(reserve/inventory)은 저장된 자료와 연결돼 있어 그대로 쓴다. -->
+                        <div class="segment-btn active" data-manage-delivery-type="reserve" onclick="selectManageDeliveryType('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 공동구매</div>
                         <div class="segment-btn" data-manage-delivery-type="inventory" onclick="selectManageDeliveryType('inventory')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📦 상시판매</div>
-                        <div class="segment-btn" data-manage-delivery-type="reserve" onclick="selectManageDeliveryType('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 예약판매</div>
                     </div>
                     <!-- 상품 목록 대분류 필터 탭 -->
                     <div class="segment-control five-cols" id="manage-category-tabs" style="margin-bottom: 12px; display: grid; grid-template-columns: repeat(5, 1fr); row-gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 12px;">
@@ -3164,12 +3170,16 @@
                             <span id="upload-selection-count-text">0개 상품 선택됨</span>
                         </div>
                     </div>
-                    <div class="batch-buttons" style="display: flex; gap: 3px; width: 100%; box-sizing: border-box;">
+                    <div class="batch-buttons" style="width: 100%; box-sizing: border-box;">
                         <button class="btn-batch type-show" onclick="handleBatchVisibility(true)" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); white-space: nowrap; overflow: hidden;">👁️ 노출</button>
                         <button class="btn-batch type-hide" onclick="handleBatchVisibility(false)" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); white-space: nowrap; overflow: hidden;">🙈 숨김</button>
-                        <button class="btn-batch type-delete" onclick="handleBatchDelete()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(220, 38, 38, 0.3); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #dc2626; white-space: nowrap; overflow: hidden;">🗑️ 삭제</button>
+                        <!-- [신규 2026-09-30] 상품 하나만 골랐을 때만 나온다 — 설명 복사·사진 공유는 한 상품 기준이라 -->
+                        <button id="btn-batch-sharephoto" class="btn-batch" onclick="handleBatchSharePhoto()" style="display:none; flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid #ca8a04; background: #FEE500; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #191919; white-space: nowrap; overflow: hidden;">💬 사진 공유</button>
+                        <button id="btn-batch-copydesc" class="btn-batch" onclick="handleBatchCopyDesc()" style="display:none; flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #1d4ed8; border-color: rgba(29, 78, 216, 0.25); white-space: nowrap; overflow: hidden;">📋 설명 복사</button>
                         <button class="btn-batch type-print" onclick="switchAdminTab('thumbnail-generator')" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #d97706; border-color: rgba(217, 119, 6, 0.25); white-space: nowrap; overflow: hidden;">🎨 섬네일</button>
                         <button class="btn-batch type-purchase" onclick="handleBatchPurchase()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #10b981; border-color: rgba(16, 185, 129, 0.25); white-space: nowrap; overflow: hidden;">🚚 발주</button>
+                        <button class="btn-batch" onclick="handleBatchDeselect()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #64748b; white-space: nowrap; overflow: hidden;">✕ 선택 해제</button>
+                        <button class="btn-batch type-delete" onclick="handleBatchDelete()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(220, 38, 38, 0.3); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #dc2626; white-space: nowrap; overflow: hidden;">🗑️ 삭제</button>
                     </div>
                 </div>
             </div>
@@ -3187,13 +3197,23 @@
                 </div>
 
                 <div class="card" style="padding: 14px;">
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
-                        <button type="button" onclick="psCalShiftMonth(-1)" style="width:36px; height:36px; border:1.5px solid var(--border); background:#fff; border-radius:10px; font-size:15px; font-weight:800; cursor:pointer;">◀</button>
-                        <div id="ps-cal-title" style="font-size:15px; font-weight:900; color:#0f172a;"></div>
-                        <button type="button" onclick="psCalShiftMonth(1)" style="width:36px; height:36px; border:1.5px solid var(--border); background:#fff; border-radius:10px; font-size:15px; font-weight:800; cursor:pointer;">▶</button>
+                    <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;">
+                        <div style="flex:1; min-width:0; font-size:11px; font-weight:700; color:var(--text-sub);">🕐 올라가는 상품 · 🕕 마감되는 상품이 있는 날에 표시돼요. 색은 지금 상태 — <span style="color:#16a34a;">🟢 판매중</span> · <span style="color:#dc2626;">🔴 숨김·예약대기</span> · <span style="color:#ca8a04;">🟡 마감</span><br>여러 개를 누르면 한꺼번에 고를 수 있어요(다시 누르면 빠져요) · 막대를 끌어서 다른 날짜에 놓으면 고른 것 전부가 같이 옮겨져요 (PC만) · <b>Ctrl</b>을 누른 채 끌면 복제돼요 (원본은 그대로) · 막대 양 끝을 끌면 그쪽 날짜만 조절돼요 · 달력을 스크롤하거나, 끌던 채로 위/아래 끝까지 가면 전달·다음달로 넘어가요</div>
+                        <button type="button" onclick="psCalGoToday()" style="flex:0 0 auto; height:32px; padding:0 12px; border:1.5px solid var(--border); background:#fff; border-radius:9px; font-size:12px; font-weight:800; cursor:pointer;">오늘</button>
                     </div>
-                    <div style="font-size:11px; font-weight:700; color:var(--text-sub); margin-bottom:8px;">🕐 올라가는 상품 · 🕕 마감되는 상품이 있는 날에 표시돼요. 색은 지금 상태 — <span style="color:#16a34a;">🟢 판매중</span> · <span style="color:#dc2626;">🔴 숨김</span> · <span style="color:#ca8a04;">🟡 마감</span></div>
-                    <div id="ps-cal-box"></div>
+                    <div id="ps-cal-box" class="ps-cal-scroll" onscroll="psCalOnScroll()" ondragover="psCalDragAutoScroll(event)"></div>
+                </div>
+                <!-- [수정] 날짜를 누르면 나오는 상품 칸 — 달력 스크롤 안에 끼워 두면 중간에 묻혀 보기 힘들다. 달력 밖 자리에 따로 둔다 -->
+                <div id="ps-day-detail-box" style="margin-top:10px;"></div>
+            </div>
+            <!-- [신규] Delete키로 예약을 지울 때 묻는 알림창 — confirm()은 막히는 브라우저·미리보기가 있어 직접 만든다 -->
+            <div id="ps-del-confirm-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:2000; align-items:center; justify-content:center; padding:16px;" onclick="if(event.target===this) psDelConfirmCancel()">
+                <div style="background:#fff; border-radius:14px; padding:20px; max-width:320px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                    <div id="ps-del-confirm-msg" style="font-size:14px; font-weight:800; color:#0f172a; margin-bottom:16px;"></div>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" onclick="psDelConfirmCancel()" style="flex:1; height:40px; border:1.5px solid var(--border); background:#f8fafc; color:#334155; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">취소</button>
+                        <button type="button" onclick="psDelConfirmOk()" style="flex:1; height:40px; border:none; background:#dc2626; color:#fff; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">삭제</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3657,11 +3677,30 @@
         #ps-cal-box .ms-cal-cell.has { background: #fff; border-color: #eef2f6; }
         .ps-bars { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
         .ps-bar { height: 17px; line-height: 17px; font-size: 10.5px; font-weight: 800; margin: 0 -8px 0 -5px; padding: 0 4px;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }
         .ps-bar.s { margin-left: 0; border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
         .ps-bar.e { margin-right: 0; border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
         .ps-bar.cut { margin-right: -5px; }   /* 토요일·달 마지막 날은 칸 끝까지만 */
         .ps-bar-empty { background: transparent !important; }
+        /* [신규] 막대 양 끝의 손잡이 — 마우스를 올리면 커서가 바뀌고, 끌면 그쪽 날짜(올라가는날/마감날)만 옮겨진다 */
+        .ps-rh { position: absolute; top: 0; bottom: 0; width: 7px; cursor: ew-resize; }
+        .ps-rh.l { left: 0; }
+        .ps-rh.r { right: 0; }
+        .ps-rh:hover { background: rgba(0,0,0,.2); }
+        /* [신규] 달력을 페이지로 넘기지 않고 쭉 이어서 스크롤 — 한 화면엔 대략 5줄만 보이게 높이를 못박는다 */
+        /* [수정] scroll-behavior:smooth를 여기 두면 우리가 코드로 scrollTop을 바로바로 보정하는 것까지 애니메이션이 돼서
+           (달 이어붙이기 보정 등) 값을 바로 읽었을 때 아직 옛 값이 나오는 일이 생긴다. '오늘로'만 scrollIntoView의
+           behavior:'smooth' 옵션으로 부드럽게 하고, 나머지는 즉시 반영되게 뺐다. */
+        .ps-cal-scroll { max-height: 520px; overflow-y: auto; overflow-x: hidden;
+            border: 1.5px solid var(--border); border-radius: 10px; padding: 0 4px 4px; }
+        .ps-cal-scroll .ps-cal-weekhead { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 3px;
+            position: sticky; top: 0; background: #fff; z-index: 3; padding: 4px 0 2px; }
+        .ps-cal-scroll .ps-cal-month-label { font-size: 12px; font-weight: 900; color: #475569; text-align: center; padding: 10px 0 4px; }
+        /* [신규] 지금 안 보고 있는 달(펼친 날이 없으면 오늘이 있는 달, 있으면 그 날의 달)은 날짜를 흐리게 해서
+           어느 달을 보고 있는지 한눈에 들어오게 한다 — 막대는 다른 달에서도 눈에 띄어야 하니 그대로 둔다. */
+        .ms-cal-cell.ps-cal-fade .ms-cal-day { color: #cbd5e1; font-weight: 700; }
+        .ms-cal-cell.ps-cal-fade.ms-cal-sun .ms-cal-day { color: #fca5a5; }
+        .ms-cal-cell.ps-cal-fade.ms-cal-sat .ms-cal-day { color: #93c5fd; }
         .ms-cal-cell.has { background:#f0fdf4; border-color:#bbf7d0; }
         /* [신규] 잘 나가는 품목 — 줄이 많아 어수선해지기 쉬운 목록이라, 자리를 못박아 눈이 세로로 흐르게 한다.
            숫자 칸은 폭을 고정하고 오른쪽 맞춤이라, 자릿수가 달라도 줄이 흔들리지 않는다. */
@@ -12493,13 +12532,19 @@
             bits += '01010';
             for (let i = 7; i <= 12; i++) bits += R[+code[i]];
             bits += '101';
-            const m = 1.1, h = 36, q = 4;    // 한 칸 너비·높이·양옆 여백(칸 수)
+            // [수정] EAN-13 칸 0.363mm — 규격(0.33mm)의 110%. 막대만 95칸이라 그림 폭은 35.94mm.
+            //        치수를 mm 로 못박아 종이에서도 그대로 찍힌다(전에는 px 로 30mm × 9.5mm 밖에 안 돼 잘 안 읽혔다).
+            //        읽히는 데 중요한 건 폭과 양옆 여백이고 높이는 겨누기를 도울 뿐이라, 막대는 규격 22.85mm 대신 18mm 로 둔다 — 종이를 아끼려고.
+            // [수정] 그림 속 여백은 2칸씩만 둔다. 규격은 왼쪽 11칸·오른쪽 7칸이지만 그만큼 흰칸을 그려 넣으면
+            //        막대가 품목표 가로선 끝에서 4mm 나 안으로 들어가 보인다. 어차피 그 옆은 카드 안쪽 여백 2mm 와
+            //        종이 가장자리라 흰 자리가 이어지므로, 그림 밖의 흰 종이가 여백 노릇을 한다.
+            const m = 0.363, h = 18, qL = 2, qR = 2, t = 3.9;   // 모두 mm
             let rects = '';
-            for (let i = 0; i < bits.length; i++) if (bits[i] === '1') rects += `<rect x="${(q + i) * m}" y="0" width="${m}" height="${h}"/>`;
-            const w = (bits.length + q * 2) * m;
-            return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h + 13}" viewBox="0 0 ${w} ${h + 13}" style="display:block;">`
+            for (let i = 0; i < bits.length; i++) if (bits[i] === '1') rects += `<rect x="${((qL + i) * m).toFixed(3)}" y="0" width="${m}" height="${h}"/>`;
+            const w = ((bits.length + qL + qR) * m).toFixed(2), H = (h + t).toFixed(2);
+            return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${H}mm" viewBox="0 0 ${w} ${H}" style="display:block;">`
                 + `<g fill="#000">${rects}</g>`
-                + `<text x="${w / 2}" y="${h + 11}" text-anchor="middle" font-size="11" font-family="monospace" fill="#000">${code}</text></svg>`;
+                + `<text x="${w / 2}" y="${H - 0.4}" text-anchor="middle" font-size="2.86" font-family="monospace" fill="#000">${code}</text></svg>`;
         }
 
         async function printSelectedCards() {
@@ -12644,6 +12689,7 @@
                     const printItems = gOffsetFeeRows(customer.items)
                         .slice()
                         .sort((a, b) => (gIsFeeRow(a) ? 1 : 0) - (gIsFeeRow(b) ? 1 : 0));
+                    const _totalSum = printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0);
                     // [신규] 미입금 합계 — 결제 바코드에 쓴다 (배달비 차감처럼 마이너스 줄도 그대로 더한다)
                     const _unpaidSum = printItems.filter(it => !(it.paid === true || it.paid === "true" || String(it.paid).toUpperCase() === "TRUE"))
                         .reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0);
@@ -12691,14 +12737,22 @@
                     printHtml += `
                                 </tbody>
                             </table>
-                            <!-- [수정] 픽업 주문이면 왼쪽에 미입금 결제 바코드, 오른쪽에 미입금·합계 금액을 위아래로 둔다.
-                                 좁은 화면용 규칙(.card-footer 세로 쌓기)이 종이에도 걸려 바코드와 금액이 위아래로 흩어졌다 → 가로로 못박는다. -->
-                            <div class="card-footer" style="display:flex; flex-direction:row; flex-wrap:nowrap; align-items:center; justify-content:space-between; gap:10px;">
+                            <!-- [수정] 픽업 주문이면 왼쪽 벽에 미입금 결제 바코드, 오른쪽 벽에 합계·결제 금액을 위아래로 둔다.
+                                 좁은 화면용 규칙(.card-footer 세로 쌓기)이 종이에도 걸려 바코드와 금액이 흩어졌다 → 가로로 못박는다.
+                                 [수정] 자리 기준은 바로 위 품목표의 가로선이다. 바코드 왼쪽 끝과 금액 오른쪽 끝을 그 선의 양 끝에 맞춘다
+                                        (= 카드 안쪽 여백 그대로, 바깥 여백 없음). 틈은 없앴고, 금액에 남는 자리는 32.06mm. -->
+                            <div class="card-footer" style="display:flex; flex-direction:row; flex-wrap:nowrap; align-items:center; justify-content:space-between; gap:0;">
                                 ${_payBars ? `<div style="flex:0 0 auto;">${_payBars}</div>` : ''}
-                                ${(!isDelivery && _unpaidSum > 0) ? `<div style="flex:1 1 auto; text-align:right; white-space:nowrap; line-height:1.25;">
-                                    <div style="font-size:15px; margin-bottom:3px;">${customer.taxFreeOnly ? '*' : ''}합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원</div>
-                                    <div style="font-size:15px;">${_isNewBar ? '*' : ''}결제금액: ${_unpaidSum.toLocaleString()}원</div>
-                                </div>` : `<div style="flex:1 1 auto; text-align:right; white-space:nowrap;">${customer.taxFreeOnly ? '*' : ''}합계금액: ${printItems.reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0).toLocaleString()}원</div>`}
+                                ${(!isDelivery && _unpaidSum > 0) ? (() => {
+                                    /* 굵은 글씨 기준 — 13px 로 다섯 자리(41,500원)가 30.2mm, 남는 자리 32.06mm 에 넉넉히 든다.
+                                       자릿수가 늘면 한 단계씩 줄여 늘 한 줄로 앉힌다. */
+                                    const _big = Math.max(_totalSum, _unpaidSum);
+                                    const _fs = _big >= 1000000 ? 11 : (_big >= 100000 ? 12 : 13);
+                                    return `<div style="flex:0 0 auto; text-align:right; white-space:nowrap; line-height:1.3;">
+                                    <div style="font-size:${_fs}px; margin-bottom:3px;">${customer.taxFreeOnly ? '*' : ''}합계금액: ${_totalSum.toLocaleString()}원</div>
+                                    <div style="font-size:${_fs}px;">${_isNewBar ? '*' : ''}결제금액: ${_unpaidSum.toLocaleString()}원</div>
+                                </div>`;
+                                })() : `<div style="flex:1 1 auto; text-align:right; white-space:nowrap;">${customer.taxFreeOnly ? '*' : ''}합계금액: ${_totalSum.toLocaleString()}원</div>`}
                             </div>
                             ${isDelivery ? `
                                 <div class="print-pickup-notice">
@@ -12896,26 +12950,239 @@
         }
 
         /* ===== [신규] 🗓️ 노출일정 탭 — 상품등록과 따로, 예약 공개·종료를 달력으로 관리한다 ===== */
-        let psCalMonth = '';          // 지금 보는 달 'YYYY-MM'
+        let psCalMonths = [];         // 지금 이어 붙여 보여주는 달들 'YYYY-MM' — 오래된→최신 차례
         let psCalOpenDay = '';        // 펼쳐 둔 날짜 'YYYY-MM-DD' (없으면 '')
         let psAddSearchOpenFor = '';  // 이 날짜에서 '+ 새로 예약 걸기' 검색칸이 열려 있으면 그 날짜
         let psAddSearchQuery = '';
 
-        function initProductScheduleTab() {
-            if (!psCalMonth) {
-                const n = new Date();
-                psCalMonth = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+        // [신규] 막대를 끌어서 다른 날짜에 놓으면 예약을 옮긴다 (PC 마우스 전용 — 폰 손가락 끌기는 아직 지원 안 함)
+        let psDragIdx = null;
+        let psDragOrigStart = '';
+        let psDragMode = 'move';   // 'move' | 'resize-start' | 'resize-end'
+        let psDragGroup = null;    // [신규] 여러 개를 같이 선택했을 때, 끄는 순간 그 전부(idx+원래 시작일)를 담아 둔다
+        function psDragStart(event, idx, startKey) {
+            psDragIdx = idx;
+            psDragOrigStart = startKey;
+            psDragMode = 'move';
+            // 여러 상품이 선택된 상태에서 그 중 하나를 끌면, 선택된 전부를 같은 만큼 같이 옮긴다/복제한다
+            psDragGroup = (psSelectedIdxs.has(idx) && psSelectedIdxs.size > 1)
+                ? [...psSelectedIdxs].map(i => {
+                    const p = uploadProducts[i];
+                    return { idx: i, start: fMsToDateKey(p.releaseAt) || fMsToDateKey(p.expireAt) };
+                })
+                : null;
+            try { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', String(idx)); } catch (e) { }
+        }
+        // [신규] 막대 양 끝 손잡이를 끌면 그쪽 날짜만 옮긴다 — 시각은 그대로 두고 날짜만 바뀐다.
+        function psResizeDragStart(event, idx, edge) {
+            event.stopPropagation();
+            psDragIdx = idx;
+            psDragMode = (edge === 'start') ? 'resize-start' : 'resize-end';
+            try { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', String(idx)); } catch (e) { }
+        }
+        async function psResizeDrop(idx, prod, mode, dropKey) {
+            const field = (mode === 'resize-start') ? 'releaseAt' : 'expireAt';
+            const cur = Number(prod[field]) || 0;
+            const hh = cur ? new Date(cur).getHours() : 15, mm = cur ? new Date(cur).getMinutes() : 0;
+            const [y, m, d] = dropKey.split('-').map(Number);
+            const newTs = new Date(y, m - 1, d, hh, mm, 0, 0).getTime();
+            if (cur && newTs === cur) return;
+            const ok = await psApplyScheduleUpdate(idx, { [field]: newTs });
+            if (ok) {
+                showToast(mode === 'resize-start' ? '📅 올라가는 날짜를 옮겼어요' : '📅 마감 날짜를 옮겼어요');
+                renderProductScheduleCalendar();
             }
-            renderProductScheduleCalendar();
+        }
+        // [신규] 그냥 끌면 이동, Ctrl(맥은 ⌘)을 누른 채 끌면 복제 — 원본은 그 자리에 그대로 두고
+        //  새 상품을 하나 더 만들어 그 상품에만 새 날짜의 예약을 건다.
+        async function psHandleDrop(event, dropKey) {
+            event.preventDefault();
+            const idx = psDragIdx, origStart = psDragOrigStart, mode = psDragMode, group = psDragGroup;
+            const isCopy = !!(event.ctrlKey || event.metaKey);
+            psDragIdx = null; psDragOrigStart = ''; psDragMode = 'move'; psDragGroup = null;
+            if (idx === null) return;
+            const prod = (uploadProducts || [])[idx];
+            if (!prod) return;
+            if (mode === 'resize-start' || mode === 'resize-end') { return psResizeDrop(idx, prod, mode, dropKey); }
+            if (!origStart || dropKey === origStart) return;   // 안 끌었거나 같은 날이면 아무 일도 안 한다
+            const [oy, om, od] = origStart.split('-').map(Number);
+            const [ny, nm, nd] = dropKey.split('-').map(Number);
+            const deltaDays = Math.round((new Date(ny, nm - 1, nd).getTime() - new Date(oy, om - 1, od).getTime()) / 86400000);
+            if (!deltaDays) return;
+
+            // [신규] 여러 개를 선택한 채 끌었으면, 잡은 막대의 이동한 며칠만큼 선택된 전부를 같이 옮기거나 복제한다
+            if (group && group.length > 1) {
+                let done = 0;
+                for (const g of group) {
+                    const p = (uploadProducts || [])[g.idx];
+                    if (!p) continue;
+                    const gChanges = {};
+                    if (p.releaseAt) gChanges.releaseAt = Number(p.releaseAt) + deltaDays * 86400000;
+                    if (p.expireAt) gChanges.expireAt = Number(p.expireAt) + deltaDays * 86400000;
+                    if (Object.keys(gChanges).length === 0) continue;
+                    const ok = isCopy ? await psDuplicateWithSchedule(g.idx, gChanges) : await psApplyScheduleUpdate(g.idx, gChanges);
+                    if (ok) done++;
+                }
+                if (done) {
+                    showToast(isCopy ? `📄 ${done}개를 복제해서 새 날짜에 예약을 만들었어요 · 원본은 그대로예요` : `📅 ${done}개 예약을 옮겼어요`);
+                    if (!isCopy) { psSelectedIdxs.clear(); }   // 복제는 새 상품을 다시 고를 수 있게, 이동은 선택을 풀어 준다
+                    renderProductScheduleCalendar();
+                }
+                return;
+            }
+
+            // 올라가는·내려가는 시각을 같은 며칠만큼 통째로 옮긴다 (시각은 그대로 두고 날짜만).
+            // 지나간 시각으로 옮기면 psApplyScheduleUpdate가 그 순간 다시 노출시키고, 새 공지도 다시 뜨게 한다.
+            const changes = {};
+            if (prod.releaseAt) changes.releaseAt = Number(prod.releaseAt) + deltaDays * 86400000;
+            if (prod.expireAt) changes.expireAt = Number(prod.expireAt) + deltaDays * 86400000;
+            if (Object.keys(changes).length === 0) return;
+
+            if (isCopy) {
+                const ok = await psDuplicateWithSchedule(idx, changes);
+                if (ok) { showToast('📄 복제해서 새 날짜에 예약을 만들었어요 · 원본은 그대로예요'); renderProductScheduleCalendar(); }
+                return;
+            }
+            const ok = await psApplyScheduleUpdate(idx, changes);
+            if (ok) { showToast('📅 예약을 옮겼어요'); renderProductScheduleCalendar(); }
         }
 
-        function psCalShiftMonth(delta) {
-            const [y, m] = psCalMonth.split('-').map(n => parseInt(n));
+        /* [신규] 상품을 복제해서, 그 복제본에만 새 예약(changes)을 건다. 원본 상품·원본 예약은 손대지 않는다.
+           식별번호는 새로 하나 받고, 사진·가격 등은 원본 그대로 물려받는다. */
+        async function psDuplicateWithSchedule(idx, changes) {
+            const prod = (uploadProducts || [])[idx];
+            if (!prod) return false;
+            if (prod.showWeekly === true) {
+                showToast("🔁 '매주 노출' 상품은 복제 예약을 걸 수 없어요");
+                return false;
+            }
+            const newReleaseAt = ('releaseAt' in changes) ? changes.releaseAt : null;
+            const newExpireAt = ('expireAt' in changes) ? changes.expireAt : null;
+            if (newReleaseAt && newExpireAt && newExpireAt <= newReleaseAt) {
+                showToast('⚠️ 마감 시각은 올라가는 시각보다 뒤여야 해요');
+                return false;
+            }
+            const now = Date.now();
+            const hasSchedule = !!(newReleaseAt || newExpireAt);
+            let showToday, showReserve, hide;
+            if (hasSchedule) {
+                const started = !newReleaseAt || now >= newReleaseAt;
+                const notEnded = !newExpireAt || now < newExpireAt;
+                const shouldShow = started && notEnded;
+                showToday = shouldShow; showReserve = shouldShow; hide = !shouldShow;
+            } else {
+                showToday = false; showReserve = false; hide = true;   // 예약 없이 복제되는 일은 없지만, 혹시 몰라 기본은 숨김
+            }
+            const prefix = /^([PFS])\d+$/.test(String(prod.productCode || '')) ? prod.productCode[0] : 'P';
+            const newIdx = uploadProducts.length;   // 기존 상품등록 저장과 같은 방식 — 배열 맨 뒤에 새로 붙인다
+            const copy = {
+                ...prod,
+                productCode: gNextProductCode(prefix),
+                createdAt: now,
+                updatedAt: now,
+                releaseAt: newReleaseAt,
+                expireAt: newExpireAt,
+                releaseApplied: hasSchedule ? (!!newReleaseAt && now >= newReleaseAt) : null,
+                expireApplied: hasSchedule ? (!!newExpireAt && now >= newExpireAt) : null,
+                announced: hasSchedule ? false : null,
+                scheduleLabel: prod.scheduleLabel || null,
+                announceText: prod.announceText || null,
+                showToday, showReserve, hide
+            };
+            const ok = await fbPatchProducts({ [newIdx]: copy });
+            if (ok) {
+                uploadProducts[newIdx] = copy;
+                const cnt = document.getElementById('product-count'); if (cnt) cnt.innerText = uploadProducts.length;
+                if (typeof renderProductsList === 'function') renderProductsList();
+            } else {
+                showToast('복제 예약 저장에 실패했어요 — 다시 시도해 주세요');
+            }
+            return ok;
+        }
+
+        function psShiftMonthKey(monthKey, delta) {
+            const [y, m] = monthKey.split('-').map(n => parseInt(n));
             const d = new Date(y, m - 1 + delta, 1);
-            psCalMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        }
+        function psTodayMonthKey() {
+            const n = new Date();
+            return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        function initProductScheduleTab() {
+            if (!psCalMonths || psCalMonths.length === 0) {
+                const base = psTodayMonthKey();
+                // [수정] 페이지를 넘기지 않고 쭉 이어서 스크롤하는 방식으로 바꿨다 — 처음엔 전달~다다음달까지 넉넉히 걸어 둔다
+                psCalMonths = [psShiftMonthKey(base, -1), base, psShiftMonthKey(base, 1), psShiftMonthKey(base, 2)];
+            }
+            renderProductScheduleCalendar();
+            requestAnimationFrame(() => psCalScrollToMonth(psTodayMonthKey(), 'auto'));
+        }
+
+        // [신규] 위/아래 끝까지 스크롤하면(또는 막대를 끝까지 끌고 가면) 자동으로 그 방향의 달을 하나 더 이어붙인다
+        let psCalExtending = false;
+        // [수정] scrollIntoView나 우리가 직접 scrollTop을 바꾸면 그것도 'scroll' 이벤트를 일으켜서,
+        //  자칫 계속 더 이어붙이는 무한 루프로 번진다 — 우리가 직접 스크롤을 움직이는 동안은 잠깐 무시한다.
+        let psCalSuppressScroll = false;
+        let psCalSuppressTimer = null;
+        function psCalSuppressFor(ms) {
+            psCalSuppressScroll = true;
+            if (psCalSuppressTimer) clearTimeout(psCalSuppressTimer);
+            psCalSuppressTimer = setTimeout(() => { psCalSuppressScroll = false; }, ms);
+        }
+        function psCalExtendTop() {
+            if (psCalExtending || !psCalMonths.length) return;
+            psCalExtending = true;
+            psCalSuppressFor(150);
+            const box = document.getElementById('ps-cal-box');
+            const prevScrollHeight = box ? box.scrollHeight : 0;
+            psCalMonths.unshift(psShiftMonthKey(psCalMonths[0], -1));
+            renderProductScheduleCalendar();
+            if (box) box.scrollTop += (box.scrollHeight - prevScrollHeight);   // 위에 끼워 넣은 만큼 보정해서 화면이 안 튀게
+            psCalExtending = false;
+        }
+        function psCalExtendBottom() {
+            if (psCalExtending || !psCalMonths.length) return;
+            psCalExtending = true;
+            psCalMonths.push(psShiftMonthKey(psCalMonths[psCalMonths.length - 1], 1));
+            renderProductScheduleCalendar();
+            psCalExtending = false;
+        }
+        function psCalOnScroll() {
+            if (psCalSuppressScroll) return;
+            const box = document.getElementById('ps-cal-box');
+            if (!box) return;
+            if (box.scrollTop < 200) psCalExtendTop();
+            else if (box.scrollHeight - box.scrollTop - box.clientHeight < 200) psCalExtendBottom();
+        }
+        // [신규] 막대(또는 늘리기 손잡이)를 끌어 화면 위/아래 끝까지 가져가면 그 방향으로 스크롤하며 달을 이어붙인다
+        function psCalDragAutoScroll(event) {
+            if (psDragIdx === null) return;   // 끄는 중이 아니면 손대지 않는다
+            const box = document.getElementById('ps-cal-box');
+            if (!box) return;
+            event.preventDefault();
+            const rect = box.getBoundingClientRect(), edge = 36, y = event.clientY;
+            if (y - rect.top < edge) { box.scrollTop -= 14; if (box.scrollTop < 150 && !psCalSuppressScroll) psCalExtendTop(); }
+            else if (rect.bottom - y < edge) { box.scrollTop += 14; if (box.scrollHeight - box.scrollTop - box.clientHeight < 150 && !psCalSuppressScroll) psCalExtendBottom(); }
+        }
+
+        // [신규] 특정 달이 보이는 자리로 스크롤 — 아직 안 걸어 둔 달이면 그 방향으로 이어붙인 뒤 옮겨간다
+        function psCalScrollToMonth(monthKey, behavior) {
+            if (!psCalMonths.length) return;
+            while (monthKey < psCalMonths[0]) psCalMonths.unshift(psShiftMonthKey(psCalMonths[0], -1));
+            while (monthKey > psCalMonths[psCalMonths.length - 1]) psCalMonths.push(psShiftMonthKey(psCalMonths[psCalMonths.length - 1], 1));
+            renderProductScheduleCalendar();
+            const box = document.getElementById('ps-cal-box');
+            // [수정] 이제 달마다 따로 칸을 안 두고 쭉 이어서 그리므로, 그 달 1일 칸을 찾아 그 자리로 옮겨간다
+            const sec = box && box.querySelector(`[data-month-start="${monthKey}"]`);
+            psCalSuppressFor(700);   // scrollIntoView 스스로 일으키는 스크롤 이벤트 때문에 또 이어붙이지 않게
+            if (sec) sec.scrollIntoView({ block: 'start', behavior: behavior || 'smooth' });
+        }
+        function psCalGoToday() {
             psCalOpenDay = '';
             psAddSearchOpenFor = '';
-            renderProductScheduleCalendar();
+            psCalScrollToMonth(psTodayMonthKey(), 'smooth');
         }
 
         function togglePsDay(key) {
@@ -12926,21 +13193,14 @@
 
         function renderProductScheduleCalendar() {
             const box = document.getElementById('ps-cal-box');
-            const title = document.getElementById('ps-cal-title');
-            if (!box || !psCalMonth) return;
-            if (title) title.innerText = psCalMonth.replace('-', '년 ') + '월';
-
-            const [y, m] = psCalMonth.split('-').map(n => parseInt(n));
-            const first = new Date(y, m - 1, 1);
-            const lastDay = new Date(y, m, 0).getDate();
-            const lead = first.getDay();
+            if (!box || !psCalMonths.length) return;
             const todayISO = fMsToDateKey(Date.now());
 
             // 이 상품들의 예약을 날짜별로 미리 모아 둔다 (이름·지금 노출상태까지 — 달력 칸에 바로 보여줘야 하므로)
             // 상품명이 길면 '달력에 보일 짧은 이름(scheduleLabel)'을 대신 쓴다 — 노출일정 상품 칸에서 적을 수 있다.
-            /* [수정 2026-09-29] 상품마다 올라가는 날~마감 날을 한 줄 막대로 잇는다.
-               색은 지금 상태 — 판매중 초록 · 숨김 빨강 · 마감 노랑.
-               막대마다 줄 자리(lane)를 정해 두어 한 주 안에서 같은 높이로 이어진다. */
+            /* [수정 2026-09-30] 상품마다 올라가는 날~마감 날을 한 줄 막대로 잇는다. 여러 달을 걸쳐도 되므로
+               달마다 따로 계산하지 않고 전체 상품 기준으로 한 번만 줄 자리(lane)를 매긴다.
+               색은 지금 실제로 손님에게 보이는지 기준 — 보임 초록, 그 외(올라가기 전이든 손으로 숨겼든) 빨강, 마감 노랑. */
             const bars = [];
             (uploadProducts || []).forEach((prod, idx) => {
                 if (!prod) return;
@@ -12949,10 +13209,9 @@
                 if (!rk && !ek) return;
                 const nm = (prod.scheduleLabel && String(prod.scheduleLabel).trim()) || prod.name || '(이름없음)';
                 const hidden = (prod.hide === true || prod.hide === 'true');
-                // 노출 기간은 초록. 올라가기 전이라 지금 숨겨진 것도 '노출 예정'이라 초록.
-                // 빨강 = 노출 기간인데 손으로 숨겨 둠, 노랑 = 마감
                 const released = !prod.releaseAt || Date.now() >= Number(prod.releaseAt);
-                const st = gIsClosedAdmin(prod) ? 'closed' : ((hidden && released) ? 'hidden' : (released ? 'on' : 'soon'));
+                const visibleNow = released && !hidden;
+                const st = gIsClosedAdmin(prod) ? 'closed' : (visibleNow ? 'on' : (released ? 'hidden' : 'soon'));
                 const start = rk || ek, end = ek || rk;
                 bars.push({ idx, nm, st, start: start <= end ? start : end, end: start <= end ? end : start,
                     tip: `${prod.releaseAt ? fFmtSchedTime(prod.releaseAt) + ' 올라감' : ''}${prod.releaseAt && prod.expireAt ? ' ~ ' : ''}${prod.expireAt ? fFmtSchedTime(prod.expireAt) + ' 마감' : ''}` });
@@ -12964,53 +13223,100 @@
                 if (l < 0) { l = laneEnd.length; laneEnd.push(''); }
                 laneEnd[l] = b.end; b.lane = l;
             });
-            const monthFirst = `${psCalMonth}-01`, monthLast = `${psCalMonth}-${String(lastDay).padStart(2, '0')}`;
-            const monthBars = bars.filter(b => b.end >= monthFirst && b.start <= monthLast);
-            const dayKey = (d) => `${psCalMonth}-${String(d).padStart(2, '0')}`;
+            const ST = { on: ['#dcfce7', '#15803d', '판매중'], soon: ['#fee2e2', '#b91c1c', '노출 예정'], hidden: ['#fee2e2', '#b91c1c', '숨김'], closed: ['#fef3c7', '#a16207', '마감'] };
+
+            // [수정 2026-09-30] 달마다 따로 칸을 그리지 않는다 — 새 달이 시작돼도 한 칸도 안 띄고 쭉 이어서 그리고,
+            //  1일 칸에만 '10월 1'처럼 달 이름을 얹어서 어디서 달이 바뀌는지 알려준다.
+            const firstMonth = psCalMonths[0], lastMonth = psCalMonths[psCalMonths.length - 1];
+            const [fy, fm] = firstMonth.split('-').map(n => parseInt(n));
+            const [ly, lm] = lastMonth.split('-').map(n => parseInt(n));
+            const rangeStart = new Date(fy, fm - 1, 1);
+            const rangeEnd = new Date(ly, lm, 0);   // 마지막 달의 마지막 날
+            const totalDays = Math.round((rangeEnd - rangeStart) / 86400000) + 1;
+            const lead = rangeStart.getDay();
+            const p2 = (x) => String(x).padStart(2, '0');
+            const dateKeys = [];
+            for (let i = 0; i < totalDays; i++) {
+                const d = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate() + i);
+                dateKeys.push(`${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`);
+            }
+            const rangeFirstKey = dateKeys[0], rangeLastKey = dateKeys[dateKeys.length - 1];
+            const rangeBars = bars.filter(b => b.end >= rangeFirstKey && b.start <= rangeLastKey);
+
             // 주(달력 한 줄)마다 쓰이는 줄 수 — 같은 주의 칸은 같은 줄 수로 맞춰야 막대가 가지런하다
             const weekLanes = {};
-            for (let d = 1; d <= lastDay; d++) {
-                const w = Math.floor((lead + d - 1) / 7), k = dayKey(d);
-                monthBars.forEach(b => { if (b.start <= k && k <= b.end) weekLanes[w] = Math.max(weekLanes[w] || 0, b.lane + 1); });
-            }
-            const ST = { on: ['#dcfce7', '#15803d', '판매중'], soon: ['#dcfce7', '#15803d', '노출 예정'], hidden: ['#fee2e2', '#b91c1c', '숨김'], closed: ['#fef3c7', '#a16207', '마감'] };
+            dateKeys.forEach((key, i) => {
+                const w = Math.floor((lead + i) / 7);
+                rangeBars.forEach(b => { if (b.start <= key && key <= b.end) weekLanes[w] = Math.max(weekLanes[w] || 0, b.lane + 1); });
+            });
 
-            let html = `<div class="ms-cal-grid">` + ['일', '월', '화', '수', '목', '금', '토'].map(w => `<div class="ms-cal-head">${w}</div>`).join('');
+            // [신규] 어느 달이 지금 '눈에 띄는' 달인지 — 펼쳐 둔 날짜가 있으면 그 달, 없으면 오늘이 있는 달.
+            //  그 달만 또렷하게 두고 나머지는 흐리게 해서, 스크롤하다 어느 달인지 한눈에 알 수 있게 한다.
+            const activeMonth = psCalOpenDay ? psCalOpenDay.slice(0, 7) : psTodayMonthKey();
+
+            let html = `<div class="ps-cal-weekhead">` + ['일', '월', '화', '수', '목', '금', '토'].map(w => `<div class="ms-cal-head">${w}</div>`).join('') + `</div>`;
+            html += `<div class="ms-cal-grid">`;
             for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty"></div>`;
 
-            const openDay = (psCalOpenDay && psCalOpenDay.slice(0, 7) === psCalMonth) ? parseInt(psCalOpenDay.slice(8), 10) : 0;
-            const openWeek = openDay ? Math.floor((lead + openDay - 1) / 7) : -1;
-
-            for (let d = 1; d <= lastDay; d++) {
-                const key = `${psCalMonth}-${String(d).padStart(2, '0')}`;
-                const todays = monthBars.filter(b => b.start <= key && key <= b.end);
+            dateKeys.forEach((key, i) => {
+                const w = Math.floor((lead + i) / 7);
+                const dow = (lead + i) % 7;
+                const dNum = parseInt(key.slice(8, 10), 10);
+                const isMonthStart = (dNum === 1);
+                const todays = rangeBars.filter(b => b.start <= key && key <= b.end);
                 const has = todays.length > 0;
-                const dow = (lead + d - 1) % 7;
                 const cls = `ms-cal-cell${has ? ' has' : ''}${key === todayISO ? ' today' : ''}`
-                    + (d === openDay ? ' ms-cal-open' : '')
+                    + (key === psCalOpenDay ? ' ms-cal-open' : '')
+                    + (key.slice(0, 7) === activeMonth ? '' : ' ps-cal-fade')
                     + (dow === 0 ? ' ms-cal-sun' : dow === 6 ? ' ms-cal-sat' : '');
                 // 줄 자리마다 막대 조각을 놓는다. 이름은 시작하는 날·일요일·1일에만 적는다
-                const nLanes = weekLanes[Math.floor((lead + d - 1) / 7)] || 0;
+                const nLanes = weekLanes[w] || 0;
                 let namesHtml = '';
                 for (let l = 0; l < nLanes; l++) {
                     const b = todays.find(x => x.lane === l);
                     if (!b) { namesHtml += `<div class="ps-bar ps-bar-empty"></div>`; continue; }
                     const isStart = b.start === key, isEnd = b.end === key;
-                    const label = (isStart || dow === 0 || d === 1) ? gEscapeHtml(b.nm) : '';
+                    const label = (isStart || dow === 0 || isMonthStart) ? gEscapeHtml(b.nm) : '';
                     const [bg, fg, word] = ST[b.st];
-                    namesHtml += `<div class="ps-bar${isStart ? ' s' : ''}${isEnd ? ' e' : ''}${(!isEnd && (dow === 6 || d === lastDay)) ? ' cut' : ''}" style="background:${bg}; color:${fg};" title="${gEscapeHtml(b.nm)} · ${b.tip} · 지금 ${word}">${label}</div>`;
+                    // [신규] 막대를 끌어다 다른 날짜에 놓으면 올라가는·내려가는 시각이 같은 만큼(며칠) 통째로 옮겨간다.
+                    //  (시각을 새로 잡으면 psApplyScheduleUpdate가 알아서 다시 노출시키고 새 공지도 뜨게 한다)
+                    //  [신규] 막대를 누르면 선택(테두리로 표시)되고, 그 상태에서 Delete를 두 번 누르면 예약이 지워진다.
+                    const selected = psSelectedIdxs.has(b.idx);
+                    // [수정] 이제 달이 바뀌어도 줄이 안 끊기므로, 막대가 잘려 보이는 건 주가 바뀌는 토요일뿐이다
+                    const isCut = (!isEnd && dow === 6);
+                    // [신규] outline은 칸마다 네 면을 다 두르니 막대 중간(칸 경계)에 선이 겹쳐 보인다.
+                    //  inset 그림자로 위·아래는 항상, 좌우는 막대의 진짜 시작·끝에만 그어 가운데 선을 없앤다.
+                    let selShadow = '';
+                    if (selected) {
+                        const parts = ['inset 0 2px 0 0 #1d4ed8', 'inset 0 -2px 0 0 #1d4ed8'];
+                        if (isStart) parts.push('inset 2px 0 0 0 #1d4ed8');
+                        if (isEnd || isCut) parts.push('inset -2px 0 0 0 #1d4ed8');
+                        selShadow = ` box-shadow:${parts.join(',')};`;
+                    }
+                    // [신규] 막대 양 끝에 손잡이를 둔다 — 진짜 시작/끝 날에만 둔다 (주 경계에서 잘려 보이는 자리는 진짜 끝이 아니라서 뺀다)
+                    const lHandle = isStart ? `<div class="ps-rh l" draggable="true" ondragstart="psResizeDragStart(event, ${b.idx}, 'start')" title="끌어서 올라가는 날짜 조절"></div>` : '';
+                    const rHandle = isEnd ? `<div class="ps-rh r" draggable="true" ondragstart="psResizeDragStart(event, ${b.idx}, 'end')" title="끌어서 마감 날짜 조절"></div>` : '';
+                    namesHtml += `<div class="ps-bar${isStart ? ' s' : ''}${isEnd ? ' e' : ''}${isCut ? ' cut' : ''}" style="background:${bg}; color:${fg}; cursor:grab;${selShadow}" title="${gEscapeHtml(b.nm)} · ${b.tip} · 지금 ${word} · 끌어서 날짜 옮기기(Ctrl+끌면 복제) · 양 끝을 끌면 시작/마감 날짜만 조절 · 눌러서 고른 뒤 Delete로 지우기" draggable="true" ondragstart="psDragStart(event, ${b.idx}, '${b.start}')" onclick="event.stopPropagation(); psSelectBar(${b.idx}, '${key}')">${lHandle}${label}${rHandle}</div>`;
                 }
-                html += `<div class="${cls}" onclick="togglePsDay('${key}')" title="${key} — 눌러서 보기">`
-                    + `<div class="ms-cal-day">${d}</div>`
+                // [수정] 1월 1일(=해가 바뀌는 날)에는 달만으론 헷갈리니 연도까지 같이 적는다
+                const monthNum = parseInt(key.slice(5, 7), 10);
+                const dayLabel = !isMonthStart ? String(dNum) : (monthNum === 1 ? `${key.slice(0, 4)}/${monthNum}/${dNum}` : `${monthNum}/${dNum}`);
+                const monthStartAttr = isMonthStart ? ` data-month-start="${key.slice(0, 7)}"` : '';
+                html += `<div class="${cls}"${monthStartAttr} onclick="togglePsDay('${key}')" ondragover="event.preventDefault()" ondrop="psHandleDrop(event, '${key}')" title="${key} — 눌러서 보기">`
+                    + `<div class="ms-cal-day">${dayLabel}</div>`
                     + (namesHtml ? `<div class="ps-bars">${namesHtml}</div>` : '')
                     + `</div>`;
-
-                if (openDay && Math.floor((lead + d - 1) / 7) === openWeek && (dow === 6 || d === lastDay)) {
-                    html += `<div class="ms-cal-detail">${psDayDetailHtml(psCalOpenDay)}</div>`;
-                }
-            }
-            html += `</div>`;
+            });
+            html += `</div>`;   // ms-cal-grid 닫기
             box.innerHTML = html;
+
+            // [수정] 날짜를 누르면 나오는 상품 칸 — 스크롤 달력 안에 끼워 두면 중간에 묻혀 보기 힘들어서, 달력 밖 자리에 따로 그린다.
+            const detailBox = document.getElementById('ps-day-detail-box');
+            if (detailBox) {
+                detailBox.innerHTML = psCalOpenDay
+                    ? `<div style="border:1.5px solid #fde68a; border-radius:10px; background:#fffdf5; padding:12px;">${psDayDetailHtml(psCalOpenDay)}</div>`
+                    : '';
+            }
         }
 
         function psDayDetailHtml(dateKey) {
@@ -13040,7 +13346,11 @@
                 ? `<div style="font-size:11px; font-weight:800; color:#dc2626; margin-top:6px;">⚠️ '매주 노출' 상품이라 예약이 반영되지 않아요. 상품목록에서 매주 노출을 먼저 꺼주세요.</div>`
                 : '';
             return `<div style="border:1.5px solid var(--border); border-radius:10px; padding:10px; background:#fff;">
-                <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:6px;">${gEscapeHtml(prod.name)}</div>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+                    <div style="font-size:13px; font-weight:800; color:#0f172a; min-width:0;">${gEscapeHtml(prod.name)}</div>
+                    <!-- [신규] 상품 자체(이름·가격·사진 등)를 고치러 상품등록 수정화면으로 바로 넘어간다 -->
+                    <button type="button" onclick="editProduct(${idx})" title="상품등록 수정화면으로 이동" style="flex:0 0 auto; height:28px; padding:0 10px; border:1.5px solid #94a3b8; background:#f8fafc; color:#475569; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">✏️ 수정</button>
+                </div>
                 <label style="font-size:10.5px; font-weight:700; color:var(--text-sub); display:block; margin-bottom:2px;">달력에 보일 짧은 이름</label>
                 <input type="text" value="${gEscapeHtml(prod.scheduleLabel || '')}" placeholder="비우면 상품명 그대로 써요 (예: 김치, 자몽음료)"
                     onchange="psUpdateScheduleLabel(${idx}, this.value)"
@@ -13055,7 +13365,7 @@
                         <input type="datetime-local" value="${expVal}" onfocus="psFillDefaultTime(this)" onchange="psUpdateTime(${idx}, 'expireAt', this.value)" style="width:100%; min-width:0; box-sizing:border-box; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
                     </div>
                 </div>
-                <textarea rows="2" placeholder="카톡 공지문구 (비우면 상품명·가격만 보내요)" onchange="psUpdateAnnounceText(${idx}, this.value)" style="width:100%; box-sizing:border-box; margin-top:6px; font-size:12px; border:1.5px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-family:inherit;">${gEscapeHtml(prod.announceText || '')}</textarea>
+                <textarea rows="2" placeholder="카톡 공지문구 (비우면 상세설명을 보내요 · 설명도 없으면 상품명·가격)" onchange="psUpdateAnnounceText(${idx}, this.value)" style="width:100%; box-sizing:border-box; margin-top:6px; font-size:12px; border:1.5px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-family:inherit;">${gEscapeHtml(prod.announceText || '')}</textarea>
                 <button type="button" onclick="psClearSchedule(${idx})" style="margin-top:6px; width:100%; height:34px; border:1px solid ${psClearArmedIdx === idx ? '#dc2626' : '#fecaca'}; background:${psClearArmedIdx === idx ? '#fecaca' : '#fef2f2'}; color:#b91c1c; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">${psClearArmedIdx === idx ? '한 번 더 누르면 예약이 지워져요' : '✕ 이 상품 예약 취소'}</button>
                 ${weeklyWarn}
             </div>`;
@@ -13152,8 +13462,63 @@
             renderProductScheduleCalendar();   // 달력 칸 표시를 바로 반영
         }
 
-        // [수정] confirm() 창은 막히는 브라우저·미리보기가 있어 눌러도 반응이 없어 보였다.
-        //  발주 삭제와 같은 방식으로 — 한 번 누르면 '한 번 더' 문구로 바뀌고, 그 상태에서 다시 눌러야 실제로 지워진다.
+        // [수정 2026-09-30] 여러 막대를 한꺼번에 고를 수 있게 — 누를 때마다 그 상품이 선택 목록에 더해지거나 빠진다.
+        //  선택된 채로 하나를 끌면(이동·Ctrl+복제) 고른 전부가 같이 움직이고, Delete를 누르면 고른 전부를 같이 지운다.
+        let psSelectedIdxs = new Set();
+        function psSelectBar(idx, dateKey) {
+            if (psSelectedIdxs.has(idx)) psSelectedIdxs.delete(idx);
+            else psSelectedIdxs.add(idx);
+            psCalOpenDay = dateKey;   // 그 날짜를 열어 둬야 '한 번 더 누르면 지워져요' 문구도 보인다
+            renderProductScheduleCalendar();
+        }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && psDelConfirmIdxs !== null) { psDelConfirmCancel(); return; }
+            if (psSelectedIdxs.size === 0) return;
+            if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+            const tag = (document.activeElement && document.activeElement.tagName) || '';
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;   // 다른 칸에 입력 중이면 끼어들지 않는다
+            // 노출일정 탭이 지금 실제로 보이고 있을 때만 반응한다 (다른 탭에서 실수로 지워지는 일이 없게 —
+            //  ps-cal-box는 항상 페이지에 있어서 존재만으로는 안 되고, 화면에 그려지고 있는지(offsetParent)를 본다)
+            const calBox = document.getElementById('ps-cal-box');
+            if (!calBox || !calBox.offsetParent) return;
+            e.preventDefault();
+            psAskClearSchedule([...psSelectedIdxs]);
+        });
+
+        // [수정 2026-09-30] Delete키는 한 번 누르면 바로 '지울까요?' 알림창을 띄운다 (버튼과 달리 두 번 누를 필요 없음).
+        //  confirm()은 막히는 브라우저·미리보기가 있어 직접 만든 알림창을 쓴다. 여러 개를 골랐으면 개수로 물어본다.
+        let psDelConfirmIdxs = null;
+        function psAskClearSchedule(idxs) {
+            const list = (Array.isArray(idxs) ? idxs : [idxs]).filter(i => (uploadProducts || [])[i]);
+            if (!list.length) return;
+            psDelConfirmIdxs = list;
+            const msg = document.getElementById('ps-del-confirm-msg');
+            if (msg) {
+                if (list.length === 1) {
+                    const prod = uploadProducts[list[0]];
+                    const nm = (prod.scheduleLabel && String(prod.scheduleLabel).trim()) || prod.name || '이 상품';
+                    msg.textContent = `'${nm}' 예약을 지울까요?`;
+                } else {
+                    msg.textContent = `${list.length}개 상품 예약을 지울까요?`;
+                }
+            }
+            const overlay = document.getElementById('ps-del-confirm-overlay');
+            if (overlay) overlay.style.display = 'flex';
+        }
+        function psDelConfirmCancel() {
+            psDelConfirmIdxs = null;
+            const overlay = document.getElementById('ps-del-confirm-overlay');
+            if (overlay) overlay.style.display = 'none';
+        }
+        async function psDelConfirmOk() {
+            const idxs = psDelConfirmIdxs;
+            psDelConfirmCancel();
+            if (!idxs || !idxs.length) return;
+            for (const idx of idxs) await psDoClearSchedule(idx);
+        }
+
+        // [수정] '✕ 이 상품 예약 취소' 버튼은 계속 두 번 눌러야 지워지는 방식을 쓴다(발주 삭제와 같은 방식) —
+        //  누르는 순간 문구가 '한 번 더'로 바뀌니 알림창 없이도 실수로 지워질 일이 없다.
         let psClearArmedIdx = null;
         async function psClearSchedule(idx) {
             const prod = (uploadProducts || [])[idx];
@@ -13165,6 +13530,13 @@
                 return;
             }
             psClearArmedIdx = null;
+            await psDoClearSchedule(idx);
+        }
+
+        // [신규] 예약을 실제로 지우는 부분만 따로 뺐다 — 버튼(두 번 누르기)과 Delete키(알림창) 둘 다 여기로 모인다.
+        async function psDoClearSchedule(idx) {
+            const prod = (uploadProducts || [])[idx];
+            if (!prod) return;
             const now = Date.now();
             const ok = await fbPatchProducts({
                 [`${idx}/releaseAt`]: null,
@@ -13178,6 +13550,7 @@
             if (ok) {
                 prod.releaseAt = null; prod.expireAt = null; prod.announced = null; prod.announceText = null;
                 prod.releaseApplied = null; prod.expireApplied = null; prod.updatedAt = now;
+                psSelectedIdxs.delete(idx);
             } else {
                 showToast('저장 실패 — 다시 시도해 주세요');
             }
@@ -13321,79 +13694,128 @@
         /* ===== [신규] 🔔 공지 대기 알림 — 반자동 카톡 공지.
            올라가는 시각이 지났는데 announced가 안 된 상품을 앱 들어오자마자 보여주고,
            문구·사진을 눌러서 복사만 하면 카톡방에 붙여넣을 수 있게 한다. ===== */
-        let announceTextCopied = new Set();  // 이번 화면에서 문구를 이미 복사한 것 (버튼에 "복사됨" 표시만 한다)
-        let announcePhotoPickerOpenFor = null;   // [신규] 사진이 여러 장인 상품 — 고르기 칸을 펼쳐 둔 상품 idx
+        let announceTextCopied = new Set();  // 이번 화면에서 문구를 이미 복사한 것 (버튼에 "복사됨" 표시만 한다) — 식별키 기준
+        let announcePhotoPickerOpenFor = null;   // [신규] 사진이 여러 장인 상품 — 고르기 칸을 펼쳐 둔 상품 (식별키)
+
+        /* [신규] 배열 순번(idx)은 다른 기기가 그 사이 상품을 지우거나 새로 등록하면 밀린다.
+           🔔 알림 배너는 열려 있는 동안 꽤 오래 남아 있을 수 있어서, idx를 그대로 버튼에 박아 두면
+           나중에 눌렀을 때 완전히 다른 상품이 걸릴 수 있었다(문구·사진이 엉뚱하게 복사되는 원인).
+           그래서 상품의 변치 않는 식별값(식별번호, 없으면 분류+이름)으로 담아 두고, 누를 때마다 다시 찾는다. */
+        function gStableKeyOf(prod) {
+            if (!prod) return '';
+            const code = String(prod.productCode || '').trim();
+            if (/^[PFS]\d+$/.test(code)) return code;
+            return fGetAdjKey(prod.matchKey, prod.name);
+        }
+        function gFindProductIdxByKey(key) {
+            if (!key) return -1;
+            return (uploadProducts || []).findIndex(p => p && gStableKeyOf(p) === key);
+        }
+        // [신규] "닫음" 기록은 상품 하나가 아니라 '상품 + 이번 올라가는 시각'을 한 묶음으로 본다.
+        //  releaseAt이 새 값으로 바뀌면(끌어다 놓기로 재예약 등) 자동으로 새 묶음이 되어, 예전 닫음 기록이 안 따라온다.
+        function gDismissCycleKey(prod, key) {
+            return `${key}::${Number(prod && prod.releaseAt) || 0}`;
+        }
+
+        /* [수정] "다 올렸어요"는 이제 가게 전체가 아니라 **누른 그 사람한테만** 적용된다.
+           예전엔 상품 자체에 announced:true를 적어서, 아무나 한 명이 닫으면 다른 가게 사람 화면에서도
+           같이 사라졌다 — 아직 안 올린 사람도 알림을 놓치게 되는 문제가 있었다.
+           이제는 "누가 어떤 상품을 닫았는지"를 로그인 계정(uid)별로 따로 적어 둔다. */
+        let myDismissedKeys = new Set();
+        async function gLoadMyDismissed() {
+            try {
+                const uid = (window.gStaffMe || {}).uid || '';
+                if (!uid) { myDismissedKeys = new Set(); return; }
+                const res = await fetch(`${FIREBASE_DB_URL}announce_dismissed/${encodeURIComponent(uid)}.json`);
+                const data = res.ok ? await res.json() : null;
+                myDismissedKeys = new Set(Object.keys(data || {}));
+            } catch (e) { console.warn('공지 닫음 기록 불러오기 실패:', e); myDismissedKeys = new Set(); }
+        }
+
+        // [신규] 지금 바쁘면 잠깐 접어 둘 수 있게 — 이번 화면(세션)에서만 기억한다. 새로고침하면 다시 펼쳐진다.
+        //  (끝낸 게 아니므로 서버엔 아무것도 안 적는다 — 다른 일 먼저 하고 나중에 또 봐야 하니까)
+        let announceBannerCollapsed = false;
+        function toggleAnnounceBannerCollapsed() {
+            announceBannerCollapsed = !announceBannerCollapsed;
+            checkPendingAnnouncements();
+        }
 
         function checkPendingAnnouncements() {
             const box = document.getElementById('announce-banner');
             const list = document.getElementById('announce-banner-list');
+            const title = document.getElementById('announce-banner-title');
+            const toggleBtn = document.getElementById('announce-banner-toggle');
             if (!box || !list) return;
             const now = Date.now();
-            // [수정] '✕ 다 올렸어요'를 눌러야만 카드가 사라진다 (announced를 그때 저장한다).
+            // [수정] '✕ 다 올렸어요'를 눌러야만 카드가 사라진다 — 그것도 **누른 사람한테만**.
             //  문구·사진을 복사하는 것만으로는 안 지운다 — 둘 다 마저 복사할 시간을 준다.
+            //  [신규] 닫음 기록은 '이 상품' 하나가 아니라 '이 상품 + 이 올라가는 시각' 조합으로 남긴다.
+            //  그래야 예약을 새 날짜로 끌어다 놓아 다시 노출시켰을 때, 예전에 닫았던 사람한테도 새 알림이 다시 뜬다.
             const pending = (uploadProducts || [])
-                .map((p, idx) => ({ p, idx }))
-                .filter(({ p }) => p && Number(p.releaseAt) && now >= Number(p.releaseAt) && p.announced !== true);
+                .map((p) => ({ p, key: gStableKeyOf(p) }))
+                .filter(({ p, key }) => p && Number(p.releaseAt) && now >= Number(p.releaseAt) && !myDismissedKeys.has(gDismissCycleKey(p, key)));
             if (pending.length === 0) {
                 box.style.display = 'none';
                 list.innerHTML = '';
                 return;
             }
-            list.innerHTML = pending.map(({ p, idx }) => announceRowHtml(p, idx)).join('');
             box.style.display = 'block';
-            if (gIsPhoneUI()) pending.slice(0, 6).forEach(({ p, idx }) => (p.images || []).slice(0, 10).forEach((_, i) => gAnnounceBlob(idx, i).catch(() => {})));
+            if (title) title.textContent = `🔔 카톡에 올릴 상품이 있어요 (${pending.length}개)`;
+            if (toggleBtn) toggleBtn.textContent = announceBannerCollapsed ? '▼ 펼치기' : '▲ 숨기기';
+            // 접혀 있어도 내용은 미리 그려 둔다 — 펼칠 때 바로 보이라고
+            list.innerHTML = pending.map(({ p, key }) => announceRowHtml(p, key)).join('');
+            list.style.display = announceBannerCollapsed ? 'none' : 'flex';
+            if (!announceBannerCollapsed && gIsPhoneUI()) pending.slice(0, 6).forEach(({ p, key }) => (p.images || []).slice(0, 10).forEach((_, i) => gAnnounceBlob(key, i).catch(() => {})));
         }
 
-        function announceRowHtml(p, idx) {
+        function announceRowHtml(p, key) {
             const images = Array.isArray(p.images) ? p.images : [];
             const hasImage = images.length > 0;
             const multiImage = images.length > 1;
-            const textDone = announceTextCopied.has(idx);
-            const pickerOpen = (announcePhotoPickerOpenFor === idx);
+            const textDone = announceTextCopied.has(key);
+            const pickerOpen = (announcePhotoPickerOpenFor === key);
+            const k = gEscapeHtml(key).replace(/'/g, "\\'");   // onclick 문자열 안에 안전하게 넣는다
             // 사진이 한 장뿐이면 바로 복사, 여러 장이면 '고르기'를 펼쳐서 원하는 만큼 골라 복사한다
             const photoBtn = !hasImage ? '' : multiImage
-                ? `<button type="button" onclick="toggleAnnouncePhotoPicker(${idx})" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #7c3aed; background:${pickerOpen ? '#ede9fe' : '#f5f3ff'}; color:#6d28d9; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">🖼️ 사진 고르기 (${images.length}장)</button>`
-                : `<button type="button" onclick="announceCopyImage(${idx}, 0)" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #7c3aed; background:#f5f3ff; color:#6d28d9; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">🖼️ 사진 복사</button>`;
-            // [신규] 폰에서는 사진 복사·붙여넣기가 잘 안 된다(아이폰 사파리 거절, 카톡 안드로이드는 사진 붙여넣기를 안 받음).
-            //  그래서 폰은 공유하기로 카톡에 바로 보내거나, 사진을 저장해 앨범에서 올린다.
+                ? `<button type="button" onclick="toggleAnnouncePhotoPicker('${k}')" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #7c3aed; background:${pickerOpen ? '#ede9fe' : '#f5f3ff'}; color:#6d28d9; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">🖼️ 사진 고르기 (${images.length}장)</button>`
+                : `<button type="button" onclick="announceCopyImage('${k}', 0)" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #7c3aed; background:#f5f3ff; color:#6d28d9; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">🖼️ 사진 복사</button>`;
+            // [수정 2026-09-30] 폰에서는 사진 복사·붙여넣기가 잘 안 된다(아이폰 사파리 거절, 카톡 안드로이드는 사진 붙여넣기를 안 받음).
+            //  그래서 폰은 공유하기로 카톡에 바로 보낸다 (여러 장도 한 번에 보내진다) — 사진 저장(다운로드) 버튼은 없앴다.
             const phone = gIsPhoneUI();
             const phoneBtns = !hasImage ? '' :
-                `<button type="button" onclick="announceShare(${idx})" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #ca8a04; background:#FEE500; color:#191919; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">💬 카톡으로 보내기${multiImage ? ` (${Math.min(images.length, 10)}장)` : ''}</button>` +
-                (multiImage
-                    ? `<button type="button" onclick="toggleAnnouncePhotoPicker(${idx})" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #7c3aed; background:${pickerOpen ? '#ede9fe' : '#f5f3ff'}; color:#6d28d9; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">⬇️ 사진 저장 (고르기)</button>`
-                    : `<button type="button" onclick="announceSaveImage(${idx}, 0)" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #7c3aed; background:#f5f3ff; color:#6d28d9; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">⬇️ 사진 저장</button>`);
-            const photoGrid = (multiImage && pickerOpen)
+                `<button type="button" onclick="announceShare('${k}')" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #ca8a04; background:#FEE500; color:#191919; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">💬 카톡으로 보내기${multiImage ? ` (${Math.min(images.length, 10)}장)` : ''}</button>`;
+            const photoGrid = (multiImage && pickerOpen && !phone)
                 ? `<div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-top:8px;">
-                    ${images.map((img, i) => `<div onclick="${phone ? 'announceSaveImage' : 'announceCopyImage'}(${idx}, ${i})" title="${phone ? '이 사진 저장' : '이 사진 복사'}" style="cursor:pointer; border:1.5px solid #e9d5ff; border-radius:8px; overflow:hidden; position:relative; aspect-ratio:1;">
+                    ${images.map((img, i) => `<div onclick="announceCopyImage('${k}', ${i})" title="이 사진 복사" style="cursor:pointer; border:1.5px solid #e9d5ff; border-radius:8px; overflow:hidden; position:relative; aspect-ratio:1;">
                         <img src="${gCdnUrl(img, 150)}" style="width:100%; height:100%; object-fit:cover; display:block;">
-                        <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(109,40,217,0.85); color:#fff; font-size:9.5px; font-weight:800; text-align:center; padding:2px 0;">${phone ? '저장' : '복사'}</div>
+                        <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(109,40,217,0.85); color:#fff; font-size:9.5px; font-weight:800; text-align:center; padding:2px 0;">복사</div>
                     </div>`).join('')}
                 </div>
-                <div style="font-size:10.5px; font-weight:700; color:#94a3b8; margin-top:5px;">${phone ? '사진을 눌러 하나씩 저장 · 카톡방에서 앨범으로 골라 올리세요' : '사진을 눌러 하나씩 복사 · 붙여넣기를 반복하면 여러 장 다 올릴 수 있어요'}</div>`
+                <div style="font-size:10.5px; font-weight:700; color:#94a3b8; margin-top:5px;">사진을 눌러 하나씩 복사 · 붙여넣기를 반복하면 여러 장 다 올릴 수 있어요</div>`
                 : '';
             return `<div style="background:#fff; border:1px solid #fde68a; border-radius:10px; padding:10px;">
                 <div style="font-size:12.5px; font-weight:800; color:#0f172a; margin-bottom:6px;">${gEscapeHtml(p.name)}${p.price ? ' · ' + Number(p.price).toLocaleString() + '원' : ''}</div>
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                    <button type="button" onclick="announceCopyText(${idx})" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid ${textDone ? '#86efac' : '#2563eb'}; background:${textDone ? '#f0fdf4' : '#eff6ff'}; color:${textDone ? '#15803d' : '#1d4ed8'}; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">${textDone ? '✅ 문구 복사됨' : '📋 문구 복사'}</button>
+                    <button type="button" onclick="announceCopyText('${k}')" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid ${textDone ? '#86efac' : '#2563eb'}; background:${textDone ? '#f0fdf4' : '#eff6ff'}; color:${textDone ? '#15803d' : '#1d4ed8'}; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">${textDone ? '✅ 문구 복사됨' : '📋 문구 복사'}</button>
                     ${phone ? phoneBtns : photoBtn}
                 </div>
                 ${photoGrid}
-                <button type="button" onclick="announceDismissRow(${idx})" style="width:100%; margin-top:6px; height:32px; border:none; background:transparent; color:#15803d; font-size:11.5px; font-weight:800; cursor:pointer;">✔ 카톡방에 다 올렸어요 · 닫기</button>
+                <button type="button" onclick="announceDismissRow('${k}')" style="width:100%; margin-top:6px; height:32px; border:none; background:transparent; color:#15803d; font-size:11.5px; font-weight:800; cursor:pointer;">✔ 카톡방에 다 올렸어요 · 닫기</button>
             </div>`;
         }
 
-        function toggleAnnouncePhotoPicker(idx) {
-            announcePhotoPickerOpenFor = (announcePhotoPickerOpenFor === idx) ? null : idx;
+        function toggleAnnouncePhotoPicker(key) {
+            announcePhotoPickerOpenFor = (announcePhotoPickerOpenFor === key) ? null : key;
             checkPendingAnnouncements();
         }
 
         // 문구를 클립보드에 복사한다. 등록화면·노출일정에서 미리 적어 둔 문구가 있으면 그걸, 없으면 상품명·가격만 간단히.
         // [수정] 여기서는 '안내 완료'로 저장하지 않는다 — 사진도 마저 복사할 수 있어야 하므로, 완료 처리는 카드의 '✕ 다 올렸어요'가 한다.
-        async function announceCopyText(idx) {
-            const p = (uploadProducts || [])[idx];
-            if (!p) return;
-            const text = (p.announceText && String(p.announceText).trim())
-                || `${p.name || ''}${p.price ? '\n' + Number(p.price).toLocaleString() + '원' : ''}`;
+        async function announceCopyText(key) {
+            const idx = gFindProductIdxByKey(key);
+            const p = uploadProducts[idx];
+            if (!p) { showToast('상품을 찾지 못했어요 — 목록이 바뀐 것 같아요. 새로고침해 주세요.'); checkPendingAnnouncements(); return; }
+            const text = await gAnnounceText(p);
             try {
                 await navigator.clipboard.writeText(text);
                 showToast('📋 문구를 복사했어요 · 카톡방에 붙여넣으세요');
@@ -13402,14 +13824,15 @@
                 showToast('복사에 실패했어요 — 이 브라우저에서는 안 될 수 있어요');
                 return;
             }
-            announceTextCopied.add(idx);
+            announceTextCopied.add(key);
             checkPendingAnnouncements();
         }
 
         // 사진을 클립보드에 복사한다 (카톡방에서 Ctrl+V로 붙여넣기). PNG로 바꿔서 넣어야 어디서든 잘 붙는다.
         // photoIndex를 생략하면 대표사진(0번). 사진이 여러 장인 상품은 '사진 고르기'에서 원하는 장을 골라 넘긴다.
-        async function announceCopyImage(idx, photoIndex) {
-            const p = (uploadProducts || [])[idx];
+        async function announceCopyImage(key, photoIndex) {
+            const idx = gFindProductIdxByKey(key);
+            const p = uploadProducts[idx];
             if (!p || !p.images || !p.images.length) return;
             const i = Math.max(0, Math.min(Number(photoIndex) || 0, p.images.length - 1));
             try {
@@ -13442,8 +13865,8 @@
         }
         // 공지 사진을 받아 둔다 (같은 사진은 한 번만). 공유 창은 누른 순간 바로 떠야 해서 미리 받아 두고 쓴다
         const announceBlobCache = new Map();
-        function gAnnounceBlob(idx, i) {
-            const p = (uploadProducts || [])[idx];
+        function gAnnounceBlob(key, i) {
+            const p = uploadProducts[gFindProductIdxByKey(key)];
             const img = p && p.images && p.images[i];
             if (!img) return Promise.reject(new Error('사진 없음'));
             const url = gCdnUrl(img, 900);
@@ -13453,20 +13876,43 @@
             }
             return announceBlobCache.get(url);
         }
-        function gAnnounceText(p) {
-            return (p.announceText && String(p.announceText).trim()) || `${p.name || ''}${p.price ? '\n' + Number(p.price).toLocaleString() + '원' : ''}`;
+        // [수정 2026-09-30] 상품 설명은 목록엔 없고(용량절감) product_desc 서랍에 따로 있다 — 한 번만 받아서 재사용한다
+        let gProductDescCache = null;
+        async function gGetProductDesc(p) {
+            const own = String((p && p.desc) || '').trim();
+            if (own) return own;
+            try {
+                if (!gProductDescCache) {
+                    const r = await fetch(`${FIREBASE_DB_URL}product_desc.json?t=${Date.now()}`);
+                    gProductDescCache = r.ok ? ((await r.json()) || {}) : {};
+                }
+                const k = fSafeKey(p && p.name);
+                const v = k ? gProductDescCache[k] : '';
+                return (typeof v === 'string') ? v.trim() : '';
+            } catch (e) { return ''; }
+        }
+        // [수정 2026-09-30] 공지문구를 안 적어 뒀으면 상세설명을 대신 보낸다. 상세설명도 없을 때만 상품명·가격으로 대신한다.
+        async function gAnnounceText(p) {
+            const custom = p.announceText && String(p.announceText).trim();
+            if (custom) return custom;
+            const desc = await gGetProductDesc(p);
+            if (desc) return desc;
+            const parts = [p.name || ''];
+            if (p.price) parts.push(Number(p.price).toLocaleString() + '원');
+            return parts.join('\n');
         }
         // [신규] 폰 — 공유 창으로 카톡에 사진(여러 장이면 모두)을 보낸다. 문구는 미리 복사해 둬 카톡에 붙여넣게 한다
-        async function announceShare(idx) {
-            const p = (uploadProducts || [])[idx];
+        async function announceShare(key) {
+            const idx = gFindProductIdxByKey(key);
+            const p = uploadProducts[idx];
             if (!p || !p.images || !p.images.length) return;
-            const text = gAnnounceText(p);
-            try { navigator.clipboard.writeText(text).then(() => { announceTextCopied.add(idx); }).catch(() => {}); } catch (e) { }
+            const text = await gAnnounceText(p);
+            try { navigator.clipboard.writeText(text).then(() => { announceTextCopied.add(key); }).catch(() => {}); } catch (e) { }
             try {
-                const blobs = await Promise.all(p.images.slice(0, 10).map((_, i) => gAnnounceBlob(idx, i)));
+                const blobs = await Promise.all(p.images.slice(0, 10).map((_, i) => gAnnounceBlob(key, i)));
                 const files = blobs.map((b, i) => new File([b], `moket_${idx}_${i + 1}.${(b.type || '').includes('png') ? 'png' : 'jpg'}`, { type: b.type || 'image/jpeg' }));
                 if (!navigator.canShare || !navigator.canShare({ files })) {
-                    showToast('이 폰에서는 공유하기가 안 돼요 · [사진 저장]을 써 주세요');
+                    showToast('이 폰에서는 공유하기가 안 돼요 · 문구는 복사해 뒀어요');
                     return;
                 }
                 await navigator.share({ files, text });
@@ -13475,34 +13921,32 @@
                 if (e && e.name === 'AbortError') return;   // 공유 창을 그냥 닫음
                 if (e && e.name === 'NotAllowedError') { showToast('사진 준비가 끝났어요 · 한 번 더 눌러 주세요'); return; }
                 console.error('공유 실패:', e);
-                showToast('보내지 못했어요 · [사진 저장]을 써 주세요');
-            }
-        }
-        // [신규] 폰 — 사진을 저장한다 (안드로이드는 갤러리·다운로드, 아이폰은 파일 앱에 저장)
-        async function announceSaveImage(idx, i) {
-            const p = (uploadProducts || [])[idx];
-            if (!p || !p.images || !p.images[i]) return;
-            try {
-                const b = await gAnnounceBlob(idx, i);
-                const url = URL.createObjectURL(b);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${String(p.scheduleLabel || p.name || '사진').slice(0, 20)}_${i + 1}.${(b.type || '').includes('png') ? 'png' : 'jpg'}`;
-                document.body.appendChild(a); a.click(); a.remove();
-                setTimeout(() => URL.revokeObjectURL(url), 4000);
-                showToast(`${p.images.length > 1 ? (i + 1) + '번째 사진을' : '사진을'} 저장했어요 · 카톡방에서 앨범으로 골라 올리세요`);
-            } catch (e) {
-                console.error('사진 저장 실패:', e);
-                showToast('사진을 저장하지 못했어요');
+                showToast('보내지 못했어요 · 다시 한 번 눌러 주세요');
             }
         }
 
         // '다 올렸어요' — 이제 안내를 마친 것으로 저장한다 (다음에 다시 로그인해도 안 뜸)
-        async function announceDismissRow(idx) {
-            const p = (uploadProducts || [])[idx];
-            const ok = await fbPatchProducts({ [`${idx}/announced`]: true });
-            if (ok && p) p.announced = true;
-            announceTextCopied.delete(idx);
+        async function announceDismissRow(key) {
+            const idx = gFindProductIdxByKey(key);
+            const p = uploadProducts[idx];
+            if (!p) { showToast('상품을 찾지 못했어요 — 목록이 바뀐 것 같아요. 새로고침해 주세요.'); checkPendingAnnouncements(); return; }
+            const uid = (window.gStaffMe || {}).uid || '';
+            if (!uid) { showToast('로그인 확인 중이에요 — 잠시 후 다시 눌러 주세요.'); return; }
+            // [수정] 나만 닫는다 — 이 계정(uid) 밑에 별도 자리(announce_dismissed)에 기록한다.
+            //  '상품 + 이번 올라가는 시각' 묶음으로 적어서, 나중에 시각이 바뀌면 이 기록이 안 따라온다.
+            //  상품 자체의 announced도 '누군가는 확인했다'는 기록으로 같이 남겨 두지만
+            //  (다른 기능이 참고할 수 있어서), 배너를 보여줄지는 이제 이 개인 기록만 본다.
+            const cycleKey = gDismissCycleKey(p, key);
+            const [ok1, ok2] = await Promise.all([
+                fetch(`${FIREBASE_DB_URL}announce_dismissed/${encodeURIComponent(uid)}/${encodeURIComponent(cycleKey)}.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true'
+                }).then(r => r.ok).catch(() => false),
+                fbPatchProducts({ [`${idx}/announced`]: true })
+            ]);
+            if (ok1) { p.announced = true; myDismissedKeys.add(cycleKey); }
+            else { showToast('닫지 못했어요 — 다시 눌러 주세요.'); return; }
+            if (!ok2) console.warn('상품 announced 기록 실패(닫기 자체는 잘 됐음):', key);
+            announceTextCopied.delete(key);
             checkPendingAnnouncements();
             if (typeof renderProductsList === 'function') renderProductsList();
         }
@@ -14573,7 +15017,7 @@
                         <!-- [신규] 할인할 때 함께 할 것 (고를 수 있다) -->
                         <div style="margin-top: 10px; display:flex; flex-direction:column; gap:6px; background:#fff; border:1.5px solid var(--border); border-radius: var(--radius-sub); padding: 10px 12px;">
                             <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-main); cursor:pointer;">
-                                <input type="checkbox" data-discount-role="today" ${optionModalDraft.saleToToday === true ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> 당일판매 '오늘의 상품'에 넣기</label>
+                                <input type="checkbox" data-discount-role="today" ${optionModalDraft.saleToToday === true ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> 당일 상품에 넣기</label>
                             <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-main); cursor:pointer;">
                                 <input type="checkbox" data-discount-role="badge" ${optionModalDraft.saleBadge === true ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> '[땡처리 특가]' 문구 붙이기</label>
                         </div>
@@ -14609,7 +15053,8 @@
                             m = parseInt(dm[4]); d = parseInt(dm[5]);
                         }
                         
-                        let targetDate = new Date(y, m - 1, d, 15, 0, 0, 0); // 오후 3시 기준
+                        const _cm = (typeof _gCloseCache !== 'undefined' && _gCloseCache.min !== null) ? _gCloseCache.min : 900;   // [수정 2026-09-30] 당일 마감시각(가게 설정) 기준, 모르면 오후 3시
+                        let targetDate = new Date(y, m - 1, d, Math.floor(_cm / 60), _cm % 60, 0, 0);
                         if (!isNaN(targetDate.getTime()) && now >= targetDate) {
                             while (now >= targetDate) {
                                 targetDate.setDate(targetDate.getDate() + 7);
@@ -14906,12 +15351,17 @@
         // [수정] 상시판매 분류를 고칠 수 있게 되면서, 이 표도 그때그때 다시 만든다.
         let DISPLAY_TAB_GROUPS = [];
         function rebuildDisplayTabGroups() {
+            // [수정 2026-09-30] 당일판매·예약판매를 '공동구매' 하나로 합쳤다. 주문서 공동구매의 종류 탭(공구·과일·사다드림·추석선물)과 같다.
+            //  예전 값 today-reserve(오늘의 상품)는 고르는 목록에서 뺐고, 이미 그 값인 상품은 주문서가 '공구'로 본다.
             DISPLAY_TAB_GROUPS = [
                 {
-                    group: '당일판매',
+                    group: '공동구매',
                     items: [
-                        { key: 'today-fruit', label: '과일 / 야채', desc: '당일 수령하는 과일·야채' },
-                        { key: 'today-reserve', label: '오늘의 상품', desc: '오늘 날짜 공동구매 (해당 상품이 있을 때만 탭이 생김)' }
+                        { key: 'reserve', label: '일반', desc: '날짜별로 묶여 보이는 일반 공동구매 상품' },
+                        { key: 'today-fruit', label: '과일·야채', desc: '과일·야채 탭 (보통은 등록 칸의 종류로 저절로 들어갑니다)' },
+                        { key: 'sada', label: '사다드림', desc: '무료배달 기준 제외 · 대행료 적용 대상' },
+                        // [신규] 철 따라 쓰는 칸. 여기로 지정한 상품이 있을 때만 주문서에 탭이 생긴다.
+                        { key: 'chuseok', label: '추석선물', desc: '추석 선물 묶음 — 지정한 상품이 있을 때만 손님 화면에 탭이 생깁니다' }
                     ]
                 },
                 {
@@ -14920,18 +15370,6 @@
                     //  보관방법은 분류(matchKey)와 선반으로 그대로 관리한다.
                     group: '상시판매',
                     items: ONSITE_CATS.map(c => ({ key: c.key, label: c.label, desc: '' }))
-                },
-                {
-                    group: '예약판매',
-                    items: [
-                        { key: 'reserve', label: '공동구매', desc: '날짜별로 묶여 보이는 예약 상품' },
-                        { key: 'sada', label: '사다드림', desc: '무료배달 기준 제외 · 대행료 적용 대상' },
-                        // [신규] 철 따라 쓰는 칸. 여기로 지정한 상품이 있을 때만 주문서에 탭이 생긴다.
-                        { key: 'chuseok', label: '추석선물', desc: '추석 선물 묶음 — 지정한 상품이 있을 때만 손님 화면에 탭이 생깁니다' }
-                        // [수정] '코스트코'는 고를 수 있는 목록에서 뺐다.
-                        //  이미 코스트코로 지정해 둔 상품의 값(displayTab:'costco')은 건드리지 않으므로
-                        //  손님 화면의 코스트코 탭은 예전처럼 동작한다.
-                    ]
                 }
             ];
         }
@@ -15218,7 +15656,8 @@
         let uploadEditIsRecommend = false; // [신규] 수정 시 '오늘의추천'(과채류) 체크 상태를 기억해 폼에 반영
         let uploadIsFresh = false;         // [신규] 공동구매 칸의 '신선식품' 선택 상태 (사다드림과 하나만 켜진다)
         let uploadSelectedDate = new Date().toISOString().split('T')[0];
-        let uploadManageDeliveryType = "today";
+        let uploadManageDeliveryType = "reserve";
+        let uploadManageKind = 'all';   // [신규 2026-09-30] 공동구매 목록의 종류 줄 (all·group·fruit·veg·sada·fresh)
         let uploadManageTab = "today-fruit";
         let uploadEditReturnScroll = 0; // [신규] 수정 진입 전 상품목록 스크롤 위치 (수정 후 복원용)
         let uploadEditReturnSearch = ''; // [신규] 수정 진입 전 상품 검색어 (수정 후 복원용)
@@ -19145,11 +19584,31 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            · 15시 과일 마감   · 날짜가 지난 상품
            상품 목록은 한 번만 받아 둘이 같이 본다 (301KB짜리라 두 번 받으면 아깝다).
            할 일이 없으면 아예 받지 않는다 — 5분마다 도는 것이라 이 문지기가 중요하다. */
+        /* [신규 2026-09-30] 당일 마감시각 — 가게 관리의 '당일판매 시간'(today_sale.close) 하나를 쓴다.
+           예전에는 여기만 15시로 못 박혀 있었다. 30분에 한 번만 다시 받아 온다. 자동이 꺼져 있으면 마감 없음(null). */
+        let _gCloseCache = { at: 0, min: 900 };
+        async function gTodayCloseMin() {
+            if (Date.now() - _gCloseCache.at < 30 * 60 * 1000) return _gCloseCache.min;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}today_sale.json?t=${Date.now()}`);
+                const v = r.ok ? await r.json() : null;
+                const ts = (v && typeof v === 'object') ? v : { auto: true, close: '15:00' };
+                const m = /^(\d{1,2}):(\d{2})$/.exec(String(ts.close || '15:00'));
+                _gCloseCache = { at: Date.now(), min: ts.auto === false ? null : (m ? (+m[1]) * 60 + (+m[2]) : 900) };
+            } catch (e) { _gCloseCache.at = Date.now(); }
+            return _gCloseCache.min;
+        }
+        async function gTodayClosePassed(now) {
+            const min = await gTodayCloseMin();
+            return min !== null && (now.getHours() * 60 + now.getMinutes()) >= min;
+        }
+
         async function gAutoHideRun() {
             try {
                 const now = new Date();
                 const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                const needFruit = now.getHours() >= 15 && localStorage.getItem('moket_fruit_autohide_date') !== todayStr;
+                // [수정 2026-09-30] 예전 과일은 마감시각에 숨기지 않는다 (손님 화면에 '마감'으로 남는다). 날이 바뀐 뒤 처음 열 때 숨긴다
+                const needFruit = localStorage.getItem('moket_fruit_autohide_date') !== todayStr;
                 const needPast = localStorage.getItem('moket_autohide_day') !== todayStr;
                 if (!needFruit && !needPast) return;
                 const res = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
@@ -19163,7 +19622,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         async function autoHideFruitsAfterCutoff(preloaded){
             try {
                 const now = new Date();
-                if (now.getHours() < 15) return; // 15시 전이면 대기
+                /* [수정 2026-09-30] 마감시각에 숨기지 않고, 날이 바뀐 뒤 처음 열 때 '어제까지 켜 둔' 예전 과일만 숨긴다.
+                   오늘 노출을 켰거나 고친 과일(updatedAt 이 오늘)은 건드리지 않는다 — 다른 기기가 늦게 열어도 오늘 켠 것을 끄지 않게.
+                   마감시각이 지난 오늘 과일은 손님 주문서가 알아서 '마감'으로 보여 준다. */
+                const _dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
                 const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
                 if (localStorage.getItem('moket_fruit_autohide_date') === todayStr) return; // 오늘 이미 처리됨
                 let data = preloaded;   // [수정] 위에서 받아 둔 목록이 있으면 그걸 쓴다 (두 번 받지 않는다)
@@ -19175,12 +19637,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const targets = [];
                 for (const key in data){
                     const p = data[key]; if (!p) continue;
+                    // [신규 2026-09-30] 공동구매 칸으로 올린 상품(kind 있음)은 날짜가 있어 여기서 숨기지 않는다.
+                    //  마감시각이 지나면 주문서가 '마감'으로 보여 주고, 날짜가 지나면 gAutoHidePastProducts 가 숨긴다.
+                    if (p.kind) continue;
                     const mk = String(p.matchKey||''); const nm = String(p.name||'');
                     const isFruit = /과일|야채|채소|기타/.test(mk) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]/.test(nm);
                     const isShown = (p.showToday === true || p.showToday === 'true');
                     // [신규] 상시판매 분류탭으로 옮긴 과일은 당일 마감과 무관하므로 자동 숨김 대상에서 뺀다
                     const isOnsiteAssigned = String(p.displayTab||'').startsWith('onsite-');
-                    if (isFruit && isShown && !isOnsiteAssigned) targets.push(key);
+                    const touchedToday = (Number(p.updatedAt) || 0) >= _dayStart;
+                    if (isFruit && isShown && !isOnsiteAssigned && !touchedToday) targets.push(key);
                 }
                 if (targets.length){
                     /* [수정] 예전에는 showToday만 껐다. 그러면 showReserve는 켜진 채 남아
@@ -19198,10 +19664,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                             what: '노출',
                             from: '노출',
                             to: '숨김',
-                            how: '자동(15시 과일마감)'
+                            how: '자동(지난 날 예전 과일)'
                         })));
                     }
-                    if (typeof showToast === 'function') showToast(`⏰ 15시 지나 과일 ${targets.length}개를 자동 숨김 처리했습니다.`);
+                    if (typeof showToast === 'function') showToast(`⏰ 어제까지 팔던 예전 과일 ${targets.length}개를 숨겼습니다. 오늘 팔 과일은 다시 노출해 주세요.`);
                 }
                 localStorage.setItem('moket_fruit_autohide_date', todayStr);
             } catch(e){ console.error('과일 자동숨김 오류:', e); }
@@ -22293,8 +22759,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function initUploadTab() {
             if (!hasUploadTabInitialized) {
                 hasUploadTabInitialized = true;
-                selectMainTab('fruit');
-                selectManageDeliveryType('today');
+                selectMainTab('reserve');
+                selectManageDeliveryType('reserve');
                 loadProductsFromServer();
             }
         }
@@ -22376,6 +22842,40 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             return String((prod && prod.name) || '').replace(/^(?:\s*\[\s*오늘의추천\s*\]\s*)+/, '');
         }
 
+        /* [신규 2026-09-30] 공동구매 종류. 저장된 kind 가 먼저, 없는 옛 상품은 사다드림·신선식품·이름·분류로 짐작한다 */
+        const LIST_KINDS = [['fruit', '과일'], ['veg', '야채'], ['sada', '사다드림'], ['group', '일반'], ['fresh', '신선식품']];   // 주문서 탭 차례(과일·사다드림·일반)와 맞춘다
+        function gListKind(prod) {
+            if (!prod) return 'group';
+            if (['group', 'fruit', 'veg', 'sada'].includes(prod.kind)) return prod.kind;
+            if (isSadaListProduct(prod)) return 'sada';
+            const mk = String(prod.matchKey || ''), nm = String(prod.name || '');
+            if (/과일/.test(mk) || /\[과일\]/.test(nm)) return 'fruit';
+            if (/야채|채소/.test(mk) || /\[야채\]|\[채소\]/.test(nm)) return 'veg';
+            return 'group';
+        }
+        // [신규] 날짜 없이 올라간 옛 당일 과일·야채·기타 (상시판매로 넘긴 것은 빼고)
+        function isLegacyTodayListProduct(prod) {
+            if (!prod || String(prod.displayTab || '').startsWith('onsite-')) return false;
+            const mk = String(prod.matchKey || '').trim();
+            return mk === '과일' || mk === '야채' || mk === '기타' || /^(과일|야채|기타)_예약$/.test(mk);
+        }
+        // [신규] 합친 '공동구매' 목록에 들어가는 상품 — 날짜 공구·사다드림 + 옛 당일 과일
+        function isGroupBuyListProduct(prod) {
+            return isReserveListProduct(prod) || isLegacyTodayListProduct(prod) || gListIsSaleToday(prod);
+        }
+        /* [신규 2026-09-30] '당일 상품에 넣기'를 켠 특가 — 주문서 gIsSaleToday 와 같은 잣대.
+           원래 상시판매 상품이어도 공동구매 목록(날짜 없으면 오늘 칸)으로 옮겨 보이고 상시판매 목록에서는 빠진다.
+           적혀 있지 않은 옛 상품은 주문서처럼 켜진 것으로 본다. */
+        function gListIsSaleToday(prod) {
+            if (!prod) return false;
+            const useOpt = (prod.useOptions === undefined || prod.useOptions === null) ? true : (prod.useOptions === true || prod.useOptions === 'true');
+            if (!useOpt || !(prod.useDiscount === true || prod.useDiscount === 'true')) return false;
+            const has = (prod.discountType === 'amount')
+                ? (parseInt(prod.discountAmount) || 0) > 0
+                : (parseInt(prod.discountRate) || 0) > 0;
+            return has && !(prod.saleToToday === false || prod.saleToToday === 'false');
+        }
+
         function isReserveListProduct(prod) {
             if (!prod) return false;
             const mk = String(prod.matchKey || '').trim();
@@ -22386,7 +22886,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!prod) return '';
             const mk = String(prod.matchKey || '').trim();
             if (/^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(mk)) return toISODate(mk); // 공동구매: matchKey가 날짜
-            return toISODate(prod.date); // 사다드림 등: date 필드가 실제 날짜
+            const d = toISODate(prod.date); // 사다드림 등: date 필드가 실제 날짜
+            // [신규 2026-09-30] 날짜 없는 '당일 상품' 특가는 오늘 칸에 둔다 (주문서와 같다)
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) && gListIsSaleToday(prod)) return gTodayISO();
+            return d;
         }
         function fmtMD(iso) {
             const pt = String(iso).split('-');
@@ -22711,10 +23214,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 container.style.setProperty('overflow-x', 'auto', 'important');
                 container.style.gap = '4px';
                 enableWheelScroll();
-                // [수정] 예약구매: 전체 + 날짜별 (사다드림·공동구매를 모두 날짜로 분류)
+                // [수정 2026-09-30] 예약구매: 전체 + 날짜별 — 사다드림은 날짜에 안 섞고 따로 '사다드림' 탭으로 뺀다
                 const dateSet = new Set();
                 uploadProducts.forEach(p => {
-                    if (!isReserveListProduct(p)) return;
+                    if (isSadaListProduct(p)) return;   // 사다드림은 날짜 칸에 안 세고 따로 탭으로 뺀다
+                    if (!isReserveListProduct(p) && !gListIsSaleToday(p)) return;   // [신규] 당일 상품 특가도 날짜 칸에 센다
                     const d = getReserveGroupDate(p);
                     if (d) dateSet.add(d);
                 });
@@ -22722,9 +23226,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const _now = new Date();
                 const _todayStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
                 const cats = []; // [변경] 전체·이전 버튼 제거 — 날짜 토글로 대체(아무것도 선택 안 하면 전체)
-                // [신규] 사다드림만 모아 보는 탭. 날짜가 여러 개로 흩어져 있어 한 번에 보기 어려웠다.
-                cats.push(['_사다드림', '사다드림']);
-                dates.filter(d => d >= _todayStr).forEach(d => cats.push([d, fmtMD(d)])); // 오늘 이후(포함) 날짜별 개별 탭
+                // [신규] 날짜 없이 올라간 옛 당일 과일이 있을 때만 모아보기를 맨 앞에 둔다
+                //  [수정] 이름을 '날짜 없음'으로 — 옛 과일뿐 아니라 날짜 없이 올린 공구도 여기 모인다
+                //  [수정 2026-09-30] 과일·사다드림은 '날짜 없음'/날짜별 탭에 섞이면 찾기 힘드니 각각 따로 앞에 둔다
+                if (uploadProducts.some(p => isLegacyTodayListProduct(p) && gListKind(p) === 'fruit')) cats.push(['_과일', '과일']);
+                if (uploadProducts.some(isSadaListProduct)) cats.push(['_사다드림', '사다드림']);
+                if (uploadProducts.some(p => isLegacyTodayListProduct(p) && gListKind(p) !== 'fruit')) cats.push(['_예전당일', '날짜 없음']);
+                dates.filter(d => d >= _todayStr).forEach(d => cats.push([d, d === _todayStr ? `오늘 ${fmtMD(d)}` : fmtMD(d)])); // 오늘 이후(포함) 날짜별 개별 탭
                 /* [신규] 오늘 이전 날짜는 탭이 끝없이 길어져 목록에서 빼 두었지만, 가끔 지난 상품을
                    확인해야 할 때가 있다. 날짜 끝 오른쪽에 '이전' 버튼 하나로 모아 둔다.
                    지난 날짜 상품이 하나도 없으면 버튼도 만들지 않는다. */
@@ -22762,6 +23270,64 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             renderProductsList();
         }
 
+        // [신규 2026-09-30] 공동구매 목록 — 지금 고른 날짜 탭에 들어가는 상품인지 (종류는 따지지 않음)
+        function gGroupBuyInDateTab(prod) {
+            if (!isGroupBuyListProduct(prod)) return false;
+            const _t = gTodayKey();
+            const gd = getReserveGroupDate(prod);
+            if (uploadManageTab === 'all') return true;
+            // [수정 2026-09-30] '날짜 없음'에는 과일·사다드림 말고 다른 것만 — 둘 다 각자 탭으로 따로 뺐다
+            if (uploadManageTab === '_예전당일') return isLegacyTodayListProduct(prod) && gListKind(prod) !== 'fruit';
+            if (uploadManageTab === '_과일') return isLegacyTodayListProduct(prod) && gListKind(prod) === 'fruit';
+            if (uploadManageTab === '_사다드림') return isSadaListProduct(prod);
+            if (uploadManageTab === '_upcoming') return gd && gd >= _t && !isSadaListProduct(prod);
+            if (uploadManageTab === '_이전') return gd && gd < _t && !isSadaListProduct(prod);
+            return gd === uploadManageTab && !isSadaListProduct(prod);
+        }
+        /* [신규 2026-09-30] 과일 상품을 모두 신선식품(isFresh)으로 켠다 — 사장님 요청.
+           과일은 받는 날에만 배달하려고 신선식품으로 둔다. 사다드림(혜택 과일 등)과 상시판매로 옮긴 과일은 뺀다. */
+        function gFruitsNeedingFresh(list) {
+            const out = [];
+            (Array.isArray(list) ? list : []).forEach((p, i) => {
+                if (!p || p.name === '배달비') return;
+                if (String(p.displayTab || '').startsWith('onsite-')) return;
+                if (isSadaListProduct(p) || String(p.displayTab || '') === 'sada') return;
+                if (p.isFresh === true || p.isFresh === 'true') return;
+                if (gListKind(p) !== 'fruit') return;
+                out.push(i);
+            });
+            return out;
+        }
+        async function gFreshAllFruits() {
+            let data;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
+                data = await r.json();
+            } catch (e) { showToast('상품 목록을 못 읽었습니다'); return; }
+            const arr = Array.isArray(data) ? data : [];
+            const idxs = gFruitsNeedingFresh(arr);
+            if (!idxs.length) { showToast('신선을 켤 과일이 없습니다'); buildSubTabs(); return; }
+            if (!confirm(`과일 상품 ${idxs.length}개의 '신선'을 켭니다.\n\n신선식품은 받는 날에만 배달되어, 뒷날 상품과 한 배달로 섞을 수 없습니다.\n\n진행할까요?`)) return;
+            const patch = {};
+            idxs.forEach(i => { patch[`${i}/isFresh`] = true; patch[`${i}/updatedAt`] = Date.now(); });
+            showLoader(`🍎 과일 ${idxs.length}개 신선 켜는 중...`);
+            const ok = await fbPatchProducts(patch);
+            hideLoader();
+            if (!ok) { showToast('저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요'); return; }
+            updatePublishedProductsTimestamp();
+            if (typeof gLogProductChange === 'function') gLogProductChange(idxs.map(i => ({ idx: i, name: String(arr[i].name || ''), what: '신선식품', from: '끔', to: '켬', how: '과일 전부 신선 켜기' })));
+            showToast(`과일 ${idxs.length}개를 신선식품으로 켰습니다`);
+            await loadProductsFromServer();
+            buildSubTabs();
+            renderProductsList();
+        }
+
+        function selectManageKind(k) {
+            uploadManageKind = k;
+            document.querySelectorAll('#sub-products-list-tabs .sub-tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.subTab === k));
+            renderProductsList();
+        }
+
         function selectManageSubTab(subTab) {
             uploadSubTab = subTab;
             document.querySelectorAll('.sub-tab-btn').forEach(btn => {
@@ -22789,6 +23355,32 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             
             if (uploadManageDeliveryType === 'today') {
                 subContainer.style.display = 'none';
+                return;
+            }
+
+            // [수정 2026-09-30] '과일'·'사다드림' 탭은 그 자체로 이미 종류가 정해져 있어 — 아래 세부 분류탭은 필요 없다
+            if (uploadManageDeliveryType === 'reserve' && (uploadManageTab === '_과일' || uploadManageTab === '_사다드림')) {
+                uploadManageKind = 'all';   // 다른 날짜 탭에서 세부탭을 골라 뒀어도, 여기서는 전부 보인다
+                subContainer.style.display = 'none';
+                return;
+            }
+
+            // [신규 2026-09-30] 공동구매 — 날짜 탭 아래 종류 줄 (그 날짜에 있는 종류만 단추로)
+            if (uploadManageDeliveryType === 'reserve') {
+                const has = new Set();
+                (uploadProducts || []).forEach(p => {
+                    if (!p || p.name === '배달비' || !gGroupBuyInDateTab(p)) return;
+                    has.add(gListKind(p));
+                    if (p.isFresh === true || p.isFresh === 'true') has.add('fresh');   // 신선식품은 종류와 따로 켜는 표시
+                });
+                if (uploadManageKind !== 'all' && !has.has(uploadManageKind)) uploadManageKind = 'all';
+                const subs = [['all', '전체']].concat(LIST_KINDS.filter(([k]) => has.has(k)));
+                const _needFresh = gFruitsNeedingFresh(uploadProducts).length;
+                subContainer.style.display = (subs.length > 2 || _needFresh) ? 'flex' : 'none';
+                subContainer.innerHTML = subs.map(([k, l]) =>
+                    `<button type="button" class="sub-tab-btn ${uploadManageKind === k ? 'active' : ''}" data-sub-tab="${k}" onclick="selectManageKind('${k}')">${l}</button>`).join('')
+                    // [신규 2026-09-30] 과일을 모두 신선식품으로 — 켜야 할 과일이 남아 있을 때만 보인다
+                    + (_needFresh ? `<button type="button" class="sub-tab-btn" onclick="gFreshAllFruits()" title="과일 상품의 '신선'을 모두 켭니다 (받는 날에만 배달)" style="background:#eef7e7; color:#3d8f19;">🍎 과일 ${_needFresh}개 신선 켜기</button>` : '');
                 return;
             }
             
@@ -22913,21 +23505,68 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             shelfSel.value = opts.some(([v]) => v === want) ? want : '';
         }
 
+        /* [신규 2026-09-30] 공동구매 칸의 종류. 저장값(kind): group 공구 · fruit 과일 · veg 야채 · sada 사다드림 · fresh 신선식품
+           kind 가 없는 옛 상품은 주문서·통계가 예전처럼 이름·분류로 짐작한다. */
+        // [수정 2026-09-30] 신선식품은 종류가 아니라 따로 켜는 단추다 (과일이면서 신선식품일 수 있게)
+        const UPLOAD_KINDS = [['fruit', '과일'], ['veg', '야채'], ['sada', '사다드림'], ['group', '일반']];   // 새 상품 기본값은 일반(group)
+        let uploadKind = 'group';
+
+        // [신규] 오늘의추천 단추 (체크박스는 숨기고 버튼처럼 쓴다. 저장 로직이 productIsRecommend 를 읽는다)
+        function makeRecommendToggle() {
+            const recLabel = document.createElement('label');
+            recLabel.className = 'checkbox-container';
+            recLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:5px; height:45px; padding:0 6px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; overflow:hidden; width:100%; min-width:0; box-sizing:border-box;';
+            const recChk = document.createElement('input');
+            recChk.type = 'checkbox';
+            recChk.id = 'productIsRecommend';
+            recChk.checked = !!(uploadIsEditMode && uploadEditIsRecommend);
+            recChk.style.display = 'none';
+            const recTxt = document.createElement('span');
+            recTxt.innerText = '추천';
+            recTxt.title = '오늘의추천';
+            const paintRec = () => {
+                const on = recChk.checked;
+                recLabel.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
+                recLabel.style.background = on ? 'var(--primary-light)' : '#ffffff';
+                recLabel.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
+            };
+            recChk.onchange = paintRec;
+            paintRec();
+            recLabel.appendChild(recChk);
+            recLabel.appendChild(recTxt);
+            return recLabel;
+        }
+
+        // [신규] 새 번호이고 과세·면세를 손대지 않았으면 과일·야채는 면세를 기본으로
+        function gAutoTaxByKind() {
+            if (typeof uploadFormTaxTouched === 'undefined' || uploadFormTaxTouched || uploadIsEditMode) return;
+            uploadFormTaxFree = (uploadCurrentTab === 'reserve' && (uploadKind === 'fruit' || uploadKind === 'veg'));
+            uploadFormTaxAuto = true;
+            paintFormTaxFree();
+        }
+
         function selectMainTab(tab) {
             uploadCurrentTab = tab;
             document.querySelectorAll('#tab-upload .segment-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.tab === tab);
             });
+            // [신규] '예전 당일'은 날짜 없는 옛 과일을 고칠 때만 보인다
+            {
+                const _old = document.querySelector('#upload-main-seg .segment-btn[data-tab="fruit"]');
+                const _seg = document.getElementById('upload-main-seg');
+                if (_old) _old.style.setProperty('display', (tab === 'fruit') ? 'flex' : 'none', 'important');   // .segment-btn 이 display 를 !important 로 잡고 있다
+                if (_seg) _seg.style.gridTemplateColumns = (tab === 'fruit') ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)';
+            }
 
             const container = document.getElementById('categoryContainer');
             container.innerHTML = '';
 
             if (tab === 'reserve') {
-                document.getElementById('categoryLabel').innerText = "날짜  ·  종류(사다드림·신선식품)  ·  분류탭";
-                // [신규] 왼쪽=날짜(폭 축소), 오른쪽=사다드림 체크박스 배치
+                document.getElementById('categoryLabel').innerText = "날짜  ·  종류  ·  신선  ·  추천  ·  분류탭";
+                // [수정 2026-09-30] 공동구매 하나로 합쳤다 — 날짜 · 종류(과일·야채·사다드림·일반) · 신선식품 · 오늘의추천 · 분류탭
                 const row = document.createElement('div');
                 // [수정] flex로는 날짜칸·고르는칸의 고유 폭 때문에 세 칸이 균등해지지 않았다. 격자로 못 박는다.
-                row.style.cssText = "display:grid; grid-template-columns:repeat(3, minmax(0,1fr)) 44px; gap:8px; align-items:stretch;";
+                row.style.cssText = "display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1.2fr) repeat(2, minmax(0,0.8fr)) minmax(0,1fr) 44px; gap:6px; align-items:stretch;";
 
                 /* [수정] 날짜칸이 'YYYY-MM-DD'를 다 못 보여 주고 잘렸다. 연도는 거의 안 바뀌므로
                    화면에는 '8/23(토)'만 보여 준다. 브라우저가 정하는 날짜칸 표시 형식은 바꿀 수 없어서,
@@ -22949,10 +23588,33 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     + ' font-size:13px; font-weight:800; color:var(--text-main); white-space:nowrap;'
                     + ' pointer-events:none; box-sizing:border-box;';   // 클릭은 밑의 진짜 날짜칸이 받는다
 
+                /* [신규 2026-09-30] 과일·야채·일반 공구는 '날짜 없음'으로도 올린다 (예전 당일처럼 올린 날 하루 판다).
+                   날짜칸 오른쪽 작은 '없음' 단추로 날짜를 비운다. 다시 날짜칸을 누르면 날짜를 고를 수 있다.
+                   사다드림은 날짜가 꼭 있어야 해서 이 단추가 안 보인다. */
+                const noDateBtn = document.createElement('button');
+                noDateBtn.type = 'button';
+                noDateBtn.innerText = '없음';
+                noDateBtn.title = '날짜 없이 올리기 (올린 날 하루만 팝니다)';
+                noDateBtn.style.cssText = 'position:absolute; right:4px; top:50%; transform:translateY(-50%); z-index:2;'
+                    + ' height:26px; padding:0 7px; border:1px solid var(--border); border-radius:7px; background:#f8fafc;'
+                    + ' color:var(--text-sub); font-family:inherit; font-size:11px; font-weight:800; cursor:pointer;';
+                // 사다드림만 빼고 모두 '날짜 없음'을 고를 수 있다 (사다드림은 주문 마감일이 있어야 한다)
+                const isFruitKind = () => ['fruit', 'veg', 'group'].includes(uploadKind) && !(document.getElementById('productIsSada') || {}).checked;
+
                 const paintDateFace = () => {
                     const v = String(input.value || '').trim();
-                    dateFace.innerText = v ? fmtMD(v) : '날짜 선택';
-                    dateFace.style.color = v ? 'var(--text-main)' : 'var(--text-sub)';
+                    const fruitish = isFruitKind();
+                    dateFace.innerText = v ? fmtMD(v) : (fruitish ? '날짜 없음' : '날짜 선택');
+                    dateFace.style.color = v ? 'var(--text-main)' : (fruitish ? 'var(--primary)' : 'var(--text-sub)');
+                    // 날짜가 있을 때만 '없음' 단추를 보인다 (이미 비었으면 누를 일이 없다)
+                    noDateBtn.style.display = (fruitish && v) ? '' : 'none';
+                    dateFace.style.paddingRight = (fruitish && v) ? '40px' : '';
+                };
+                noDateBtn.onclick = (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    input.value = '';
+                    uploadSelectedDate = '';
+                    paintDateFace();
                 };
                 input._paintFace = paintDateFace;   // 값을 코드로 바꿨을 때 다시 그리기 위해 붙여 둔다
                 input.onchange = () => {
@@ -22963,9 +23625,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 //  기기 종류로 갈라 두면 개발자도구 모바일 모드처럼 애매한 경우에 안 열려서, 항상 시도한다.
                 //  (이미 떠 있거나 지원하지 않는 브라우저면 그냥 무시된다)
                 input.onclick = () => { try { input.showPicker(); } catch (e) {} };
-                paintDateFace();
 
                 dateWrap.appendChild(dateFace);
+                dateWrap.appendChild(noDateBtn);
                 dateWrap.appendChild(input);
 
                 /* [수정] 사다드림 체크 하나였던 것을 '사다드림 / 신선식품' 토글로 바꾼다.
@@ -22989,31 +23651,63 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 kindSel.id = 'productKindSelect';
                 kindSel.className = 'form-control';
                 kindSel.style.cssText = 'height:45px; width:100%; min-width:0; padding:0 8px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap; box-sizing:border-box;';
-                [['', '선택안함'], ['sada', '사다드림'], ['fresh', '신선식품']].forEach(([v, t]) => {
+                // [수정 2026-09-30] 종류에 과일·야채를 더했다 (예전 당일판매 칸이 하던 일). 고른 값은 kind 로 저장한다
+                UPLOAD_KINDS.forEach(([v, t]) => {
                     const o = document.createElement('option');
                     o.value = v; o.innerText = t;
                     kindSel.appendChild(o);
                 });
-                kindSel.value = sadaChk.checked ? 'sada' : (uploadIsFresh ? 'fresh' : '');
+                if (sadaChk.checked) uploadKind = 'sada';
+                kindSel.value = UPLOAD_KINDS.some(([v]) => v === uploadKind) ? uploadKind : 'group';
 
                 const paintKind = () => {
-                    const on = kindSel.value !== '';
+                    const on = kindSel.value !== 'group';
                     kindSel.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
                     kindSel.style.background = on ? 'var(--primary-light)' : '#ffffff';
-                    kindSel.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
+                    kindSel.style.color = on ? 'var(--primary)' : 'var(--text-main)';
                 };
+                // [신규 2026-09-30] 신선식품 단추 — 사다드림과는 같이 못 켠다 (사다드림을 고르면 꺼진다)
+                const freshBtn = document.createElement('button');
+                freshBtn.type = 'button';
+                freshBtn.id = 'btn-product-fresh';
+                freshBtn.innerText = '신선';
+                freshBtn.title = '신선식품 — 받는 날을 지켜야 해서 뒷날 상품과 한 배달로 못 섞습니다';
+                freshBtn.style.cssText = 'width:100%; min-width:0; height:45px; padding:0 4px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap; box-sizing:border-box;';
+                const paintFresh = () => {
+                    const on = !!uploadIsFresh && kindSel.value !== 'sada';
+                    freshBtn.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
+                    freshBtn.style.background = on ? 'var(--primary-light)' : '#ffffff';
+                    freshBtn.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
+                    freshBtn.style.opacity = kindSel.value === 'sada' ? '0.45' : '1';
+                };
+                freshBtn.onclick = () => {
+                    if (kindSel.value === 'sada') { showToast('사다드림은 신선식품과 같이 못 켭니다'); return; }
+                    uploadIsFresh = !uploadIsFresh;
+                    paintFresh();
+                };
+
                 kindSel.onchange = () => {
+                    uploadKind = kindSel.value;
                     sadaChk.checked = (kindSel.value === 'sada');
-                    uploadIsFresh = (kindSel.value === 'fresh');
+                    if (kindSel.value === 'sada') uploadIsFresh = false;
+                    // [신규 2026-09-30] 과일·야채는 신선식품이 기본 (받는 날에만 배달). 필요 없으면 '신선'을 눌러 끈다
+                    if (kindSel.value === 'fruit' || kindSel.value === 'veg') uploadIsFresh = true;
+                    paintFresh();
                     paintKind();
-                    try { paintAutoCodePrefix(); } catch (e) {}   // [신규] 사다드림을 고르면 자동 (S)
+                    paintDateFace();   // [신규] 사다드림이 아니면 '날짜 없음'을 고를 수 있다
+                    try { paintAutoCodePrefix(); } catch (e) {}   // [신규] 사다드림 (S) · 과일 (F)
+                    try { gAutoTaxByKind(); } catch (e) {}        // [신규] 과일·야채는 면세가 기본
                 };
                 paintKind();
 
                 segWrap.appendChild(kindSel);
 
+                paintFresh();
+                paintDateFace();   // 종류 칸이 생긴 뒤에 그린다 (과일·야채인지 봐야 한다)
                 row.appendChild(dateWrap);
                 row.appendChild(segWrap);
+                row.appendChild(freshBtn);
+                row.appendChild(makeRecommendToggle());
                 row.appendChild(makeDisplayTabBtn());
                 container.appendChild(row);
             }
@@ -23081,30 +23775,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 // 체크 시 상품명 앞에 [오늘의추천] 말머리를 자동으로 붙여 저장한다.
                 //  [수정] 앞에 있던 네모 체크표시는 뺐다. 옆 칸(분류·분류탭)과 같은 버튼 모양으로 두고
                 //  켜졌는지는 색으로만 구분한다. 저장 로직이 읽는 체크박스는 숨겨서 그대로 둔다.
-                const recLabel = document.createElement('label');
-                recLabel.className = 'checkbox-container';
-                // [수정] 세 칸(분류·오늘의추천·분류탭)을 같은 폭으로 나눈다
-                recLabel.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:5px; height:45px; padding:0 6px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; user-select:none; white-space:nowrap; overflow:hidden; width:100%; min-width:0; box-sizing:border-box;';
-                const recChk = document.createElement('input');
-                recChk.type = 'checkbox';
-                recChk.id = 'productIsRecommend';
-                recChk.checked = !!(uploadIsEditMode && uploadEditIsRecommend);
-                recChk.style.display = 'none';
-                const recTxt = document.createElement('span');
-                recTxt.innerText = '오늘의추천';
-                const paintRec = () => {
-                    const on = recChk.checked;
-                    recLabel.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
-                    recLabel.style.background = on ? 'var(--primary-light)' : '#ffffff';
-                    recLabel.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
-                };
-                recChk.onchange = paintRec;
-                paintRec();
-                recLabel.appendChild(recChk);
-                recLabel.appendChild(recTxt);
-
                 row.appendChild(select);
-                row.appendChild(recLabel);
+                row.appendChild(makeRecommendToggle());
                 row.appendChild(makeDisplayTabBtn());
                 container.appendChild(row);
             }
@@ -24063,8 +24735,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             //  더 넣는 것은 격자 끝의 ＋ 칸으로 한다. (사진 한 장인데 접힌 줄만 보이는 게 답답했다)
             const photoCount = uploadSelectedFiles.length;
             const compact = (photoCount > 0 && photoCount <= 3);
-            // 이미 서버에 올라가 있는 사진이 있을 때만 내려받을 게 있다 (수정 모드에서만)
-            const canDownload = !!(uploadIsEditMode && uploadSelectedFiles.some(it => it && it.isExisting));
+            // 이미 서버에 올라가 있는 사진이 있을 때만 보낼 게 있다 (수정 모드에서만)
+            const canShare = !!(uploadIsEditMode && uploadSelectedFiles.some(it => it && it.isExisting));
 
             // [신규] '사진 첨부하기' 칸 자리 옮기기.
             //  사진이 없으면 맨 위(그것 말고는 누를 게 없다), 있으면 목록 안 다운로드 버튼 위로 보낸다.
@@ -24086,9 +24758,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 return;
             }
 
-            // [신규] 세 장 이하일 때는 ＋ 칸 아래 절반이 다운로드 버튼을 대신하므로 넓은 버튼은 감춘다
+            // [신규] 세 장 이하일 때는 ＋ 칸 아래 절반이 공유 버튼을 대신하므로 넓은 버튼은 감춘다
             const dlBtn = document.getElementById('btn-download-images');
-            if (dlBtn) dlBtn.style.display = (!compact && canDownload) ? 'flex' : 'none';
+            if (dlBtn) dlBtn.style.display = (!compact && canShare) ? 'flex' : 'none';
 
             if (compact) {
                 if (countRow) countRow.style.display = 'none';
@@ -24137,13 +24809,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 list.appendChild(row);
             });
 
-            // [신규] 세 장 이하일 때 격자 맨 끝의 칸.
-            //  내려받을 사진이 있으면 위아래로 반씩 나눠 위=＋(더 넣기), 아래=사진 다운로드.
+            // [수정 2026-09-30] 세 장 이하일 때 격자 맨 끝의 칸.
+            //  보낼 사진이 있으면 위아래로 반씩 나눠 위=＋(더 넣기), 아래=카톡으로 보내기.
             //  없으면 ＋가 칸을 다 쓴다. (data-photo-row가 없어 끌어서 순서 바꾸기에는 끼어들지 않는다)
             if (compact) {
                 const addTile = document.createElement('div');
                 addTile.style.cssText = 'aspect-ratio:1/1; display:grid; gap:4px; min-width:0;'
-                    + ` grid-template-rows:${canDownload ? '1fr 1fr' : '1fr'};`;
+                    + ` grid-template-rows:${canShare ? '1fr 1fr' : '1fr'};`;
 
                 const plusBtn = document.createElement('button');
                 plusBtn.type = 'button';
@@ -24155,16 +24827,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     + ' color:#94a3b8; font-family:inherit; font-size:20px; font-weight:800; line-height:1; cursor:pointer;';
                 addTile.appendChild(plusBtn);
 
-                if (canDownload) {
-                    const dlSmall = document.createElement('button');
-                    dlSmall.type = 'button';
-                    dlSmall.title = '이 상품 사진 내려받기';
-                    dlSmall.innerText = '⬇️';
-                    dlSmall.onclick = downloadProductImages;
-                    dlSmall.style.cssText = 'width:100%; height:100%; padding:0; display:flex; align-items:center;'
-                        + ' justify-content:center; border:1.5px solid #0284c7; border-radius:8px; background:#fff;'
-                        + ' color:#0284c7; font-family:inherit; font-size:16px; font-weight:800; line-height:1; cursor:pointer;';
-                    addTile.appendChild(dlSmall);
+                if (canShare) {
+                    const shareSmall = document.createElement('button');
+                    shareSmall.type = 'button';
+                    shareSmall.title = '이 상품 사진 카톡으로 보내기';
+                    shareSmall.innerText = '💬';
+                    shareSmall.onclick = shareProductImages;
+                    shareSmall.style.cssText = 'width:100%; height:100%; padding:0; display:flex; align-items:center;'
+                        + ' justify-content:center; border:1.5px solid #ca8a04; border-radius:8px; background:#FEE500;'
+                        + ' color:#191919; font-family:inherit; font-size:16px; font-weight:800; line-height:1; cursor:pointer;';
+                    addTile.appendChild(shareSmall);
                 }
 
                 list.appendChild(addTile);
@@ -24278,18 +24950,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             renderSelectedFilesList();
         }
 
-        // [신규] 수정 중인 상품의 사진들을 ZIP으로 묶어 다운로드
-        async function downloadProductImages() {
-            if (!uploadSelectedFiles || uploadSelectedFiles.length === 0) { showToast("다운로드할 사진이 없습니다."); return; }
-            if (typeof JSZip === 'undefined') { showToast("압축 라이브러리를 불러오지 못했습니다."); return; }
-            showLoader("⬇️ 사진 다운로드 준비 중...");
+        // [수정 2026-09-30] 다운로드(ZIP) 대신 — 수정 중인 상품의 사진들을 공유 창으로 카톡에 바로 보낸다
+        async function shareProductImages() {
+            if (!uploadSelectedFiles || uploadSelectedFiles.length === 0) { showToast("보낼 사진이 없어요."); return; }
+            showLoader("💬 사진 준비 중...");
             try {
-                const zip = new JSZip();
-                const rawName = (document.getElementById('productName').value || uploadEditProductKey || '상품').trim();
-                const nameBase = rawName.replace(/[\\/:*?"<>|]/g, '_').slice(0, 40) || '상품';
-                let ok = 0, fail = 0;
-                for (let i = 0; i < uploadSelectedFiles.length; i++) {
-                    const item = uploadSelectedFiles[i];
+                const items = uploadSelectedFiles.slice(0, 10);
+                const files = [];
+                let fail = 0;
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
                     let blob = null, ext = 'jpg';
                     try {
                         if (item.file) {
@@ -24305,24 +24975,24 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                             ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : ct.includes('gif') ? 'gif' : 'jpg';
                         }
                     } catch (e) { fail++; continue; }
-                    if (blob) {
-                        const isThumb = (i === uploadThumbnailIndex);
-                        zip.file(`${nameBase}_${String(i + 1).padStart(2, '0')}${isThumb ? '_대표' : ''}.${ext}`, blob);
-                        ok++;
-                    }
+                    if (blob) files.push(new File([blob], `사진_${i + 1}.${ext}`, { type: blob.type || 'image/jpeg' }));
                 }
-                if (ok === 0) { hideLoader(); showToast("사진을 가져오지 못했습니다. (권한/네트워크 문제)"); return; }
-                const content = await zip.generateAsync({ type: 'blob' });
-                const url = URL.createObjectURL(content);
-                const a = document.createElement('a');
-                a.href = url; a.download = `${nameBase}_사진.zip`;
-                document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                setTimeout(() => URL.revokeObjectURL(url), 4000);
                 hideLoader();
-                showToast(`사진 ${ok}장 다운로드${fail ? ` (${fail}장 실패)` : ''}`);
+                if (files.length === 0) { showToast("사진을 가져오지 못했어요. (권한/네트워크 문제)"); return; }
+                const nm = (document.getElementById('productName').value || '').trim();
+                const priceVal = (document.getElementById('productPrice').value || '').trim();
+                const text = nm + (priceVal ? `\n${Number(priceVal).toLocaleString()}원` : '');
+                if (!navigator.canShare || !navigator.canShare({ files })) {
+                    showToast('이 기기에서는 공유하기가 안 돼요');
+                    return;
+                }
+                await navigator.share({ files, text });
+                showToast(`카톡에 보냈어요${fail ? ` (${fail}장 실패)` : ''}`);
             } catch (e) {
                 hideLoader();
-                showToast("다운로드 실패: " + e.message);
+                if (e && e.name === 'AbortError') return;   // 공유 창을 그냥 닫음
+                console.error('공유 실패:', e);
+                showToast("보내지 못했어요 · 다시 한 번 눌러 주세요");
             }
         }
 
@@ -24490,7 +25160,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 buildSubTabs();
                 renderProductsList();
                 autoApplyScheduledVisibility();   // [신규] 상품 자료를 받을 때마다 예약 공개·종료 시각에 맞춰 노출도 같이 맞춘다
-                checkPendingAnnouncements();   // [신규] 상품 자료를 받을 때마다 🔔 공지 대기 알림도 같이 맞춘다
+                gLoadMyDismissed().then(checkPendingAnnouncements);   // [수정] 내가 닫은 목록부터 받아온 뒤에 🔔 알림을 맞춘다
 
                 // [신규] 저장해 둔 기본 대행료 불러오기 (신규 등록 폼에 미리 채움)
                 loadDefaultProductSettings().catch(e => console.error("기본 설정 로드 실패:", e));
@@ -24532,6 +25202,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 //  종류 탭은 그 종류만. 선반은 하위탭에서 따로 좁힌다(종류와 상관없이 쓸 수 있다).
                 filteredProducts = filteredProducts.filter(({ prod }) => {
                     if (prod.name === "배달비") return false;
+                    if (gListIsSaleToday(prod)) return false;   // [신규] 당일 상품에 넣은 특가는 공동구매 오늘 칸에만
                     const cat = gOnsiteTabCatOfList(prod);
                     if (!cat) return false; // 당일 과일·공동구매 날짜·사다드림·코스트코 등은 제외
                     if (uploadManageTab !== 'inv-all' && cat !== uploadManageTab) return false;
@@ -24544,17 +25215,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 });
             } else {
                 // [수정] 예약구매: 사다드림 + 공동구매(날짜)만 표시. 탭 = 전체 또는 특정 날짜.
+                // [수정 2026-09-30] 공동구매(합침): 날짜 공구·사다드림 + 옛 당일 과일. 날짜 탭 → 종류 줄 순서로 좁힌다
                 filteredProducts = filteredProducts.filter(({ prod }) => {
                     if (prod.name === "배달비") return false;
-                    if (!isReserveListProduct(prod)) return false;
-                    if (uploadManageTab === 'all') return true;
-                    const _n = new Date();
-                    const _t = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`;
-                    const gd = getReserveGroupDate(prod);
-                    if (uploadManageTab === '_사다드림') return isSadaListProduct(prod); // [신규] 사다드림만 모아보기
-                    if (uploadManageTab === '_upcoming') return gd && gd >= _t; // 오늘 포함 이후 날짜 상품 전부
-                    if (uploadManageTab === '_이전') return gd && gd < _t;       // 오늘 이전 날짜 상품 모아보기
-                    return gd === uploadManageTab;
+                    if (!gGroupBuyInDateTab(prod)) return false;
+                    if (uploadManageKind === 'fresh') return prod.isFresh === true || prod.isFresh === 'true';
+                    return uploadManageKind === 'all' || gListKind(prod) === uploadManageKind;
                 });
             }
 
@@ -24629,7 +25295,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     displayTitle = gShelfLabel(mKey);
                 }
                 else if (isReserveView) {
-                    displayTitle = /^\d{4}-\d{2}-\d{2}$/.test(mKey) ? `🗓️ ${mKey}` : '🗓️ 날짜미정';
+                    displayTitle = /^\d{4}-\d{2}-\d{2}$/.test(mKey)
+                        ? `🗓️ ${mKey}${mKey === gTodayKey() ? ' (오늘)' : ''}`
+                        : (grouped[mKey].every(x => isLegacyTodayListProduct(x.prod)) ? '🗓️ 날짜 없음' : '🗓️ 날짜미정');
                 }
                 else if (mKey === "냉동") displayTitle = "🧊 냉동 상품";
                 else if (mKey === "냉장") displayTitle = "❄️ 냉장 상품";
@@ -24911,12 +25579,59 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function updateBatchBar() {
             const bar = document.getElementById('upload-batch-bar');
             const countText = document.getElementById('upload-selection-count-text');
-            
+
             if (uploadSelectedProductIndices.size > 0) {
                 countText.innerText = `${uploadSelectedProductIndices.size}개 상품 선택됨`;
                 bar.classList.add('show');
             } else {
                 bar.classList.remove('show');
+            }
+            // [신규 2026-09-30] 설명 복사·사진 공유는 상품 하나를 골랐을 때만 뜻이 통해서, 하나만 골랐을 때만 보인다
+            const single = uploadSelectedProductIndices.size === 1;
+            const copyBtn = document.getElementById('btn-batch-copydesc');
+            const shareBtn = document.getElementById('btn-batch-sharephoto');
+            if (copyBtn) copyBtn.style.display = single ? 'flex' : 'none';
+            if (shareBtn) shareBtn.style.display = single ? 'flex' : 'none';
+        }
+
+        // [신규 2026-09-30] 고른 상품 하나의 상세설명만 클립보드로 복사한다
+        async function handleBatchCopyDesc() {
+            if (uploadSelectedProductIndices.size !== 1) return;
+            const idx = [...uploadSelectedProductIndices][0];
+            const p = uploadProducts[idx];
+            if (!p) return;
+            const desc = await gGetProductDesc(p);
+            if (!desc) { showToast('상세설명이 없어요'); return; }
+            try {
+                await navigator.clipboard.writeText(desc);
+                showToast('📋 상세설명을 복사했어요');
+            } catch (e) {
+                console.error('설명 복사 실패:', e);
+                showToast('복사에 실패했어요 — 이 브라우저에서는 안 될 수 있어요');
+            }
+        }
+
+        // [신규 2026-09-30] 고른 상품 하나의 사진(여러 장이면 최대 10장)을 공유 창으로 카톡에 보낸다
+        async function handleBatchSharePhoto() {
+            if (uploadSelectedProductIndices.size !== 1) return;
+            const idx = [...uploadSelectedProductIndices][0];
+            const p = uploadProducts[idx];
+            if (!p || !p.images || !p.images.length) { showToast('사진이 없어요'); return; }
+            showLoader('💬 사진 준비 중...');
+            try {
+                const key = gStableKeyOf(p);
+                const items = p.images.slice(0, 10);
+                const blobs = await Promise.all(items.map((_, i) => gAnnounceBlob(key, i)));
+                const files = blobs.map((b, i) => new File([b], `사진_${i + 1}.${(b.type || '').includes('png') ? 'png' : 'jpg'}`, { type: b.type || 'image/jpeg' }));
+                hideLoader();
+                if (!navigator.canShare || !navigator.canShare({ files })) { showToast('이 기기에서는 공유하기가 안 돼요'); return; }
+                await navigator.share({ files, text: p.name || '' });
+                showToast('카톡에 보냈어요');
+            } catch (e) {
+                hideLoader();
+                if (e && e.name === 'AbortError') return;   // 공유 창을 그냥 닫음
+                console.error('사진 공유 실패:', e);
+                showToast('보내지 못했어요 · 다시 한 번 눌러 주세요');
             }
         }
 
@@ -25023,6 +25738,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 m.querySelector('#ui-confirm-no').onclick = () => done(false);
                 m.onclick = (e) => { if (e.target === m) done(false); };
             });
+        }
+
+        // [신규 2026-09-30] 고른 상품을 전부 풀어서 바 자체를 닫는다
+        function handleBatchDeselect() {
+            uploadSelectedProductIndices.clear();
+            updateBatchBar();
+            renderProductsList();
         }
 
         async function handleBatchDelete() {
@@ -25166,6 +25888,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 matchKey = catVal;
                 date = catVal;
             }
+            /* [신규 2026-09-30] 사다드림을 뺀 공구(과일·야채·일반)는 '날짜 없음'으로도 올린다.
+               예전 당일 상품과 똑같이 저장한다 (matchKey 과일·야채·기타, 날짜 비움, kind 없음).
+               주문서·자동 작업이 이 셋을 '예전 당일'로 알아봐서, 올린 날 하루 팔고
+               마감시각이 지나면 '마감', 다음 날 자동으로 숨는다. 일반 공구는 예전 당일의 '기타' 자리를 쓴다.
+               사다드림은 주문 마감일이 있어야 해서 날짜가 꼭 필요하다. */
+            const _noDateFruit = (uploadCurrentTab === 'reserve' && !String(catVal || '').trim()
+                && ['fruit', 'veg', 'group'].includes(uploadKind) && !(document.getElementById('productIsSada') || {}).checked);
+            if (_noDateFruit) {
+                matchKey = (uploadKind === 'veg') ? '야채' : (uploadKind === 'fruit') ? '과일' : '기타';
+                date = '';
+            }
 
             // [신규] 분류(matchKey)가 비면 주문서에서 어느 카테고리에도 못 들어가고
             //  공동구매 전체상품에 '날짜 없는 빈 그룹'으로 새어 나온다. 저장 자체를 막는다.
@@ -25201,7 +25934,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             //  (예전에는 이름에 붙여 저장해서, 이름을 고칠 때마다 말머리가 겹쳐 쌓였다)
             //  위에서 이름의 [오늘의추천] 말머리를 이미 떼어냈으므로, 예전 상품도 한 번 저장하면 이름이 깨끗해진다.
             const _recChkEl = document.getElementById('productIsRecommend');
-            const _isRecommendChecked = (uploadCurrentTab === 'fruit' && !!_recChkEl && _recChkEl.checked);
+            const _isRecommendChecked = ((uploadCurrentTab === 'fruit' || uploadCurrentTab === 'reserve') && !!_recChkEl && _recChkEl.checked);
 
             // [신규] 공동구매 칸의 '신선식품' 선택. 지금은 값만 저장한다(주문서 동작은 아직 없음).
             //  사다드림과 하나만 켜지므로, 사다드림이면 신선식품은 꺼진 것으로 본다.
@@ -25285,7 +26018,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                        이미 있는 갈래에 이어 붙일 생각이면 '🔍 번호 찾기'로 고르면 된다. */
                     // [변경] 단추로 고른 갈래가 있으면 그것을 쓴다
                     const _pre = productCodePrefixPick || (_isSadaChecked ? 'S'
-                        : (uploadCurrentTab === 'fruit' && String(matchKey || '').trim() === '과일') ? 'F'
+                        : ((uploadCurrentTab === 'fruit' && String(matchKey || '').trim() === '과일') || (uploadCurrentTab === 'reserve' && uploadKind === 'fruit')) ? 'F'
                         : 'P');
                     productCodePrefixPick = '';
                     // 이미 쓰는 가장 큰 번호 다음으로 새 번호를 만든다
@@ -25363,6 +26096,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     isFresh: _isFresh,
                     // [신규] 오늘의추천 여부 (과채류)
                     isRecommend: _isRecommendChecked,
+                    // [신규 2026-09-30] 공동구매 종류 — group·fruit·veg·sada·fresh. 공동구매 칸이 아니면 비운다(예전 규칙으로 짐작)
+                    // 신선식품은 isFresh 로 따로. 날짜 없는 과일·야채는 kind 를 비워 예전 당일 과일로 다루게 한다
+                    kind: (uploadCurrentTab === 'reserve' && !_noDateFruit) ? (_isSadaChecked ? 'sada' : (['fruit', 'veg'].includes(uploadKind) ? uploadKind : 'group')) : null,
                     // [신규] 상세옵션 설정
                     useOptions: uploadUseOptions,
                     useChoiceOptions: uploadUseChoiceOptions,
@@ -26315,6 +27051,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 }
             }
 
+            /* [신규 2026-09-30] 날짜 없는 옛 당일 상품(과일·야채·기타)도 '공동구매' 칸으로 연다.
+               '예전 당일' 칸은 따로 두지 않는다. 날짜는 '날짜 없음', 종류는 분류대로(과일·야채·일반) 골라 둔다.
+               그대로 저장하면 공동구매 쪽 '날짜 없음' 저장이 예전 당일과 같은 모양으로 다시 적는다. */
+            let _legacyKind = '';
+            if (tabType === 'fruit') {
+                tabType = 'reserve';
+                _legacyKind = /야채|채소/.test(mKey) ? 'veg' : /기타/.test(mKey) ? 'group' : 'fruit';
+            }
+
             uploadEditShelf = String(prod.shelf || ''); // [신규] 기존 선반위치를 폼에 반영 (selectMainTab에서 사용)
             // [수정] 사다드림 여부 복원 — 저장된 isSada 값이 있으면 그것을 쓰고,
             //  없는 예전 상품만 이름 말머리로 판단한다.
@@ -26326,6 +27071,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // [신규] 오늘의추천 여부 복원 (같은 방식)
             uploadEditIsRecommend = (prod.isRecommend === true || prod.isRecommend === 'true')
                 || (prod.isRecommend === undefined && /^\s*\[\s*오늘의추천\s*\]/.test(String(prod.name || '')));
+            // [신규 2026-09-30] 공동구매 종류 되살리기. kind 가 없는 옛 상품은 사다드림·신선식품만 보고 나머지는 공구로 연다
+            uploadKind = uploadEditIsSada ? 'sada'
+                : (UPLOAD_KINDS.some(([v]) => v === prod.kind) ? prod.kind : (_legacyKind || 'group'));
+            if (_legacyKind) uploadSelectedDate = '';   // 날짜 없음으로 연다 (selectMainTab 이 이 값으로 날짜칸을 그린다)
             selectMainTab(tabType);
 
             gPickedCode = '';   // 다른 상품을 불러왔으니 앞서 고른 번호는 버린다
@@ -26493,7 +27242,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             uploadEditIsRecommend = false; // [신규] 오늘의추천 체크 기억값 초기화
             uploadDisplayTab = ''; // [신규] 분류탭 초기화 (새 상품은 '없음'으로 시작)
             updateDisplayTabUI();
-            selectMainTab('fruit');
+            uploadKind = 'group';  // [신규] 종류는 공구로
+            selectMainTab('reserve');
 
             uploadSelectedFiles = [];
             uploadThumbnailIndex = -1;
@@ -31831,6 +32581,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (uploadCurrentTab === 'reserve' && sada) return 'S';
             const cat = String((document.getElementById('categoryValue') || {}).value || '').trim();
             if (uploadCurrentTab === 'fruit' && cat === '과일') return 'F';
+            if (uploadCurrentTab === 'reserve' && uploadKind === 'fruit') return 'F';
             return 'P';
         }
 
@@ -31856,7 +32607,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // [신규] 새 번호(자동)이고 과세·면세를 손대지 않았으면, 과일은 면세·그 밖은 과세를 기본으로 둔다
             if (typeof uploadFormTaxTouched !== 'undefined' && !uploadFormTaxTouched) {
                 const _cat = String((document.getElementById('categoryValue') || {}).value || '').trim();
-                uploadFormTaxFree = (uploadCurrentTab === 'fruit' && (_cat === '과일' || _cat === '야채'));
+                uploadFormTaxFree = (uploadCurrentTab === 'fruit' && (_cat === '과일' || _cat === '야채'))
+                    || (uploadCurrentTab === 'reserve' && (uploadKind === 'fruit' || uploadKind === 'veg'));
                 uploadFormTaxAuto = true;
                 paintFormTaxFree();
             }
