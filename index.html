@@ -2733,14 +2733,31 @@
 
     <!-- [수정] 공지 대기 알림 — 알림은 무엇보다 먼저 보여야 하므로 메뉴 탭보다 위, 헤더 바로 아래로 옮겼다.
          올라가는 시각이 지났는데 아직 카톡에 안 올린 상품이 있으면 여기 뜬다. -->
+    <!-- [수정 2026-10-01] 상품마다 상자·큰 단추·닫기 줄이 쌓여 번잡했다 (사장님 요청).
+         한 상자 안에 한 줄씩(얇은 선으로만 구분), 단추는 '공유&복사'와 '완료' 둘, 많으면 상자 안에서만 넘겨 본다. -->
+    <style>
+        #announce-banner-list { background:#fff; border:1px solid #fde68a; border-radius:10px; max-height:290px; overflow-y:auto; }
+        .ab-row { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; padding:9px 12px; }
+        .ab-row + .ab-row { border-top:1px solid #fef3c7; }
+        .ab-info { flex:1 1 180px; min-width:0; display:flex; flex-direction:column; gap:2px; }
+        .ab-name { min-width:0; display:flex; align-items:baseline; gap:8px; }
+        .ab-when { font-size:11.5px; font-weight:700; color:#a16207; font-variant-numeric:tabular-nums; }
+        .ab-name b { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; font-weight:800; color:#0f172a; }
+        .ab-name span { flex:0 0 auto; font-size:12px; font-weight:700; color:#92400e; font-variant-numeric:tabular-nums; }
+        .ab-acts { flex:0 0 auto; display:flex; gap:6px; margin-left:auto; }
+        .ab-share { min-width:116px; height:30px; padding:0 12px; border:1.5px solid #ca8a04; background:#FEE500; color:#191919; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap; }
+        .ab-share small { font-size:11px; font-weight:700; color:#713f12; margin-left:4px; }
+        .ab-done { height:30px; padding:0 10px; border:1px solid #bbf7d0; background:#f0fdf4; color:#15803d; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap; }
+        .ab-share:focus-visible, .ab-done:focus-visible { outline:2px solid #2563eb; outline-offset:1px; }
+    </style>
     <div id="announce-banner" class="no-print" style="display:none; max-width:1200px; margin:10px auto 0; padding:0 15px; box-sizing:border-box;">
         <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:14px; padding:12px 14px;">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
-                <div style="font-size:13px; font-weight:900; color:#92400e;" id="announce-banner-title">🔔 카톡에 올릴 상품이 있어요</div>
+                <div style="font-size:13px; font-weight:900; color:#92400e;" id="announce-banner-title">🔔 카톡에 올릴 상품</div>
                 <!-- [신규] 지금 바쁘면 잠깐 접어 둔다. 끝난 게 아니라서 새로고침하면 다시 펼쳐진 채로 뜬다. -->
                 <button type="button" onclick="toggleAnnounceBannerCollapsed()" id="announce-banner-toggle" style="flex:0 0 auto; height:26px; padding:0 10px; border:1px solid #fde68a; background:#fff; color:#92400e; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">숨기기</button>
             </div>
-            <div id="announce-banner-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+            <div id="announce-banner-list" style="display:flex; flex-direction:column;"></div>
         </div>
     </div>
 
@@ -4236,7 +4253,8 @@
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-cust" onclick="switchDataSubTab('cust')" style="position:relative; text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">👤 손님<span class="err-badge cust-badge" id="cust-badge-sub" style="display:none;"></span></div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-apart" onclick="switchDataSubTab('apart')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🏢 아파트</div>
                 <!-- [신규 2026-10-01] 손님 화면 오류 — 주문서가 남긴 오류를 본다 -->
-                <div class="segment-btn data-sub-btn" id="btn-data-sub-errors" onclick="switchDataSubTab('errors')" style="position:relative; text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">⚠️ 오류<span class="err-badge" id="err-badge-sub" style="display:none;"></span></div>
+                <!-- [수정] 해결 안 한 오류가 있을 때만 보인다 (gErrShowTab) -->
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-errors" onclick="switchDataSubTab('errors')" style="display:none !important; position:relative; text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">⚠️ 오류<span class="err-badge" id="err-badge-sub" style="display:none;"></span></div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-general" onclick="switchDataSubTab('general')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">⚙️ 일반</div>
             </div>
 
@@ -8131,15 +8149,39 @@
         let _errLogs = [];          // [{ day, id, at, phone, name, where, msg, ... }] 새것이 앞
         let _errUnseenShown = -1;   // 지난번에 본 '확인 안 한 개수' — 늘었을 때만 알림창을 띄운다
         function gErrSeenAt() { return parseInt(localStorage.getItem('moket_errlog_seen_at') || '0', 10) || 0; }
-        function gErrUnseenCount() { const s = gErrSeenAt(); return _errLogs.filter(e => (e.lastAt || e.at || 0) > s).length; }
+        /* [신규] 해결 — 가게가 '해결'을 누르면 resolvedAt 을 적는다 (모든 기기에 같이 보인다).
+           해결한 뒤 같은 오류가 또 나면(주문서가 lastAt 을 올린다) 다시 열린 것으로 본다. */
+        function gErrIsOpen(e) { return !(e && e.resolvedAt && e.resolvedAt >= (e.lastAt || e.at || 0)); }
+        function gErrUnseenCount() { const s = gErrSeenAt(); return _errLogs.filter(e => gErrIsOpen(e) && (e.lastAt || e.at || 0) > s).length; }
         function gErrPaintBadges() {
             const n = gErrUnseenCount();
             ['err-badge-nav', 'err-badge-sub'].forEach(id => {
                 const b = document.getElementById(id);
                 if (b) { b.textContent = n > 99 ? '99+' : String(n); b.style.display = n ? 'inline-block' : 'none'; }
             });
+            gErrShowTab();
             if (typeof gCustPaintBadges === 'function') gCustPaintBadges();   // 빨간 숫자 폭이 바뀌면 초록 숫자 자리도 맞춘다
             return n;
+        }
+        /* [신규] 해결 안 한 오류가 없으면 '오류' 칸 단추를 숨긴다. 칸 줄은 보이는 단추 수만큼 다시 나눈다.
+           지금 오류 칸을 보고 있는 중이면 다 해결해도 화면은 그대로 두고 단추만 숨긴다 (다른 칸을 누르면 그때 사라진 것처럼 보인다). */
+        function gErrShowTab() {
+            const btn = document.getElementById('btn-data-sub-errors');
+            if (!btn) return;
+            const any = _errLogs.some(gErrIsOpen);
+            // .segment-btn 이 display 를 !important 로 잡고 있어 숨길 때도 !important 로 건다
+            if (any) btn.style.removeProperty('display'); else btn.style.setProperty('display', 'none', 'important');
+            const bar = btn.parentElement;
+            if (bar) bar.style.gridTemplateColumns = `repeat(${[...bar.children].filter(c => getComputedStyle(c).display !== 'none').length},1fr)`;
+        }
+        async function gErrResolve(day, id, on) {
+            try {
+                await rtdb.ref(`error_logs/${day}/${id}`).update({ resolvedAt: on ? Date.now() : null });
+                showToast(on ? '해결로 표시했습니다' : '다시 열었습니다');
+            } catch (e) {
+                showToast('저장하지 못했습니다 (규칙 게시 전이면 막힙니다)');
+                console.warn('오류 해결 표시 실패:', e && e.message);
+            }
         }
         function gErrOnTab() {
             const sec = document.getElementById('data-sub-errors'), tab = document.getElementById('tab-admin-sales');
@@ -8148,6 +8190,7 @@
         function gStartErrorWatch() {
             if (window._errWatchOn) return;
             window._errWatchOn = true;
+            gErrShowTab();   // 받아 오기 전에는 오류 칸을 숨기고 칸 줄을 맞춰 둔다
             const cut = new Date(); cut.setDate(cut.getDate() - ORDER_LOG_KEEP_DAYS);
             rtdb.ref('error_logs').orderByKey().startAt(gLogDayKey(cut)).on('value', snap => {
                 const v = snap.val() || {};
@@ -8173,26 +8216,33 @@
             gErrPaintBadges();
             const E = gEscapeHtml;
             const pad = n => String(n).padStart(2, '0');
-            if (!_errLogs.length) {
+            /* [수정] 해결 안 한 오류만 날짜별로 보이고, 해결한 것은 맨 아래 '해결함'에 흐리게 모은다 */
+            const openLogs = _errLogs.filter(gErrIsOpen), doneLogs = _errLogs.filter(e => !gErrIsOpen(e));
+            if (!openLogs.length && !doneLogs.length) {
                 box.innerHTML = `<div style="background:#fff; border-radius:var(--radius-main); box-shadow:var(--shadow); padding:28px 16px; text-align:center; color:var(--text-sub); font-weight:700;">최근 30일 손님 화면 오류 없음</div>`;
                 return;
             }
             const byDay = {};
-            _errLogs.forEach(e => (byDay[e.day] = byDay[e.day] || []).push(e));
+            openLogs.forEach(e => (byDay[e.day] = byDay[e.day] || []).push(e));
             let html = `<div style="font-size:12px; color:var(--text-sub); font-weight:700; margin:0 2px 8px;">최근 30일 · 카카오 로그인한 손님 화면 · 새것이 위</div>`;
-            Object.keys(byDay).sort().reverse().forEach(day => {
-                const d = new Date(day + 'T12:00:00');
-                html += `<div style="font-size:13px; font-weight:900; color:var(--text-main); margin:14px 2px 6px;">${d.getMonth() + 1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]}) · ${byDay[day].length}건</div>`;
-                byDay[day].forEach(e => {
-                    const t = new Date(e.at || 0), isNew = (e.lastAt || e.at || 0) > seenBefore;
+            if (!openLogs.length) html += `<div style="background:#fff; border-radius:var(--radius-main); box-shadow:var(--shadow); padding:22px 16px; text-align:center; color:#059669; font-weight:800;">✓ 남은 오류 없음</div>`;
+            const cardHtml = (e, done) => {
+                    const t = new Date(e.at || 0), isNew = !done && (e.lastAt || e.at || 0) > seenBefore;
                     const tag = (txt, bg, fg) => `<span style="display:inline-block; font-size:11px; font-weight:800; padding:2px 7px; border-radius:6px; background:${bg}; color:${fg}; margin-left:4px;">${txt}</span>`;
                     const savedTag = e.saved === true ? tag('주문 들어감', '#fee2e2', '#b91c1c') : e.saved === false ? tag('주문 안 들어감', '#f1f5f9', '#475569') : '';
                     const phone = String(e.phone || ''), tail = phone.slice(-4);
                     const ver = String(e.ver || '').replace(/^(\d{2})\/(\d{2})\/\d{4} (\d{2}:\d{2}).*$/, '$1/$2 $3');
-                    html += `
-                    <div style="background:#fff; border-radius:var(--radius-main); box-shadow:var(--shadow); padding:12px 14px; margin-bottom:8px; ${isNew ? 'border-left:4px solid #dc2626;' : ''}">
+                    const d0 = new Date((e.day || '') + 'T12:00:00');
+                    const whenTxt = done ? `${d0.getMonth() + 1}/${d0.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}` : `${pad(t.getHours())}:${pad(t.getMinutes())}`;
+                    // [신규] 해결 · 되돌리기 — 오른쪽 위에 둔다
+                    const doneBtn = `<button type="button" onclick="gErrResolve('${E(e.day)}','${E(e.id)}', ${!done})"
+                        style="margin-left:auto; flex:0 0 auto; height:28px; padding:0 12px; border:none; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;
+                               background:${done ? '#e2e8f0' : 'var(--primary)'}; color:${done ? '#475569' : '#fff'};">${done ? '되돌리기' : '해결'}</button>`;
+                    return `
+                    <div style="background:#fff; border-radius:var(--radius-main); box-shadow:var(--shadow); padding:12px 14px; margin-bottom:8px; ${isNew ? 'border-left:4px solid #dc2626;' : ''}${done ? 'opacity:.55;' : ''}">
                         <div style="display:flex; align-items:center; flex-wrap:wrap; gap:2px; font-size:12.5px; font-weight:800; color:var(--text-sub);">
-                            ${isNew ? '<span style="color:#dc2626; margin-right:4px;">새</span>' : ''}${pad(t.getHours())}:${pad(t.getMinutes())} · ${E(e.where || '')}${(e.count || 1) > 1 ? ` · ${e.count}번` : ''}${savedTag}
+                            ${isNew ? '<span style="color:#dc2626; font-weight:900; letter-spacing:.3px; margin-right:4px;">NEW</span>' : ''}${whenTxt} · ${E(e.where || '')}${(e.count || 1) > 1 ? ` · ${e.count}번` : ''}${savedTag}
+                            ${doneBtn}
                         </div>
                         <div style="margin-top:5px; font-size:14px; font-weight:800; color:var(--text-main); word-break:break-all;">${E(e.msg || '')}</div>
                         <div style="margin-top:6px; display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:12.5px; color:var(--text-sub); font-weight:700;">
@@ -8203,8 +8253,16 @@
                         ${e.cart ? `<div style="margin-top:6px; font-size:12px; color:var(--text-sub); word-break:break-all;">🛒 ${E(e.cart)}</div>` : ''}
                         ${(e.line || e.stack) ? `<div style="margin-top:6px; font-size:11px; color:#94a3b8; font-family:monospace; word-break:break-all;">${E([e.line, e.stack].filter(Boolean).join(' / '))}</div>` : ''}
                     </div>`;
-                });
+            };
+            Object.keys(byDay).sort().reverse().forEach(day => {
+                const d = new Date(day + 'T12:00:00');
+                html += `<div style="font-size:13px; font-weight:900; color:var(--text-main); margin:14px 2px 6px;">${d.getMonth() + 1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]}) · ${byDay[day].length}건</div>`;
+                byDay[day].forEach(e => { html += cardHtml(e, false); });
             });
+            if (doneLogs.length) {
+                html += `<div style="font-size:13px; font-weight:900; color:#94a3b8; margin:18px 2px 6px;">✓ 해결함 · ${doneLogs.length}건</div>`;
+                doneLogs.forEach(e => { html += cardHtml(e, true); });
+            }
             box.innerHTML = html;
         }
         /* 손님 화면 오류 기록도 30일치만 남긴다 — 손님 기록과 같은 방식, 하루 한 번 */
@@ -8227,7 +8285,7 @@
         /* ===== [신규 2026-10-01] 새 손님 알림 =====
            손님이 주문서에서 처음 정보를 저장하면(가입·재가입) customer_logs/{날짜} 에 한 줄이 남는다 (주문서 saveProfile).
            최근 7일치를 실시간으로 받아(7일에 3KB 남짓),
-             · 확인 안 한 새 손님이 있으면 가게 관리 탭과 손님 칸에 초록 숫자 (빨간 오류 숫자와 따로)
+             · 오늘 가입한 손님 중 확인 안 한 손님이 있으면 가게 관리 탭과 손님 칸에 초록 숫자 (빨간 오류 숫자와 따로)
              · 새로 들어오면 알림창 — 한 명이면 이름, 여럿이면 '○명 (누구 외 ○명)'
              · 손님 칸을 열면 확인한 것으로 친다 (이 기기 기준)
              · 목록의 '신규'·'재가입' 표시는 가입한 날 하루만 붙는다 — 본 것과 상관없이, 모든 기기에서 같다 (사장님 요청)
@@ -8237,7 +8295,11 @@
         let _newCustShown = -1;   // 지난번에 본 '확인 안 한 새 손님 수' — 늘었을 때만 알림창
         let _custNewMap = {};     // 오늘 가입한 번호(숫자만) → '가입' | '재가입' — 손님 칸 '신규'·'재가입' 표시
         function gCustSeenAt() { return parseInt(localStorage.getItem('moket_newcust_seen_at') || '0', 10) || 0; }
-        function gNewCustUnseen() { const s = gCustSeenAt(); return _newCusts.filter(c => c.at > s); }
+        function gNewCustUnseen() {   // [수정 2026-10-01] 오늘 가입한 손님 중 확인 안 한 것만 — '신규' 딱지와 같은 기준 (사장님 요청)
+            const t0 = new Date(); t0.setHours(0, 0, 0, 0);   // 기기에서 처음 열 때 지난 7일 가입자가 한꺼번에 뜨지 않게
+            const s = Math.max(gCustSeenAt(), t0.getTime() - 1);
+            return _newCusts.filter(c => c.at > s);
+        }
         function gCustPaintBadges() {
             const n = gNewCustUnseen().length;
             ['cust-badge-nav', 'cust-badge-sub'].forEach(id => {
@@ -8271,6 +8333,8 @@
         function gStartNewCustWatch() {
             if (window._custWatchOn) return;
             window._custWatchOn = true;
+            // 켜 둔 채 밤 12시를 넘겨도 '오늘 가입' 숫자·딱지가 어제 것으로 남지 않게 1분마다 다시 맞춘다
+            setInterval(() => { _custNewMap = gCustTodayMap(); gCustPaintBadges(); }, 60000);
             const cut = new Date(); cut.setDate(cut.getDate() - NEW_CUST_DAYS);
             rtdb.ref('customer_logs').orderByKey().startAt(gLogDayKey(cut)).on('value', snap => {
                 const v = snap.val() || {};
@@ -14187,7 +14251,7 @@
                 return;
             }
             box.style.display = 'block';
-            if (title) title.textContent = `🔔 카톡에 올릴 상품이 있어요 (${pending.length}개)`;
+            if (title) title.textContent = `🔔 카톡에 올릴 상품 ${pending.length}개`;
             if (toggleBtn) toggleBtn.textContent = announceBannerCollapsed ? '▼ 펼치기' : '▲ 숨기기';
             // 접혀 있어도 내용은 미리 그려 둔다 — 펼칠 때 바로 보이라고
             list.innerHTML = pending.map(({ p, key }) => announceRowHtml(p, key)).join('');
@@ -14197,37 +14261,26 @@
 
         function announceRowHtml(p, key) {
             const images = Array.isArray(p.images) ? p.images : [];
-            const hasImage = images.length > 0;
-            const multiImage = images.length > 1;
-            const textDone = announceTextCopied.has(key);
-            const pickerOpen = (announcePhotoPickerOpenFor === key);
             const k = gEscapeHtml(key).replace(/'/g, "\\'");   // onclick 문자열 안에 안전하게 넣는다
-            // 사진이 한 장뿐이면 바로 복사, 여러 장이면 '고르기'를 펼쳐서 원하는 만큼 골라 복사한다
-            const photoBtn = !hasImage ? '' : multiImage
-                ? `<button type="button" onclick="toggleAnnouncePhotoPicker('${k}')" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #7c3aed; background:${pickerOpen ? '#ede9fe' : '#f5f3ff'}; color:#6d28d9; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">🖼️ 사진 고르기 (${images.length}장)</button>`
-                : `<button type="button" onclick="announceCopyImage('${k}', 0)" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #7c3aed; background:#f5f3ff; color:#6d28d9; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">🖼️ 사진 복사</button>`;
-            // [수정 2026-09-30] 폰에서는 사진 복사·붙여넣기가 잘 안 된다(아이폰 사파리 거절, 카톡 안드로이드는 사진 붙여넣기를 안 받음).
-            //  그래서 폰은 공유하기로 카톡에 바로 보낸다 (여러 장도 한 번에 보내진다) — 사진 저장(다운로드) 버튼은 없앴다.
-            const phone = gIsPhoneUI();
-            const phoneBtns = !hasImage ? '' :
-                `<button type="button" onclick="announceShare('${k}')" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid #ca8a04; background:#FEE500; color:#191919; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">💬 카톡으로 보내기${multiImage ? ` (${Math.min(images.length, 10)}장)` : ''}</button>`;
-            const photoGrid = (multiImage && pickerOpen && !phone)
-                ? `<div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-top:8px;">
-                    ${images.map((img, i) => `<div onclick="announceCopyImage('${k}', ${i})" title="이 사진 복사" style="cursor:pointer; border:1.5px solid #e9d5ff; border-radius:8px; overflow:hidden; position:relative; aspect-ratio:1;">
-                        <img src="${gCdnUrl(img, 150)}" style="width:100%; height:100%; object-fit:cover; display:block;">
-                        <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(109,40,217,0.85); color:#fff; font-size:9.5px; font-weight:800; text-align:center; padding:2px 0;">복사</div>
-                    </div>`).join('')}
+            /* [수정 2026-10-01] 배너도 상품 목록과 같은 '공유&복사' 하나로 합쳤다 — 사진이 없어도 같은 단추 (사장님 요청).
+                 · 폰 — 문구를 먼저 복사해 두고 공유 창으로 카톡에 사진을 보낸다 (사진이 없으면 문구만 복사).
+                        폰에서는 사진 복사·붙여넣기가 잘 안 된다(아이폰 사파리 거절, 카톡 안드로이드는 사진 붙여넣기를 안 받음)
+                 · PC — 작은 창(gOpenPcShareCopy): 문구 복사 · 사진 눌러 복사(Ctrl+V) · 사진 받기(폴더)
+               '완료'는 카톡방에 다 올렸다는 뜻 — 배너에서 뺀다 (announceDismissRow). */
+            const act = gIsPhoneUI() ? `announceShare('${k}')` : `gOpenPcShareCopy(gFindProductIdxByKey('${k}'))`;
+            const count = images.length > 1 ? `<small>${Math.min(images.length, 10)}장</small>` : '';
+            // [신규 2026-10-01] 올라간 시각(노출일정 releaseAt) — 배너는 이 시각이 지난 상품만 띄운다 (사장님 요청)
+            const ra = Number(p.releaseAt) ? new Date(Number(p.releaseAt)) : null;
+            const when = ra ? `노출시각 ${ra.getMonth() + 1}/${ra.getDate()}(${'일월화수목금토'[ra.getDay()]}) ${String(ra.getHours()).padStart(2, '0')}:${String(ra.getMinutes()).padStart(2, '0')}` : '';
+            return `<div class="ab-row">
+                <div class="ab-info">
+                    <div class="ab-name"><b title="${gEscapeHtml(p.name || '')}">${gEscapeHtml(p.name || '')}</b>${p.price ? `<span>${Number(p.price).toLocaleString()}원</span>` : ''}</div>
+                    ${when ? `<div class="ab-when">${when}</div>` : ''}
                 </div>
-                <div style="font-size:10.5px; font-weight:700; color:#94a3b8; margin-top:5px;">사진을 눌러 하나씩 복사 · 붙여넣기를 반복하면 여러 장 다 올릴 수 있어요</div>`
-                : '';
-            return `<div style="background:#fff; border:1px solid #fde68a; border-radius:10px; padding:10px;">
-                <div style="font-size:12.5px; font-weight:800; color:#0f172a; margin-bottom:6px;">${gEscapeHtml(p.name)}${p.price ? ' · ' + Number(p.price).toLocaleString() + '원' : ''}</div>
-                <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                    <button type="button" onclick="announceCopyText('${k}')" style="flex:1 1 auto; min-width:100px; height:36px; border:1.5px solid ${textDone ? '#86efac' : '#2563eb'}; background:${textDone ? '#f0fdf4' : '#eff6ff'}; color:${textDone ? '#15803d' : '#1d4ed8'}; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">${textDone ? '✅ 문구 복사됨' : '📋 문구 복사'}</button>
-                    ${phone ? phoneBtns : photoBtn}
+                <div class="ab-acts">
+                    <button type="button" class="ab-share" onclick="${act}">💬 공유&amp;복사${count}</button>
+                    <button type="button" class="ab-done" onclick="announceDismissRow('${k}')" title="카톡방에 다 올렸어요 · 배너에서 뺍니다">✓ 완료</button>
                 </div>
-                ${photoGrid}
-                <button type="button" onclick="announceDismissRow('${k}')" style="width:100%; margin-top:6px; height:32px; border:none; background:transparent; color:#15803d; font-size:11.5px; font-weight:800; cursor:pointer;">✔ 카톡방에 다 올렸어요 · 닫기</button>
             </div>`;
         }
 
@@ -14320,10 +14373,11 @@
         }
         // [수정 2026-09-30] 공지문구를 안 적어 뒀으면 상세설명을 대신 보낸다. 상세설명도 없을 때만 상품명·가격으로 대신한다.
         async function gAnnounceText(p) {
+            // [수정 2026-10-01] 카톡으로 가는 글이라 제목 다음 줄에 상품 날짜(픽업/배달)를 넣는다 — 공유&복사와 같다
             const custom = p.announceText && String(p.announceText).trim();
-            if (custom) return custom;
+            if (custom) return gDescWithDate(custom, p);
             const desc = await gGetProductDesc(p);
-            if (desc) return desc;
+            if (desc) return gDescWithDate(desc, p);
             const parts = [p.name || ''];
             if (p.price) parts.push(Number(p.price).toLocaleString() + '원');
             return parts.join('\n');
@@ -14332,7 +14386,12 @@
         async function announceShare(key) {
             const idx = gFindProductIdxByKey(key);
             const p = uploadProducts[idx];
-            if (!p || !p.images || !p.images.length) return;
+            if (!p) return;
+            if (!p.images || !p.images.length) {   // [수정 2026-10-01] 사진 없는 상품도 같은 단추 — 문구만 복사한다
+                try { await navigator.clipboard.writeText(await gAnnounceText(p)); announceTextCopied.add(key); showToast('📋 문구 복사됨 · 사진 없음'); }
+                catch (e) { console.error('문구 복사 실패:', e); showToast('복사 실패'); }
+                return;
+            }
             const text = await gAnnounceText(p);
             try { navigator.clipboard.writeText(text).then(() => { announceTextCopied.add(key); }).catch(() => {}); } catch (e) { }
             try {
@@ -14342,7 +14401,8 @@
                     showToast('이 폰에서는 공유하기가 안 돼요 · 문구는 복사해 뒀어요');
                     return;
                 }
-                await navigator.share({ files, text });
+                // [수정] 사진만 보낸다 — 글을 같이 넘기면 카톡에 상품명이 따라붙었다. 문구는 위에서 복사해 뒀다
+                await navigator.share({ files });
                 showToast('카톡에 보냈어요 · 문구는 복사해 뒀으니 필요하면 붙여넣으세요');
             } catch (e) {
                 if (e && e.name === 'AbortError') return;   // 공유 창을 그냥 닫음
@@ -14357,6 +14417,8 @@
             const idx = gFindProductIdxByKey(key);
             const p = uploadProducts[idx];
             if (!p) { showToast('상품을 찾지 못했어요 — 목록이 바뀐 것 같아요. 새로고침해 주세요.'); checkPendingAnnouncements(); return; }
+            // [신규 2026-10-01] 실수로 누르면 배너에서 빠져 안내를 놓친다 — 한 번 더 묻는다 (사장님 요청)
+            if (!confirm(`${p.name || '이 상품'}\n\n카톡방에 다 올렸나요?\n완료하면 배너에서 빠집니다.`)) return;
             const uid = (window.gStaffMe || {}).uid || '';
             if (!uid) { showToast('로그인 확인 중이에요 — 잠시 후 다시 눌러 주세요.'); return; }
             // [수정] 나만 닫는다 — 이 계정(uid) 밑에 별도 자리(announce_dismissed)에 기록한다.
@@ -15530,11 +15592,39 @@
 
                 const patch = {};
                 const logs = [];
-                let n = 0;
+                let n = 0, nSold = 0;
+
+                /* [신규 2026-10-01] 상시판매 품절 상품도 자정 지나 처음 열 때 숨긴다 (사장님 요청).
+                   품절은 재고(stock)+조정값(global_stock)이 0 이하이고 무제한이 아닌 것 — 목록의 '품절' 표시와 같은 잣대.
+                   조정값을 안 받은 채로 보면 재고가 남은 상품을 품절로 잘못 볼 수 있어 여기서 새로 받는다 (못 받으면 품절 숨김은 건너뛴다).
+                   오늘 손으로 노출을 켜거나 고친 상품(updatedAt 이 오늘)은 건드리지 않는다. */
+                let adj = null;
+                try {
+                    const ar = await fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`);
+                    if (ar.ok) adj = (await ar.json()) || {};
+                } catch (e) { adj = null; }
+                const soldOut = p => {
+                    const unl = (p.stock === "" || p.stock == null || String(p.stock).trim() === "무제한");
+                    const a = adj[fGetAdjKey(p.matchKey, p.name)];
+                    const unlAdj = (a === "unlimited" || (a != null && String(a).startsWith("unlimited")));
+                    if (unl || unlAdj) return false;
+                    return Math.max(0, (parseInt(p.stock || 0) || 0) + (parseInt(a || 0) || 0)) <= 0;
+                };
+
                 Object.keys(data).forEach(key => {
                     const p = data[key];
                     if (!p || !String(p.name || '').trim()) return;
                     if (p.hide === true || p.hide === 'true') return;                      // 이미 숨김
+                    // [신규] 상시판매 품절
+                    if (adj && gOnsiteTabCatOfList(p) && soldOut(p) && !((Number(p.updatedAt) || 0) >= today.getTime())) {
+                        patch[`${key}/hide`] = true;
+                        patch[`${key}/showToday`] = false;
+                        patch[`${key}/showReserve`] = false;
+                        p.hide = true; p.showToday = false; p.showReserve = false;
+                        logs.push({ idx: key, name: String(p.name || ''), what: '노출', from: '노출', to: '숨김', how: '자동(품절)' });
+                        nSold++;
+                        return;
+                    }
                     if (p.showWeekly === true || p.showWeekly === 'true') return;          // 매주 상품은 날짜가 밀린다
                     const s = String(p.matchKey || p.date || '').trim().replace(/[.\/]/g, '-');
                     const dm = s.match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|^(\d{1,2})-(\d{1,2})$/);
@@ -15552,15 +15642,15 @@
                     n++;
                 });
 
-                if (!n) { localStorage.setItem('moket_autohide_day', dayKey); return 0; }
+                if (!n && !nSold) { if (adj) localStorage.setItem('moket_autohide_day', dayKey); return 0; }   // 조정값을 못 받았으면 다음에 다시 본다
                 const ok = await fbPatchProducts(patch);
                 if (!ok) return 0;                                                          // 실패하면 다음에 다시 해 본다
-                localStorage.setItem('moket_autohide_day', dayKey);
+                if (adj) localStorage.setItem('moket_autohide_day', dayKey);
                 updatePublishedProductsTimestamp();
                 // 자동으로 끈 것도 기록에 남긴다 (손으로 끈 것과 구분되어야 원인을 가릴 수 있다)
                 if (typeof gLogProductChange === 'function') gLogProductChange(logs);
-                showToast(`날짜가 지난 상품 ${n}개를 숨겼습니다.`);
-                return n;
+                showToast([n ? `날짜가 지난 상품 ${n}개` : '', nSold ? `품절된 상시판매 ${nSold}개` : ''].filter(Boolean).join(' · ') + '를 숨겼습니다.');
+                return n + nSold;
             } catch (e) {
                 console.error('지난 상품 자동 숨김 실패:', e);
                 return 0;
@@ -16483,7 +16573,7 @@
                 return `<div class="card" style="background:#fff; border-radius:14px; padding:13px 15px; margin-bottom:10px; border:1px solid var(--border); ${x.done ? 'opacity:.55;' : ''}">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
                         <div style="min-width:0;">
-                            <div style="font-size:15px; font-weight:900; color:#0f172a; word-break:keep-all;">${x.done ? '' : '<span style="color:#dc2626; font-size:11px; font-weight:900; margin-right:5px;">새</span>'}${E(x.name)}</div>
+                            <div style="font-size:15px; font-weight:900; color:#0f172a; word-break:keep-all;">${x.done ? '' : '<span style="color:#dc2626; font-size:11px; font-weight:900; letter-spacing:.3px; margin-right:5px;">NEW</span>'}${E(x.name)}</div>
                             <div style="margin-top:3px; font-size:11.5px; font-weight:700; color:#94a3b8;">${E(x.customer || '')} · ${E(phone(x.phone || x._ph))} · ${when(x.at)}</div>
                         </div>
                         <div style="display:flex; gap:5px; flex-shrink:0;">
@@ -20136,12 +20226,22 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function salesFindProduct(order){
             const name = String(order.item || '').trim();
             if (!name || !uploadProducts) return null;
-            const cands = uploadProducts.filter(p => p && String(p.name || '').trim() === name);
-            if (cands.length === 0) return null;
-            if (cands.length === 1) return cands[0];
             const oDate = getOrderDateInfo(order).dateStr;
-            const byDate = cands.find(p => (toISODate(p.matchKey) === oDate) || (toISODate(p.date) === oDate));
-            return byDate || cands[0];
+            const sameDay = p => (toISODate(p.matchKey) === oDate) || (toISODate(p.date) === oDate);
+            const cands = uploadProducts.filter(p => p && String(p.name || '').trim() === name);
+            if (cands.length === 1) return cands[0];
+            if (cands.length > 1) return cands.find(sameDay) || cands[0];
+            /* [신규] 이름으로 못 찾으면 식별번호로 찾는다.
+               주문 뒤에 상품 이름을 고치면(예: 앞말을 '수식어' 칸으로 옮김) 주문에 남은 옛 이름과 달라져
+               상품을 못 찾았고, 그러면 주문 집계가 날짜 공구도 '상시판매'로 넣었다.
+               P 번호는 상품 하나에 하나라 바로 쓴다. 과일(F)·사다드림(S)은 여러 상품이 한 번호를 나눠 쓰므로
+               같은 날 상품이 있을 때만 쓴다 (엉뚱한 규격의 재고를 끌어오지 않게). */
+            const code = String(order.productCode || '').trim();
+            if (!code) return null;
+            const byCode = uploadProducts.filter(p => p && String(p.productCode || '').trim() === code);
+            if (byCode.length === 0) return null;
+            if (byCode.length === 1 && /^P/.test(code)) return byCode[0];
+            return byCode.find(sameDay) || (/^P/.test(code) ? byCode[0] : null);
         }
 
         // 집계 기준 날짜(Date)
@@ -20229,7 +20329,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 else { if (d < today) return; } // 전체(오늘 포함 이후)
                 const _q = (parseInt(o.qty || 0) || 0);
                 if (_done) { doneMap.set(key, (doneMap.get(key) || 0) + _q); return; } // 완료 수량은 별도 집계(발주 목록엔 미포함)
-                if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, qty: 0, amount: 0, dates: new Set(), dateQty: new Map(), optionQty: new Map(), optionItemQty: new Map() });
+                // [수정] ocat — 주문에 적힌 분류. 상품을 못 찾아도 이걸로 묶음(공동구매·상시판매…)을 정한다
+                if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, ocat: String(o.category || ''), qty: 0, amount: 0, dates: new Set(), dateQty: new Map(), optionQty: new Map(), optionItemQty: new Map() });
                 const g = map.get(key);
                 g.qty += _q;
                 g.amount += (parseInt(o.total || 0) || 0);
@@ -20364,7 +20465,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 ['sada', '🛵 사다드림', '#0891b2', '#ecfeff'],
                 ['other', '🏪 상시판매', '#c2410c', '#fff7ed']
             ];
-            const catOf = (r) => salesProductCategory(r.prod, r.name, (r.prod && r.prod.category) || '');
+            // [수정] 주문에 적힌 분류(ocat)를 넘긴다. 예전에는 상품의 category(상품엔 이 칸이 없다)를 넘겨
+            //  사실상 늘 빈 값이었고, 상품을 못 찾으면 날짜 공구도 '상시판매'로 떨어졌다.
+            const catOf = (r) => salesProductCategory(r.prod, r.name, r.ocat || '');
             const grouped = new Map(UPCAT_ORDER.map(([k]) => [k, []]));
             filteredRows.forEach(r => {
                 const c = catOf(r);
@@ -25409,14 +25512,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 }
                 hideLoader();
                 if (files.length === 0) { showToast("사진을 가져오지 못했어요. (권한/네트워크 문제)"); return; }
-                const nm = (document.getElementById('productName').value || '').trim();
-                const priceVal = (document.getElementById('productPrice').value || '').trim();
-                const text = nm + (priceVal ? `\n${Number(priceVal).toLocaleString()}원` : '');
                 if (!navigator.canShare || !navigator.canShare({ files })) {
                     showToast('이 기기에서는 공유하기가 안 돼요');
                     return;
                 }
-                await navigator.share({ files, text });
+                // [수정] 사진만 보낸다 — 상품명·가격 글을 같이 넘기면 카톡에 따라붙었다
+                await navigator.share({ files });
                 showToast(`카톡에 보냈어요${fail ? ` (${fail}장 실패)` : ''}`);
             } catch (e) {
                 hideLoader();
@@ -26074,9 +26175,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const idx = [...uploadSelectedProductIndices][0];
             const p = uploadProducts[idx];
             if (!p) return;
+            // [신규 2026-10-01] 폰(손가락 화면)에서만 공유 창으로 보낸다. PC 는 사진 복사·받기 창을 띄운다
+            if (!gIsPhoneUI()) { gOpenPcShareCopy(idx); return; }
 
-            // 1) 설명 복사
-            const desc = gDescWithDate(await gGetProductDesc(p), p);
+            // 1) 문구 복사 — 공지문구가 있으면 그것, 없으면 상품 설명 (날짜 줄 포함, 배너와 같다)
+            const desc = await gAnnounceText(p);
             let copied = false;
             if (desc) {
                 try { await navigator.clipboard.writeText(desc); copied = true; }
@@ -26093,7 +26196,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const files = blobs.map((b, i) => new File([b], `사진_${i + 1}.${(b.type || '').includes('png') ? 'png' : 'jpg'}`, { type: b.type || 'image/jpeg' }));
                 hideLoader();
                 if (!navigator.canShare || !navigator.canShare({ files })) { showToast(copied ? '📋 설명 복사 · 이 기기는 공유 불가' : '이 기기는 공유 불가'); return; }
-                await navigator.share({ files, text: p.name || '' });
+                // [수정] 사진만 보낸다 — 상품명을 같이 넘기면 카톡에 따라붙었다. 설명은 위에서 복사해 뒀다
+                await navigator.share({ files });
                 showToast(copied ? '보냈어요 · 설명 붙여넣기' : '보냈어요 · 설명 없음');
             } catch (e) {
                 hideLoader();
@@ -26101,6 +26205,150 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (e && e.name === 'NotAllowedError') { showToast('사진 준비 끝 · 한 번 더 눌러 주세요'); return; }
                 console.error('공유 실패:', e);
                 showToast('못 보냈어요 · 다시 눌러 주세요');
+            }
+        }
+
+        /* [신규 2026-10-01] PC에서 공유&복사 — 폰처럼 공유 창으로 카톡에 보낼 길이 없다(PC 카톡은 웹 공유를 받지 않는다).
+           그래서 작은 창을 띄워
+             · 멘트(날짜 줄 포함)는 열 때 먼저 복사해 두고, '멘트 복사'로 다시 담을 수 있게
+             · 사진은 눌러서 한 장씩 복사 → 카톡 창에 Ctrl+V (상품 안내 배너와 같은 announceCopyImage)
+             · 여러 장은 '사진 받기'로 한꺼번에 내려받아 카톡 창에 끌어다 놓기
+           창은 로딩(9999)·알림(10200)보다 아래(9990)에 둔다. */
+        let _pcShareDesc = '';
+        async function gOpenPcShareCopy(idx) {
+            const p = uploadProducts[idx];
+            if (!p) return;
+            const key = gStableKeyOf(p);
+            const k = gEscapeHtml(key).replace(/'/g, "\\'");
+            const images = Array.isArray(p.images) ? p.images.slice(0, 10) : [];
+            _pcShareDesc = await gAnnounceText(p);   // 공지문구가 있으면 그것, 없으면 상품 설명 — 날짜 줄 포함 (배너와 같다)
+            let box = document.getElementById('pc-sharecopy');
+            if (!box) { box = document.createElement('div'); box.id = 'pc-sharecopy'; document.body.appendChild(box); }
+            box.style.cssText = 'position:fixed; inset:0; z-index:9990; background:rgba(15,23,42,0.45); display:flex; align-items:center; justify-content:center; padding:16px;';
+            box.onclick = e => { if (e.target === box) box.remove(); };
+            const btn = (bg, bd, fg) => `flex:1 1 0; height:40px; border:1.5px solid ${bd}; background:${bg}; color:${fg}; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;`;
+            box.innerHTML = `
+                <div style="background:#fff; border-radius:14px; width:100%; max-width:440px; max-height:90vh; overflow:auto; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.25);">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                        <div style="flex:1; min-width:0; font-size:14px; font-weight:900; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(p.name || '')}</div>
+                        <button type="button" onclick="document.getElementById('pc-sharecopy').remove()" style="border:none; background:none; font-size:18px; color:#64748b; cursor:pointer; padding:0 4px;">✕</button>
+                    </div>
+                    <div style="display:flex; gap:6px; margin-bottom:10px;">
+                        <button type="button" onclick="gPcCopyDesc()" style="${btn('#eff6ff', '#2563eb', '#1d4ed8')}">📋 멘트 복사</button>
+                        ${images.length ? `<button type="button" onclick="gPcDownloadPhotos('${k}')" style="${btn('#f0fdf4', '#16a34a', '#15803d')}">⬇️ 사진 받기 (${images.length}장)</button>` : ''}
+                    </div>
+                    ${images.length ? `<div id="pc-dir-line" style="font-size:11.5px; color:#64748b; font-weight:700; margin:-2px 2px 10px;"></div>` : ''}
+                    ${images.length ? `<div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;">
+                        ${images.map((img, i) => `<div onclick="announceCopyImage('${k}', ${i})" title="이 사진 복사" style="cursor:pointer; border:1.5px solid #e9d5ff; border-radius:8px; overflow:hidden; position:relative; aspect-ratio:1;">
+                            <img src="${gCdnUrl(img, 150)}" style="width:100%; height:100%; object-fit:cover; display:block;">
+                            <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(109,40,217,0.85); color:#fff; font-size:10px; font-weight:800; text-align:center; padding:2px 0;">복사</div>
+                        </div>`).join('')}
+                    </div>` : `<div style="padding:14px; text-align:center; color:#94a3b8; font-weight:700;">사진 없음</div>`}
+                    ${images.length ? `<div style="font-size:11.5px; color:#94a3b8; font-weight:700; margin-top:10px; line-height:1.6;">사진 누르기 → 카톡 창에 Ctrl+V<br>여러 장은 받은 뒤 카톡 창에 끌어다 놓기</div>` : ''}
+                </div>`;
+            gPcPaintDirLine();
+            if (_pcShareDesc) gPcCopyDesc(); else showToast('설명 없음');
+        }
+        async function gPcCopyDesc() {
+            if (!_pcShareDesc) { showToast('설명 없음'); return; }
+            try { await navigator.clipboard.writeText(_pcShareDesc); showToast('📋 멘트 복사됨'); }
+            catch (e) { console.error('멘트 복사 실패:', e); showToast('복사 실패'); }
+        }
+        /* [수정 2026-10-01] 사진 받기 — 폴더를 골라 그 안에 '상품 이름' 폴더를 만들어 담는다 (사장님 요청).
+           카톡에 끌어다 놓을 때 다른 사진과 안 섞이게. 고른 폴더는 이 기기(브라우저)에 기억해 두고 다음에도 쓴다.
+           폴더 고르기(showDirectoryPicker)는 PC 크롬·엣지만 된다 — 안 되는 브라우저는 예전처럼 다운로드 폴더로 받는다.
+           폴더 창·권한 묻기는 누른 그 순간에만 열 수 있어서, 사진을 받기 전에 폴더부터 정한다. */
+        function gPhotoDirDb() {
+            return new Promise((ok, no) => {
+                const r = indexedDB.open('moket_photo_dir', 1);
+                r.onupgradeneeded = () => r.result.createObjectStore('h');
+                r.onsuccess = () => ok(r.result);
+                r.onerror = () => no(r.error);
+            });
+        }
+        async function gPhotoDirGet() {
+            try {
+                const db = await gPhotoDirDb();
+                return await new Promise(ok => { const q = db.transaction('h').objectStore('h').get('dir'); q.onsuccess = () => ok(q.result || null); q.onerror = () => ok(null); });
+            } catch (e) { return null; }
+        }
+        async function gPhotoDirSet(h) {
+            try { const db = await gPhotoDirDb(); db.transaction('h', 'readwrite').objectStore('h').put(h, 'dir'); } catch (e) { }
+        }
+        async function gPcPaintDirLine() {
+            const el = document.getElementById('pc-dir-line');
+            if (!el) return;
+            if (!window.showDirectoryPicker) { el.textContent = '받은 사진은 다운로드 폴더에 들어갑니다'; return; }
+            const h = await gPhotoDirGet();
+            el.innerHTML = h
+                ? `📁 저장 폴더: <b style="color:#0f172a;">${gEscapeHtml(h.name)}</b> · <button type="button" onclick="gPcPickDir()" style="border:none; background:none; padding:0; color:#2563eb; font-weight:800; font-size:11.5px; cursor:pointer; text-decoration:underline;">바꾸기</button>`
+                : '📁 처음 받을 때 저장할 폴더를 고릅니다';
+        }
+        async function gPcPickDir() {
+            try {
+                const h = await window.showDirectoryPicker({ id: 'moket-photos', mode: 'readwrite' });
+                await gPhotoDirSet(h);
+                gPcPaintDirLine();
+                return h;
+            } catch (e) {
+                if (e && e.name === 'AbortError') return null;   // 폴더 창을 그냥 닫음
+                console.error('폴더 고르기 실패:', e);
+                showToast('폴더 고르기 실패');
+                return null;
+            }
+        }
+        async function gPcDownloadPhotos(key) {
+            const p = uploadProducts[gFindProductIdxByKey(key)];
+            if (!p || !p.images || !p.images.length) return;
+            const base = String(p.name || '사진').replace(/[\\/:*?"<>|]/g, '').replace(/[.\s]+$/, '').trim().slice(0, 40) || '사진';
+
+            // 1) 저장할 폴더부터 — 기억한 폴더가 있으면 그걸(권한을 다시 물을 수 있다), 없으면 고르게 한다
+            let root = null;
+            if (window.showDirectoryPicker) {
+                root = await gPhotoDirGet();
+                if (root) {
+                    try {
+                        const ok = (await root.queryPermission({ mode: 'readwrite' })) === 'granted'
+                            || (await root.requestPermission({ mode: 'readwrite' })) === 'granted';
+                        if (!ok) root = null;
+                    } catch (e) { root = null; }
+                }
+                if (!root) root = await gPcPickDir();
+                if (!root) return;   // 폴더를 안 골랐다
+            }
+
+            showLoader('⬇️ 사진 받는 중...');
+            try {
+                const blobs = await Promise.all(p.images.slice(0, 10).map((_, i) => gAnnounceBlob(key, i)));
+                const ext = b => (b.type || '').includes('png') ? 'png' : 'jpg';
+                if (root) {
+                    // 2) 고른 폴더 안에 상품 이름 폴더를 만들어 담는다 (같은 이름이 있으면 그 폴더에 덮어쓴다)
+                    const dir = await root.getDirectoryHandle(base, { create: true });
+                    for (let i = 0; i < blobs.length; i++) {
+                        const fh = await dir.getFileHandle(`${base}_${i + 1}.${ext(blobs[i])}`, { create: true });
+                        const w = await fh.createWritable();
+                        await w.write(blobs[i]);
+                        await w.close();
+                    }
+                    hideLoader();
+                    showToast(`⬇️ 사진 ${blobs.length}장 · ${root.name}/${base} 폴더에 저장`);
+                    return;
+                }
+                // 폴더 고르기가 안 되는 브라우저 — 예전처럼 다운로드 폴더로
+                hideLoader();
+                for (let i = 0; i < blobs.length; i++) {
+                    const url = URL.createObjectURL(blobs[i]);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = `${base}_${i + 1}.${ext(blobs[i])}`;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(() => URL.revokeObjectURL(url), 10000);
+                    await new Promise(r => setTimeout(r, 300));   // 한꺼번에 누르면 브라우저가 몇 개를 막는다
+                }
+                showToast(`⬇️ 사진 ${blobs.length}장 받음 · 카톡 창에 끌어다 놓기`);
+            } catch (e) {
+                hideLoader();
+                console.error('사진 받기 실패:', e);
+                showToast('사진 받기 실패');
             }
         }
 
