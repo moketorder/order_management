@@ -1817,6 +1817,7 @@
             width: 90%;
             max-width: 500px;
             max-height: 85vh;
+            max-height: 85dvh;   /* [수정] 폰 주소창 때문에 위아래가 잘리지 않게 보이는 높이로 */
             overflow-y: auto;
             box-shadow: var(--shadow);
             transform: scale(0.9);
@@ -1864,6 +1865,9 @@
         .summary-modal-content.cust-card-modal {
             max-width: 880px;
             max-height: 94vh;
+            /* [수정] 폰에서 위아래가 잘렸다. vh 는 주소창이 숨었을 때의 높이라 실제 보이는 화면보다 크고,
+               가운데 놓인 창이 위아래로 넘쳤다. 보이는 높이(dvh)로 다시 잡는다 (모르는 브라우저는 위 줄). */
+            max-height: calc(100dvh - 24px);
         }
         .cust-card-cols {
             display: grid;
@@ -2746,7 +2750,7 @@
             <div class="segment-btn admin-nav-btn active" data-tab="orders" onclick="switchAdminTab('orders')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📋 주문 관리</div>
             <div class="segment-btn admin-nav-btn" data-tab="product-list" onclick="switchAdminTab('product-list')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🛒 상품 관리 <span id="product-count" style="display: none;">(0)</span></div>
             <div class="segment-btn admin-nav-btn" data-tab="purchase-history" onclick="switchAdminTab('purchase-history')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🚚 발주 관리</div>
-            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🏪 가게 관리</div>
+            <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="position:relative; text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🏪 가게 관리<span class="err-badge" id="err-badge-nav" style="display:none;"></span><span class="err-badge cust-badge" id="cust-badge-nav" style="display:none;"></span></div>
             <!-- [숨김] 섬네일 탭 — 버튼만 숨기고 기능(tab-admin-thumbnail-generator, switchAdminTab)은 그대로 유지 -->
             <div class="segment-btn admin-nav-btn" data-tab="thumbnail-generator" onclick="switchAdminTab('thumbnail-generator')" style="display:none; text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🎨 섬네일</div>
         </div>
@@ -3173,9 +3177,9 @@
                     <div class="batch-buttons" style="width: 100%; box-sizing: border-box;">
                         <button class="btn-batch type-show" onclick="handleBatchVisibility(true)" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); white-space: nowrap; overflow: hidden;">👁️ 노출</button>
                         <button class="btn-batch type-hide" onclick="handleBatchVisibility(false)" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); white-space: nowrap; overflow: hidden;">🙈 숨김</button>
-                        <!-- [신규 2026-09-30] 상품 하나만 골랐을 때만 나온다 — 설명 복사·사진 공유는 한 상품 기준이라 -->
-                        <button id="btn-batch-sharephoto" class="btn-batch" onclick="handleBatchSharePhoto()" style="display:none; flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid #ca8a04; background: #FEE500; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #191919; white-space: nowrap; overflow: hidden;">💬 사진 공유</button>
-                        <button id="btn-batch-copydesc" class="btn-batch" onclick="handleBatchCopyDesc()" style="display:none; flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #1d4ed8; border-color: rgba(29, 78, 216, 0.25); white-space: nowrap; overflow: hidden;">📋 설명 복사</button>
+                        <!-- [신규 2026-09-30] 상품 하나만 골랐을 때만 나온다 — 한 상품 기준이라
+                             [수정 2026-10-01] 사진 공유·설명 복사를 '공유&복사' 하나로 합쳤다 (사장님 요청) -->
+                        <button id="btn-batch-sharecopy" class="btn-batch" onclick="handleBatchShareCopy()" style="display:none; flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid #ca8a04; background: #FEE500; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #191919; white-space: nowrap; overflow: hidden;">💬 공유&amp;복사</button>
                         <button class="btn-batch type-print" onclick="switchAdminTab('thumbnail-generator')" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #d97706; border-color: rgba(217, 119, 6, 0.25); white-space: nowrap; overflow: hidden;">🎨 섬네일</button>
                         <button class="btn-batch type-purchase" onclick="handleBatchPurchase()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #10b981; border-color: rgba(16, 185, 129, 0.25); white-space: nowrap; overflow: hidden;">🚚 발주</button>
                         <button class="btn-batch" onclick="handleBatchDeselect()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #64748b; white-space: nowrap; overflow: hidden;">✕ 선택 해제</button>
@@ -3198,10 +3202,17 @@
 
                 <div class="card" style="padding: 14px;">
                     <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;">
-                        <div style="flex:1; min-width:0; font-size:11px; font-weight:700; color:var(--text-sub);">🕐 올라가는 상품 · 🕕 마감되는 상품이 있는 날에 표시돼요. 색은 지금 상태 — <span style="color:#16a34a;">🟢 판매중</span> · <span style="color:#dc2626;">🔴 숨김·예약대기</span> · <span style="color:#ca8a04;">🟡 마감</span><br>여러 개를 누르면 한꺼번에 고를 수 있어요(다시 누르면 빠져요) · 막대를 끌어서 다른 날짜에 놓으면 고른 것 전부가 같이 옮겨져요 (PC만) · <b>Ctrl</b>을 누른 채 끌면 복제돼요 (원본은 그대로) · 막대 양 끝을 끌면 그쪽 날짜만 조절돼요 · 달력을 스크롤하거나, 끌던 채로 위/아래 끝까지 가면 전달·다음달로 넘어가요</div>
+                        <div style="flex:1; min-width:0; font-size:11px; font-weight:700; color:var(--text-sub);">🕐 올라가는 상품 · 🕕 마감되는 상품이 있는 날에 표시돼요. 색은 지금 상태 — <span style="color:#16a34a;">🟢 판매중</span> · <span style="color:#dc2626;">🔴 숨김·예약대기</span> · <span style="color:#ca8a04;">🟡 마감</span><br>여러 개를 누르면 한꺼번에 고를 수 있어요(다시 누르면 빠져요) · 날짜칸 안 다섯 줄은 11·13·15·17·19시예요 · 막대를 끌어서 다른 날짜·시간 줄에 놓으면 그 날 그 시각으로 옮겨져요(고른 것 전부 같이) (PC만) · <b>Ctrl</b>을 누른 채 끌면 복제돼요 (원본은 그대로) · 막대 양 끝을 끌면 그쪽 날짜만 조절돼요 · 달력을 스크롤하거나, 끌던 채로 위/아래 끝까지 가면 전달·다음달로 넘어가요</div>
                         <button type="button" onclick="psCalGoToday()" style="flex:0 0 auto; height:32px; padding:0 12px; border:1.5px solid var(--border); background:#fff; border-radius:9px; font-size:12px; font-weight:800; cursor:pointer;">오늘</button>
                     </div>
-                    <div id="ps-cal-box" class="ps-cal-scroll" onscroll="psCalOnScroll()" ondragover="psCalDragAutoScroll(event)"></div>
+                    <div class="ps-cal-wrap">
+                        <div id="ps-cal-box" class="ps-cal-scroll" onscroll="psCalOnScroll()" ondragover="psCalDragAutoScroll(event)"></div>
+                        <!-- [신규] 폰에서는 달력 안 손가락 스크롤을 막고(바깥 화면이 대신 움직임) 이 막대로 위아래를 옮긴다 -->
+                        <div id="ps-cal-rail" class="ps-cal-rail" onpointerdown="psCalRailDown(event)">
+                            <div class="ps-cal-rail-track"></div>
+                            <div id="ps-cal-thumb" class="ps-cal-thumb"></div>
+                        </div>
+                    </div>
                 </div>
                 <!-- [수정] 날짜를 누르면 나오는 상품 칸 — 달력 스크롤 안에 끼워 두면 중간에 묻혀 보기 힘들다. 달력 밖 자리에 따로 둔다 -->
                 <div id="ps-day-detail-box" style="margin-top:10px;"></div>
@@ -3693,7 +3704,27 @@
            behavior:'smooth' 옵션으로 부드럽게 하고, 나머지는 즉시 반영되게 뺐다. */
         .ps-cal-scroll { max-height: 520px; overflow-y: auto; overflow-x: hidden;
             border: 1.5px solid var(--border); border-radius: 10px; padding: 0 4px 4px; }
-        .ps-cal-scroll .ps-cal-weekhead { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 3px;
+        /* [신규] 폰(손가락 화면) — 달력 안에서 손가락으로 밀면 바깥 화면이 움직이게 하고, 달력은 오른쪽 막대로만 옮긴다 */
+        .ps-cal-wrap { position: relative; }
+        /* [신규 2026-10-01] 날짜칸 안 시간 다섯 줄 — 빈 줄엔 흐린 시각 글자, 막대를 끌어 올리면 파랗게 */
+        #ps-cal-box .ps-bars { gap: 1px; }
+        .ps-slot { position: relative; min-height: 15px; display: flex; flex-direction: column; gap: 2px; border-top: 1px dashed #eef2f6; }
+        .ps-slot:first-child { border-top: none; }
+        .ps-slot.over { background: #dbeafe; }
+        /* 맨 왼쪽 시간 기둥 — 노출일정 달력에서만 8칸(기둥 + 7일)으로 쓴다 */
+        #ps-cal-box .ms-cal-grid { grid-template-columns: 22px repeat(7, minmax(0,1fr)); }
+        #ps-cal-box .ms-cal-cell.ps-gutter { background: transparent; border-color: transparent; cursor: default; padding-left: 0; padding-right: 0; outline: none; }
+        .ps-gutter .ps-slot { border-top-color: transparent; }
+        .ps-gutter .ps-bar-empty { margin: 0; }
+        .ps-gutter-lbl { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font-size: 10.5px; font-weight: 800; color: #94a3b8; pointer-events: none; }
+        .ps-cal-rail { display: none; }
+        @media (pointer: coarse) {
+            .ps-cal-wrap .ps-cal-scroll { overflow-y: hidden; padding-right: 30px; }
+            .ps-cal-rail { display: block; position: absolute; top: 2px; right: 2px; bottom: 2px; width: 26px; touch-action: none; z-index: 4; }
+            .ps-cal-rail-track { position: absolute; top: 6px; bottom: 6px; left: 50%; width: 4px; margin-left: -2px; background: #e2e8f0; border-radius: 2px; }
+            .ps-cal-thumb { position: absolute; left: 3px; right: 3px; top: 0; height: 64px; background: #64748b; border-radius: 10px; }
+        }
+        .ps-cal-scroll .ps-cal-weekhead { display: grid; grid-template-columns: 22px repeat(7, minmax(0,1fr)); gap: 3px;
             position: sticky; top: 0; background: #fff; z-index: 3; padding: 4px 0 2px; }
         .ps-cal-scroll .ps-cal-month-label { font-size: 12px; font-weight: 900; color: #475569; text-align: center; padding: 10px 0 4px; }
         /* [신규] 지금 안 보고 있는 달(펼친 날이 없으면 오늘이 있는 달, 있으면 그 날의 달)은 날짜를 흐리게 해서
@@ -3813,12 +3844,16 @@
         .cv-flow span { font-size:10.5px; font-weight:700; color:#94a3b8; }
         .cv-flow b { font-size:13px; font-weight:900; color:#0f172a; white-space:nowrap; }
         .cv-flow em { font-style:normal; font-size:10px; font-weight:700; color:#94a3b8; }
-        .cv-day { display:flex; align-items:baseline; gap:8px; padding:5px 2px; border-top:1px dashed #e2e8f0; font-size:11.5px; font-weight:700; color:#475569; }
+        .cv-day { display:flex; align-items:baseline; gap:8px; padding:5px 2px; border-top:1px dashed #e2e8f0; font-size:11.5px; font-weight:700; color:#475569;
+            /* [수정] 폰에서 주문한 날 줄이 겹쳤다. '🛒 주문 1건 21,000원'이 자리를 다 먹어 시간 칸이 0으로 줄고,
+               시간 글씨가 옆 '조회 2건' 위로 넘쳐 찍혔다. 시간 칸에 최소 폭을 주고, 모자라면 주문 표시를 다음 줄 오른쪽으로 내린다. */
+            flex-wrap:wrap; row-gap:2px; }
+        .cv-day > span { white-space:nowrap; }
         .cv-day.ord { cursor:pointer; }
         .cv-day.ord:hover { background:#eff6ff; }
         .cv-day-d { flex:0 0 66px; color:#334155; }
-        .cv-day-t { flex:1; min-width:0; }
-        .cv-day-o { flex:0 0 auto; color:#94a3b8; }
+        .cv-day-t { flex:1 1 84px; min-width:84px; white-space:normal !important; word-break:keep-all; }   /* '12:40~12:50' 한 덩이가 들어갈 만큼 */
+        .cv-day-o { flex:0 0 auto; margin-left:auto; color:#94a3b8; }
         .cv-day.ord .cv-day-o { color:#1d4ed8; font-weight:800; }
         @media (max-width: 640px) {
             .cv-flow b { font-size:12px; }
@@ -4182,6 +4217,10 @@
         #cust-metrics > div > div:last-child { font-size:13px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         #sales-metrics > div > div:last-child { font-size:13px !important; white-space:nowrap; }
         #sales-metrics > div > div:last-child span { font-size:10px !important; }
+        /* [신규 2026-10-01] 확인 안 한 손님 화면 오류 수 — 가게 관리 탭과 오류 칸 위에 붙는다 */
+        .err-badge { position:absolute; top:3px; right:4px; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; border-radius:9px; background:#dc2626; color:#fff; font-size:11px; font-weight:900; line-height:18px; text-align:center; pointer-events:none; }
+        /* [신규 2026-10-01] 확인 안 한 새 손님 수 — 오류(빨강)와 따로 초록 */
+        .err-badge.cust-badge { background:#16a34a; }
     </style>
     <div id="tab-admin-sales" class="admin-tab-content" style="display: none;">
         <!-- [수정] 매입·매출 월별표에서 매입·매출·지출을 다 펼치면 칸이 11개가 된다.
@@ -4191,17 +4230,24 @@
 
             <!-- [수정] 자료 정리 하위 탭: 판매 통계 / 매입·매출 / 아파트 관리 -->
             <!-- [수정] '자료 정리' → '가게 관리'. 주문서에 있던 사장님 설정(배달·영업일·손님 화면)을 '일반 관리'로 옮겨 왔다 -->
-            <div class="segment-control" style="display:grid; grid-template-columns:repeat(5,1fr); background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
+            <div class="segment-control" style="display:grid; grid-template-columns:repeat(6,1fr); background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
                 <div class="segment-btn data-sub-btn active" id="btn-data-sub-sales" onclick="switchDataSubTab('sales')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📊 통계</div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-profit" onclick="switchDataSubTab('profit')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📈 매입·매출</div>
-                <div class="segment-btn data-sub-btn" id="btn-data-sub-cust" onclick="switchDataSubTab('cust')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">👤 손님</div>
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-cust" onclick="switchDataSubTab('cust')" style="position:relative; text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">👤 손님<span class="err-badge cust-badge" id="cust-badge-sub" style="display:none;"></span></div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-apart" onclick="switchDataSubTab('apart')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🏢 아파트</div>
+                <!-- [신규 2026-10-01] 손님 화면 오류 — 주문서가 남긴 오류를 본다 -->
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-errors" onclick="switchDataSubTab('errors')" style="position:relative; text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">⚠️ 오류<span class="err-badge" id="err-badge-sub" style="display:none;"></span></div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-general" onclick="switchDataSubTab('general')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">⚙️ 일반</div>
             </div>
 
             <!-- [신규] 일반 관리 — 배달·배달비, 토요일·임시 휴무일, 상품목록 공개·로그인 강제 -->
             <div id="data-sub-general" style="display:none;">
                 <div id="general-admin-body"><!-- 동적 삽입 --></div>
+            </div>
+
+            <!-- [신규 2026-10-01] 손님 화면 오류 — error_logs (최근 30일, 실시간) -->
+            <div id="data-sub-errors" style="display:none;">
+                <div id="err-admin-body"><!-- 동적 삽입 --></div>
             </div>
 
             <!-- [신규] 손님 관리 — 손님별 연락처·주소·주문 실적을 한 자리에서 본다 -->
@@ -4821,6 +4867,7 @@
                 setTimeout(() => { try { cleanupOrderLogs(); } catch (e) {} }, 4000);   // [신규] 30일 지난 변경 기록 정리 (하루 한 번)
                 setTimeout(() => { try { cleanupProductLogs(); } catch (e) {} }, 6000); // [신규] 상품 변경 기록도 같은 주기로 정리
                 setTimeout(() => { try { cleanupCustomerLogs(); } catch (e) {} }, 8000); // [신규] 손님 정보 변경 기록도 30일치만
+                setTimeout(() => { try { cleanupErrorLogs(); } catch (e) {} }, 9000);    // [신규 2026-10-01] 손님 화면 오류 기록도 30일치만
                 
             } catch (e) {
                 console.error(e);
@@ -5115,6 +5162,9 @@
                 try { localStorage.setItem('moket_print_fixed_memos_cache', JSON.stringify(printFixedMemos)); } catch (e) {}
                 renderFilteredOrders();
             });
+
+            gStartErrorWatch();   // [신규 2026-10-01] 손님 화면 오류 — 가게 관리 > 오류 칸과 알림
+            gStartNewCustWatch(); // [신규 2026-10-01] 새 손님 — 가게 관리 > 손님 칸 초록 숫자와 알림
         }
 
         // 날짜 파싱 헬퍼
@@ -8070,6 +8120,179 @@
                 if (old.length) console.log(`[손님 기록] ${old.length}일치 정리`);
             } catch (e) { console.warn('손님 기록 정리 실패:', e); }
         }
+
+        /* ===== [신규 2026-10-01] 손님 화면 오류 (error_logs) =====
+           주문서가 오류를 만나면 error_logs/{날짜}/{번호} 에 남긴다 (카카오 로그인한 손님만 — 주문서ver3 gReportError).
+           10/1 배달 주문이 저장된 뒤 손님에게 오류 창이 떴는데, 손님이 캡처를 보내기 전엔 몰랐다.
+             · 최근 30일치를 실시간으로 받아 가게 관리 > 오류 칸에 보인다
+             · 확인 안 한 오류가 있으면 가게 관리 탭과 오류 칸에 빨간 숫자, 새로 들어오면 알림창
+             · '확인'은 이 기기 기준 — 오류 칸을 열어 본 시각을 기기에 적어 둔다
+             · 주문 오류는 '주문 들어감/안 들어감'을 붙여, 손님 주문 카드로 바로 가서 확인한다 */
+        let _errLogs = [];          // [{ day, id, at, phone, name, where, msg, ... }] 새것이 앞
+        let _errUnseenShown = -1;   // 지난번에 본 '확인 안 한 개수' — 늘었을 때만 알림창을 띄운다
+        function gErrSeenAt() { return parseInt(localStorage.getItem('moket_errlog_seen_at') || '0', 10) || 0; }
+        function gErrUnseenCount() { const s = gErrSeenAt(); return _errLogs.filter(e => (e.lastAt || e.at || 0) > s).length; }
+        function gErrPaintBadges() {
+            const n = gErrUnseenCount();
+            ['err-badge-nav', 'err-badge-sub'].forEach(id => {
+                const b = document.getElementById(id);
+                if (b) { b.textContent = n > 99 ? '99+' : String(n); b.style.display = n ? 'inline-block' : 'none'; }
+            });
+            if (typeof gCustPaintBadges === 'function') gCustPaintBadges();   // 빨간 숫자 폭이 바뀌면 초록 숫자 자리도 맞춘다
+            return n;
+        }
+        function gErrOnTab() {
+            const sec = document.getElementById('data-sub-errors'), tab = document.getElementById('tab-admin-sales');
+            return !!(sec && tab && sec.style.display !== 'none' && tab.style.display !== 'none');
+        }
+        function gStartErrorWatch() {
+            if (window._errWatchOn) return;
+            window._errWatchOn = true;
+            const cut = new Date(); cut.setDate(cut.getDate() - ORDER_LOG_KEEP_DAYS);
+            rtdb.ref('error_logs').orderByKey().startAt(gLogDayKey(cut)).on('value', snap => {
+                const v = snap.val() || {};
+                const list = [];
+                Object.keys(v).forEach(day => Object.keys(v[day] || {}).forEach(id => {
+                    const r = v[day][id];
+                    if (r && typeof r === 'object') list.push(Object.assign({ day, id }, r));
+                }));
+                list.sort((a, b) => (b.lastAt || b.at || 0) - (a.lastAt || a.at || 0));
+                _errLogs = list;
+                if (gErrOnTab()) { renderErrorAdmin(); return; }   // 보고 있으면 바로 다시 그리고 확인한 것으로 친다
+                const n = gErrPaintBadges();
+                if (n > 0 && n > _errUnseenShown) showToast(`⚠️ 손님 화면 오류 ${n}건 · 가게 관리 > 오류`);
+                _errUnseenShown = n;
+            }, err => console.warn('손님 오류 기록 받기 실패 (규칙 게시 전이면 막힌다):', err && err.message));
+        }
+        function renderErrorAdmin() {
+            const box = document.getElementById('err-admin-body');
+            if (!box) return;
+            const seenBefore = gErrSeenAt();
+            localStorage.setItem('moket_errlog_seen_at', String(Date.now()));
+            _errUnseenShown = 0;
+            gErrPaintBadges();
+            const E = gEscapeHtml;
+            const pad = n => String(n).padStart(2, '0');
+            if (!_errLogs.length) {
+                box.innerHTML = `<div style="background:#fff; border-radius:var(--radius-main); box-shadow:var(--shadow); padding:28px 16px; text-align:center; color:var(--text-sub); font-weight:700;">최근 30일 손님 화면 오류 없음</div>`;
+                return;
+            }
+            const byDay = {};
+            _errLogs.forEach(e => (byDay[e.day] = byDay[e.day] || []).push(e));
+            let html = `<div style="font-size:12px; color:var(--text-sub); font-weight:700; margin:0 2px 8px;">최근 30일 · 카카오 로그인한 손님 화면 · 새것이 위</div>`;
+            Object.keys(byDay).sort().reverse().forEach(day => {
+                const d = new Date(day + 'T12:00:00');
+                html += `<div style="font-size:13px; font-weight:900; color:var(--text-main); margin:14px 2px 6px;">${d.getMonth() + 1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]}) · ${byDay[day].length}건</div>`;
+                byDay[day].forEach(e => {
+                    const t = new Date(e.at || 0), isNew = (e.lastAt || e.at || 0) > seenBefore;
+                    const tag = (txt, bg, fg) => `<span style="display:inline-block; font-size:11px; font-weight:800; padding:2px 7px; border-radius:6px; background:${bg}; color:${fg}; margin-left:4px;">${txt}</span>`;
+                    const savedTag = e.saved === true ? tag('주문 들어감', '#fee2e2', '#b91c1c') : e.saved === false ? tag('주문 안 들어감', '#f1f5f9', '#475569') : '';
+                    const phone = String(e.phone || ''), tail = phone.slice(-4);
+                    const ver = String(e.ver || '').replace(/^(\d{2})\/(\d{2})\/\d{4} (\d{2}:\d{2}).*$/, '$1/$2 $3');
+                    html += `
+                    <div style="background:#fff; border-radius:var(--radius-main); box-shadow:var(--shadow); padding:12px 14px; margin-bottom:8px; ${isNew ? 'border-left:4px solid #dc2626;' : ''}">
+                        <div style="display:flex; align-items:center; flex-wrap:wrap; gap:2px; font-size:12.5px; font-weight:800; color:var(--text-sub);">
+                            ${isNew ? '<span style="color:#dc2626; margin-right:4px;">새</span>' : ''}${pad(t.getHours())}:${pad(t.getMinutes())} · ${E(e.where || '')}${(e.count || 1) > 1 ? ` · ${e.count}번` : ''}${savedTag}
+                        </div>
+                        <div style="margin-top:5px; font-size:14px; font-weight:800; color:var(--text-main); word-break:break-all;">${E(e.msg || '')}</div>
+                        <div style="margin-top:6px; display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:12.5px; color:var(--text-sub); font-weight:700;">
+                            <span style="color:var(--text-main);">${E(e.name || '이름 없음')} · …${E(tail)}</span>
+                            ${phone ? `<button type="button" onclick="showCustomerCardModal('${encodeURIComponent(phone)}','${encodeURIComponent(e.name || '')}')" style="border:1.5px solid var(--border); background:#fff; border-radius:7px; padding:3px 9px; font-size:12px; font-weight:800; cursor:pointer;">주문 보기</button>` : ''}
+                            <span>${E(e.device || '')}${e.ship ? ' · ' + E(e.ship) : ''}${ver ? ' · ' + E(ver) + ' 판' : ''}</span>
+                        </div>
+                        ${e.cart ? `<div style="margin-top:6px; font-size:12px; color:var(--text-sub); word-break:break-all;">🛒 ${E(e.cart)}</div>` : ''}
+                        ${(e.line || e.stack) ? `<div style="margin-top:6px; font-size:11px; color:#94a3b8; font-family:monospace; word-break:break-all;">${E([e.line, e.stack].filter(Boolean).join(' / '))}</div>` : ''}
+                    </div>`;
+                });
+            });
+            box.innerHTML = html;
+        }
+        /* 손님 화면 오류 기록도 30일치만 남긴다 — 손님 기록과 같은 방식, 하루 한 번 */
+        async function cleanupErrorLogs() {
+            try {
+                const today = gLogDayKey();
+                if (localStorage.getItem('moket_errlog_clean_day') === today) return;
+                localStorage.setItem('moket_errlog_clean_day', today);
+                const res = await fetch(`${FIREBASE_DB_URL}error_logs.json?shallow=true&t=${Date.now()}`);
+                if (!res.ok) return;
+                const days = Object.keys((await res.json()) || {});
+                const cut = new Date(); cut.setDate(cut.getDate() - ORDER_LOG_KEEP_DAYS);
+                const cutKey = gLogDayKey(cut);
+                const old = days.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && d < cutKey);
+                for (const d of old) await fetch(`${FIREBASE_DB_URL}error_logs/${d}.json`, { method: 'DELETE' });
+                if (old.length) console.log(`[손님 오류] ${old.length}일치 정리`);
+            } catch (e) { console.warn('손님 오류 기록 정리 실패:', e); }
+        }
+
+        /* ===== [신규 2026-10-01] 새 손님 알림 =====
+           손님이 주문서에서 처음 정보를 저장하면(가입·재가입) customer_logs/{날짜} 에 한 줄이 남는다 (주문서 saveProfile).
+           최근 7일치를 실시간으로 받아(7일에 3KB 남짓),
+             · 확인 안 한 새 손님이 있으면 가게 관리 탭과 손님 칸에 초록 숫자 (빨간 오류 숫자와 따로)
+             · 새로 들어오면 알림창 — 한 명이면 이름, 여럿이면 '○명 (누구 외 ○명)'
+             · 손님 칸을 열면 확인한 것으로 친다 (이 기기 기준)
+             · 목록의 '신규'·'재가입' 표시는 가입한 날 하루만 붙는다 — 본 것과 상관없이, 모든 기기에서 같다 (사장님 요청)
+           가게가 주문관리에서 넣은 손님(who '가게')은 세지 않는다. */
+        const NEW_CUST_DAYS = 7;
+        let _newCusts = [];       // [{ at, phone, name, what }] 새것이 앞
+        let _newCustShown = -1;   // 지난번에 본 '확인 안 한 새 손님 수' — 늘었을 때만 알림창
+        let _custNewMap = {};     // 오늘 가입한 번호(숫자만) → '가입' | '재가입' — 손님 칸 '신규'·'재가입' 표시
+        function gCustSeenAt() { return parseInt(localStorage.getItem('moket_newcust_seen_at') || '0', 10) || 0; }
+        function gNewCustUnseen() { const s = gCustSeenAt(); return _newCusts.filter(c => c.at > s); }
+        function gCustPaintBadges() {
+            const n = gNewCustUnseen().length;
+            ['cust-badge-nav', 'cust-badge-sub'].forEach(id => {
+                const b = document.getElementById(id);
+                if (b) { b.textContent = n > 99 ? '99+' : String(n); b.style.display = n ? 'inline-block' : 'none'; }
+            });
+            // 큰 탭에서는 빨간 오류 숫자가 보이면 그 왼쪽에 붙는다
+            const red = document.getElementById('err-badge-nav'), green = document.getElementById('cust-badge-nav');
+            if (red && green) green.style.right = (red.style.display !== 'none' ? 4 + red.offsetWidth + 3 : 4) + 'px';
+            return n;
+        }
+        function gCustOnTab() {
+            const sec = document.getElementById('data-sub-cust'), tab = document.getElementById('tab-admin-sales');
+            return !!(sec && tab && sec.style.display !== 'none' && tab.style.display !== 'none');
+        }
+        function gCustMarkSeen() {
+            localStorage.setItem('moket_newcust_seen_at', String(Date.now()));
+            _newCustShown = 0;
+            gCustPaintBadges();
+        }
+        function gCustTodayMap() {   // 오늘(밤 12시 지나기 전) 가입한 손님 — 같은 번호면 가장 최근 것(가입/재가입)
+            const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+            const m = {};
+            _newCusts.filter(c => c.at >= t0.getTime()).forEach(c => { const k = String(c.phone).replace(/\D/g, ''); if (!m[k]) m[k] = c.what; });
+            return m;
+        }
+        function gNewCustToast(list) {
+            const n = list.length, first = (list[0] && list[0].name) || '이름 없음';
+            showToast(n === 1 ? `🆕 새 손님 ${first} · 가게 관리 > 손님` : `🆕 새 손님 ${n}명 (${first} 외 ${n - 1}명) · 가게 관리 > 손님`);
+        }
+        function gStartNewCustWatch() {
+            if (window._custWatchOn) return;
+            window._custWatchOn = true;
+            const cut = new Date(); cut.setDate(cut.getDate() - NEW_CUST_DAYS);
+            rtdb.ref('customer_logs').orderByKey().startAt(gLogDayKey(cut)).on('value', snap => {
+                const v = snap.val() || {};
+                const list = [];
+                Object.keys(v).forEach(day => Object.values(v[day] || {}).forEach(r => {
+                    if (r && (r.what === '가입' || r.what === '재가입') && r.who !== '가게')
+                        list.push({ at: Number(r.at) || 0, phone: String(r.phone || ''), name: String(r.name || r.to || ''), what: r.what });
+                }));
+                list.sort((a, b) => b.at - a.at);
+                _newCusts = list;
+                _custNewMap = gCustTodayMap();
+                const unseen = gNewCustUnseen();
+                if (gCustOnTab()) {   // 손님 칸을 보고 있으면 알림만 띄우고 확인한 것으로 친다
+                    if (unseen.length) gNewCustToast(unseen);
+                    gCustMarkSeen();
+                    return;
+                }
+                const n = gCustPaintBadges();
+                if (n > 0 && n > _newCustShown) gNewCustToast(unseen);
+                _newCustShown = n;
+            }, err => console.warn('새 손님 받기 실패:', err && err.message));
+        }
         /* [신규] 목록을 다시 그려도 보던 자리에 그대로 있게 한다.
            renderFilteredOrders()는 목록을 통째로 새로 만들기 때문에, 배달완료·입금완료처럼
            목록 중간에서 누르는 버튼을 쓰면 화면이 맨 위로 튀어 올라갔다. 어디까지 처리했는지
@@ -9459,6 +9682,37 @@
             return patchBody;
         }
 
+        /* [신규] 배달 기록(deliveries) 맞추기.
+           배달기사 앱이 '집 하나 · 하루 · 한 칸'으로 누가 언제 배달했는지 남긴다(기사 정산용).
+           여기서 배달완료를 다른 상태로 되돌렸는데 기록이 남아 있으면 기사 몫이 더 잡힌다.
+           되돌리기 전에 배달완료였던 줄들(prevRows)의 집·날짜마다, 아직 배달완료로 남은 줄이
+           하나도 없으면 그 칸을 지운다.
+           주문관리에서 배달완료로 바꾸는 것은 기록하지 않는다 — 기사 앱에서 누른 것만 센다. */
+        function gIsDeliveredRow(o) {
+            if (!o) return false;
+            const del = (o.delivered === true || o.delivered === 'true' || String(o.delivered).toUpperCase() === 'TRUE');
+            const can = (o.canceled === true || o.canceled === 'true' || String(o.canceled).toUpperCase() === 'TRUE');
+            return del && !can;
+        }
+        function gDelivSyncAfterStatus(prevRows, newStatus) {
+            if (newStatus === '배달완료' || !Array.isArray(prevRows) || !prevRows.length) return;
+            const houseOf = o => String((o && (o.firebasePhoneKey || o.phone)) || '').replace(/\D/g, '');
+            const seen = new Set();
+            prevRows.forEach(r => {
+                const house = houseOf(r);
+                const m = String(getOrderDateInfo(r).dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if (!house || !m) return;
+                const id = `${m[1]}-${m[2]}/${m[3]}/${house}`;
+                if (seen.has(id)) return;
+                seen.add(id);
+                const ymd = `${m[1]}-${m[2]}-${m[3]}`;
+                const still = (rawOrders || []).some(o => houseOf(o) === house && getOrderDateInfo(o).dateStr === ymd && gIsDeliveredRow(o));
+                if (still) return;
+                fetch(`${FIREBASE_DB_URL}deliveries/${id}.json`, { method: 'DELETE' })
+                    .catch(e => console.warn('배달 기록 지우기 실패:', e));
+            });
+        }
+
         // [신규] 주문관리에서 취소↔활성 전이 시 전역 재고 조정(복구/재차감).
         // 상품의 실제 matchKey 기준 키로 계산해야 실재고에 반영됨. 취소상태 변화가 있을 때만 조정 → 중복 복구 방지.
         /* [변경 2026-09-18] 주문관리에서는 주문 상태(취소·노쇼·취소 해제)로 재고를 돌리거나 줄이지 않는다.
@@ -10658,11 +10912,13 @@
                 
                 // 로컬 데이터 갱신
                 const _wasCanceledS = target && (target.canceled === true || target.canceled === "true" || String(target.canceled).toUpperCase() === "TRUE");
+                const _prevDelS = (target && gIsDeliveredRow(target)) ? [Object.assign({}, target)] : [];
                 if (target) {
                     Object.assign(target, patchBody);
                     syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
                     await applyStockDeltaForCancel(target, _wasCanceledS, newStatus === '취소'); // [신규] 취소↔활성 시 재고 복구/재차감
                 }
+                gDelivSyncAfterStatus(_prevDelS, newStatus);   // [신규] 배달완료를 되돌렸으면 배달 기록도 맞춘다
 
                 renderFilteredOrders();
                 if (typeof calRefreshIfOpen === 'function') calRefreshIfOpen();   // [신규] 달력이 열려 있으면 같이 새로 그린다
@@ -10715,10 +10971,12 @@
                 
                 // 로컬 데이터 일괄 갱신
                 const _wasCanceledMap = customerItems.map(it => it && (it.canceled === true || it.canceled === "true" || String(it.canceled).toUpperCase() === "TRUE"));
+                const _prevDelC = customerItems.filter(gIsDeliveredRow).map(it => Object.assign({}, it));
                 customerItems.forEach(it => {
                     Object.assign(it, patchBody);
                     syncStatusToGoogleSheets(it.phone, it.timestamp, it.item, newStatus);
                 });
+                gDelivSyncAfterStatus(_prevDelC, newStatus);   // [신규] 배달완료를 되돌렸으면 배달 기록도 맞춘다
                 // [신규] 취소↔활성 시 재고 복구/재차감 (같은 상품 경합 방지 위해 순차 처리)
                 for (let i = 0; i < customerItems.length; i++) await applyStockDeltaForCancel(customerItems[i], _wasCanceledMap[i], newStatus === '취소');
 
@@ -10771,9 +11029,11 @@
             }
 
             showLoader(`선택 항목 [${newStatus}] 일괄 처리 중...`);
-            
+
             try {
                 const patchBody = getStatusPatchBody(newStatus);
+                // [신규] 바꾸기 전에 배달완료였던 줄 (배달 기록 맞추기용)
+                const _prevDelB = itemsToProcess.map(x => x.target).filter(gIsDeliveredRow).map(t => Object.assign({}, t));
                 const promises = [];
                 itemsToProcess.forEach(({ phone, orderKey, target }) => {
                     const cleanPhone = String(phone || "").replace(/\D/g, "");
@@ -10808,6 +11068,7 @@
 
                 // [신규] 취소↔활성 전이 시 재고 복구/재차감 (같은 상품 경합 방지 위해 순차 처리)
                 for (const it of itemsToProcess) await applyStockDeltaForCancel(it.target, it.wasCanceled, newStatus === '취소');
+                gDelivSyncAfterStatus(_prevDelB, newStatus);   // [신규] 배달완료를 되돌렸으면 배달 기록도 맞춘다
 
                 showToast(`${itemsToProcess.length}개 주문 항목의 상태를 일괄 변경했습니다.` + (skippedDone > 0 ? ` (완료/취소 ${skippedDone}건 제외)` : ``));
                 selectedItems.clear();
@@ -12951,6 +13212,14 @@
 
         /* ===== [신규] 🗓️ 노출일정 탭 — 상품등록과 따로, 예약 공개·종료를 달력으로 관리한다 ===== */
         let psCalMonths = [];         // 지금 이어 붙여 보여주는 달들 'YYYY-MM' — 오래된→최신 차례
+        // [신규 2026-10-01] 올라가는 시각은 이 다섯 칸 중에서만 고른다 (11·13·15·17·19시)
+        const PS_SLOTS = [11, 13, 15, 17, 19];
+        function psSlotLabel(h, m) {
+            return `${String(h).padStart(2, '0')}시${m ? ' ' + String(m).padStart(2, '0') + '분' : ''}`;   // 24시간제 두 자리 (13시·15시…)
+        }
+        function psNearestSlot(hourFloat) {
+            return PS_SLOTS.reduce((best, s) => (Math.abs(s - hourFloat) < Math.abs(best - hourFloat) ? s : best), PS_SLOTS[0]);
+        }
         let psCalOpenDay = '';        // 펼쳐 둔 날짜 'YYYY-MM-DD' (없으면 '')
         let psAddSearchOpenFor = '';  // 이 날짜에서 '+ 새로 예약 걸기' 검색칸이 열려 있으면 그 날짜
         let psAddSearchQuery = '';
@@ -12978,47 +13247,93 @@
             event.stopPropagation();
             psDragIdx = idx;
             psDragMode = (edge === 'start') ? 'resize-start' : 'resize-end';
+            // [신규 2026-10-01] 여러 개를 고른 채 손잡이를 끌면, 고른 것 전부의 같은 쪽 끝을 같은 만큼 늘이거나 줄인다
+            psDragGroup = (psSelectedIdxs.has(idx) && psSelectedIdxs.size > 1) ? [...psSelectedIdxs].map(i => ({ idx: i })) : null;
             try { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', String(idx)); } catch (e) { }
         }
-        async function psResizeDrop(idx, prod, mode, dropKey) {
+        // 날짜 'YYYY-MM-DD' 두 개 사이 날수 (뒤 - 앞)
+        function psDayDiff(fromKey, toKey) {
+            const [a, b, c] = fromKey.split('-').map(Number), [x, y, z] = toKey.split('-').map(Number);
+            return Math.round((new Date(x, y - 1, z) - new Date(a, b - 1, c)) / 86400000);
+        }
+        // 시각 ts를 며칠 옮기고, slotHour가 있으면 그 시각(정각)으로 맞춘다 — 없으면 원래 시각 그대로
+        function psShiftTs(ts, days, slotHour) {
+            const d = new Date(Number(ts));
+            d.setDate(d.getDate() + days);
+            if (slotHour !== null && slotHour !== undefined) d.setHours(slotHour, 0, 0, 0);
+            return d.getTime();
+        }
+        async function psResizeDrop(idx, prod, mode, dropKey, hour, group) {
             const field = (mode === 'resize-start') ? 'releaseAt' : 'expireAt';
             const cur = Number(prod[field]) || 0;
-            const hh = cur ? new Date(cur).getHours() : 15, mm = cur ? new Date(cur).getMinutes() : 0;
+            let hh = cur ? new Date(cur).getHours() : 15, mm = cur ? new Date(cur).getMinutes() : 0;
+            // [신규 2026-10-01] 시작 손잡이를 시간칸에 놓으면 그 시각으로 올라간다 (마감은 시각 그대로)
+            if (mode === 'resize-start' && PS_SLOTS.includes(hour)) { hh = hour; mm = 0; }
             const [y, m, d] = dropKey.split('-').map(Number);
             const newTs = new Date(y, m - 1, d, hh, mm, 0, 0).getTime();
             if (cur && newTs === cur) return;
+            const word = mode === 'resize-start' ? '올라가는' : '마감';
+            // [신규 2026-10-01] 여러 개를 고른 채 끌었으면, 잡은 막대가 늘어난(줄어든) 날수만큼 고른 것 전부의 같은 쪽 끝을 똑같이 옮긴다.
+            //  시작 손잡이를 시간칸에 놓았으면 다 같이 그 시각으로 맞춘다 (다섯 칸 밖 시각으로 밀리지 않게)
+            if (group && group.length > 1 && cur) {
+                const dDays = psDayDiff(fMsToDateKey(cur), dropKey);
+                const slotHour = (mode === 'resize-start' && PS_SLOTS.includes(hour)) ? hour : null;
+                let done = 0;
+                for (const g of group) {
+                    const p = (uploadProducts || [])[g.idx];
+                    const v = p && Number(p[field]);
+                    if (!v) continue;   // 그쪽 끝이 없는 상품은 건너뛴다 (예: 마감 시각을 안 걸어 둔 상품)
+                    if (await psApplyScheduleUpdate(g.idx, { [field]: psShiftTs(v, dDays, slotHour) })) done++;
+                }
+                if (done) { showToast(`📅 ${done}개 상품의 ${word} 날짜를 같이 옮겼어요`); renderProductScheduleCalendar(); }
+                return;
+            }
             const ok = await psApplyScheduleUpdate(idx, { [field]: newTs });
             if (ok) {
-                showToast(mode === 'resize-start' ? '📅 올라가는 날짜를 옮겼어요' : '📅 마감 날짜를 옮겼어요');
+                showToast(`📅 ${word} 날짜를 옮겼어요`);
                 renderProductScheduleCalendar();
             }
         }
         // [신규] 그냥 끌면 이동, Ctrl(맥은 ⌘)을 누른 채 끌면 복제 — 원본은 그 자리에 그대로 두고
         //  새 상품을 하나 더 만들어 그 상품에만 새 날짜의 예약을 건다.
-        async function psHandleDrop(event, dropKey) {
+        async function psHandleDrop(event, dropKey, hour) {
             event.preventDefault();
+            if (hour !== undefined) event.stopPropagation();   // 시간칸에 놓았으면 날짜칸이 한 번 더 받지 않게
             const idx = psDragIdx, origStart = psDragOrigStart, mode = psDragMode, group = psDragGroup;
             const isCopy = !!(event.ctrlKey || event.metaKey);
             psDragIdx = null; psDragOrigStart = ''; psDragMode = 'move'; psDragGroup = null;
             if (idx === null) return;
             const prod = (uploadProducts || [])[idx];
             if (!prod) return;
-            if (mode === 'resize-start' || mode === 'resize-end') { return psResizeDrop(idx, prod, mode, dropKey); }
-            if (!origStart || dropKey === origStart) return;   // 안 끌었거나 같은 날이면 아무 일도 안 한다
+            if (mode === 'resize-start' || mode === 'resize-end') { return psResizeDrop(idx, prod, mode, dropKey, hour, group); }
+            if (!origStart) return;
             const [oy, om, od] = origStart.split('-').map(Number);
             const [ny, nm, nd] = dropKey.split('-').map(Number);
             const deltaDays = Math.round((new Date(ny, nm - 1, nd).getTime() - new Date(oy, om - 1, od).getTime()) / 86400000);
-            if (!deltaDays) return;
+            /* [수정 2026-10-01] 시간칸에 놓으면 끈 상품의 올라가는 시각이 '그 날 그 시각'이 되고,
+               마감 시각과 같이 고른 다른 상품들은 그만큼(날짜+시간) 똑같이 밀린다. 날짜칸에 놓으면 예전처럼 날짜만 옮긴다. */
+            let deltaMs = deltaDays * 86400000;
+            if (PS_SLOTS.includes(hour) && prod.releaseAt) {
+                deltaMs = new Date(ny, nm - 1, nd, hour, 0, 0, 0).getTime() - Number(prod.releaseAt);
+            }
+            if (!deltaMs) return;   // 안 끌었거나 같은 자리면 아무 일도 안 한다
 
             // [신규] 여러 개를 선택한 채 끌었으면, 잡은 막대의 이동한 며칠만큼 선택된 전부를 같이 옮기거나 복제한다
             if (group && group.length > 1) {
                 let done = 0;
+                // [수정 2026-10-01] 고른 것 전부 같은 날수만큼 옮기되, 시간칸에 놓았으면 다 같이 그 시각에 올라가게 맞춘다.
+                //  마감 시각은 각자 올라가는 시각이 바뀐 만큼 같이 밀린다 (판매 기간 길이는 그대로)
+                const slotHour = PS_SLOTS.includes(hour) ? hour : null;
                 for (const g of group) {
                     const p = (uploadProducts || [])[g.idx];
                     if (!p) continue;
                     const gChanges = {};
-                    if (p.releaseAt) gChanges.releaseAt = Number(p.releaseAt) + deltaDays * 86400000;
-                    if (p.expireAt) gChanges.expireAt = Number(p.expireAt) + deltaDays * 86400000;
+                    let shift = deltaDays * 86400000;
+                    if (p.releaseAt) {
+                        gChanges.releaseAt = psShiftTs(p.releaseAt, deltaDays, slotHour);
+                        shift = gChanges.releaseAt - Number(p.releaseAt);
+                    }
+                    if (p.expireAt) gChanges.expireAt = Number(p.expireAt) + shift;
                     if (Object.keys(gChanges).length === 0) continue;
                     const ok = isCopy ? await psDuplicateWithSchedule(g.idx, gChanges) : await psApplyScheduleUpdate(g.idx, gChanges);
                     if (ok) done++;
@@ -13034,8 +13349,8 @@
             // 올라가는·내려가는 시각을 같은 며칠만큼 통째로 옮긴다 (시각은 그대로 두고 날짜만).
             // 지나간 시각으로 옮기면 psApplyScheduleUpdate가 그 순간 다시 노출시키고, 새 공지도 다시 뜨게 한다.
             const changes = {};
-            if (prod.releaseAt) changes.releaseAt = Number(prod.releaseAt) + deltaDays * 86400000;
-            if (prod.expireAt) changes.expireAt = Number(prod.expireAt) + deltaDays * 86400000;
+            if (prod.releaseAt) changes.releaseAt = Number(prod.releaseAt) + deltaMs;
+            if (prod.expireAt) changes.expireAt = Number(prod.expireAt) + deltaMs;
             if (Object.keys(changes).length === 0) return;
 
             if (isCopy) {
@@ -13149,7 +13464,52 @@
             renderProductScheduleCalendar();
             psCalExtending = false;
         }
+        // [신규] 폰용 오른쪽 막대 — 손잡이 자리를 지금 스크롤 위치에 맞춘다
+        function psCalSyncThumb() {
+            const box = document.getElementById('ps-cal-box');
+            const rail = document.getElementById('ps-cal-rail');
+            const thumb = document.getElementById('ps-cal-thumb');
+            if (!box || !rail || !thumb || !rail.offsetParent) return;
+            const max = box.scrollHeight - box.clientHeight;
+            const room = rail.clientHeight - thumb.offsetHeight;
+            thumb.style.top = (max > 0 ? Math.round(box.scrollTop / max * room) : 0) + 'px';
+        }
+        // 막대를 누르면 그 자리로 옮기고, 누른 채 끌면 끈 만큼 달력을 위아래로 움직인다
+        function psCalRailDown(ev) {
+            const box = document.getElementById('ps-cal-box');
+            const rail = document.getElementById('ps-cal-rail');
+            const thumb = document.getElementById('ps-cal-thumb');
+            if (!box || !rail || !thumb) return;
+            ev.preventDefault();
+            const ratio = () => {
+                const room = rail.clientHeight - thumb.offsetHeight;
+                return room > 0 ? (box.scrollHeight - box.clientHeight) / room : 0;
+            };
+            if (ev.target !== thumb) {
+                const r = rail.getBoundingClientRect();
+                const want = ev.clientY - r.top - thumb.offsetHeight / 2;
+                box.scrollTop = want * ratio();
+            }
+            let lastY = ev.clientY;
+            try { rail.setPointerCapture(ev.pointerId); } catch (e) { }
+            const move = (e) => {
+                if (e.pointerId !== ev.pointerId) return;
+                e.preventDefault();
+                box.scrollTop += (e.clientY - lastY) * ratio();   // 달이 이어붙어 길이가 바뀌어도 그때그때 비율로 따라간다
+                lastY = e.clientY;
+            };
+            const up = (e) => {
+                if (e.pointerId !== ev.pointerId) return;
+                rail.removeEventListener('pointermove', move);
+                rail.removeEventListener('pointerup', up);
+                rail.removeEventListener('pointercancel', up);
+            };
+            rail.addEventListener('pointermove', move);
+            rail.addEventListener('pointerup', up);
+            rail.addEventListener('pointercancel', up);
+        }
         function psCalOnScroll() {
+            psCalSyncThumb();
             if (psCalSuppressScroll) return;
             const box = document.getElementById('ps-cal-box');
             if (!box) return;
@@ -13189,6 +13549,16 @@
             psCalOpenDay = (psCalOpenDay === key) ? '' : key;
             psAddSearchOpenFor = '';
             renderProductScheduleCalendar();
+            if (psCalOpenDay) psCalCenterOn(key);
+        }
+        // [신규] 누른 날짜가 달력 칸 한가운데로 오게 부드럽게 옮긴다
+        function psCalCenterOn(key) {
+            const box = document.getElementById('ps-cal-box');
+            const cell = box && box.querySelector(`[data-day="${key}"]`);
+            if (!cell) return;
+            const top = cell.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+            psCalSuppressFor(700);   // 옮기는 동안 위·아래 끝에 닿았다고 달을 덧붙이지 않게
+            box.scrollTo({ top: Math.max(0, top - (box.clientHeight - cell.offsetHeight) / 2), behavior: 'smooth' });
         }
 
         function renderProductScheduleCalendar() {
@@ -13213,12 +13583,21 @@
                 const visibleNow = released && !hidden;
                 const st = gIsClosedAdmin(prod) ? 'closed' : (visibleNow ? 'on' : (released ? 'hidden' : 'soon'));
                 const start = rk || ek, end = ek || rk;
-                bars.push({ idx, nm, st, start: start <= end ? start : end, end: start <= end ? end : start,
+                // [신규 2026-10-01] 올라가는 시각 — 같은 날 안에서는 이른 시각이 위로 오고, 막대 머리에 '3시'처럼 붙인다
+                const relD = prod.releaseAt ? new Date(Number(prod.releaseAt)) : null;
+                const relMin = relD ? relD.getHours() * 60 + relD.getMinutes() : 9999;
+                // [신규 2026-10-01] 날짜칸 안 시간 다섯 줄 중 어느 줄에 놓을지 — 다섯 칸에 안 맞는 예전 시각은 가장 가까운 줄로
+                const baseD = relD || (prod.expireAt ? new Date(Number(prod.expireAt)) : null);
+                const slot = psNearestSlot(baseD ? baseD.getHours() + baseD.getMinutes() / 60 : 15);
+                bars.push({ idx, nm, st, slot, start: start <= end ? start : end, end: start <= end ? end : start,
+                    relMin, timeTag: (relD && !(relD.getMinutes() === 0 && PS_SLOTS.includes(relD.getHours()))) ? psSlotLabel(relD.getHours(), relD.getMinutes()) : '',
                     tip: `${prod.releaseAt ? fFmtSchedTime(prod.releaseAt) + ' 올라감' : ''}${prod.releaseAt && prod.expireAt ? ' ~ ' : ''}${prod.expireAt ? fFmtSchedTime(prod.expireAt) + ' 마감' : ''}` });
             });
-            bars.sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
-            const laneEnd = [];
+            bars.sort((a, b) => a.start.localeCompare(b.start) || a.relMin - b.relMin || a.end.localeCompare(b.end));
+            // [수정 2026-10-01] 줄 자리(lane)는 시간 줄마다 따로 매긴다 — 같은 시간 줄 안에서만 겹치지 않게 쌓는다
+            const laneEndBySlot = {};
             bars.forEach(b => {
+                const laneEnd = laneEndBySlot[b.slot] || (laneEndBySlot[b.slot] = []);
                 let l = laneEnd.findIndex(e => e < b.start);
                 if (l < 0) { l = laneEnd.length; laneEnd.push(''); }
                 laneEnd[l] = b.end; b.lane = l;
@@ -13243,24 +13622,38 @@
             const rangeFirstKey = dateKeys[0], rangeLastKey = dateKeys[dateKeys.length - 1];
             const rangeBars = bars.filter(b => b.end >= rangeFirstKey && b.start <= rangeLastKey);
 
-            // 주(달력 한 줄)마다 쓰이는 줄 수 — 같은 주의 칸은 같은 줄 수로 맞춰야 막대가 가지런하다
-            const weekLanes = {};
+            // 주(달력 한 줄)마다·시간 줄마다 쓰이는 줄 수 — 같은 주의 칸은 같은 줄 수로 맞춰야 막대가 가지런하다
+            const weekLanes = {};   // weekLanes[w][slot] = 줄 수
             dateKeys.forEach((key, i) => {
                 const w = Math.floor((lead + i) / 7);
-                rangeBars.forEach(b => { if (b.start <= key && key <= b.end) weekLanes[w] = Math.max(weekLanes[w] || 0, b.lane + 1); });
+                const row = weekLanes[w] || (weekLanes[w] = {});
+                rangeBars.forEach(b => { if (b.start <= key && key <= b.end) row[b.slot] = Math.max(row[b.slot] || 0, b.lane + 1); });
             });
 
             // [신규] 어느 달이 지금 '눈에 띄는' 달인지 — 펼쳐 둔 날짜가 있으면 그 달, 없으면 오늘이 있는 달.
             //  그 달만 또렷하게 두고 나머지는 흐리게 해서, 스크롤하다 어느 달인지 한눈에 알 수 있게 한다.
             const activeMonth = psCalOpenDay ? psCalOpenDay.slice(0, 7) : psTodayMonthKey();
 
-            let html = `<div class="ps-cal-weekhead">` + ['일', '월', '화', '수', '목', '금', '토'].map(w => `<div class="ms-cal-head">${w}</div>`).join('') + `</div>`;
+            /* [신규 2026-10-01] 맨 왼쪽 시간 기둥 — 주마다 11·13·15·17·19를 적는다.
+               날짜칸과 똑같은 모양(날짜 줄 + 시간 다섯 줄 + 같은 수의 빈 막대 자리)으로 그려서 줄 높이가 꼭 맞는다. */
+            const gutterHtml = (w) => {
+                let g = `<div class="ms-cal-cell ps-gutter"><div class="ms-cal-day">&nbsp;</div><div class="ps-bars">`;
+                PS_SLOTS.forEach(slot => {
+                    const n = (weekLanes[w] || {})[slot] || 0;
+                    g += `<div class="ps-slot"><span class="ps-gutter-lbl">${String(slot).padStart(2, '0')}</span>`
+                        + '<div class="ps-bar ps-bar-empty"></div>'.repeat(n) + `</div>`;
+                });
+                return g + `</div></div>`;
+            };
+            let html = `<div class="ps-cal-weekhead"><div></div>` + ['일', '월', '화', '수', '목', '금', '토'].map(w => `<div class="ms-cal-head">${w}</div>`).join('') + `</div>`;
             html += `<div class="ms-cal-grid">`;
+            html += gutterHtml(0);
             for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty"></div>`;
 
             dateKeys.forEach((key, i) => {
                 const w = Math.floor((lead + i) / 7);
                 const dow = (lead + i) % 7;
+                if (dow === 0 && lead + i > 0) html += gutterHtml(w);   // 새 주가 시작될 때마다 시간 기둥부터
                 const dNum = parseInt(key.slice(8, 10), 10);
                 const isMonthStart = (dNum === 1);
                 const todays = rangeBars.filter(b => b.start <= key && key <= b.end);
@@ -13269,14 +13662,19 @@
                     + (key === psCalOpenDay ? ' ms-cal-open' : '')
                     + (key.slice(0, 7) === activeMonth ? '' : ' ps-cal-fade')
                     + (dow === 0 ? ' ms-cal-sun' : dow === 6 ? ' ms-cal-sat' : '');
-                // 줄 자리마다 막대 조각을 놓는다. 이름은 시작하는 날·일요일·1일에만 적는다
-                const nLanes = weekLanes[w] || 0;
+                // [수정 2026-10-01] 날짜칸 안을 시간 다섯 줄(11시·1시·3시·5시·7시)로 나눈다.
+                //  줄마다 그 시각에 올라가는 막대가 있고, 막대를 다른 날·다른 시간 줄에 끌어다 놓으면 그 날 그 시각으로 옮겨진다.
                 let namesHtml = '';
+                PS_SLOTS.forEach(slot => {
+                const nLanes = (weekLanes[w] || {})[slot] || 0;
+                namesHtml += `<div class="ps-slot" title="${psSlotLabel(slot)}" ondragover="event.preventDefault(); this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="this.classList.remove('over'); psHandleDrop(event, '${key}', ${slot})">`;
                 for (let l = 0; l < nLanes; l++) {
-                    const b = todays.find(x => x.lane === l);
+                    const b = todays.find(x => x.slot === slot && x.lane === l);
                     if (!b) { namesHtml += `<div class="ps-bar ps-bar-empty"></div>`; continue; }
                     const isStart = b.start === key, isEnd = b.end === key;
-                    const label = (isStart || dow === 0 || isMonthStart) ? gEscapeHtml(b.nm) : '';
+                    const timeTag = (isStart && b.timeTag && b.start === fMsToDateKey((uploadProducts[b.idx] || {}).releaseAt))
+                        ? `<b style="margin-right:3px;">${b.timeTag}</b>` : '';
+                    const label = (isStart || dow === 0 || isMonthStart) ? timeTag + gEscapeHtml(b.nm) : '';
                     const [bg, fg, word] = ST[b.st];
                     // [신규] 막대를 끌어다 다른 날짜에 놓으면 올라가는·내려가는 시각이 같은 만큼(며칠) 통째로 옮겨간다.
                     //  (시각을 새로 잡으면 psApplyScheduleUpdate가 알아서 다시 노출시키고 새 공지도 뜨게 한다)
@@ -13298,17 +13696,20 @@
                     const rHandle = isEnd ? `<div class="ps-rh r" draggable="true" ondragstart="psResizeDragStart(event, ${b.idx}, 'end')" title="끌어서 마감 날짜 조절"></div>` : '';
                     namesHtml += `<div class="ps-bar${isStart ? ' s' : ''}${isEnd ? ' e' : ''}${isCut ? ' cut' : ''}" style="background:${bg}; color:${fg}; cursor:grab;${selShadow}" title="${gEscapeHtml(b.nm)} · ${b.tip} · 지금 ${word} · 끌어서 날짜 옮기기(Ctrl+끌면 복제) · 양 끝을 끌면 시작/마감 날짜만 조절 · 눌러서 고른 뒤 Delete로 지우기" draggable="true" ondragstart="psDragStart(event, ${b.idx}, '${b.start}')" onclick="event.stopPropagation(); psSelectBar(${b.idx}, '${key}')">${lHandle}${label}${rHandle}</div>`;
                 }
+                namesHtml += `</div>`;   // ps-slot 닫기
+                });
                 // [수정] 1월 1일(=해가 바뀌는 날)에는 달만으론 헷갈리니 연도까지 같이 적는다
                 const monthNum = parseInt(key.slice(5, 7), 10);
                 const dayLabel = !isMonthStart ? String(dNum) : (monthNum === 1 ? `${key.slice(0, 4)}/${monthNum}/${dNum}` : `${monthNum}/${dNum}`);
                 const monthStartAttr = isMonthStart ? ` data-month-start="${key.slice(0, 7)}"` : '';
-                html += `<div class="${cls}"${monthStartAttr} onclick="togglePsDay('${key}')" ondragover="event.preventDefault()" ondrop="psHandleDrop(event, '${key}')" title="${key} — 눌러서 보기">`
+                html += `<div class="${cls}"${monthStartAttr} data-day="${key}" onclick="togglePsDay('${key}')" ondragover="event.preventDefault()" ondrop="psHandleDrop(event, '${key}')" title="${key} — 눌러서 보기">`
                     + `<div class="ms-cal-day">${dayLabel}</div>`
                     + (namesHtml ? `<div class="ps-bars">${namesHtml}</div>` : '')
                     + `</div>`;
             });
             html += `</div>`;   // ms-cal-grid 닫기
             box.innerHTML = html;
+            psCalSyncThumb();
 
             // [수정] 날짜를 누르면 나오는 상품 칸 — 스크롤 달력 안에 끼워 두면 중간에 묻혀 보기 힘들어서, 달력 밖 자리에 따로 그린다.
             const detailBox = document.getElementById('ps-day-detail-box');
@@ -13325,6 +13726,9 @@
                 if (!prod) return;
                 if (fMsToDateKey(prod.releaseAt) === dateKey || fMsToDateKey(prod.expireAt) === dateKey) idxList.push(idx);
             });
+            // [수정 2026-10-01] 이 날 올라가는 것을 이른 시각부터, 이 날 마감만 되는 것은 그 뒤에
+            const key = (i) => { const p = uploadProducts[i]; return fMsToDateKey(p.releaseAt) === dateKey ? Number(p.releaseAt) : Infinity; };
+            idxList.sort((a, b) => key(a) - key(b));
             let html = `<div style="display:flex; flex-direction:column; gap:10px;">`;
             html += `<div style="font-size:12.5px; font-weight:900; color:#0f172a;">📅 ${dateKey}</div>`;
             if (idxList.length === 0) {
@@ -13332,7 +13736,7 @@
             } else {
                 html += idxList.map(idx => psScheduleRowHtml(idx)).join('');
             }
-            html += psAddSearchHtml(dateKey);
+            html += psAddSearchHtml(dateKey, 15);
             html += `</div>`;
             return html;
         }
@@ -13342,6 +13746,14 @@
             if (!prod) return '';
             const relVal = fMsToScheduleInputValue(prod.releaseAt);
             const expVal = fMsToScheduleInputValue(prod.expireAt);
+            // [신규 2026-10-01] 올라가는 시각 = 날짜 + 다섯 시각 중 하나. 예전에 다른 시각으로 걸어 둔 것은 그 값도 목록에 남겨 둔다
+            const relDate = relVal ? relVal.slice(0, 10) : '';
+            const relTime = relVal ? relVal.slice(11, 16) : '15:00';
+            const slotVals = PS_SLOTS.map(h => `${String(h).padStart(2, '0')}:00`);
+            const timeOpts = (slotVals.includes(relTime) ? [] : [relTime]).concat(slotVals).map(v => {
+                const [hh, mm] = v.split(':').map(Number);
+                return `<option value="${v}"${v === relTime ? ' selected' : ''}>${psSlotLabel(hh, mm)}${slotVals.includes(v) ? '' : ' (예전 시각)'}</option>`;
+            }).join('');
             const weeklyWarn = (prod.showWeekly === true)
                 ? `<div style="font-size:11px; font-weight:800; color:#dc2626; margin-top:6px;">⚠️ '매주 노출' 상품이라 예약이 반영되지 않아요. 상품목록에서 매주 노출을 먼저 꺼주세요.</div>`
                 : '';
@@ -13358,7 +13770,10 @@
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:6px;">   <!-- [수정] 폭이 모자라면 두 줄로 (날짜·시각 칸이 옆으로 넘쳤다) -->
                     <div>
                         <label style="font-size:10.5px; font-weight:700; color:var(--text-sub); display:block; margin-bottom:2px;">🕐 올라가는 시각</label>
-                        <input type="datetime-local" value="${relVal}" onfocus="psFillDefaultTime(this)" onchange="psUpdateTime(${idx}, 'releaseAt', this.value)" style="width:100%; min-width:0; box-sizing:border-box; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
+                        <div style="display:flex; gap:4px;">
+                            <input type="date" id="ps-rel-date-${idx}" value="${relDate}" onchange="psUpdateReleaseSlot(${idx})" style="flex:1 1 0; min-width:0; box-sizing:border-box; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
+                            <select id="ps-rel-hour-${idx}" onchange="psUpdateReleaseSlot(${idx})" style="flex:0 0 auto; width:88px; box-sizing:border-box; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 4px; font-size:12px; font-weight:800; background:#fff;">${timeOpts}</select>
+                        </div>
                     </div>
                     <div>
                         <label style="font-size:10.5px; font-weight:700; color:var(--text-sub); display:block; margin-bottom:2px;">🕕 마감 시각</label>
@@ -13371,9 +13786,9 @@
             </div>`;
         }
 
-        function psAddSearchHtml(dateKey) {
-            if (psAddSearchOpenFor !== dateKey) {
-                return `<button type="button" onclick="psOpenAddSearch('${dateKey}')" style="width:100%; height:38px; border:1.5px dashed var(--border); background:#f8fafc; border-radius:10px; font-size:12px; font-weight:800; color:#475569; cursor:pointer;">＋ 이 날짜에 상품 새로 예약 걸기</button>`;
+        function psAddSearchHtml(dateKey, hour) {
+            if (psAddSearchOpenFor !== `${dateKey}|${hour}`) {
+                return `<button type="button" onclick="psOpenAddSearch('${dateKey}', ${hour})" style="width:100%; height:38px; border:1.5px dashed var(--border); background:#f8fafc; border-radius:10px; font-size:12px; font-weight:800; color:#475569; cursor:pointer;">＋ 이 날짜에 상품 새로 예약 걸기 (${psSlotLabel(hour)})</button>`;
             }
             const q = psAddSearchQuery.trim();
             const results = q ? (uploadProducts || [])
@@ -13396,7 +13811,7 @@
                         if (weekly) {
                             return `<div title="'매주 노출' 중인 상품은 예약을 걸 수 없어요. 상품목록에서 매주 노출을 먼저 꺼주세요." style="padding:7px 9px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:7px; font-size:12.5px; font-weight:700; color:#94a3b8; cursor:not-allowed;">${gEscapeHtml(p.name)} <span style="color:#cbd5e1; font-weight:800;">🔁 매주 노출 중 · 예약 불가</span></div>`;
                         }
-                        return `<div onclick="psPickProductForSchedule(${idx}, '${dateKey}')" style="padding:7px 9px; background:#fff; border:1px solid #dbeafe; border-radius:7px; font-size:12.5px; font-weight:700; cursor:pointer;">${gEscapeHtml(p.name)} <span style="color:#94a3b8; font-weight:600;">${p.price ? Number(p.price).toLocaleString() + '원' : ''}</span></div>`;
+                        return `<div onclick="psPickProductForSchedule(${idx}, '${dateKey}', ${hour})" style="padding:7px 9px; background:#fff; border:1px solid #dbeafe; border-radius:7px; font-size:12.5px; font-weight:700; cursor:pointer;">${gEscapeHtml(p.name)} <span style="color:#94a3b8; font-weight:600;">${p.price ? Number(p.price).toLocaleString() + '원' : ''}</span></div>`;
                     }).join('')
                         : (q ? `<div style="font-size:11.5px; color:#94a3b8;">찾는 상품이 없어요</div>` : `<div style="font-size:11.5px; color:#94a3b8;">상품명을 입력하고 Enter 또는 검색</div>`)}
                 </div>
@@ -13404,14 +13819,14 @@
             </div>`;
         }
 
-        function psOpenAddSearch(dateKey) {
-            psAddSearchOpenFor = dateKey;
+        function psOpenAddSearch(dateKey, hour) {
+            psAddSearchOpenFor = `${dateKey}|${hour}`;
             psAddSearchQuery = '';
             renderProductScheduleCalendar();
             setTimeout(() => { const el = document.getElementById('ps-add-search-input'); if (el) el.focus(); }, 0);
         }
 
-        async function psPickProductForSchedule(idx, dateKey) {
+        async function psPickProductForSchedule(idx, dateKey, hour) {
             const prod = (uploadProducts || [])[idx];
             // [신규] '매주 노출' 상품은 검색결과에서 이미 회색으로 막아 두지만,
             //  혹시 모를 경우를 대비해 여기서도 한 번 더 막는다 — 조용히 안 걸리는 대신 뚜렷하게 알린다.
@@ -13419,7 +13834,9 @@
                 showToast("🔁 '매주 노출' 상품은 예약을 걸 수 없어요");
                 return;
             }
-            const defaultMs = new Date(`${dateKey}T15:00`).getTime();   // [수정] 기본 시각 오후 3시 (사장님 요청)
+            // [수정 2026-10-01] 고른 시간 칸의 시각으로 건다 (칸 없이 불리면 예전처럼 오후 3시)
+            const h = PS_SLOTS.includes(Number(hour)) ? Number(hour) : 15;
+            const defaultMs = new Date(`${dateKey}T${String(h).padStart(2, '0')}:00`).getTime();
             const ok = await psApplyScheduleUpdate(idx, { releaseAt: defaultMs });
             if (ok) { psAddSearchOpenFor = ''; psAddSearchQuery = ''; }
             renderProductScheduleCalendar();
@@ -13432,6 +13849,15 @@
             const d = new Date();
             const p = (x) => String(x).padStart(2, '0');
             el.value = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T15:00`;
+        }
+
+        // [신규 2026-10-01] 올라가는 시각 — 날짜칸 + 시간 다섯 칸 고르기를 합쳐 저장한다. 날짜를 지우면 올라가는 예약도 지운다
+        async function psUpdateReleaseSlot(idx) {
+            const d = (document.getElementById(`ps-rel-date-${idx}`) || {}).value || '';
+            const t = (document.getElementById(`ps-rel-hour-${idx}`) || {}).value || '15:00';
+            const ms = d ? new Date(`${d}T${t}`).getTime() : NaN;
+            await psApplyScheduleUpdate(idx, { releaseAt: (d && !isNaN(ms)) ? ms : null });
+            renderProductScheduleCalendar();
         }
 
         async function psUpdateTime(idx, field, value) {
@@ -13470,6 +13896,7 @@
             else psSelectedIdxs.add(idx);
             psCalOpenDay = dateKey;   // 그 날짜를 열어 둬야 '한 번 더 누르면 지워져요' 문구도 보인다
             renderProductScheduleCalendar();
+            psCalCenterOn(dateKey);
         }
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && psDelConfirmIdxs !== null) { psDelConfirmCancel(); return; }
@@ -15777,7 +16204,7 @@
         // ===== [신규] 가게 관리(옛 자료 정리) — 하위 탭 (판매 통계 / 매입·매출 / 손님 관리 / 아파트 관리 / 일반 관리) =====
         function switchDataSubTab(which) {
             // [수정] '매입·매출'이 늘어 세 갈래가 됐다. 보일 것 하나만 켜고 나머지는 끈다.
-            const keys = ['sales', 'profit', 'cust', 'apart', 'general'];
+            const keys = ['sales', 'profit', 'cust', 'apart', 'general', 'errors'];
             if (!keys.includes(which)) which = 'sales';
             keys.forEach(k => {
                 const sec = document.getElementById('data-sub-' + k);
@@ -15789,8 +16216,9 @@
             // [수정] 전단지 기록은 맨 위 '🧾 전단지 기록' 단추를 눌렀을 때만 띄운다 (openFlyerModal)
             if (which === 'apart') renderApartmentAdmin();
             else if (which === 'profit') renderProfitReport();
-            else if (which === 'cust') initCustomerAdmin();
+            else if (which === 'cust') { _custNewMap = gCustTodayMap(); gCustMarkSeen(); initCustomerAdmin(); }   // [신규 2026-10-01] 오늘 가입한 손님에 '신규'·'재가입' 표시
             else if (which === 'general') renderGeneralAdmin(true);
+            else if (which === 'errors') renderErrorAdmin();
         }
 
         /* ================= [신규] 일반 관리 (주문서 '사장님 설정'을 옮겨 옴) =================
@@ -17715,7 +18143,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 return `
                 <div class="ca-card" onclick="showCustomerCardModal('${encodeURIComponent(r.phone)}','${encodeURIComponent(r.name)}')">
                     <div class="ca-r1">
-                        <span class="ca-name">${gEscapeHtml(r.name)}${r.realName && r.realName !== r.name ? `<span style="font-weight:700; color:#94a3b8;"> (${gEscapeHtml(r.realName)})</span>` : ''}</span>
+                        ${_custNewMap[String(r.phone || '').replace(/\D/g, '')] ? `<span style="flex:0 0 auto; font-size:11px; font-weight:900; color:#fff; background:#16a34a; padding:1px 6px; border-radius:6px; margin-right:5px;">${_custNewMap[String(r.phone || '').replace(/\D/g, '')] === '재가입' ? '재가입' : '신규'}</span>` : ''}<span class="ca-name">${gEscapeHtml(r.name)}${r.realName && r.realName !== r.name ? `<span style="font-weight:700; color:#94a3b8;"> (${gEscapeHtml(r.realName)})</span>` : ''}</span>
                         ${r.noShow ? `<span style="flex:0 0 auto; font-size:11px; font-weight:800; color:#c2410c;" title="마지막 노쇼 ${gEscapeHtml(r.noShowLast)}">⛔ 노쇼 ${r.noShow}회</span>` : ''}
                         <span class="ca-cnt">${r.orders}회</span>
                         <span class="ca-amt" title="${r.amt.toLocaleString()}원">${won(r.amt)}</span>
@@ -22482,6 +22910,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             try {
                 const patchBody = getStatusPatchBody(newStatus);
                 const wasCanceled = rows.map(o => isSalesCanceled(o));
+                const _prevDelK = rows.filter(gIsDeliveredRow).map(o => Object.assign({}, o));   // [신규] 배달 기록 맞추기용
 
                 await Promise.all(rows.map(o => {
                     const phoneKey = o.firebasePhoneKey ? o.firebasePhoneKey : String(o.phone || '').replace(/\D/g, '');
@@ -22508,6 +22937,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 for (let i = 0; i < rows.length; i++) {
                     await applyStockDeltaForCancel(rows[i], wasCanceled[i], newStatus === '취소');
                 }
+                gDelivSyncAfterStatus(_prevDelK, newStatus);   // [신규] 배달완료를 되돌렸으면 배달 기록도 맞춘다
 
                 showToast(skippedDone > 0
                     ? `${rows.length}건을 [${newStatus}]로 바꿨습니다. (이미 끝난 ${skippedDone}건은 그대로 뒀습니다)`
@@ -25586,37 +26016,75 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             } else {
                 bar.classList.remove('show');
             }
-            // [신규 2026-09-30] 설명 복사·사진 공유는 상품 하나를 골랐을 때만 뜻이 통해서, 하나만 골랐을 때만 보인다
+            // [신규 2026-09-30] 공유&복사는 상품 하나를 골랐을 때만 뜻이 통해서, 하나만 골랐을 때만 보인다
             const single = uploadSelectedProductIndices.size === 1;
-            const copyBtn = document.getElementById('btn-batch-copydesc');
-            const shareBtn = document.getElementById('btn-batch-sharephoto');
-            if (copyBtn) copyBtn.style.display = single ? 'flex' : 'none';
-            if (shareBtn) shareBtn.style.display = single ? 'flex' : 'none';
+            const shareCopyBtn = document.getElementById('btn-batch-sharecopy');
+            if (shareCopyBtn) shareCopyBtn.style.display = single ? 'flex' : 'none';
         }
 
-        // [신규 2026-09-30] 고른 상품 하나의 상세설명만 클립보드로 복사한다
-        async function handleBatchCopyDesc() {
+        /* [신규 2026-10-01] 설명 속 날짜 줄(📦 픽업/배달·예정일·택배발송·주문마감 … N월 N일)을 뺀다.
+           날짜는 상품마다 바뀌는데 설명에 손으로 적어 두면 지난 날짜가 남는다(9월 말에 41개, 그중 3개는 틀린 날짜).
+           설명에는 날짜를 두지 않고, 카톡에 보낼 때만 상품 날짜로 넣는다 (사장님 요청).
+             · '📦 택배가능'처럼 날짜 없는 줄은 남긴다. 소비기한 같은 다른 날짜 줄도 이름으로 가려 건드리지 않는다
+             · ━ 막대 사이가 비면 막대도 빼고, 제목과 본문이 붙지 않게 빈 줄 하나를 남긴다 */
+        const DESC_DATE_BAR = '━━━━━━━━━━━━━━━━';
+        const gIsDescBar = l => /^\s*━{3,}\s*$/.test(l);
+        const gIsDescDateLine = l => /📦\s*(픽업|배달|택배\s*발송|발송|주문\s*마감|마감|수령)/.test(l) && /\d{1,2}\s*월\s*\d{1,2}\s*일/.test(l);
+        function gStripDescDate(desc) {
+            const L = String(desc || '').replace(/\r/g, '').split('\n');
+            if (!L.some(gIsDescDateLine)) return String(desc || '');
+            for (let i = L.length - 1; i >= 0; i--) if (gIsDescDateLine(L[i])) L.splice(i, 1);
+            for (let i = 0; i < L.length - 1; i++) {
+                if (!(gIsDescBar(L[i]) && gIsDescBar(L[i + 1]))) continue;   // 막대 둘이 붙었다 = 안이 비었다
+                const up = i > 0 && !L[i - 1].trim();
+                const down = i + 2 < L.length && !L[i + 2].trim();
+                if (up && down) L.splice(i, 3);          // 위아래 모두 빈 줄 — 막대와 빈 줄 하나를 뺀다
+                else if (up || down) L.splice(i, 2);     // 한쪽에 빈 줄 — 막대만 뺀다
+                else L.splice(i, 2, '');                 // 제목·본문 사이에 끼어 있었다 — 빈 줄로 바꾼다
+                i--;
+            }
+            return L.join('\n');
+        }
+
+        /* [신규 2026-10-01] 설명을 복사할 때 제목 다음 줄에 상품 날짜(픽업/배달일)를 넣는다.
+           날짜는 상품에 적힌 날(matchKey·date)로 만든다. 날짜가 없는 상품(상시판매·날짜 없는 과일)은 넣지 않는다.
+           제목이 두 줄(한 줄 소개 + 상품명, 그 밑이 빈 줄)이면 그 아래에 넣는다 — 손으로 적어 두던 자리와 같다. */
+        function gDescWithDate(desc, p) {
+            const s = gStripDescDate(desc).replace(/\r/g, '');   // 옛 날짜 줄이 남아 있어도 두 번 들어가지 않게
+            if (!s) return s;
+            const m = String((p && (p.matchKey || p.date)) || '').trim().replace(/[.\/]/g, '-').match(/^(\d{2,4})-(\d{1,2})-(\d{1,2})$/);
+            if (!m) return s;
+            const y = +m[1] < 100 ? 2000 + (+m[1]) : +m[1];
+            const d = new Date(y, +m[2] - 1, +m[3]);
+            if (isNaN(d.getTime())) return s;
+            const line = `📦 픽업/배달 : ${d.getMonth() + 1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]})`;
+            const L = s.split('\n');
+            const fb = L.findIndex(l => !l.trim());
+            const at = (fb === 1 || fb === 2) ? fb : 1;
+            if (gIsDescBar(L[at])) L.splice(at + 1, 0, line);       // '📦 택배가능'처럼 남은 막대 칸이 있으면 그 안 맨 위에
+            else L.splice(at, 0, DESC_DATE_BAR, line, DESC_DATE_BAR);
+            return L.join('\n');
+        }
+
+        /* [수정 2026-10-01] 사진 공유와 설명 복사를 한 단추로 합쳤다 (사장님 요청).
+           설명을 먼저 복사해 두고 사진 공유 창을 연다 — 공유 창이 뜨면 이 화면이 가려져 복사가 막히므로 순서가 중요하다.
+           카톡에 사진을 보낸 뒤 대화창에 붙여넣으면 설명이 들어간다. */
+        async function handleBatchShareCopy() {
             if (uploadSelectedProductIndices.size !== 1) return;
             const idx = [...uploadSelectedProductIndices][0];
             const p = uploadProducts[idx];
             if (!p) return;
-            const desc = await gGetProductDesc(p);
-            if (!desc) { showToast('상세설명이 없어요'); return; }
-            try {
-                await navigator.clipboard.writeText(desc);
-                showToast('📋 상세설명을 복사했어요');
-            } catch (e) {
-                console.error('설명 복사 실패:', e);
-                showToast('복사에 실패했어요 — 이 브라우저에서는 안 될 수 있어요');
-            }
-        }
 
-        // [신규 2026-09-30] 고른 상품 하나의 사진(여러 장이면 최대 10장)을 공유 창으로 카톡에 보낸다
-        async function handleBatchSharePhoto() {
-            if (uploadSelectedProductIndices.size !== 1) return;
-            const idx = [...uploadSelectedProductIndices][0];
-            const p = uploadProducts[idx];
-            if (!p || !p.images || !p.images.length) { showToast('사진이 없어요'); return; }
+            // 1) 설명 복사
+            const desc = gDescWithDate(await gGetProductDesc(p), p);
+            let copied = false;
+            if (desc) {
+                try { await navigator.clipboard.writeText(desc); copied = true; }
+                catch (e) { console.error('설명 복사 실패:', e); }
+            }
+
+            // 2) 사진 공유 (여러 장이면 최대 10장)
+            if (!p.images || !p.images.length) { showToast(copied ? '📋 설명 복사 · 사진 없음' : '사진·설명 없음'); return; }
             showLoader('💬 사진 준비 중...');
             try {
                 const key = gStableKeyOf(p);
@@ -25624,14 +26092,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const blobs = await Promise.all(items.map((_, i) => gAnnounceBlob(key, i)));
                 const files = blobs.map((b, i) => new File([b], `사진_${i + 1}.${(b.type || '').includes('png') ? 'png' : 'jpg'}`, { type: b.type || 'image/jpeg' }));
                 hideLoader();
-                if (!navigator.canShare || !navigator.canShare({ files })) { showToast('이 기기에서는 공유하기가 안 돼요'); return; }
+                if (!navigator.canShare || !navigator.canShare({ files })) { showToast(copied ? '📋 설명 복사 · 이 기기는 공유 불가' : '이 기기는 공유 불가'); return; }
                 await navigator.share({ files, text: p.name || '' });
-                showToast('카톡에 보냈어요');
+                showToast(copied ? '보냈어요 · 설명 붙여넣기' : '보냈어요 · 설명 없음');
             } catch (e) {
                 hideLoader();
                 if (e && e.name === 'AbortError') return;   // 공유 창을 그냥 닫음
-                console.error('사진 공유 실패:', e);
-                showToast('보내지 못했어요 · 다시 한 번 눌러 주세요');
+                if (e && e.name === 'NotAllowedError') { showToast('사진 준비 끝 · 한 번 더 눌러 주세요'); return; }
+                console.error('공유 실패:', e);
+                showToast('못 보냈어요 · 다시 눌러 주세요');
             }
         }
 
