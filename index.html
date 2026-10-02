@@ -26734,6 +26734,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    예전처럼 예약 공개·종료를 맞추고(autoApplyScheduledVisibility) → 반복 일정을 4주 앞까지 채운다 */
                 (async () => {
                     await psLoadSchedules();
+                    await gMaybeMigrateSids();   // 노출번호 없는 상품(예전 화면에서 저장한 것 등)에 먼저 번호를 붙인다 — 일정은 노출번호에 딸리므로
+                    for (let w = 0; w < 50 && gSidMigrating; w++) await new Promise(r => setTimeout(r, 200));   // 다른 곳에서 붙이는 중이면 끝날 때까지 기다린다
                     const mig = await psMigrateToSchedules();
                     if (mig > 0) { renderProductsList(); showToast('📅 일정을 따로 관리하도록 옮겼어요'); }
                     await psPromoteDue();
