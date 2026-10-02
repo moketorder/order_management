@@ -3225,6 +3225,7 @@
                     <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;">
                         <div style="flex:1; min-width:0; font-size:11px; font-weight:700; color:var(--text-sub);">🕐 올라가는 상품 · 🕕 마감되는 상품이 있는 날에 표시돼요. 막대 색은 일정 단계 — <span style="color:#6b7280;">⚪ 예약대기</span> · <span style="color:#16a34a;">🟢 판매중</span> · <span style="color:#ca8a04;">🟡 마감</span> · <span style="color:#dc2626;">🔴 숨김</span> · 이름 앞 동그라미는 지금 상태<br>여러 개를 누르면 한꺼번에 고를 수 있어요(다시 누르면 빠져요) · 날짜칸 안 다섯 줄은 11·13·15·17·19시예요 · 막대를 끌어서 다른 날짜·시간 줄에 놓으면 그 날 그 시각으로 옮겨져요(고른 것 전부 같이) · 공동구매는 막대 끝이 픽업일, 가운데 세로선이 마감이에요 (PC만) · <b>Ctrl</b>을 누른 채 끌면 복제돼요 (원본은 그대로) · 막대 양 끝을 끌면 그쪽 날짜만 조절돼요 · 달력을 스크롤하거나, 끌던 채로 위/아래 끝까지 가면 전달·다음달로 넘어가요</div>
                         <div style="flex:0 0 auto; display:flex; flex-direction:column; gap:4px;">
+                        <button type="button" id="ps-undo-btn" onclick="psUndo()" disabled title="되돌릴 것이 없어요" style="flex:0 0 auto; height:32px; padding:0 10px; border:1.5px solid var(--border); background:#fff; color:#334155; border-radius:9px; font-size:12px; font-weight:800; cursor:pointer; opacity:.45;">↩ 되돌리기</button>
                         <button type="button" id="ps-view-btn" onclick="psToggleView()" style="flex:0 0 auto; height:32px; padding:0 10px; border:1.5px solid #93c5fd; background:#eff6ff; color:#1d4ed8; border-radius:9px; font-size:12px; font-weight:800; cursor:pointer;">📋 목록</button>
                         <button type="button" onclick="psViewMode='cal'; psCalGoToday()" style="flex:0 0 auto; height:32px; padding:0 12px; border:1.5px solid var(--border); background:#fff; border-radius:9px; font-size:12px; font-weight:800; cursor:pointer;">오늘</button>
                         </div>
@@ -13705,7 +13706,16 @@
             const n = salesRealStock(uploadProducts[idx]);
             return (n === Infinity) ? '무제한' : (n === null ? '-' : `${n}개`);
         }
+        /* [수정 2026-10-02] 이번 차례 재고 칸 — 지금 재고를 흐린 글씨로 보여 주고, 누르면 그 숫자가 바로 들어가 고칠 수 있게 한다 (사장님 요청).
+           안 고치고 나가면 다시 비워서(=재고 이어가기) 저장하지 않는다. */
+        function psStockInputEvents(key, idx) {
+            const n = salesRealStock(uploadProducts[idx]);
+            const cur = (n === Infinity || n === null) ? '' : String(n);
+            const kq = gEscapeHtml(key);
+            return `onfocus="if(!this.value && '${cur}' !== ''){this.value='${cur}'; this.dataset.auto='1'; try{this.select();}catch(e){}}" oninput="delete this.dataset.auto" onchange="if(!this.dataset.auto) psItemSetStock('${kq}', this.value)" onblur="if(this.dataset.auto){this.value=''; delete this.dataset.auto;}"`;
+        }
         async function psItemSetStock(key, value) {
+            psUndoMark('이번 차례 재고');
             const v = String(value || '').trim();
             const n = v === '' ? null : Math.max(0, parseInt(v, 10) || 0);
             if (await psItemSave(key, { stock: n, stockApplied: null })) showToast(n === null ? '📦 재고를 이어가요' : `📦 이번 차례가 시작하면 재고를 ${n}개로 맞춰요`);
@@ -14028,6 +14038,7 @@
             return psItemSave(key, { pickup: newKey });
         }
         async function psSetPickupFromInput(key, value) {
+            psUndoMark('픽업일');
             const it = psItem(key);
             if (!it || !value) { renderProductScheduleCalendar(); return; }
             const p = uploadProducts[it.idx];
@@ -14083,6 +14094,7 @@
             const isCopy = !!(event.ctrlKey || event.metaKey);
             psDragIdx = null; psDragOrigStart = ''; psDragMode = 'move'; psDragGroup = null;
             if (key === null) return;
+            psUndoMark(mode === 'move' ? (isCopy ? '복사' : '옮기기') : '길이 바꾸기');
             const it = psItem(key);
             if (!it) return;
             if (mode !== 'move') return psResizeDrop(key, mode, dropKey, hour, group);
@@ -14155,6 +14167,7 @@
         }
         // 일정 카드의 '반복' 고르기 — 한 일정에 담긴 상품 전부에 같이 건다 (반복은 상품마다 적어 둔다)
         async function psSetRepeat(key, weeks) {
+            psUndoMark('반복');
             const it = psItem(key);
             if (!it) return;
             const w = Number(weeks) || 0;
@@ -14648,6 +14661,72 @@
             psDragIdx = null; psDragGroup = null; psDragMode = 'move';
         }
 
+        /* ===== [신규 2026-10-02] 되돌리기 (사장님 요청) =====
+           노출일정에서 한 일(끌기·시각·픽업일·재고·합치기·나누기·담기·빼기·바꾸기·지우기·반복 …)을 하기 직전에
+           일정 전부와 상품의 일정 관련 칸을 기억해 두었다가, 되돌릴 때 '그 뒤로 바뀐 칸만' 다시 쓴다. 최근 20번까지.
+           새로고침하면 기억은 지워진다. 그 사이 주문으로 줄어든 재고(조정값)나 다른 기기에서 고친 것은 되돌리지 않는다. */
+        const PS_UNDO_F = ['releaseAt', 'expireAt', 'nextDate', 'releaseApplied', 'expireApplied', 'announced', 'hide', 'showToday', 'showReserve',
+            'date', 'matchKey', 'schedRid', 'stock', 'repeatWeeks', 'scheduleLabel', 'announceText'];
+        let psUndoStack = [];
+        let psUndoHold = false;   // 여러 번 이어 부르는 일(일정에 담기 등)은 한 번으로 친다
+        function psUndoMark(label) {
+            if (psUndoHold) return;
+            const prods = {};
+            (uploadProducts || []).forEach(p => {
+                if (!p || !p.sid) return;
+                const o = {};
+                PS_UNDO_F.forEach(f => { o[f] = (p[f] === undefined ? null : p[f]); });
+                prods[p.sid] = o;
+            });
+            psUndoStack.push({ label, sched: JSON.parse(JSON.stringify(psSched || {})), prods });
+            if (psUndoStack.length > 20) psUndoStack.shift();
+            psUndoPaint();
+        }
+        function psUndoPaint() {
+            const b = document.getElementById('ps-undo-btn');
+            if (!b) return;
+            const n = psUndoStack.length;
+            b.disabled = !n;
+            b.style.opacity = n ? '1' : '.45';
+            b.title = n ? `되돌리기: ${psUndoStack[n - 1].label} (Ctrl+Z)` : '되돌릴 것이 없어요';
+        }
+        let psUndoing = false;
+        async function psUndo() {
+            if (psUndoing) return;
+            psUndoing = true;
+            try {
+                while (psUndoStack.length) {
+                    const s = psUndoStack.pop();
+                    const schedPatch = {};
+                    new Set([...Object.keys(s.sched), ...Object.keys(psSched || {})]).forEach(sid => {
+                        if (JSON.stringify(s.sched[sid] || null) !== JSON.stringify(psSched[sid] || null)) schedPatch[sid] = s.sched[sid] || null;
+                    });
+                    const prodPatch = {};
+                    Object.keys(s.prods).forEach(sid => {
+                        const idx = psIdxOfSid(sid);
+                        if (idx < 0) return;
+                        const p = uploadProducts[idx];
+                        PS_UNDO_F.forEach(f => {
+                            const v = s.prods[sid][f], cur = (p[f] === undefined ? null : p[f]);
+                            if (JSON.stringify(v) !== JSON.stringify(cur)) prodPatch[`${idx}/${f}`] = v;
+                        });
+                    });
+                    if (!Object.keys(schedPatch).length && !Object.keys(prodPatch).length) continue;   // 아무것도 안 바뀐 일 — 그 앞 것으로
+                    if (Object.keys(schedPatch).length && !(await psSchedPatch(schedPatch))) { psUndoStack.push(s); return; }
+                    if (Object.keys(prodPatch).length && !(await fbPatchProducts(prodPatch))) { showToast('되돌리기 실패 — 다시 시도해 주세요'); return; }
+                    Object.keys(schedPatch).forEach(sid => { if (schedPatch[sid]) psSched[sid] = JSON.parse(JSON.stringify(schedPatch[sid])); else delete psSched[sid]; });
+                    Object.keys(prodPatch).forEach(k => { const i = parseInt(k, 10), f = k.slice(k.indexOf('/') + 1); if (uploadProducts[i]) uploadProducts[i][f] = prodPatch[k]; });
+                    if (Object.keys(prodPatch).length) updatePublishedProductsTimestamp();
+                    showToast(`↩ 되돌렸어요 · ${s.label}`);
+                    psSelectedIdxs.clear();
+                    renderProductScheduleCalendar();
+                    if (typeof renderProductsList === 'function') renderProductsList();
+                    return;
+                }
+                showToast('되돌릴 것이 없어요');
+            } finally { psUndoing = false; psUndoPaint(); }
+        }
+
         // 일정 열쇠들을 단위로 묶는다 (한 일정에 담긴 상품들은 한 단위)
         function psUnitsOf(keys) {
             const seen = new Set(), units = [];
@@ -14715,9 +14794,8 @@
                 </div>
                 ${grp ? '' : `<div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
                     <label style="${PS_LAB} margin:0; flex:0 0 auto;">📦 이번 차례 재고</label>
-                    <input type="number" min="0" inputmode="numeric" value="${(it.stock === null || it.stock === undefined) ? '' : it.stock}" placeholder="비우면 이어가기" onchange="psItemSetStock('${kq}', this.value)" style="flex:1 1 auto; min-width:0; ${PS_INP}">
+                    <input type="number" min="0" inputmode="numeric" value="${(it.stock === null || it.stock === undefined) ? '' : it.stock}" placeholder="지금 ${psNowStockText(it.idx)} · 비우면 이어가기" title="이번 차례 재고 — 누르면 지금 재고가 들어가요. 안 고치면 그대로 이어가요" ${psStockInputEvents(key, it.idx)} style="flex:1 1 auto; min-width:0; ${PS_INP}">
                     ${it.stockApplied === true ? `<span style="flex:0 0 auto; font-size:10.5px; font-weight:800; color:#16a34a;">맞춤</span>` : ''}
-                    <span title="지금 남은 재고 (주문으로 깎인 것까지 반영)" style="flex:0 0 auto; font-size:11px; font-weight:800; color:#475569;">지금 ${psNowStockText(it.idx)}</span>   <!-- [신규 2026-10-02] 현재 재고 -->
 
                 </div>`}
                 <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
@@ -14808,7 +14886,7 @@
                             <span class="ps-dot" style="background:${PS_DOTC[psLiveStateOf(x.idx)]};"></span>
                             <span style="flex:1 1 auto; min-width:0; font-size:12px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gEscapeHtml(xp.name)}</span>
                             <button type="button" onclick="editProduct(${x.idx})" style="flex:0 0 auto; height:26px; padding:0 8px; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; border-radius:6px; font-size:10.5px; font-weight:800; cursor:pointer;">상품 정보</button>
-                            <input type="number" min="0" inputmode="numeric" title="이번 차례 재고 — 비우면 이어가기 (지금 ${psNowStockText(x.idx)})" placeholder="${psNowStockText(x.idx)}" value="${(x.stock === null || x.stock === undefined) ? '' : x.stock}" onchange="psItemSetStock('${xk}', this.value)" style="flex:0 0 auto; width:56px; height:26px; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:6px; padding:0 4px; font-size:11px;">
+                            <input type="number" min="0" inputmode="numeric" title="이번 차례 재고 — 누르면 지금 재고(${psNowStockText(x.idx)})가 들어가요. 안 고치면 그대로 이어가요" placeholder="${psNowStockText(x.idx)}" value="${(x.stock === null || x.stock === undefined) ? '' : x.stock}" ${psStockInputEvents(k, x.idx)} style="flex:0 0 auto; width:56px; height:26px; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:6px; padding:0 4px; font-size:11px;">
                             <button type="button" onclick="psGroupDetach('${xk}')" title="같은 시각 그대로, 이 상품만 따로인 일정으로" style="flex:0 0 auto; height:26px; padding:0 8px; border:1px solid #93c5fd; background:#eff6ff; color:#1d4ed8; border-radius:6px; font-size:10.5px; font-weight:800; cursor:pointer;">떼기</button>
                             <button type="button" onclick="psGroupRemove('${xk}')" title="이 상품의 이 일정을 지워요 (상품은 그대로)" style="flex:0 0 auto; height:26px; padding:0 8px; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:6px; font-size:10.5px; font-weight:800; cursor:pointer;">빼기</button>
                         </div>`; }).join('')}
@@ -14830,6 +14908,7 @@
         }
         // 일정 칸 고치기 — grp 면 같은 일정에 담긴 일정 전부에 똑같이
         async function psItemSetRelease(key, grp) {
+            psUndoMark('올라가는 시각');
             const sid = psSafeId(key);
             const d = (document.getElementById(`ps-rel-date-${sid}`) || {}).value || '';
             const t = (document.getElementById(`ps-rel-hour-${sid}`) || {}).value || '15:00';
@@ -14839,6 +14918,7 @@
             renderProductScheduleCalendar();
         }
         async function psItemSetExpire(key, value, grp) {
+            psUndoMark('마감 시각');
             let v = value;
             if (v && v.endsWith('T00:00')) v = v.slice(0, 10) + 'T15:00';
             const ms = v ? new Date(v).getTime() : NaN;
@@ -14849,6 +14929,7 @@
             renderProductScheduleCalendar();
         }
         async function psGroupSetPickup(key, value) {
+            psUndoMark('픽업일');
             if (!value) { renderProductScheduleCalendar(); return; }
             const ks = psGroupMembers(key).filter(k => { const x = psItem(k); return !!x; });
             if (ks.some(k => { const x = psItem(k); return psIsActive(x) && !psIsUpcoming(uploadProducts[x.idx]); })
@@ -14859,12 +14940,14 @@
             renderProductScheduleCalendar();
         }
         async function psGroupSetLabel(key, value) {
+            psUndoMark('일정 이름');
             const v = String(value || '').trim() || null;
             for (const k of psGroupMembers(key)) await psItemSave(k, { groupLabel: v });
             renderProductScheduleCalendar();
         }
         // 상품 하나를 이 일정에 담는다 — 그 상품에 같은 시각 일정이 이미 있으면 묶기만, 아니면 같은 모양의 일정을 하나 만든다
         async function psGroupAddTo(key, pIdx) {
+            psUndoMark('상품 담기');
             const src = psItem(key);
             const p = (uploadProducts || [])[pIdx];
             if (!src || !p) return;
@@ -14882,6 +14965,7 @@
         async function psGroupRemove(key) {
             const it = psItem(key);
             if (!it || !confirm(`이 일정에서 빼요.\n\n${uploadProducts[it.idx].name}`)) return;
+            psUndoMark('상품 빼기');
             await psItemDelete(key);
             renderProductScheduleCalendar();
             if (typeof renderProductsList === 'function') renderProductsList();
@@ -14911,6 +14995,7 @@
             </div>`;
         }
         async function psMergeInto(baseKey) {
+            psUndoMark('합치기');
             const b = document.getElementById('ps-merge-pick'); if (b) b.remove();
             const base = psItem(baseKey);
             if (!base) return;
@@ -14939,6 +15024,7 @@
             renderProductScheduleCalendar();
         }
         async function psSplitSelected() {
+            psUndoMark('나누기');
             const groups = psUnitsOf([...psSelectedIdxs].filter(k => psItem(k))).filter(u => u.length > 1 || (psItem(u[0]) || {}).group);
             let n = 0;
             for (const u of groups) for (const k of u) if (await psItemSave(k, { group: null, groupLabel: null })) n++;
@@ -14947,6 +15033,7 @@
         }
         // 묶음 카드의 '떼기' — 이 상품만 같은 시각 그대로 따로인 일정으로
         async function psGroupDetach(key) {
+            psUndoMark('떼기');
             const others = psGroupMembers(key).filter(k => k !== key);
             if (await psItemSave(key, { group: null, groupLabel: null })) showToast('✂️ 따로인 일정으로 뗐어요');
             if (others.length === 1) await psItemSave(others[0], { group: null, groupLabel: null });   // 혼자 남으면 묶음도 푼다
@@ -14989,6 +15076,7 @@
             if (psIsActive(A) && !psIsUpcoming(uploadProducts[A.idx])) { showToast('⚠️ 이미 올라간 일정은 상품을 바꿀 수 없어요'); return; }
             const pk = psItemPickup(A);
             if (!confirm(`이 일정을 다른 상품으로 바꿔요.\n\n${uploadProducts[A.idx].name}\n → ${B.name}\n\n${psItemSummary(A)}`)) return;
+            psUndoMark('상품 바꾸기');
             const ok = await psItemAdd(toIdx, { releaseAt: A.releaseAt, expireAt: A.expireAt, pickup: pk || null, group: A.group || null, groupLabel: A.groupLabel || null });
             if (!ok) return;   // 겹침 등은 안에서 알려 준다
             await psItemDelete(key);
@@ -15036,6 +15124,7 @@
         }
         // 날짜에 상품 일정 걸기 — 올라가는 시각 + 기본 마감·픽업일(상품 날짜 기준)까지 한 번에 만든다 (사장님 요청)
         async function psPickProductForSchedule(idx, dateKey, hour) {
+            psUndoMark('일정 걸기');
             const p = (uploadProducts || [])[idx];
             if (!p) return;
             if (p.showWeekly === true) { showToast("🔁 '매주 노출' 상품은 일정을 걸 수 없어요"); return; }
@@ -15057,6 +15146,7 @@
         }
 
         async function psUpdateAnnounceText(idx, value) {
+            psUndoMark('공지문구');
             const prod = (uploadProducts || [])[idx];
             if (!prod) return;
             const text = String(value || '').trim();
@@ -15066,6 +15156,7 @@
 
         // [신규] 달력 칸에 보일 짧은 이름. 상품명이 길면 달력이 지저분해지니, 원하면 짧게 따로 적을 수 있게 한다.
         async function psUpdateScheduleLabel(idx, value) {
+            psUndoMark('짧은 이름');
             const prod = (uploadProducts || [])[idx];
             if (!prod) return;
             const label = String(value || '').trim();
@@ -15151,6 +15242,8 @@
             const calBox = document.getElementById('ps-cal-box');
             if (!calBox || !calBox.offsetParent) return;   // 노출일정 탭이 지금 보일 때만
             const tag = (document.activeElement && document.activeElement.tagName) || '';
+            // [신규 2026-10-02] Ctrl+Z — 노출일정 되돌리기 (입력 칸에서는 그 칸의 되돌리기를 쓴다)
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && String(e.key).toLowerCase() === 'z' && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') { e.preventDefault(); psUndo(); return; }
             // [신규 2026-10-02] Esc — 고른 날짜·고른 일정을 푼다 (사장님 요청)
             if (e.key === 'Escape') {
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') { document.activeElement.blur(); }
@@ -15189,6 +15282,7 @@
             if (overlay) overlay.style.display = 'none';
         }
         async function psClearSchedules(keys) {
+            psUndoMark('일정 지우기');
             let n = 0;
             for (const k of [...new Set(keys)]) if (await psItemDelete(k)) n++;
             psSelectedIdxs.clear();
@@ -27471,12 +27565,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             </div>`;
         }
         function psBatchDone(n) {
+            psUndoHold = false;
             const b = document.getElementById('batch-sched-pick'); if (b) b.remove();
             uploadSelectedProductIndices.clear(); updateBatchBar();
             renderProductsList();
             showToast(n ? `📅 상품 ${n}개를 일정에 담았어요` : '담지 못했어요');
         }
         async function psBatchToUnit(firstKey) {
+            psUndoMark('일정에 담기'); psUndoHold = true;   // 여러 상품을 담아도 되돌리기는 한 번
             const have = new Set(psGroupMembers(firstKey).map(k => (psItem(k) || {}).sid));
             let n = 0;
             for (const i of [...uploadSelectedProductIndices].filter(i => uploadProducts[i] && !have.has(uploadProducts[i].sid))) {
@@ -27488,6 +27584,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         async function psBatchToNew() {
             const d = (document.getElementById('bsp-date') || {}).value, h = Number((document.getElementById('bsp-hour') || {}).value) || 15;
             if (!d) return;
+            psUndoMark('일정에 담기'); psUndoHold = true;
             const rel = new Date(`${d}T${String(h).padStart(2, '0')}:00`).getTime();
             const picked = [...uploadSelectedProductIndices].filter(i => uploadProducts[i]);
             const gid = picked.length > 1 ? psNewGroupId() : null;
