@@ -3192,12 +3192,15 @@
                         </div>
                     </div>
                     <div class="batch-buttons" style="width: 100%; box-sizing: border-box;">
-                        <button class="btn-batch type-show" onclick="handleBatchVisibility(true)" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); white-space: nowrap; overflow: hidden;">👁️ 노출</button>
-                        <button class="btn-batch type-hide" onclick="handleBatchVisibility(false)" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); white-space: nowrap; overflow: hidden;">🙈 숨김</button>
+                        <!-- [수정 2026-10-02] 노출·숨김 두 단추를 하나로 합쳤다 (사장님 요청).
+                             고른 상품이 모두 노출 중이면 '숨김', 하나라도 숨김이면 '노출'로 바뀐다 (updateBatchBar) -->
+                        <button id="btn-batch-vis" class="btn-batch type-show" onclick="handleBatchVisibilityToggle()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); white-space: nowrap; overflow: hidden;">👁️ 노출</button>
                         <!-- [신규 2026-09-30] 상품 하나만 골랐을 때만 나온다 — 한 상품 기준이라
                              [수정 2026-10-01] 사진 공유·설명 복사를 '공유&복사' 하나로 합쳤다 (사장님 요청) -->
                         <button id="btn-batch-sharecopy" class="btn-batch" onclick="handleBatchShareCopy()" style="display:none; flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid #ca8a04; background: #FEE500; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #191919; white-space: nowrap; overflow: hidden;">💬 공유&amp;복사</button>
                         <button class="btn-batch type-print" onclick="switchAdminTab('thumbnail-generator')" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #d97706; border-color: rgba(217, 119, 6, 0.25); white-space: nowrap; overflow: hidden;">🎨 섬네일</button>
+                        <!-- [신규 2026-10-02] 고른 상품으로 가격표 생성기와 같은 모양의 A4 가격표를 만든다 (할인이면 정상가 줄도) -->
+                        <button class="btn-batch" onclick="handleBatchPriceTag()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(76, 175, 32, 0.35); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #3f8f1a; white-space: nowrap; overflow: hidden;">🏷️ 가격표</button>
                         <button class="btn-batch type-purchase" onclick="handleBatchPurchase()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #10b981; border-color: rgba(16, 185, 129, 0.25); white-space: nowrap; overflow: hidden;">🚚 발주</button>
                         <button class="btn-batch" onclick="handleBatchDeselect()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #64748b; white-space: nowrap; overflow: hidden;">✕ 선택 해제</button>
                         <button class="btn-batch type-delete" onclick="handleBatchDelete()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(220, 38, 38, 0.3); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #dc2626; white-space: nowrap; overflow: hidden;">🗑️ 삭제</button>
@@ -3219,11 +3222,11 @@
 
                 <div class="card" style="padding: 14px;">
                     <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;">
-                        <div style="flex:1; min-width:0; font-size:11px; font-weight:700; color:var(--text-sub);">🕐 올라가는 상품 · 🕕 마감되는 상품이 있는 날에 표시돼요. 색은 지금 상태 — <span style="color:#16a34a;">🟢 판매중</span> · <span style="color:#dc2626;">🔴 숨김·예약대기</span> · <span style="color:#ca8a04;">🟡 마감</span><br>여러 개를 누르면 한꺼번에 고를 수 있어요(다시 누르면 빠져요) · 날짜칸 안 다섯 줄은 11·13·15·17·19시예요 · 막대를 끌어서 다른 날짜·시간 줄에 놓으면 그 날 그 시각으로 옮겨져요(고른 것 전부 같이) (PC만) · <b>Ctrl</b>을 누른 채 끌면 복제돼요 (원본은 그대로) · 막대 양 끝을 끌면 그쪽 날짜만 조절돼요 · 달력을 스크롤하거나, 끌던 채로 위/아래 끝까지 가면 전달·다음달로 넘어가요</div>
+                        <div style="flex:1; min-width:0; font-size:11px; font-weight:700; color:var(--text-sub);">🕐 올라가는 상품 · 🕕 마감되는 상품이 있는 날에 표시돼요. 막대 색은 일정 단계 — <span style="color:#6b7280;">⚪ 예약대기</span> · <span style="color:#16a34a;">🟢 판매중</span> · <span style="color:#ca8a04;">🟡 마감</span> · <span style="color:#dc2626;">🔴 숨김</span> · 이름 앞 동그라미는 지금 상태<br>여러 개를 누르면 한꺼번에 고를 수 있어요(다시 누르면 빠져요) · 날짜칸 안 다섯 줄은 11·13·15·17·19시예요 · 막대를 끌어서 다른 날짜·시간 줄에 놓으면 그 날 그 시각으로 옮겨져요(고른 것 전부 같이) · 공동구매는 막대 끝이 픽업일, 가운데 세로선이 마감이에요 (PC만) · <b>Ctrl</b>을 누른 채 끌면 복제돼요 (원본은 그대로) · 막대 양 끝을 끌면 그쪽 날짜만 조절돼요 · 달력을 스크롤하거나, 끌던 채로 위/아래 끝까지 가면 전달·다음달로 넘어가요</div>
                         <button type="button" onclick="psCalGoToday()" style="flex:0 0 auto; height:32px; padding:0 12px; border:1.5px solid var(--border); background:#fff; border-radius:9px; font-size:12px; font-weight:800; cursor:pointer;">오늘</button>
                     </div>
                     <div class="ps-cal-wrap">
-                        <div id="ps-cal-box" class="ps-cal-scroll" onscroll="psCalOnScroll()" ondragover="psCalDragAutoScroll(event)"></div>
+                        <div id="ps-cal-box" class="ps-cal-scroll" onscroll="psCalOnScroll()" ondragover="psCalDragAutoScroll(event)" onmousedown="psMarqueeDown(event)"></div>
                         <!-- [신규] 폰에서는 달력 안 손가락 스크롤을 막고(바깥 화면이 대신 움직임) 이 막대로 위아래를 옮긴다 -->
                         <div id="ps-cal-rail" class="ps-cal-rail" onpointerdown="psCalRailDown(event)">
                             <div class="ps-cal-rail-track"></div>
@@ -3715,6 +3718,14 @@
         .ps-rh.l { left: 0; }
         .ps-rh.r { right: 0; }
         .ps-rh:hover { background: rgba(0,0,0,.2); }
+        /* [신규 2026-10-02] 끌어서 한꺼번에 고르기 — 네모와, 네모에 걸린 막대 */
+        .ps-marquee { position: fixed; z-index: 60; border: 1.5px dashed #2563eb; background: rgba(37,99,235,.08); pointer-events: none; }
+        .ps-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; vertical-align: 0; box-shadow: 0 0 0 1px rgba(255,255,255,.9); }
+        .ps-bar.ps-mq-hit { box-shadow: inset 0 0 0 2px #1d4ed8 !important; }
+        /* [신규 2026-10-02] 마감선 — 픽업일까지 가는 막대 가운데의 세로선. 끌면 마감 날짜만 옮긴다 */
+        .ps-xl { position: absolute; top: 0; bottom: 0; width: 9px; margin-left: -4px; cursor: ew-resize; z-index: 1; }
+        .ps-xl::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 3px; background: currentColor; border-radius: 1px; }
+        .ps-xl:hover::after { left: 2px; width: 5px; }
         /* [신규] 달력을 페이지로 넘기지 않고 쭉 이어서 스크롤 — 한 화면엔 대략 5줄만 보이게 높이를 못박는다 */
         /* [수정] scroll-behavior:smooth를 여기 두면 우리가 코드로 scrollTop을 바로바로 보정하는 것까지 애니메이션이 돼서
            (달 이어붙이기 보정 등) 값을 바로 읽었을 때 아직 옛 값이 나오는 일이 생긴다. '오늘로'만 scrollIntoView의
@@ -4342,7 +4353,7 @@
                     <!-- [수정] '✍️ 직접 입력' 제목은 뺐다. 팝업 머리에 이미 같은 글이 있어 두 번이었다. -->
                     <div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin-bottom:11px; line-height:1.6;">
                         매입 · 매출 · 지출을 날짜별로 적어 두면 위 통계에 함께 잡힙니다.<br>
-                        <b>고정비</b>는 한 번 적으면 그 달부터 <b>매달 그대로</b> 잡힙니다. (지우거나 고치기 전까지)
+                        <b>고정비</b>는 달마다 저장합니다. 저장 안 한 달은 <b>앞 달 것</b>이 그대로 이어집니다.
                     </div>
 
                     <!-- 1줄: 무엇을 적을지 -->
@@ -4378,7 +4389,7 @@
                     </div>
 
                     <!-- 4줄: 값 두 칸 (매출=포스·계좌이체 / 매입·지출=항목·금액) -->
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <div id="ms-fields" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                         <div id="ms-f1">
                             <label id="ms-f1-label" style="display:block; font-size:11.5px; font-weight:800; color:#475569; margin-bottom:5px;">💳 포스</label>
                             <input type="number" id="ms-pos" min="0" placeholder="0" class="form-control" style="width:100%; height:40px; padding:8px 10px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:700; box-sizing:border-box;">
@@ -4395,6 +4406,21 @@
                                     style="flex:0 0 auto; width:40px; height:40px; padding:0; background:#eef2ff; color:#4338ca; border:1.5px solid #c7d2fe; border-radius:9px; font-size:15px; font-weight:800; cursor:pointer;">📥</button>
                             </div>
                             <input type="number" id="ms-exp-amount" min="0" placeholder="0" class="form-control" style="display:none; width:100%; height:40px; padding:8px 10px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:700; box-sizing:border-box;">
+                        </div>
+                    </div>
+
+                    <!-- [신규 2026-10-02] 지출 > 🏠 고정비 — 값 두 칸 대신 그 달 고정비를 통째로 적는다 (사장님 요청).
+                         '이달 저장'을 누르면 그 달에만 저장되고, 저장 안 한 달은 앞 달 것이 이어진다 (gFixedMonthInfo) -->
+                    <div id="ms-fixed-box" style="display:none;">
+                        <div style="display:flex; align-items:center; gap:7px; margin-bottom:7px; min-height:26px;">
+                            <b id="ms-fixed-title" style="font-size:13.5px; font-weight:900; color:#0f172a;"></b>
+                            <span id="ms-fixed-src" style="font-size:11.5px; font-weight:800; color:#94a3b8;"></span>
+                            <button type="button" id="ms-fixed-clear" onclick="askClearFixedMonth()" style="display:none; margin-left:auto; padding:4px 9px; border:1px solid #fca5a5; background:#fef2f2; color:#ef4444; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">↺ 지우기</button>
+                        </div>
+                        <div id="ms-fixed-rows"></div>
+                        <div style="display:flex; align-items:center; gap:7px;">
+                            <button type="button" onclick="addFixedRow()" style="padding:7px 12px; border:1.5px dashed #cbd5e1; background:#fff; color:#475569; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer;">＋ 항목</button>
+                            <span id="ms-fixed-sum" style="margin-left:auto; font-size:13.5px; font-weight:900; color:#dc2626; white-space:nowrap;"></span>
                         </div>
                     </div>
 
@@ -13197,7 +13223,7 @@
             try {
                 if (!prod || !prod.name) return;
                 if (!(Number(realStock) <= 0)) return;
-                const key = fGetAdjKey(prod.matchKey, prod.name);
+                const key = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
                 const now = new Date();
                 const rec = { at: now.getTime(), date: gLogDayKey(now) };
                 gSoldOutAt[key] = rec;
@@ -13208,9 +13234,250 @@
             } catch (e) { console.warn('품절 기록 실패:', e); }
         }
 
-        function fGetAdjKey(mKey, name) {
+        /* [수정 2026-10-02] 재고 열쇠 = 상품 노출번호(sid). 날짜가 바뀌어도 재고·마감 표시가 그대로 따라간다 (사장님 요청).
+           노출번호는 손님 화면의 상품 칸 하나마다 따로 붙는다 — 식별번호(productCode)는 발주·통계에서 '같은 물건'을 묶는 번호라
+           박스·팩처럼 여러 칸이 함께 쓰므로 재고 열쇠로 못 쓴다.
+           부르는 쪽은 예전처럼 (날짜·분류, 이름)을 넘기고, 여기서 그 상품을 찾아 노출번호를 돌려준다.
+           노출번호가 아직 없는 상품(옮기기 전)은 예전 열쇠 '날짜_이름'을 그대로 쓴다. sid 를 직접 넘기면 그것을 쓴다. */
+        function gSidNormMk(mKey) {
+            const s = String(mKey || '').trim();
+            const m = s.match(/^(\d{2,4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})$/);
+            if (!m) return s;
+            const y = m[1].length === 2 ? '20' + m[1] : m[1];
+            return `${y}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+        }
+        function gSidOf(mKey, name) {
+            const nm = String(name || '').trim();
+            if (!nm || !Array.isArray(uploadProducts)) return '';
+            const mk = gSidNormMk(mKey);
+            for (const p of uploadProducts) {
+                if (p && p.sid && String(p.name || '').trim() === nm && gSidNormMk(p.matchKey || p.date) === mk) return String(p.sid);
+            }
+            return '';
+        }
+        function fGetAdjKey(mKey, name, sid) {
+            const direct = String(sid || '').trim();
+            if (direct) return direct;
+            const found = gSidOf(mKey, name);
+            if (found) return found;
             const s = String(mKey || "").trim();
             return fSafeKey(s) + "_" + fSafeKey(name);
+        }
+        /* [수정 2026-10-02] 노출번호는 식별번호를 그대로 쓴다 (사장님 요청).
+           같은 식별번호를 쓰는 상품이 또 생길 때만 뒤에 _2, _3 … 을 붙인다 — 비어 있는 가장 앞 번호부터 차례로.
+           식별번호가 없는 상품만 예전처럼 시각+무작위 번호를 쓴다.
+           taken 을 넘기면(옮기기 중) 그 모음으로 겹침을 보고, 안 넘기면 지금 상품 목록을 본다. */
+        function gSidForCode(code, taken) {
+            const c = String(code || '').trim();
+            if (!/^[PFS]\d+$/.test(c)) return gNewSid(taken);
+            const used = taken || new Set((uploadProducts || []).map(p => p && p.sid).filter(Boolean));
+            let s = c, k = 1;
+            while (used.has(s)) { k++; s = `${c}_${k}`; }
+            if (taken) taken.add(s);
+            else gClearSidLeftovers(s);   // 예전에 지운 상품이 쓰던 번호면, 남은 [마감]·옵션 재고·품절 기록을 비운다
+            return s;
+        }
+        function gClearSidLeftovers(sid) {
+            const del = path => fetch(`${FIREBASE_DB_URL}${path}.json`, { method: 'DELETE' }).catch(() => { });
+            if (uploadClosedMap && uploadClosedMap[sid] === true) { del(`product_closed/${encodeURIComponent(sid)}`); delete uploadClosedMap[sid]; }
+            Object.keys(optionAdjustments || {}).forEach(k => { if (k.startsWith(sid + '__')) { del(`option_stock/${encodeURIComponent(k)}`); delete optionAdjustments[k]; } });
+            if (gSoldOutAt && gSoldOutAt[sid]) { del(`stock_soldout/${encodeURIComponent(sid)}`); delete gSoldOutAt[sid]; }
+        }
+        // 식별번호가 없을 때 쓰는 노출번호 — 기기 여러 대가 동시에 만들어도 안 겹치게 시각+무작위로 만든다
+        function gNewSid(taken) {
+            let s;
+            do { s = 'N' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+            while ((taken && taken.has(s)) || (uploadProducts || []).some(p => p && p.sid === s));
+            if (taken) taken.add(s);
+            return s;
+        }
+        /* [신규 2026-10-02] 노출일정에서 Ctrl+끌기로 복사한 상품은 원본과 같은 노출번호를 쓴다 (사장님 요청 — 재고를 같이 센다).
+           남은 재고 = 상품에 적힌 재고(stock) + 조정값(sid 칸)이라, 조정값은 저절로 같이 쓰지만 적힌 재고는 상품마다 따로다.
+           그래서 한쪽 재고를 고치면 같은 번호를 쓰는 나머지 상품의 적힌 재고도 똑같이 맞춘다. */
+        /* [수정 2026-10-02] 같은 노출번호 = 한 상품 (사장님 요청). 노출일정 복사본은 일정마다 한 줄씩 따로 저장되지만,
+           같은 노출번호끼리는 한 상품으로 본다 — 목록에선 한 장으로 묶고, 일정이 겹치지 않게 막고,
+           상품 내용(이름·가격·사진·설명·재고 …)을 고치면 나머지 줄도 똑같이 맞춘다. 일정·노출 상태·날짜만 줄마다 따로다.
+           노출번호로 옮기기 전에는 예전 재고 열쇠(날짜_이름)가 같은 줄끼리를 한 상품으로 본다. */
+        function gSiblingKey(p) {
+            if (!p || !String(p.name || '').trim()) return '';
+            return fGetAdjKey(p.matchKey, p.name, p.sid);
+        }
+        function gSiblingsOf(list, idx) {
+            const k = gSiblingKey(list && list[idx]);
+            if (!k) return [];
+            const out = [];
+            list.forEach((q, i) => { if (i !== idx && q && gSiblingKey(q) === k) out.push(i); });
+            return out;
+        }
+        /* [신규 2026-10-02] 상품(같은 노출번호 줄 전부)의 지금 실제 상태 — 노출일정 동그라미가 쓴다 (사장님 요청).
+           손님 화면에 보이는 줄이 판매 중이면 'on', 보이는 줄이 마감이면 'closed', 보이는 줄이 없으면 'hidden'.
+           (아직 안 올라간 다음 예약 줄은 숨겨져 있어도, 원본이 마감으로 보이고 있으면 마감이다) */
+        function psLiveStateOf(idx) {
+            const list = uploadProducts || [];
+            const rows = [idx].concat(gSiblingsOf(list, idx));
+            let best = 'hidden';
+            for (const i of rows) {
+                const p = list[i];
+                if (!p) continue;
+                const hid = (p.hide === true || p.hide === 'true');
+                const released = !p.releaseAt || Date.now() >= Number(p.releaseAt);
+                if (!released || hid) continue;              // 손님에게 안 보이는 줄
+                if (!gIsClosedAdmin(p)) return 'on';          // 판매 중인 줄이 하나라도 있으면 판매중
+                best = 'closed';
+            }
+            return best;
+        }
+        // 줄마다 따로인 칸 — 나머지는 같은 상품이라 같이 맞춘다
+        const G_ROUND_FIELDS = new Set(['releaseAt', 'expireAt', 'releaseApplied', 'expireApplied', 'announced', 'announceText', 'nextDate',
+            'date', 'matchKey', 'hide', 'showToday', 'showReserve', 'createdAt', 'updatedAt', 'sid', 'productCode']);
+        async function gSyncSidStock(list, idx) {   // (이름은 예전 그대로 — 이제 재고뿐 아니라 상품 내용 전부를 맞춘다)
+            const p = list && list[idx];
+            if (!p) return;
+            const sibs = gSiblingsOf(list, idx);
+            if (!sibs.length) return;
+            const patch = {}, now = Date.now();
+            sibs.forEach(i => {
+                const q = list[i];
+                let changed = false;
+                new Set([...Object.keys(p), ...Object.keys(q)]).forEach(f => {
+                    if (G_ROUND_FIELDS.has(f) || f.startsWith('__')) return;
+                    if (JSON.stringify(p[f]) === JSON.stringify(q[f])) return;
+                    patch[`${i}/${f}`] = (p[f] === undefined ? null : p[f]);
+                    q[f] = p[f];
+                    changed = true;
+                });
+                if (changed) { patch[`${i}/updatedAt`] = now; q.updatedAt = now; }
+            });
+            if (!Object.keys(patch).length) return;
+            if (await fbPatchProducts(patch)) updatePublishedProductsTimestamp();
+        }
+        // 같은 상품의 다른 일정과 기간이 겹치는 줄 (없으면 -1) — includeSelf 는 복사본을 새로 만들 때(원본 줄도 견준다)
+        function psScheduleOverlap(idx, rel, exp, includeSelf) {
+            const list = uploadProducts || [];
+            if (!rel && !exp) return -1;
+            const s = Number(rel) || 0, e = Number(exp) || Infinity;
+            const cands = gSiblingsOf(list, idx).concat(includeSelf ? [idx] : []);
+            for (const i of cands) {
+                const q = list[i];
+                const qs = Number(q.releaseAt) || 0, qe = Number(q.expireAt) || 0;
+                if (!qs && !qe) continue;   // 일정이 없는 줄은 견주지 않는다
+                if (s < (qe || Infinity) && qs < e) return i;
+            }
+            return -1;
+        }
+        function psOverlapMsg(i) {
+            const q = (uploadProducts || [])[i] || {};
+            return `⚠️ 같은 상품의 다른 일정(${q.releaseAt ? fFmtSchedTime(q.releaseAt) : '…'} ~ ${q.expireAt ? fFmtSchedTime(q.expireAt) : '…'})과 겹쳐요`;
+        }
+        // 이 노출번호를 아직 다른 상품이 쓰는가 — 지울 때 재고 칸을 남길지 본다
+        function gSidStillUsed(sid, list) {
+            return !!sid && (list || []).some(q => q && q.sid === sid);
+        }
+        let gStockBySid = false;   // 노출번호로 옮기기를 마쳤는지 (settings/stock_by_sid) — 마친 뒤에만 새 상품에 번호를 붙인다
+        let gSidMigrating = false;
+        /* [신규 2026-10-02] 노출번호 옮기기 — 번호가 없는 상품에 번호를 붙이고, 예전 열쇠(날짜_이름)에 있던
+           재고 조정값·옵션 재고·[마감]·품절 기록을 새 번호 칸으로 옮겨 적는다. 한 번의 묶음 저장이라 반쯤만 되는 일은 없다.
+           처음 한 번은 손님 주문서(moket.store)가 노출번호를 알아듣는 판으로 올라간 것을 확인한 뒤에만 한다 —
+           먼저 옮기면 옛 주문서가 계속 예전 칸을 깎아 재고가 어긋난다. 그 뒤로는 번호 없는 상품이 보일 때마다 채운다.
+           예전 칸은 지우지 않고 남겨 둔다 (되돌릴 때 쓸 수 있게). */
+        async function gMaybeMigrateSids() {
+            if (gSidMigrating) return 0;
+            gSidMigrating = true;
+            try {
+                // [수정 2026-10-02] 화면이 기억하는 값은 믿지 않고 매번 서버 표시를 새로 읽는다
+                //  (표시를 지워 되돌린 뒤에도 예전에 열어 둔 화면이 '이미 옮겼다'고 알고 다시 옮긴 일이 있었다)
+                {
+                    const r = await fetch(`${FIREBASE_DB_URL}settings/stock_by_sid.json?t=${Date.now()}`).catch(() => null);
+                    if (!r || !r.ok) return 0;   // 못 읽으면 이번엔 건너뛴다
+                    gStockBySid = (await r.json()) === true;
+                }
+                if (!(uploadProducts || []).some(p => p && p.name && !p.sid)) return 0;
+                if (!gStockBySid) {
+                    const live = await fetch(`https://moket.store/?t=${Date.now()}`, { cache: 'no-store' }).then(r => r.ok ? r.text() : '').catch(() => '');
+                    if (!live.includes('gSidIndex')) return 0;   // 손님 주문서가 아직 옛 판 — 올라간 뒤에 옮긴다
+                }
+                const get = n => fetch(`${FIREBASE_DB_URL}${n}.json?t=${Date.now()}`).then(r => r.ok ? r.json() : Promise.reject(n));
+                const [ps, gs, os, cl, so] = await Promise.all([get('published_products'), get('global_stock'), get('option_stock'), get('product_closed'), get('stock_soldout')]);
+                if (!ps) return 0;
+                const entries = Array.isArray(ps) ? ps.map((p, i) => [i, p]) : Object.entries(ps);
+                const taken = new Set(entries.map(([, p]) => p && p.sid).filter(Boolean));
+                const pick = (map, keys) => {   // 손님 주문서와 같은 규칙 — 예전 열쇠 여러 모양 중 처음 있는 것
+                    for (const k of keys) {
+                        if (!k) continue;
+                        const e = map && map[encodeURIComponent(k)]; if (e !== undefined && e !== null) return e;
+                        const v = map && map[k]; if (v !== undefined && v !== null) return v;
+                    }
+                    return undefined;
+                };
+                const normKey = (str) => {
+                    const s = String(str || '').trim();
+                    const m = s.match(/(\d{2,4})[./-]?(\d{1,2})[./-]?(\d{1,2})/);
+                    if (!m) return s;
+                    const y = m[1].length === 2 ? '20' + m[1] : m[1];
+                    return `${y}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+                };
+                const oldKeysOf = p => {
+                    const nm = String(p.name || '');
+                    const a = String(p.matchKey || '').trim(), b = String(p.matchKey || p.date || '').trim();
+                    return [...new Set([a, b, normKey(b)].map(k => fSafeKey(k) + '_' + fSafeKey(nm)))];
+                };
+                const patch = {}, local = {};
+                const sidByOldKey = {};   // 예전 열쇠가 같던 상품(노출일정 복사본 등)은 원래 재고를 같이 썼으니 같은 번호로 묶는다
+                entries.forEach(([, p]) => { if (p && p.sid && p.name) sidByOldKey[oldKeysOf(p)[0]] = p.sid; });
+                let n = 0;
+                for (const [i, p] of entries) {
+                    if (!p || !String(p.name || '').trim() || p.sid) continue;
+                    const keys = oldKeysOf(p);
+                    const shared = sidByOldKey[keys[0]];
+                    const sid = shared || gSidForCode(p.productCode, taken);
+                    sidByOldKey[keys[0]] = sid;
+                    if (shared) {   // 이미 옮긴 칸 — 번호만 붙인다
+                        patch[`published_products/${i}/sid`] = sid;
+                        local[`${String(p.name).trim()}|${gSidNormMk(p.matchKey || p.date)}`] = sid;
+                        n++;
+                        continue;
+                    }
+                    patch[`published_products/${i}/sid`] = sid;
+                    local[`${String(p.name).trim()}|${gSidNormMk(p.matchKey || p.date)}`] = sid;
+                    const adj = pick(gs, keys);
+                    if (adj !== undefined) patch[`global_stock/${sid}`] = adj;
+                    if (pick(cl, keys) === true) patch[`product_closed/${sid}`] = true;
+                    const sod = pick(so, keys);
+                    if (sod !== undefined) patch[`stock_soldout/${sid}`] = sod;
+                    Object.keys(os || {}).forEach(ok => {
+                        const raw = decodeURIComponent(ok);
+                        const base = keys.find(k => raw.startsWith(k + '__'));
+                        if (base) patch[`option_stock/${sid}${raw.slice(base.length)}`] = os[ok];
+                    });
+                    n++;
+                }
+                if (!n) return 0;
+                patch['settings/stock_by_sid'] = true;
+                patch['published_products_last_updated'] = Date.now();   // 손님 폰이 번호가 붙은 새 목록을 받아 가게
+                const w = await fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
+                if (!w.ok) { console.error('노출번호 옮기기 실패:', w.status); return 0; }
+                gStockBySid = true;
+                // 화면이 들고 있는 것도 맞춘다
+                (uploadProducts || []).forEach(p => {
+                    if (!p || p.sid) return;
+                    const s = local[`${String(p.name || '').trim()}|${gSidNormMk(p.matchKey || p.date)}`];
+                    if (s) p.sid = s;
+                });
+                Object.keys(patch).forEach(k => {
+                    const m = k.match(/^(global_stock|option_stock|product_closed)\/(.+)$/);
+                    if (!m) return;
+                    if (m[1] === 'global_stock') uploadGlobalAdjustments[m[2]] = patch[k];
+                    else if (m[1] === 'option_stock') optionAdjustments[m[2]] = patch[k];
+                    else uploadClosedMap[m[2]] = true;
+                });
+                console.log(`노출번호 옮기기: 상품 ${n}개`);
+                return n;
+            } catch (e) {
+                console.error('노출번호 옮기기 오류:', e);
+                return 0;
+            } finally {
+                gSidMigrating = false;
+            }
         }
 
         // 상태 변수
@@ -13310,7 +13577,7 @@
         function psResizeDragStart(event, idx, edge) {
             event.stopPropagation();
             psDragIdx = idx;
-            psDragMode = (edge === 'start') ? 'resize-start' : 'resize-end';
+            psDragMode = (edge === 'start') ? 'resize-start' : (edge === 'pickup') ? 'resize-pickup' : 'resize-end';
             // [신규 2026-10-01] 여러 개를 고른 채 손잡이를 끌면, 고른 것 전부의 같은 쪽 끝을 같은 만큼 늘이거나 줄인다
             psDragGroup = (psSelectedIdxs.has(idx) && psSelectedIdxs.size > 1) ? [...psSelectedIdxs].map(i => ({ idx: i })) : null;
             try { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', String(idx)); } catch (e) { }
@@ -13327,7 +13594,119 @@
             if (slotHour !== null && slotHour !== undefined) d.setHours(slotHour, 0, 0, 0);
             return d.getTime();
         }
+
+        /* ===== [신규 2026-10-02] 막대 끝 = 배달·픽업일 (공동구매 = 분류가 날짜인 상품만) =====
+           막대는 올라감 ─ 마감선 ─ 픽업일 끝. 올라가기 전 예약은 픽업일을 nextDate 에 적어 두었다가,
+           올라가는 순간 상품 날짜(date·matchKey)를 그 날로 바꾼다 — 재고는 노출번호(sid)로 세므로 날짜가 바뀌어도 그대로 이어진다.
+           이미 팔고 있는 상품은 끝을 끌면 그 자리에서 날짜를 바꾸고, 재고는 그대로 이어진다 (번호 옮기기 전 상품은 남은 재고를 새 열쇠로 옮긴다). */
+        function psIsGroupProd(p) { return !!p && /^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(String(p.matchKey || '').trim()); }
+        function psIsUpcoming(p) { return !!p && Number(p.releaseAt) > 0 && (Date.now() < Number(p.releaseAt) || p.releaseApplied !== true); }
+        function psAddDays(key, n) { const [y, m, d] = key.split('-').map(Number); return fMsToDateKey(new Date(y, m - 1, d + n).getTime()); }
+        // 올라가는 순간 쓸 픽업일 — 적어 둔 nextDate, 없으면 지금 날짜가 올라가는 날 뒤면 그대로, 아니면 마감 같은 날
+        function psPlannedPickup(p) {
+            if (!psIsGroupProd(p)) return '';
+            if (p.nextDate) return toISODate(p.nextDate);
+            const cur = toISODate(p.matchKey), rk = fMsToDateKey(p.releaseAt);
+            if (cur && (!rk || cur >= rk)) return cur;
+            return fMsToDateKey(p.expireAt) || rk || cur;
+        }
+        // 막대 끝에 그릴 픽업일
+        function psPickupKey(p) {
+            if (!psIsGroupProd(p)) return '';
+            return psIsUpcoming(p) ? psPlannedPickup(p) : toISODate(p.matchKey);
+        }
+        // 판매 중인 상품의 날짜를 바로 바꾼다 — 재고 칸 열쇠(날짜+이름)가 바뀌므로 남은 재고·[마감] 표시를 새 열쇠로 옮긴다
+        async function psChangeLiveDate(idx, newKey) {
+            const p = (uploadProducts || [])[idx];
+            if (!psIsGroupProd(p) || toISODate(p.matchKey) === newKey) return false;
+            if ((uploadProducts || []).some((q, i) => i !== idx && q && q.name === p.name && toISODate(q.matchKey) === newKey)) {
+                showToast(`⚠️ ${newKey.slice(5).replace('-', '/')}에 같은 이름 상품이 있어요`);
+                return false;
+            }
+            if (p.sid) {   // 노출번호로 세는 상품 — 날짜만 바꾸면 재고·마감 표시가 그대로 따라간다
+                const now0 = Date.now();
+                const ok0 = await fbPatchProducts({ [`${idx}/date`]: newKey, [`${idx}/matchKey`]: newKey, [`${idx}/nextDate`]: null, [`${idx}/updatedAt`]: now0 });
+                if (!ok0) { showToast('저장 실패 — 다시 시도해 주세요'); return false; }
+                p.date = newKey; p.matchKey = newKey; p.nextDate = null; p.updatedAt = now0;
+                updatePublishedProductsTimestamp();
+                if (typeof renderProductsList === 'function') renderProductsList();
+                return true;
+            }
+            // 아래는 노출번호로 옮기기 전 상품 — 날짜가 열쇠라 남은 재고·[마감]을 새 열쇠로 옮긴다
+            const oldAdjKey = fGetAdjKey(p.matchKey, p.name, p.sid), newAdjKey = fGetAdjKey(newKey, p.name);
+            const a = uploadGlobalAdjustments[oldAdjKey];
+            const unlAdj = (a === 'unlimited' || (a != null && String(a).startsWith('unlimited')));
+            const unl = (p.stock === '' || p.stock == null || String(p.stock).trim() === '무제한') || unlAdj;
+            const newStock = unl ? p.stock : Math.max(0, (parseInt(p.stock || 0) || 0) + (parseInt(a || 0) || 0));
+            const now = Date.now();
+            const ok = await fbPatchProducts({
+                [`${idx}/date`]: newKey, [`${idx}/matchKey`]: newKey, [`${idx}/nextDate`]: null,
+                [`${idx}/stock`]: (newStock === undefined ? null : newStock), [`${idx}/updatedAt`]: now
+            });
+            if (!ok) { showToast('저장 실패 — 다시 시도해 주세요'); return false; }
+            p.date = newKey; p.matchKey = newKey; p.nextDate = null; p.stock = newStock; p.updatedAt = now;
+            try {
+                const newAdj = unlAdj ? a : (unl ? null : 0);
+                await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(newAdjKey)}.json`, newAdj === null
+                    ? { method: 'DELETE' }
+                    : { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAdj) });
+                if (newAdj === null) delete uploadGlobalAdjustments[newAdjKey]; else uploadGlobalAdjustments[newAdjKey] = newAdj;
+                await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(oldAdjKey)}.json`, { method: 'DELETE' });
+                delete uploadGlobalAdjustments[oldAdjKey];
+                if (uploadClosedMap[oldAdjKey] === true || uploadClosedMap[encodeURIComponent(oldAdjKey)] === true) {
+                    await fetch(`${FIREBASE_DB_URL}product_closed/${encodeURIComponent(newAdjKey)}.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true' });
+                    await fetch(`${FIREBASE_DB_URL}product_closed/${encodeURIComponent(oldAdjKey)}.json`, { method: 'DELETE' });
+                    delete uploadClosedMap[oldAdjKey]; delete uploadClosedMap[encodeURIComponent(oldAdjKey)];
+                    uploadClosedMap[newAdjKey] = true;
+                }
+            } catch (e) { console.error('픽업일 변경 — 재고 옮기기 실패:', e); }
+            updatePublishedProductsTimestamp();
+            if (typeof renderProductsList === 'function') renderProductsList();
+            return true;
+        }
+        // 픽업일을 newKey 로 — 올라가기 전이면 nextDate 로 적어 두고, 판매 중이면 바로 바꾼다
+        async function psSetPickupOne(idx, newKey) {
+            const p = (uploadProducts || [])[idx];
+            if (!psIsGroupProd(p) || !newKey) return false;
+            const minKey = fMsToDateKey(p.expireAt) || fMsToDateKey(p.releaseAt) || '';
+            if (minKey && newKey < minKey) { showToast('⚠️ 픽업일은 마감 날짜보다 앞설 수 없어요'); return false; }
+            if (psPickupKey(p) === newKey) return false;
+            return psIsUpcoming(p) ? psApplyScheduleUpdate(idx, { nextDate: newKey }) : psChangeLiveDate(idx, newKey);
+        }
+        // 막대 끝(픽업) 손잡이를 놓았을 때 — 여러 개 골랐으면 같은 날수만큼 같이
+        async function psPickupDrop(idx, dropKey, group) {
+            const list = (group && group.length > 1) ? group.map(g => g.idx) : [idx];
+            const base = psPickupKey((uploadProducts || [])[idx]);
+            if (!base) return;
+            const dDays = psDayDiff(base, dropKey);
+            if (!dDays) return;
+            const live = list.filter(i => psIsGroupProd(uploadProducts[i]) && !psIsUpcoming(uploadProducts[i]));
+            if (live.length && !confirm(`판매 중인 상품 ${live.length}개의 픽업일을 지금 바로 ${dDays > 0 ? dDays + '일 뒤로' : (-dDays) + '일 앞으로'} 바꿔요.\n재고는 그대로이고, 이미 받은 주문의 날짜는 안 바뀌어요.`)) return;
+            let done = 0;
+            for (const i of list) {
+                const pk = psPickupKey(uploadProducts[i]);
+                if (pk && await psSetPickupOne(i, psAddDays(pk, dDays))) done++;
+            }
+            if (done) { showToast(`🚚 ${done > 1 ? done + '개 상품의 ' : ''}픽업일을 옮겼어요`); renderProductScheduleCalendar(); }
+        }
+        async function psSetPickupFromInput(idx, value) {
+            const p = (uploadProducts || [])[idx];
+            if (!p || !value) { renderProductScheduleCalendar(); return; }
+            if (!psIsUpcoming(p) && !confirm(`판매 중인 상품의 픽업일을 지금 바로 ${value}로 바꿔요.\n재고는 그대로이고, 이미 받은 주문의 날짜는 안 바뀌어요.`)) { renderProductScheduleCalendar(); return; }
+            if (await psSetPickupOne(idx, value)) showToast('🚚 픽업일을 바꿨어요');
+            renderProductScheduleCalendar();
+        }
+        // [신규 2026-10-02] 마감을 픽업일보다 뒤로 끌면, 올라가기 전 예약은 픽업일도 마감 같은 날로 같이 민다
+        function psExpireChanges(p, newExpTs) {
+            const ch = { expireAt: newExpTs };
+            if (psIsGroupProd(p) && psIsUpcoming(p)) {
+                const ek = fMsToDateKey(newExpTs);
+                if (psPlannedPickup({ ...p, expireAt: newExpTs }) < ek) ch.nextDate = ek;
+            }
+            return ch;
+        }
         async function psResizeDrop(idx, prod, mode, dropKey, hour, group) {
+            if (mode === 'resize-pickup') return psPickupDrop(idx, dropKey, group);
             const field = (mode === 'resize-start') ? 'releaseAt' : 'expireAt';
             const cur = Number(prod[field]) || 0;
             let hh = cur ? new Date(cur).getHours() : 15, mm = cur ? new Date(cur).getMinutes() : 0;
@@ -13347,12 +13726,13 @@
                     const p = (uploadProducts || [])[g.idx];
                     const v = p && Number(p[field]);
                     if (!v) continue;   // 그쪽 끝이 없는 상품은 건너뛴다 (예: 마감 시각을 안 걸어 둔 상품)
-                    if (await psApplyScheduleUpdate(g.idx, { [field]: psShiftTs(v, dDays, slotHour) })) done++;
+                    const nv = psShiftTs(v, dDays, slotHour);
+                    if (await psApplyScheduleUpdate(g.idx, field === 'expireAt' ? psExpireChanges(p, nv) : { [field]: nv })) done++;
                 }
                 if (done) { showToast(`📅 ${done}개 상품의 ${word} 날짜를 같이 옮겼어요`); renderProductScheduleCalendar(); }
                 return;
             }
-            const ok = await psApplyScheduleUpdate(idx, { [field]: newTs });
+            const ok = await psApplyScheduleUpdate(idx, field === 'expireAt' ? psExpireChanges(prod, newTs) : { [field]: newTs });
             if (ok) {
                 showToast(`📅 ${word} 날짜를 옮겼어요`);
                 renderProductScheduleCalendar();
@@ -13369,7 +13749,7 @@
             if (idx === null) return;
             const prod = (uploadProducts || [])[idx];
             if (!prod) return;
-            if (mode === 'resize-start' || mode === 'resize-end') { return psResizeDrop(idx, prod, mode, dropKey, hour, group); }
+            if (mode === 'resize-start' || mode === 'resize-end' || mode === 'resize-pickup') { return psResizeDrop(idx, prod, mode, dropKey, hour, group); }
             if (!origStart) return;
             const [oy, om, od] = origStart.split('-').map(Number);
             const [ny, nm, nd] = dropKey.split('-').map(Number);
@@ -13386,7 +13766,7 @@
             if (group && group.length > 1) {
                 let done = 0;
                 // [수정 2026-10-01] 고른 것 전부 같은 날수만큼 옮기되, 시간칸에 놓았으면 다 같이 그 시각에 올라가게 맞춘다.
-                //  마감 시각은 각자 올라가는 시각이 바뀐 만큼 같이 밀린다 (판매 기간 길이는 그대로)
+                //  [수정 2026-10-02] 마감은 날짜만 같은 날수만큼 옮기고 시각은 정해 둔 그대로 둔다 (사장님 요청)
                 const slotHour = PS_SLOTS.includes(hour) ? hour : null;
                 for (const g of group) {
                     const p = (uploadProducts || [])[g.idx];
@@ -13397,8 +13777,10 @@
                         gChanges.releaseAt = psShiftTs(p.releaseAt, deltaDays, slotHour);
                         shift = gChanges.releaseAt - Number(p.releaseAt);
                     }
-                    if (p.expireAt) gChanges.expireAt = Number(p.expireAt) + shift;
+                    if (p.expireAt) gChanges.expireAt = psShiftTs(p.expireAt, deltaDays, null);
                     if (Object.keys(gChanges).length === 0) continue;
+                    const gpk = psPickupKey(p);   // [신규 2026-10-02] 픽업일도 같은 날수만큼 같이
+                    if (gpk && (psIsUpcoming(p) || Number(gChanges.releaseAt) > Date.now())) { const b0 = Number(p.releaseAt || p.expireAt); gChanges.nextDate = psAddDays(gpk, psDayDiff(fMsToDateKey(b0), fMsToDateKey(b0 + shift))); }
                     const ok = isCopy ? await psDuplicateWithSchedule(g.idx, gChanges) : await psApplyScheduleUpdate(g.idx, gChanges);
                     if (ok) done++;
                 }
@@ -13412,10 +13794,16 @@
 
             // 올라가는·내려가는 시각을 같은 며칠만큼 통째로 옮긴다 (시각은 그대로 두고 날짜만).
             // 지나간 시각으로 옮기면 psApplyScheduleUpdate가 그 순간 다시 노출시키고, 새 공지도 다시 뜨게 한다.
+            // [수정 2026-10-02] 시간 줄을 바꿔 놓아도 마감 시각은 정해 둔 그대로 — 마감은 날짜만 같은 날수만큼 옮긴다 (사장님 요청)
             const changes = {};
             if (prod.releaseAt) changes.releaseAt = Number(prod.releaseAt) + deltaMs;
-            if (prod.expireAt) changes.expireAt = Number(prod.expireAt) + deltaMs;
+            if (prod.expireAt) {
+                const b0 = Number(prod.releaseAt || prod.expireAt);
+                changes.expireAt = psShiftTs(prod.expireAt, psDayDiff(fMsToDateKey(b0), fMsToDateKey(b0 + deltaMs)), null);
+            }
             if (Object.keys(changes).length === 0) return;
+            const pk = psPickupKey(prod);   // [신규 2026-10-02] 픽업일도 같은 날수만큼 같이
+            if (pk && (psIsUpcoming(prod) || Number(changes.releaseAt) > Date.now())) { const b0 = Number(prod.releaseAt || prod.expireAt); changes.nextDate = psAddDays(pk, psDayDiff(fMsToDateKey(b0), fMsToDateKey(b0 + deltaMs))); }
 
             if (isCopy) {
                 const ok = await psDuplicateWithSchedule(idx, changes);
@@ -13427,7 +13815,7 @@
         }
 
         /* [신규] 상품을 복제해서, 그 복제본에만 새 예약(changes)을 건다. 원본 상품·원본 예약은 손대지 않는다.
-           식별번호는 새로 하나 받고, 사진·가격 등은 원본 그대로 물려받는다. */
+           [수정 2026-10-02] 식별번호·노출번호·사진·가격 등은 원본 그대로 물려받는다 (같은 물건을 다시 올리는 것). */
         async function psDuplicateWithSchedule(idx, changes) {
             const prod = (uploadProducts || [])[idx];
             if (!prod) return false;
@@ -13441,6 +13829,7 @@
                 showToast('⚠️ 마감 시각은 올라가는 시각보다 뒤여야 해요');
                 return false;
             }
+            { const ov = psScheduleOverlap(idx, newReleaseAt, newExpireAt, true); if (ov >= 0) { showToast(psOverlapMsg(ov)); return false; } }   // [신규 2026-10-02] 복사본 일정이 원본·다른 일정과 겹치면 막는다
             const now = Date.now();
             const hasSchedule = !!(newReleaseAt || newExpireAt);
             let showToday, showReserve, hide;
@@ -13456,7 +13845,8 @@
             const newIdx = uploadProducts.length;   // 기존 상품등록 저장과 같은 방식 — 배열 맨 뒤에 새로 붙인다
             const copy = {
                 ...prod,
-                productCode: gNextProductCode(prefix),
+                productCode: /^[PFS]\d+$/.test(String(prod.productCode || '').trim()) ? String(prod.productCode).trim() : gNextProductCode(prefix),   // [수정 2026-10-02] 같은 물건을 다시 올리는 것 — 원본 식별번호 그대로 (사장님 요청)
+                sid: prod.sid || null,   // [수정 2026-10-02] 노출일정 복사본은 원본과 같은 노출번호 — 재고를 같이 센다 (사장님 요청)
                 createdAt: now,
                 updatedAt: now,
                 releaseAt: newReleaseAt,
@@ -13466,8 +13856,14 @@
                 announced: hasSchedule ? false : null,
                 scheduleLabel: prod.scheduleLabel || null,
                 announceText: prod.announceText || null,
-                showToday, showReserve, hide
+                showToday, showReserve, hide,
+                nextDate: null
             };
+            // [신규 2026-10-02] 픽업일 — 올라가기 전이면 적어 두고, 바로 올라가는 복제본은 날짜를 그 날로 (복제본은 원본과 같은 노출번호라 재고도 같이 센다)
+            if (changes.nextDate && psIsGroupProd(prod)) {
+                if (newReleaseAt && now < newReleaseAt) copy.nextDate = changes.nextDate;
+                else { copy.date = changes.nextDate; copy.matchKey = changes.nextDate; }
+            }
             const ok = await fbPatchProducts({ [newIdx]: copy });
             if (ok) {
                 uploadProducts[newIdx] = copy;
@@ -13645,7 +14041,12 @@
                 const hidden = (prod.hide === true || prod.hide === 'true');
                 const released = !prod.releaseAt || Date.now() >= Number(prod.releaseAt);
                 const visibleNow = released && !hidden;
-                const st = gIsClosedAdmin(prod) ? 'closed' : (visibleNow ? 'on' : (released ? 'hidden' : 'soon'));
+                /* [수정 2026-10-02] 막대 색 = 이번 일정이 어디까지 지나왔나 (사장님 요청 — 한 번씩 지나간 표시)
+                     올라가기 전 ⚪ 예약대기 → 올라간 뒤 🟢 판매중 → 마감 시각 지나면 🟡 마감 → 그 뒤 숨김 처리되면 🔴 숨김
+                   동그라미 = 지금 실제 상태 (🟢 판매중 · 🟡 마감 · 🔴 숨김 — 회색 없음). 올라가기 전 예약은 실제로 숨겨져 있어 빨강이다. */
+                const _now = Date.now(), _relT = Number(prod.releaseAt) || 0, _expT = Number(prod.expireAt) || 0;
+                const st = (_relT && _now < _relT) ? 'soon' : ((!_expT || _now < _expT) ? 'on' : (hidden ? 'hidden' : 'closed'));
+                const live = psLiveStateOf(idx);   // [수정 2026-10-02] 같은 노출번호(한 상품) 전체의 지금 상태
                 const start = rk || ek, end = ek || rk;
                 // [신규 2026-10-01] 올라가는 시각 — 같은 날 안에서는 이른 시각이 위로 오고, 막대 머리에 '3시'처럼 붙인다
                 const relD = prod.releaseAt ? new Date(Number(prod.releaseAt)) : null;
@@ -13653,9 +14054,16 @@
                 // [신규 2026-10-01] 날짜칸 안 시간 다섯 줄 중 어느 줄에 놓을지 — 다섯 칸에 안 맞는 예전 시각은 가장 가까운 줄로
                 const baseD = relD || (prod.expireAt ? new Date(Number(prod.expireAt)) : null);
                 const slot = psNearestSlot(baseD ? baseD.getHours() + baseD.getMinutes() / 60 : 15);
-                bars.push({ idx, nm, st, slot, start: start <= end ? start : end, end: start <= end ? end : start,
+                /* [신규 2026-10-02] 공동구매 상품은 막대가 픽업일까지 이어진다 — 마감 자리엔 세로선, 마감 뒤(픽업 기다리는 동안)는 빗금 */
+                const s0 = start <= end ? start : end;
+                let e0 = start <= end ? end : start;
+                const pk = psPickupKey(prod);
+                if (pk && pk > e0) e0 = pk;
+                const expD = prod.expireAt ? new Date(Number(prod.expireAt)) : null;
+                bars.push({ idx, nm, st, live, slot, start: s0, end: e0, pk, expKey: ek,
+                    expPct: expD ? Math.round((expD.getHours() + expD.getMinutes() / 60) / 24 * 100) : null,
                     relMin, timeTag: (relD && !(relD.getMinutes() === 0 && PS_SLOTS.includes(relD.getHours()))) ? psSlotLabel(relD.getHours(), relD.getMinutes()) : '',
-                    tip: `${prod.releaseAt ? fFmtSchedTime(prod.releaseAt) + ' 올라감' : ''}${prod.releaseAt && prod.expireAt ? ' ~ ' : ''}${prod.expireAt ? fFmtSchedTime(prod.expireAt) + ' 마감' : ''}` });
+                    tip: `${prod.releaseAt ? fFmtSchedTime(prod.releaseAt) + ' 올라감' : ''}${prod.releaseAt && prod.expireAt ? ' ~ ' : ''}${prod.expireAt ? fFmtSchedTime(prod.expireAt) + ' 마감' : ''}${pk ? ` · 🚚 ${Number(pk.slice(5, 7))}/${Number(pk.slice(8))} 픽업` : ''}` });
             });
             bars.sort((a, b) => a.start.localeCompare(b.start) || a.relMin - b.relMin || a.end.localeCompare(b.end));
             // [수정 2026-10-01] 줄 자리(lane)는 시간 줄마다 따로 매긴다 — 같은 시간 줄 안에서만 겹치지 않게 쌓는다
@@ -13666,7 +14074,7 @@
                 if (l < 0) { l = laneEnd.length; laneEnd.push(''); }
                 laneEnd[l] = b.end; b.lane = l;
             });
-            const ST = { on: ['#dcfce7', '#15803d', '판매중'], soon: ['#fee2e2', '#b91c1c', '노출 예정'], hidden: ['#fee2e2', '#b91c1c', '숨김'], closed: ['#fef3c7', '#a16207', '마감'] };
+            const ST = { on: ['#dcfce7', '#15803d', '판매중'], soon: ['#e5e7eb', '#4b5563', '예약대기'], hidden: ['#fee2e2', '#b91c1c', '숨김'], closed: ['#fef3c7', '#a16207', '마감'] };
 
             // [수정 2026-09-30] 달마다 따로 칸을 그리지 않는다 — 새 달이 시작돼도 한 칸도 안 띄고 쭉 이어서 그리고,
             //  1일 칸에만 '10월 1'처럼 달 이름을 얹어서 어디서 달이 바뀌는지 알려준다.
@@ -13738,7 +14146,10 @@
                     const isStart = b.start === key, isEnd = b.end === key;
                     const timeTag = (isStart && b.timeTag && b.start === fMsToDateKey((uploadProducts[b.idx] || {}).releaseAt))
                         ? `<b style="margin-right:3px;">${b.timeTag}</b>` : '';
-                    const label = (isStart || dow === 0 || isMonthStart) ? timeTag + gEscapeHtml(b.nm) : '';
+                    // [신규 2026-10-02] 이름 앞 색 동그라미 — 지금 노출 상태 (판매중 초록 · 마감 노랑 · 숨김 빨강 — 회색 없음)
+                    const PS_DOT = { on: '#16a34a', hidden: '#dc2626', closed: '#ca8a04' };
+                    const dot = `<span class="ps-dot" style="background:${PS_DOT[b.live]};"></span>`;
+                    const label = (isStart || dow === 0 || isMonthStart) ? dot + timeTag + gEscapeHtml(b.nm) : '';
                     const [bg, fg, word] = ST[b.st];
                     // [신규] 막대를 끌어다 다른 날짜에 놓으면 올라가는·내려가는 시각이 같은 만큼(며칠) 통째로 옮겨간다.
                     //  (시각을 새로 잡으면 psApplyScheduleUpdate가 알아서 다시 노출시키고 새 공지도 뜨게 한다)
@@ -13757,8 +14168,20 @@
                     }
                     // [신규] 막대 양 끝에 손잡이를 둔다 — 진짜 시작/끝 날에만 둔다 (주 경계에서 잘려 보이는 자리는 진짜 끝이 아니라서 뺀다)
                     const lHandle = isStart ? `<div class="ps-rh l" draggable="true" ondragstart="psResizeDragStart(event, ${b.idx}, 'start')" title="끌어서 올라가는 날짜 조절"></div>` : '';
-                    const rHandle = isEnd ? `<div class="ps-rh r" draggable="true" ondragstart="psResizeDragStart(event, ${b.idx}, 'end')" title="끌어서 마감 날짜 조절"></div>` : '';
-                    namesHtml += `<div class="ps-bar${isStart ? ' s' : ''}${isEnd ? ' e' : ''}${isCut ? ' cut' : ''}" style="background:${bg}; color:${fg}; cursor:grab;${selShadow}" title="${gEscapeHtml(b.nm)} · ${b.tip} · 지금 ${word} · 끌어서 날짜 옮기기(Ctrl+끌면 복제) · 양 끝을 끌면 시작/마감 날짜만 조절 · 눌러서 고른 뒤 Delete로 지우기" draggable="true" ondragstart="psDragStart(event, ${b.idx}, '${b.start}')" onclick="event.stopPropagation(); psSelectBar(${b.idx}, '${key}')">${lHandle}${label}${rHandle}</div>`;
+                    let rHandle = isEnd ? `<div class="ps-rh r" draggable="true" ondragstart="psResizeDragStart(event, ${b.idx}, 'end')" title="끌어서 마감 날짜 조절"></div>` : '';
+                    /* [신규 2026-10-02] 픽업일까지 가는 막대 — 끝 손잡이는 픽업일, 마감은 마감 날 칸 안의 세로선(그 시각 자리)을 끈다.
+                       마감 뒤(픽업 기다리는 동안)는 빗금으로 흐리게 */
+                    let bgCss = `background:${bg};`, xLine = '';
+                    if (b.pk) {
+                        rHandle = isEnd ? `<div class="ps-rh r" draggable="true" ondragstart="psResizeDragStart(event, ${b.idx}, 'pickup')" title="끌어서 픽업일 조절"></div>` : '';
+                        const STRIPE = 'repeating-linear-gradient(135deg, rgba(255,255,255,.75) 0 3px, transparent 3px 6px)';
+                        if (b.expKey && key > b.expKey) bgCss = `background:${STRIPE}, ${bg};`;
+                        else if (b.expKey && key === b.expKey) {
+                            bgCss = `background:linear-gradient(to right, ${bg} ${b.expPct}%, transparent ${b.expPct}%), ${STRIPE}, ${bg};`;
+                            xLine = `<div class="ps-xl" style="left:${b.expPct}%" draggable="true" ondragstart="psResizeDragStart(event, ${b.idx}, 'end')" title="마감 — 끌어서 마감 날짜 조절"></div>`;
+                        }
+                    }
+                    namesHtml += `<div class="ps-bar${isStart ? ' s' : ''}${isEnd ? ' e' : ''}${isCut ? ' cut' : ''}" data-idx="${b.idx}" style="${bgCss} color:${fg}; cursor:grab;${selShadow}" title="${gEscapeHtml(b.nm)} · ${b.tip} · 일정 ${word} · 지금 ${ST[b.live][2]} · 끌어서 날짜 옮기기(Ctrl+끌면 복제) · 양 끝을 끌면 시작/${b.pk ? '픽업' : '마감'} 날짜만 조절${b.pk ? ' · 세로선을 끌면 마감 날짜 조절' : ''} · 눌러서 고른 뒤 Delete로 지우기" draggable="true" ondragstart="psDragStart(event, ${b.idx}, '${b.start}')" onclick="event.stopPropagation(); psSelectBar(${b.idx}, '${key}')">${lHandle}${label}${xLine}${rHandle}</div>`;
                 }
                 namesHtml += `</div>`;   // ps-slot 닫기
                 });
@@ -13788,7 +14211,8 @@
             const idxList = [];
             (uploadProducts || []).forEach((prod, idx) => {
                 if (!prod) return;
-                if (fMsToDateKey(prod.releaseAt) === dateKey || fMsToDateKey(prod.expireAt) === dateKey) idxList.push(idx);
+                if (fMsToDateKey(prod.releaseAt) === dateKey || fMsToDateKey(prod.expireAt) === dateKey
+                    || ((prod.releaseAt || prod.expireAt) && psPickupKey(prod) === dateKey)) idxList.push(idx);   // [신규 2026-10-02] 이 날 픽업도
             });
             // [수정 2026-10-01] 이 날 올라가는 것을 이른 시각부터, 이 날 마감만 되는 것은 그 뒤에
             const key = (i) => { const p = uploadProducts[i]; return fMsToDateKey(p.releaseAt) === dateKey ? Number(p.releaseAt) : Infinity; };
@@ -13821,11 +14245,29 @@
             const weeklyWarn = (prod.showWeekly === true)
                 ? `<div style="font-size:11px; font-weight:800; color:#dc2626; margin-top:6px;">⚠️ '매주 노출' 상품이라 예약이 반영되지 않아요. 상품목록에서 매주 노출을 먼저 꺼주세요.</div>`
                 : '';
-            return `<div style="border:1.5px solid var(--border); border-radius:10px; padding:10px; background:#fff;">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
-                    <div style="font-size:13px; font-weight:800; color:#0f172a; min-width:0;">${gEscapeHtml(prod.name)}</div>
+            /* [수정 2026-10-02] 날짜를 누르면 나오는 일정 카드는 기본으로 접어 둔다 (사장님 요청).
+               접힌 카드엔 지금 상태 동그라미·이름·일정 한 줄만 보이고, 카드를 누르면 펼쳐져서 그 자리에서 고친다. */
+            const open = psRowOpen.has(idx);
+            const _hid = (prod.hide === true || prod.hide === 'true');
+            const _released = !prod.releaseAt || Date.now() >= Number(prod.releaseAt);
+            const _live = psLiveStateOf(idx);
+            const _dot = { on: '#16a34a', closed: '#ca8a04', hidden: '#dc2626' }[_live];
+            const _pk = psPickupKey(prod);
+            const _sum = [prod.releaseAt ? fFmtSchedTime(prod.releaseAt) + ' 올라감' : '', prod.expireAt ? fFmtSchedTime(prod.expireAt) + ' 마감' : '',
+                _pk ? `🚚 ${Number(_pk.slice(5, 7))}/${Number(_pk.slice(8))} 픽업` : ''].filter(Boolean).join(' · ');
+            return `<div style="border:1.5px solid ${open ? '#93c5fd' : 'var(--border)'}; border-radius:10px; padding:10px; background:#fff;">
+                <div onclick="psToggleRow(${idx})" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <span class="ps-dot" style="background:${_dot}; flex:0 0 auto;"></span>
+                    <div style="flex:1 1 auto; min-width:0;">
+                        <div style="font-size:13px; font-weight:800; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${gEscapeHtml(prod.name)}</div>
+                        <div style="font-size:11px; font-weight:700; color:#64748b; margin-top:1px;">${_sum || '일정 없음'}</div>
+                    </div>
+                    <span style="flex:0 0 auto; font-size:11px; color:#94a3b8;">${open ? '▲' : '▼'}</span>
+                </div>
+                ${open ? `<div style="margin-top:10px;">
+                <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
                     <!-- [신규] 상품 자체(이름·가격·사진 등)를 고치러 상품등록 수정화면으로 바로 넘어간다 -->
-                    <button type="button" onclick="editProduct(${idx})" title="상품등록 수정화면으로 이동" style="flex:0 0 auto; height:28px; padding:0 10px; border:1.5px solid #94a3b8; background:#f8fafc; color:#475569; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">✏️ 수정</button>
+                    <button type="button" onclick="editProduct(${idx})" title="상품등록 수정화면으로 이동" style="flex:0 0 auto; height:28px; padding:0 10px; border:1.5px solid #94a3b8; background:#f8fafc; color:#475569; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">상품 정보</button>
                 </div>
                 <label style="font-size:10.5px; font-weight:700; color:var(--text-sub); display:block; margin-bottom:2px;">달력에 보일 짧은 이름</label>
                 <input type="text" value="${gEscapeHtml(prod.scheduleLabel || '')}" placeholder="비우면 상품명 그대로 써요 (예: 김치, 자몽음료)"
@@ -13843,11 +14285,21 @@
                         <label style="font-size:10.5px; font-weight:700; color:var(--text-sub); display:block; margin-bottom:2px;">🕕 마감 시각</label>
                         <input type="datetime-local" value="${expVal}" onfocus="psFillDefaultTime(this)" onchange="psUpdateTime(${idx}, 'expireAt', this.value)" style="width:100%; min-width:0; box-sizing:border-box; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
                     </div>
+                    ${psIsGroupProd(prod) ? `<div>
+                        <label style="font-size:10.5px; font-weight:700; color:var(--text-sub); display:block; margin-bottom:2px;">🚚 픽업일</label>
+                        <input type="date" value="${psPickupKey(prod)}" onchange="psSetPickupFromInput(${idx}, this.value)" style="width:100%; min-width:0; box-sizing:border-box; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
+                    </div>` : ''}
                 </div>
                 <textarea rows="2" placeholder="카톡 공지문구 (비우면 상세설명을 보내요 · 설명도 없으면 상품명·가격)" onchange="psUpdateAnnounceText(${idx}, this.value)" style="width:100%; box-sizing:border-box; margin-top:6px; font-size:12px; border:1.5px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-family:inherit;">${gEscapeHtml(prod.announceText || '')}</textarea>
                 <button type="button" onclick="psClearSchedule(${idx})" style="margin-top:6px; width:100%; height:34px; border:1px solid ${psClearArmedIdx === idx ? '#dc2626' : '#fecaca'}; background:${psClearArmedIdx === idx ? '#fecaca' : '#fef2f2'}; color:#b91c1c; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">${psClearArmedIdx === idx ? '한 번 더 누르면 예약이 지워져요' : '✕ 이 상품 예약 취소'}</button>
                 ${weeklyWarn}
+                </div>` : ''}
             </div>`;
+        }
+        let psRowOpen = new Set();   // [신규 2026-10-02] 펼쳐 둔 일정 카드 (상품 번호)
+        function psToggleRow(idx) {
+            if (psRowOpen.has(idx)) psRowOpen.delete(idx); else psRowOpen.add(idx);
+            renderProductScheduleCalendar();
         }
 
         function psAddSearchHtml(dateKey, hour) {
@@ -13958,9 +14410,77 @@
         function psSelectBar(idx, dateKey) {
             if (psSelectedIdxs.has(idx)) psSelectedIdxs.delete(idx);
             else psSelectedIdxs.add(idx);
-            psCalOpenDay = dateKey;   // 그 날짜를 열어 둬야 '한 번 더 누르면 지워져요' 문구도 보인다
+            // [수정 2026-10-02] 막대를 눌러도 뒤 날짜칸은 안 연다 (사장님 요청 — 고르기만)
             renderProductScheduleCalendar();
-            psCalCenterOn(dateKey);
+        }
+
+        /* [신규 2026-10-02] 끌어서 한꺼번에 고르기 (PC 마우스) — 막대가 아닌 빈 곳에서 눌러 끌면 네모가 그려지고,
+           네모에 걸친 막대를 모두 고른다. Shift·Ctrl 을 누른 채 끌면 지금 고른 것에 더한다(안 누르면 새로 고른다).
+           조금도 안 끌고 떼면 예전처럼 날짜칸 누르기로 친다. */
+        let psMq = null;   // { x0, y0 (달력 안 좌표), add, base, el, moved }
+        function psMarqueeDown(ev) {
+            if (ev.button !== 0) return;
+            if (ev.target.closest('.ps-bar:not(.ps-bar-empty), .ps-rh, .ps-xl, input, button, select, textarea')) return;
+            const box = document.getElementById('ps-cal-box');
+            if (!box) return;
+            const r = box.getBoundingClientRect();
+            psMq = { x0: ev.clientX - r.left + box.scrollLeft, y0: ev.clientY - r.top + box.scrollTop, cx: ev.clientX, cy: ev.clientY,
+                add: !!(ev.shiftKey || ev.ctrlKey || ev.metaKey), base: new Set(psSelectedIdxs), el: null, moved: false, hits: new Set() };
+            document.addEventListener('mousemove', psMarqueeMove);
+            document.addEventListener('mouseup', psMarqueeUp);
+            box.addEventListener('scroll', psMarqueeMove);
+        }
+        function psMarqueeMove(ev) {
+            if (!psMq) return;
+            const box = document.getElementById('ps-cal-box');
+            if (ev && ev.clientX !== undefined) { psMq.cx = ev.clientX; psMq.cy = ev.clientY; }
+            const r = box.getBoundingClientRect();
+            const x1 = psMq.cx - r.left + box.scrollLeft, y1 = psMq.cy - r.top + box.scrollTop;
+            if (!psMq.moved && Math.abs(x1 - psMq.x0) < 6 && Math.abs(y1 - psMq.y0) < 6) return;
+            if (!psMq.moved) {
+                psMq.moved = true;
+                psMq.el = document.createElement('div');
+                psMq.el.className = 'ps-marquee';
+                document.body.appendChild(psMq.el);
+                document.body.style.userSelect = 'none';
+            }
+            if (ev && ev.preventDefault && ev.type === 'mousemove') ev.preventDefault();
+            // 화면 좌표로 네모를 그린다 (달력이 스크롤돼도 처음 누른 자리를 따라간다)
+            const left = Math.min(psMq.x0, x1) - box.scrollLeft + r.left, right = Math.max(psMq.x0, x1) - box.scrollLeft + r.left;
+            const top = Math.min(psMq.y0, y1) - box.scrollTop + r.top, bottom = Math.max(psMq.y0, y1) - box.scrollTop + r.top;
+            Object.assign(psMq.el.style, { left: left + 'px', top: Math.max(top, r.top) + 'px', width: (right - left) + 'px', height: Math.max(0, Math.min(bottom, r.bottom) - Math.max(top, r.top)) + 'px' });
+            // 네모에 걸친 막대 — 보기만 바로 바꾸고, 다 끌고 떼면 한 번에 저장(그리기)한다
+            const hits = new Set();
+            box.querySelectorAll('.ps-bar[data-idx]').forEach(b => {
+                const br = b.getBoundingClientRect();
+                const on = br.right > left && br.left < right && br.bottom > top && br.top < bottom;
+                if (on) hits.add(Number(b.dataset.idx));
+            });
+            psMq.hits = hits;
+            box.querySelectorAll('.ps-bar[data-idx]').forEach(b => {
+                const i = Number(b.dataset.idx);
+                b.classList.toggle('ps-mq-hit', hits.has(i) || (psMq.add && psMq.base.has(i)));
+            });
+            // 위·아래 끝에 가까우면 달력을 굴려 준다
+            if (psMq.cy > r.bottom - 24) box.scrollTop += 12;
+            else if (psMq.cy < r.top + 24) box.scrollTop -= 12;
+        }
+        function psMarqueeUp() {
+            document.removeEventListener('mousemove', psMarqueeMove);
+            document.removeEventListener('mouseup', psMarqueeUp);
+            const box = document.getElementById('ps-cal-box');
+            if (box) box.removeEventListener('scroll', psMarqueeMove);
+            const mq = psMq; psMq = null;
+            if (!mq || !mq.moved) return;   // 안 끌었으면 그냥 날짜칸 누르기
+            if (mq.el) mq.el.remove();
+            document.body.style.userSelect = '';
+            // 끌고 뗀 자리의 날짜칸 누르기(click)는 한 번 막는다
+            //  (click 이 안 생기는 경우도 있어 바로 다음 차례에 거둬들인다 — 안 그러면 엉뚱한 다음 누르기를 먹는다)
+            const eat = e => { e.stopPropagation(); e.preventDefault(); };
+            document.addEventListener('click', eat, true);
+            setTimeout(() => document.removeEventListener('click', eat, true), 0);
+            psSelectedIdxs = mq.add ? new Set([...mq.base, ...mq.hits]) : new Set(mq.hits);
+            renderProductScheduleCalendar();
         }
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && psDelConfirmIdxs !== null) { psDelConfirmCancel(); return; }
@@ -14036,9 +14556,11 @@
                 [`${idx}/announceText`]: null,
                 [`${idx}/releaseApplied`]: null,
                 [`${idx}/expireApplied`]: null,
+                [`${idx}/nextDate`]: null,
                 [`${idx}/updatedAt`]: now
             });
             if (ok) {
+                prod.nextDate = null;
                 prod.releaseAt = null; prod.expireAt = null; prod.announced = null; prod.announceText = null;
                 prod.releaseApplied = null; prod.expireApplied = null; prod.updatedAt = now;
                 psSelectedIdxs.delete(idx);
@@ -14067,6 +14589,7 @@
                 showToast('⚠️ 마감 시각은 올라가는 시각보다 뒤여야 해요');
                 return false;
             }
+            { const ov = psScheduleOverlap(idx, newReleaseAt, newExpireAt, false); if (ov >= 0) { showToast(psOverlapMsg(ov)); return false; } }   // [신규 2026-10-02] 같은 상품(노출번호) 일정끼리 겹치면 막는다
 
             const now = Date.now();
             const hasSchedule = !!(newReleaseAt || newExpireAt);
@@ -14089,6 +14612,20 @@
             const releaseApplied = hasSchedule ? (!!newReleaseAt && now >= newReleaseAt) : null;
             const expireApplied = hasSchedule ? (!!newExpireAt && now >= newExpireAt) : null;
 
+            /* [신규 2026-10-02] 픽업일 — 아직 안 올라간 예약이면 nextDate 로 적어 둔다.
+               이번 저장으로 바로 올라가게 됐으면(지난 시각으로 옮김 등) 그 자리에서 상품 날짜를 바꾼다 —
+               재고는 노출번호로 세므로 그대로 이어진다. */
+            const isGroup = psIsGroupProd(prod);
+            const wasUpcoming = psIsUpcoming(prod);
+            const nowUpcoming = !!newReleaseAt && now < newReleaseAt;
+            const newNext = ('nextDate' in changes) ? (changes.nextDate || null) : (prod.nextDate || null);
+            let freshDate = '', liveDate = '';
+            if (isGroup && newReleaseAt && !nowUpcoming) {
+                if (wasUpcoming) freshDate = psPlannedPickup({ ...prod, releaseAt: newReleaseAt, expireAt: newExpireAt, nextDate: newNext });
+                else if (changes.nextDate) liveDate = changes.nextDate;
+                if (freshDate === toISODate(prod.matchKey)) freshDate = '';
+            }
+
             const patch = {
                 [`${idx}/releaseAt`]: newReleaseAt,
                 [`${idx}/expireAt`]: newExpireAt,
@@ -14098,8 +14635,10 @@
                 [`${idx}/announced`]: hasSchedule ? announced : null,
                 [`${idx}/releaseApplied`]: releaseApplied,
                 [`${idx}/expireApplied`]: expireApplied,
+                [`${idx}/nextDate`]: (isGroup && nowUpcoming) ? newNext : null,
                 [`${idx}/updatedAt`]: now
             };
+            if (freshDate) { patch[`${idx}/date`] = freshDate; patch[`${idx}/matchKey`] = freshDate; }
             const ok = await fbPatchProducts(patch);
             // [버그수정] '상품이 바뀌었다' 표식을 남긴다. 안 남기면 손님 폰이 옛 목록(옛 마감 시각·노출)을 계속 쓴다
             if (ok) updatePublishedProductsTimestamp();
@@ -14109,7 +14648,10 @@
                 prod.announced = hasSchedule ? announced : null;
                 prod.releaseApplied = releaseApplied;
                 prod.expireApplied = expireApplied;
+                prod.nextDate = (isGroup && nowUpcoming) ? newNext : null;
+                if (freshDate) { prod.date = freshDate; prod.matchKey = freshDate; }
                 prod.updatedAt = now;
+                if (liveDate) await psChangeLiveDate(idx, liveDate);
             } else {
                 showToast('저장 실패 — 다시 시도해 주세요');
             }
@@ -14144,12 +14686,19 @@
 
                 // 올라가는 시각 — 아직 한 번도 안 켰고 시각이 됐으면 켠다
                 if (releaseAt && now >= releaseAt && p.releaseApplied !== true) {
+                    /* [신규 2026-10-02] 올라가는 순간 상품 날짜를 정해 둔 배달·픽업일로 바꾼 뒤 올린다 (재고는 노출번호로 이어진다) */
+                    const nk = psPlannedPickup(p);
+                    if (nk && nk !== toISODate(p.matchKey)) {
+                        patch[`${idx}/date`] = nk; patch[`${idx}/matchKey`] = nk;
+                        p.date = nk; p.matchKey = nk;
+                    }
+                    if (p.nextDate) { patch[`${idx}/nextDate`] = null; p.nextDate = null; }
                     nextHide = false;
                     patch[`${idx}/releaseApplied`] = true;
                     p.releaseApplied = true;
                     /* [신규 2026-09-29] 새 일정이 시작되는 이 순간, 숨김이든 마감이든 판매중으로 돌린다.
                        (숨김은 바로 아래에서 풀고, 손으로 해 둔 [마감]은 저장이 끝난 뒤 지운다. 한 번만 작동) */
-                    const ck = fGetAdjKey(p.matchKey, p.name);
+                    const ck = fGetAdjKey(p.matchKey, p.name, p.sid);
                     if (uploadClosedMap[ck] === true || uploadClosedMap[encodeURIComponent(ck)] === true) reopen.push(ck);
                 }
                 // [수정 2026-09-29] 내려가는(마감) 시각이 지나도 숨기지 않는다.
@@ -14195,8 +14744,15 @@
         function gStableKeyOf(prod) {
             if (!prod) return '';
             const code = String(prod.productCode || '').trim();
-            if (/^[PFS]\d+$/.test(code)) return code;
-            return fGetAdjKey(prod.matchKey, prod.name);
+            if (/^[PFS]\d+$/.test(code)) {
+                /* [수정 2026-10-02] 노출일정 복사본은 원본과 식별번호가 같다. 번호만으로 찾으면 언제나 원본이 걸려
+                   🔔 배너·공유가 엉뚱한 상품(원본)의 문구·사진을 보낸다. 같은 번호의 첫 상품은 예전처럼 번호만 쓰고
+                   (가격표 수정 기록 등이 그대로 이어지게), 둘째부터는 등록 시각(없으면 날짜+이름)을 붙여 구분한다. */
+                const first = (uploadProducts || []).find(p => p && String(p.productCode || '').trim() === code);
+                if (!first || first === prod) return code;
+                return `${code}~${Number(prod.createdAt) || fGetAdjKey(prod.matchKey, prod.name)}`;
+            }
+            return fGetAdjKey(prod.matchKey, prod.name, prod.sid);
         }
         function gFindProductIdxByKey(key) {
             if (!key) return -1;
@@ -14482,25 +15038,40 @@
             ['final', '팔 금액', '판매가와의 차액만큼 할인합니다. 판매가는 그대로 둡니다.'],
             ['list', '정상가', '적은 금액이 판매가(정상가)가 되고, 지금 판매가와의 차액만큼 할인합니다.']
         ];
+        /* [수정 2026-10-02] 정상가(list) 방식은 '지금 손님이 내는 값(sell)'을 밑값으로 고정한다 (사장님 제보).
+           예전에는 판매가 칸 값을 밑값으로 썼는데, 정상가로 저장하면 판매가 칸이 이미 정상가로 올라가 있어서
+           다시 열면 '정상가 - 정상가 = 0원 할인'이 되거나(아무 체크만 눌러도 할인이 사라짐),
+           정상가를 새로 적으면 손님이 내는 값까지 올라갔다 (10,900에 팔던 것을 12,900 적으면 → 10,900이 아니라 12,000에 팔림).
+           sell 은 창을 열 때·정상가 방식으로 바꿀 때 '판매가 - 지금 할인 금액'으로 한 번 정한다 (optionModalDraft.discountSellBase) */
         // 저장된 값(판매가·할인금액)에서 각 방식의 입력칸에 보일 숫자를 되돌린다
-        function gDiscAmountInputValue(mode, price, amount) {
+        function gDiscAmountInputValue(mode, price, amount, sell) {
             const p = Math.max(0, parseInt(price) || 0);
             const a = Math.max(0, parseInt(amount) || 0);
             if (mode === 'final') return Math.max(0, p - a);
-            if (mode === 'list') return p;          // list는 판매가가 곧 정상가다
+            if (mode === 'list') return Math.max(0, parseInt(sell) || 0) + a;   // 정상가 = 손님이 내는 값 + 할인
             return a;
         }
         // 입력칸 숫자를 '깎는 금액'으로 바꾼다. list는 판매가도 함께 바뀌므로 새 판매가를 같이 돌려준다.
-        function gDiscAmountFromInput(mode, price, input) {
+        function gDiscAmountFromInput(mode, price, input, sell) {
             const p = Math.max(0, parseInt(price) || 0);
             const v = Math.max(0, parseInt(input) || 0);
             if (mode === 'final') return { amount: Math.max(0, p - v), price: p };
-            if (mode === 'list') return { amount: Math.max(0, v - p), price: Math.max(p, v) };
+            if (mode === 'list') {
+                const b = Math.max(0, parseInt(sell) || 0);
+                // 손님이 내는 값보다 큰 정상가를 적어야 할인이 된다. 아니면 판매가는 손님이 내던 값으로 둔다
+                return v > b ? { amount: v - b, price: v } : { amount: 0, price: b };
+            }
             return { amount: v, price: p };
+        }
+        // 지금 손님이 내는 값 — 판매가에서 지금 걸린 원 할인을 뺀 값
+        function gDiscSellBase(useDiscount, type, amount) {
+            const a = (useDiscount && type === 'amount') ? Math.max(0, parseInt(amount) || 0) : 0;
+            return Math.max(0, gFormPrice() - a);
         }
         // [수정] 둘 다 기본은 꺼짐. 켤 일보다 안 켤 일이 많아 매번 지우는 게 번거로웠다.
         let uploadSaleToToday = false;     // 할인하면 '오늘의 상품'에 넣을지
         let uploadSaleBadge = false;       // '[땡처리 특가]' 문구를 붙일지
+        let uploadSaleBadgeText = '';      // [신규 2026-10-02] 섬네일 띠에 쓸 문구 — 비우면 문구 없이 'n원 할인!' (사장님 요청)
         // 할인이 걸렸는지 (방식에 맞는 값이 0보다 큰지)
         function gDiscHas(type, rate, amount) { return type === 'amount' ? (parseInt(amount) || 0) > 0 : (parseInt(rate) || 0) > 0; }
         // 방식까지 보고 깎은 값 (금액 할인은 그대로 빼고 0 아래로는 안 간다)
@@ -14872,8 +15443,10 @@
                 discountAmount: uploadDiscountAmount,
                 discountAmountMode: uploadDiscountAmountMode,   // [신규] 원 할인 입력 방식 (깎을 금액/팔 금액/정상가)
                 discountNewPrice: 0,
+                discountSellBase: gDiscSellBase(uploadUseDiscount, uploadDiscountType, uploadDiscountAmount),   // [수정 2026-10-02] 정상가 방식의 밑값
                 saleToToday: uploadSaleToToday,
-                saleBadge: uploadSaleBadge
+                saleBadge: uploadSaleBadge,
+                saleBadgeText: uploadSaleBadgeText
             };
 
             const old = document.getElementById('product-option-modal');
@@ -14990,8 +15563,9 @@
                 if (np > 0 && priceEl && priceEl.type === 'number') priceEl.value = np;
             }
             // [수정] 적어 두지 않았으면 '꺼짐'으로 본다 (예전에는 안 적으면 켜진 것으로 봤다)
-            uploadSaleToToday = (optionModalDraft.saleToToday === true);
+            uploadSaleToToday = false;   // [수정 2026-10-02] '당일 상품에 넣기' 체크를 뺐다 — 늘 꺼짐
             uploadSaleBadge = (optionModalDraft.saleBadge === true);
+            uploadSaleBadgeText = String(optionModalDraft.saleBadgeText || '').trim().slice(0, 12);
 
             /* [삭제 2026-09-20] 할인(특가)을 켜면 분류탭을 '오늘의 상품'으로 바꾸던 것 — 과일을 등록할 때
                고르지도 않은 분류탭이 걸려 있어 뺐다. 분류탭은 사장님이 고른 대로만 간다. */
@@ -15051,7 +15625,7 @@
             // [수정] 적은 숫자를 방식에 맞게 '깎는 금액'으로 바꿔 담는다 (정상가 방식은 판매가도 함께 정해진다)
             const amtEl = document.querySelector('#product-option-modal-body [data-discount-role="amount"]');
             if (amtEl) {
-                const conv = gDiscAmountFromInput(optionModalDraft.discountAmountMode, gFormPrice(), amtEl.value);
+                const conv = gDiscAmountFromInput(optionModalDraft.discountAmountMode, gFormPrice(), amtEl.value, optionModalDraft.discountSellBase);
                 optionModalDraft.discountAmount = conv.amount;
                 optionModalDraft.discountNewPrice = conv.price;   // '정상가' 방식일 때 판매가를 이 값으로 올린다
             }
@@ -15059,6 +15633,8 @@
             if (todayEl) optionModalDraft.saleToToday = !!todayEl.checked;
             const badgeEl = document.querySelector('#product-option-modal-body [data-discount-role="badge"]');
             if (badgeEl) optionModalDraft.saleBadge = !!badgeEl.checked;
+            const badgeTextEl = document.querySelector('#product-option-modal-body [data-discount-role="badge-text"]');
+            if (badgeTextEl) optionModalDraft.saleBadgeText = badgeTextEl.value;
         }
 
         function toggleDraftUseAgencyFee() {
@@ -15094,7 +15670,17 @@
         function setDraftDiscountAmountMode(m) {
             syncDetailOptionDraft();
             if (!optionModalDraft) return;
+            const was = optionModalDraft.discountAmountMode;
             optionModalDraft.discountAmountMode = ['cut', 'final', 'list'].includes(m) ? m : 'cut';
+            // [수정 2026-10-02] 정상가 방식으로 들어올 때 손님이 내는 값을 다시 잡는다 (방금 적은 할인까지 반영)
+            if (optionModalDraft.discountAmountMode === 'list' && was !== 'list') {
+                optionModalDraft.discountSellBase = gDiscSellBase(optionModalDraft.useDiscount, optionModalDraft.discountType, optionModalDraft.discountAmount);
+                optionModalDraft.discountNewPrice = 0;
+            } else if (was === 'list' && optionModalDraft.discountAmountMode !== 'list') {
+                // 정상가 방식에서 나갈 때 — 적은 정상가는 아직 판매가 칸에 안 들어갔으니 버리고, 손님이 내는 값은 그대로 둔다
+                optionModalDraft.discountAmount = Math.max(0, gFormPrice() - (parseInt(optionModalDraft.discountSellBase) || 0));
+                optionModalDraft.discountNewPrice = 0;
+            }
             renderDetailOptionBody();
         }
         // 할인율을 고치면 예상 가격을 다시 그린다
@@ -15477,7 +16063,7 @@
                                     ${[['rate', '%'], ['amount', '원']].map(([k, l]) => `<button type="button" onclick="setDraftDiscountType('${k}')" style="height:30px; padding:0 12px; border:none; border-radius:6px; font-size:12px; font-weight:800; cursor:pointer; background:${(optionModalDraft.discountType === 'amount' ? 'amount' : 'rate') === k ? '#fff' : 'transparent'}; color:${(optionModalDraft.discountType === 'amount' ? 'amount' : 'rate') === k ? '#dc2626' : 'var(--text-sub)'};">${l} 할인</button>`).join('')}
                                 </span>
                                 ${optionModalDraft.discountType === 'amount'
-                                    ? `<input type="number" data-discount-role="amount" value="${gDiscAmountInputValue(optionModalDraft.discountAmountMode, gFormPrice(), optionModalDraft.discountAmount) || ''}" min="0" step="100" placeholder="예: 1000" oninput="refreshDiscountPreview()"
+                                    ? `<input type="number" data-discount-role="amount" value="${gDiscAmountInputValue(optionModalDraft.discountAmountMode, gFormPrice(), optionModalDraft.discountAmount, optionModalDraft.discountSellBase) || ''}" min="0" step="100" placeholder="예: 1000" oninput="refreshDiscountPreview()"
                                         style="flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; font-weight: 800; outline: none; text-align: right;">
                                        <span style="flex: 0 0 auto; font-size: 13px; font-weight: 800; color: var(--text-sub);">원</span>`
                                     : `<input type="number" data-discount-role="rate" value="${parseInt(optionModalDraft.discountRate) || 0}" min="0" max="100" step="1" placeholder="예: 10"
@@ -15505,10 +16091,14 @@
                         </div>
                         <!-- [신규] 할인할 때 함께 할 것 (고를 수 있다) -->
                         <div style="margin-top: 10px; display:flex; flex-direction:column; gap:6px; background:#fff; border:1.5px solid var(--border); border-radius: var(--radius-sub); padding: 10px 12px;">
+                            <!-- [삭제 2026-10-02] '당일 상품에 넣기' 체크 — 사장님 요청으로 뺐다. 저장은 늘 꺼짐(saleToToday:false) -->
                             <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-main); cursor:pointer;">
-                                <input type="checkbox" data-discount-role="today" ${optionModalDraft.saleToToday === true ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> 당일 상품에 넣기</label>
-                            <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-main); cursor:pointer;">
-                                <input type="checkbox" data-discount-role="badge" ${optionModalDraft.saleBadge === true ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> '[땡처리 특가]' 문구 붙이기</label>
+                                <input type="checkbox" data-discount-role="badge" ${optionModalDraft.saleBadge === true ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> 섬네일 문구</label>
+                            <!-- [신규 2026-10-02] 섬네일 띠에 쓸 문구를 직접 쓴다. 비우면 띠에는 'n원 할인!'. 쓰면 위 체크가 저절로 켜진다.
+                                 사진이 좁아(폰에서 120px 남짓) 12자까지만 받는다 -->
+                            <input type="text" data-discount-role="badge-text" maxlength="12" value="${gEscapeHtml(optionModalDraft.saleBadgeText || '')}" placeholder=""
+                                oninput="if (this.value.trim()) { const c = document.querySelector('#product-option-modal-body [data-discount-role=badge]'); if (c) c.checked = true; }"
+                                style="margin-left:25px; width:calc(100% - 25px); box-sizing:border-box; height:34px; padding:0 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-weight:700; font-family:inherit; color:#e11d48;">
                         </div>
                         <div style="font-size: 11px; font-weight: 600; color: var(--text-sub); margin-top: 8px; line-height: 1.5;">${optionModalDraft.discountType === 'amount' ? '판매가에서 적은 금액을 그대로 뺍니다.' : '할인가는 100원 단위로 버립니다. (예: 9,537원 → 9,500원)'}</div>
                     </div>
@@ -15519,6 +16109,7 @@
             body.innerHTML = html;
         }
 
+        let gWeeklyPurgedKeys = [];   // [신규 2026-10-02] 매주 갱신으로 재고를 비운 노출번호들
         // 매주 노출 상품 자동 날짜 갱신 헬퍼 함수
         function checkAndRunWeeklyProductsAutoUpdate(data) {
             if (!data) return false;
@@ -15569,6 +16160,19 @@
                                     updatedAt: Date.now()
                                 })
                             }).catch(err => console.error("매주 자동 갱신 실패:", err));
+
+                            /* [신규 2026-10-02] 예전엔 날짜가 재고 열쇠라 새 주가 되면 재고·마감·옵션 재고가 저절로 새로 시작됐다.
+                               노출번호(sid)로 세면 날짜가 바뀌어도 이어지므로, 매주 상품은 여기서 직접 비워 같은 동작을 지킨다. */
+                            if (p.sid) {
+                                const sk = String(p.sid);
+                                const del = (path) => fetch(`${FIREBASE_DB_URL}${path}.json`, { method: 'DELETE' }).catch(e => console.warn('매주 재고 비우기 실패:', path, e));
+                                del(`global_stock/${encodeURIComponent(sk)}`);
+                                gWeeklyPurgedKeys.push(sk);
+                                if (uploadClosedMap && uploadClosedMap[sk] === true) { del(`product_closed/${encodeURIComponent(sk)}`); delete uploadClosedMap[sk]; }
+                                Object.keys(optionAdjustments || {}).forEach(ok => {
+                                    if (ok.startsWith(sk + '__')) { del(`option_stock/${encodeURIComponent(ok)}`); delete optionAdjustments[ok]; }
+                                });
+                            }
                         }
                     }
                 }
@@ -15605,7 +16209,7 @@
                 } catch (e) { adj = null; }
                 const soldOut = p => {
                     const unl = (p.stock === "" || p.stock == null || String(p.stock).trim() === "무제한");
-                    const a = adj[fGetAdjKey(p.matchKey, p.name)];
+                    const a = adj[fGetAdjKey(p.matchKey, p.name, p.sid)];
                     const unlAdj = (a === "unlimited" || (a != null && String(a).startsWith("unlimited")));
                     if (unl || unlAdj) return false;
                     return Math.max(0, (parseInt(p.stock || 0) || 0) + (parseInt(a || 0) || 0)) <= 0;
@@ -15765,7 +16369,7 @@
         function gIsProductSoldOut(prod) {
             if (!prod) return false;
             const unl = (prod.stock === "" || prod.stock == null || String(prod.stock).trim() === "무제한");
-            const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)];
+            const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name, prod.sid)];
             const unlAdj = (adjRaw === "unlimited" || (adjRaw != null && String(adjRaw).startsWith("unlimited")));
             if (unl || unlAdj) return false;
             return Math.max(0, parseInt(prod.stock || 0) + parseInt(adjRaw || 0)) <= 0;
@@ -20216,7 +20820,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function salesRealStock(prod){
             if (!prod) return null;
             const isUnlimitedStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null || String(prod.stock).trim() === "무제한");
-            const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)];
+            const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name, prod.sid)];
             const isUnlimitedAdj = (adjRaw === "unlimited" || (adjRaw !== undefined && String(adjRaw).startsWith("unlimited")));
             if (isUnlimitedStock || isUnlimitedAdj) return Infinity;
             return Math.max(0, (parseInt(prod.stock || 0) || 0) + (parseInt(adjRaw || 0) || 0));
@@ -25593,7 +26197,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         // 옵션 항목 하나를 가리키는 키 (주문서ver2의 gOptStockKey와 같은 규칙이어야 한다)
         function gOptStockKey(p, groupName, itemName) {
-            const base = fGetAdjKey((p && (p.matchKey || p.date)) || '', (p && p.name) || '');
+            const base = fGetAdjKey((p && (p.matchKey || p.date)) || '', (p && p.name) || '', p && p.sid);
             return base + '__' + fSafeKey(groupName) + '__' + fSafeKey(itemName);
         }
 
@@ -25663,6 +26267,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
                 if (stockRes && stockRes.ok) {
                     uploadGlobalAdjustments = await stockRes.json() || {};
+                    gWeeklyPurgedKeys.forEach(k => { delete uploadGlobalAdjustments[k]; });   // [신규] 방금 매주 갱신으로 비운 칸 (받아 온 값은 비우기 전 것)
+                    gWeeklyPurgedKeys = [];
                 } else {
                     uploadGlobalAdjustments = {};
                 }
@@ -25699,12 +26305,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 // [신규] 식별번호가 없는 상품에 번호를 채운다. 발주에 같은 이름이 있으면 그 번호로 이어 붙는다.
                 ensureProductCodes().then(n => { if (n > 0) renderProductsList(); })
                     .catch(e => console.error("식별번호 부여 실패:", e));
+
+                // [신규 2026-10-02] 재고를 노출번호로 세도록 옮긴다 (손님 주문서가 새 판일 때만, 번호 없는 상품만)
+                gMaybeMigrateSids().then(n => { if (n > 0) { renderProductsList(); showToast(`🔢 상품 ${n}개 재고를 노출번호로 옮겼어요`); } });
             } catch (e) {
                 console.error("데이터 로드 실패:", e);
                 showToast("데이터 로드에 실패했습니다.");
             }
         }
 
+        let gListRoundCount = {};   // [신규 2026-10-02] 목록에서 같은 노출번호로 묶인 줄 수 (gSiblingKey → 수)
         function renderProductsList() {
             const container = document.getElementById('products-list-container');
             container.innerHTML = '';
@@ -25765,6 +26375,26 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     String(prod.productCode || "").toLowerCase().includes(keyword)
                 );
             }
+
+            /* [신규 2026-10-02] 같은 노출번호 = 한 상품 — 노출일정 복사본 줄은 목록에 한 장으로 묶는다.
+               대표는 지금 팔고 있는 줄, 없으면 가장 먼저 올라갈 예약 줄, 그것도 없으면 먼저 등록된 줄. 카드엔 '일정 N' 을 붙인다. */
+            const _repScore = (p, i) => {
+                const now = Date.now();
+                if (gIsProductShown(p) && !gIsExpiredAdmin(p)) return [3, -i];
+                if (Number(p.releaseAt) > now) return [2, -Number(p.releaseAt)];
+                return [1, -i];
+            };
+            const _rep = {}, _cnt = {};
+            filteredProducts.forEach(({ prod, index }) => {
+                const k = gSiblingKey(prod); if (!k) return;
+                _cnt[k] = (_cnt[k] || 0) + 1;
+                const cur = _rep[k];
+                if (cur === undefined) { _rep[k] = index; return; }
+                const a = _repScore(prod, index), b = _repScore(uploadProducts[cur], cur);
+                if (a[0] > b[0] || (a[0] === b[0] && a[1] > b[1])) _rep[k] = index;
+            });
+            filteredProducts = filteredProducts.filter(({ prod, index }) => { const k = gSiblingKey(prod); return !k || _rep[k] === index; });
+            gListRoundCount = _cnt;
 
             if (filteredProducts.length === 0) {
                 const msg = hasKeyword ? "검색 결과와 일치하는 상품이 없습니다." : "해당 카테고리에 등록된 상품이 없습니다.";
@@ -25887,7 +26517,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     }
 
                     const isUnlimitedStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null || String(prod.stock).trim() === "무제한");
-                    const adjValRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)];
+                    const adjValRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name, prod.sid)];
                     const isUnlimitedAdj = (adjValRaw === "unlimited" || (adjValRaw !== undefined && String(adjValRaw).startsWith("unlimited")));
 
                     const isUnlimited = isUnlimitedStock || isUnlimitedAdj;
@@ -25917,6 +26547,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                             scheduleBadge = `<span title="이 시각에 자동으로 숨겨집니다" style="font-size: 10px; font-weight: 800; background: #fff7ed; color: #d97706; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🕕 ${fFmtSchedTime(prod.expireAt)} 종료</span>`;
                         }
                     }
+                    // [신규 2026-10-02] 같은 노출번호로 묶인 일정 수 (노출일정 복사본)
+                    { const _rc = (gListRoundCount && gListRoundCount[gSiblingKey(prod)]) || 0; if (_rc > 1) scheduleBadge += `<span title="같은 상품(노출번호)의 일정 ${_rc}개 — 노출일정 달력에서 보고 고쳐요" style="font-size: 10px; font-weight: 800; background: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center;">🗓️ 일정 ${_rc}</span>`; }
 
                     // [신규] 보관방법 뱃지. 주문서 상품카드에 뜨는 것과 같은 색으로 맞춰 둔다.
                     const storageBadge = gListStorageBadge(prod);
@@ -26121,6 +26753,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const single = uploadSelectedProductIndices.size === 1;
             const shareCopyBtn = document.getElementById('btn-batch-sharecopy');
             if (shareCopyBtn) shareCopyBtn.style.display = single ? 'flex' : 'none';
+            // [신규 2026-10-02] 노출·숨김 토글 — 고른 상품이 모두 노출 중일 때만 '숨김'
+            const visBtn = document.getElementById('btn-batch-vis');
+            if (visBtn) visBtn.innerHTML = gBatchAllShown() ? '🙈 숨김' : '👁️ 노출';
+        }
+        function gBatchAllShown() {
+            const ids = [...uploadSelectedProductIndices];
+            return ids.length > 0 && ids.every(i => gIsProductShown(uploadProducts[i]));
+        }
+        function handleBatchVisibilityToggle() {
+            if (uploadSelectedProductIndices.size === 0) return;
+            handleBatchVisibility(!gBatchAllShown());
         }
 
         /* [신규 2026-10-01] 설명 속 날짜 줄(📦 픽업/배달·예정일·택배발송·주문마감 … N월 N일)을 뺀다.
@@ -26491,7 +27134,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
                 // 각 상품의 Firebase 재고 조정값도 함께 제거 (병렬)
                 await Promise.all(toDelete.map(prod => {
-                    const adjKey = fGetAdjKey(prod.matchKey, prod.name);
+                    if (gSidStillUsed(prod.sid, updatedList)) return null;   // [신규 2026-10-02] 같은 노출번호를 쓰는 상품이 남아 있으면 재고 칸을 둔다
+                    const adjKey = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
                     delete uploadGlobalAdjustments[adjKey];
                     return fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, { method: 'DELETE' })
                         .catch(e => console.error("재고 조정값 삭제 실패:", e));
@@ -26528,6 +27172,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const copyObj = {
                     ...prod,
                     name: prod.name + " (복사본)",
+                    sid: gStockBySid ? gSidForCode(prod.productCode) : null,   // [신규 2026-10-02] 복제본은 재고를 따로 센다 — 같은 식별번호 다음 노출번호(_2, _3 …)
                     updatedAt: Date.now()
                 };
                 
@@ -26535,7 +27180,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 
                 // 재고 정보 연계용 키 생성 및 초기 0값 설정
                 const isUnlimited = (copyObj.stock === undefined || copyObj.stock === null || copyObj.stock === "");
-                const adjKey = fGetAdjKey(copyObj.matchKey, copyObj.name);
+                const adjKey = fGetAdjKey(copyObj.matchKey, copyObj.name, copyObj.sid);
                 const adjValue = isUnlimited ? "unlimited" : 0;
                 
                 // 1. Firebase 전역 재고 변동분(global_stock) 초기화
@@ -26723,6 +27368,40 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         .find(po => fNormItemName(po.itemName) === _key && /^[PFS]\d+$/.test(String(po.productCode || '').trim()));
                     if (_hit) _productCode = String(_hit.productCode).trim();
                 }
+                /* [신규 2026-10-02] 새 번호를 만들기 전에, 이미 있는 번호를 물려받을 수 있는지 본다.
+                   과일은 갈래(품종) 하나에 번호 하나인데, 새로 올릴 때마다 새 번호가 붙어
+                   상품 순위에 '[과일] 황도'·'[과일] 샤인머스켓'이 두 줄씩 나왔다.
+                     · 이름 칸에 적은 이름표와 똑같은 이름표를 쓰는 번호가 있으면 그 번호
+                     · 과일이면 '[과일] 황도' 같은 이름표의 품종 낱말이 상품명에 들어 있는 번호 (가장 긴 낱말 우선 —
+                       '그린황도'는 황도, '홍로 사과'는 홍로사과) */
+                if (!_productCode) {
+                    const _tight = s => String(s || '').toLowerCase().replace(/[\s·.,!~\-_()\[\]]/g, '');
+                    try { await gLoadCodeLabels(); } catch (e) { }   // 이름표를 아직 안 받았으면 받는다
+                    const _labMap = (typeof gCodeLabels === 'object' && gCodeLabels) ? gCodeLabels : {};
+                    const _typed = String(document.getElementById('productCodeLabel')?.value || '').trim();
+                    if (_typed) {
+                        const hit = Object.keys(_labMap).find(c => /^[PFS]\d+$/.test(c) && String(_labMap[c]).trim() === _typed);
+                        if (hit) _productCode = hit;
+                    }
+                    const _isFruitNew = (uploadCurrentTab === 'reserve' && uploadKind === 'fruit')
+                        || (uploadCurrentTab === 'fruit' && String(matchKey || '').trim() === '과일') || productCodePrefixPick === 'F';
+                    if (!_productCode && _isFruitNew) {
+                        const nm = _tight(name);
+                        // 한 글자 과일(배·감·귤)은 '합배송'·'배추'처럼 다른 낱말 속에 잘 숨어 있어, 따로 떨어진 낱말일 때만 본다
+                        const _toks = String(name || '').toLowerCase().split(/[\s·.,!~\-_()\[\]/+]+/).map(t => t.replace(/\d.*$/, ''));
+                        let best = null;
+                        Object.keys(_labMap).forEach(c => {
+                            if (!/^F\d+$/.test(c)) return;
+                            const m = String(_labMap[c] || '').match(/^\[과일\]\s*(.+)$/);
+                            if (!m) return;
+                            const word = _tight(m[1]);
+                            const hit = word.length >= 2 ? nm.includes(word) : (word.length === 1 && _toks.includes(word));
+                            if (hit && (!best || word.length > best.len
+                                || (word.length === best.len && c < best.code))) best = { code: c, len: word.length };
+                        });
+                        if (best) _productCode = best.code;
+                    }
+                }
                 if (!_productCode) {
                     // 저장함까지 봐야 이미 쓰는 가장 큰 번호를 안다. 안 보면 번호가 겹칠 수 있다.
                     try { await loadPurchaseArchiveIfNeeded(); } catch (e) { console.error('발주 저장함 로드 실패:', e); }
@@ -26841,6 +27520,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     discountAmountMode: uploadDiscountAmountMode,   // [신규] 원 할인을 어떻게 적었는지 (다시 열 때 같은 방식으로 보여 주려고 저장)
                     saleToToday: uploadSaleToToday,
                     saleBadge: uploadSaleBadge,
+                    saleBadgeText: uploadSaleBadgeText,   // [신규 2026-10-02] 섬네일 띠 문구 — 비우면 주문서는 'n원 할인!'
                     updatedAt: Date.now()
                 };
 
@@ -26932,7 +27612,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
                     oldProd = updatedProducts[editIdx];
                     const oldRawStock = (oldProd.stock === undefined || oldProd.stock === null || oldProd.stock === "") ? 9999 : parseInt(oldProd.stock);
-                    const oldAdjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(oldProd.matchKey, oldProd.name)] || 0);
+                    const oldAdjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(oldProd.matchKey, oldProd.name, oldProd.sid)] || 0);
                     const oldRealStock = (oldRawStock >= 9999) ? 9999 : Math.max(0, oldRawStock + oldAdjVal);
 
                     if (isUnlimited) {
@@ -26962,7 +27642,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         }
                         oldProd = updatedProducts[dupIndex];
                         const oldRawStock = (oldProd.stock === undefined || oldProd.stock === null || oldProd.stock === "") ? 9999 : parseInt(oldProd.stock);
-                        const oldAdjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(oldProd.matchKey, oldProd.name)] || 0);
+                        const oldAdjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(oldProd.matchKey, oldProd.name, oldProd.sid)] || 0);
                         const oldRealStock = (oldRawStock >= 9999) ? 9999 : Math.max(0, oldRawStock + oldAdjVal);
 
                         if (isUnlimited) {
@@ -26985,6 +27665,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         };
                         _savedIdx = dupIndex;   // [신규] 이 자리만 저장한다
                     } else {
+                        if (gStockBySid) productObj.sid = gSidForCode(productObj.productCode);   // [신규 2026-10-02] 새 상품 칸 — 식별번호, 같은 번호 상품이 있으면 _2, _3 …
                         updatedProducts.push(productObj);
                         _savedIdx = updatedProducts.length - 1;   // [신규] 맨 뒤에 새로 붙인 자리
                         isStockChanged = true;
@@ -26993,12 +27674,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
                 // [신규] 상품 재고 정보가 수정되거나 식별자가 변경된 경우, 전역 재고 변동분(global_stock) 초기화 조치
                 if (isStockChanged) {
-                    const newAdjKey = fGetAdjKey(matchKey, name);
+                    const newAdjKey = fGetAdjKey(matchKey, name, updatedProducts[_savedIdx] && updatedProducts[_savedIdx].sid);
                     const adjValue = isUnlimited ? "unlimited" : 0;
                     
                     // 만약 상품명이나 날짜(키)가 변경되었다면 기존 키의 조정값 삭제
                     if (oldProd && (oldProd.name !== name || oldProd.matchKey !== matchKey)) {
-                        const oldAdjKey = fGetAdjKey(oldProd.matchKey, oldProd.name);
+                        const oldAdjKey = fGetAdjKey(oldProd.matchKey, oldProd.name, oldProd.sid);
                         await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(oldAdjKey)}.json`, {
                             method: 'DELETE'
                         }).catch(e => console.error("기존 재고 변동분 삭제 실패:", e));
@@ -27013,7 +27694,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     });
                     uploadGlobalAdjustments[newAdjKey] = adjValue;
                     // [신규] 이번 저장으로 재고가 0이 됐으면 품절된 날을 적어 둔다
-                    gMarkSoldOut({ name: name, matchKey: matchKey }, (adjValue === 'unlimited') ? 1 : (parseInt(stock || 0) || 0));
+                    gMarkSoldOut({ name: name, matchKey: matchKey, sid: updatedProducts[_savedIdx] && updatedProducts[_savedIdx].sid }, (adjValue === 'unlimited') ? 1 : (parseInt(stock || 0) || 0));
                 }
 
                 /* [수정] 바뀐 상품 한 칸만 저장한다.
@@ -27024,6 +27705,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     : await fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, updatedProducts);
 
                 if (!_writeOk) throw new Error("Firebase 배포 실패");
+                if (_savedIdx >= 0) await gSyncSidStock(updatedProducts, _savedIdx);   // [신규 2026-10-02] 같은 노출번호를 쓰는 복사본도 같은 재고로
 
                 /* [용량절감] 상품 설명은 product_desc 서랍에도 함께 적는다.
                    손님 주문서는 목록에서 설명을 받지 않고, 상세를 열 때 이 서랍에서 하나만 받아 간다.
@@ -27236,13 +27918,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
         function gIsClosedAdmin(prod) {
             if (!prod) return false;
-            const k = fGetAdjKey(prod.matchKey, prod.name);
+            const k = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
             return uploadClosedMap[k] === true || uploadClosedMap[encodeURIComponent(k)] === true || gIsExpiredAdmin(prod);
         }
         async function toggleProductClosed(index) {
             const prod = uploadProducts[index];
             if (!prod) { showToast("상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요."); renderProductsList(); return; }
-            const k = fGetAdjKey(prod.matchKey, prod.name);
+            const k = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
             const closing = !gIsClosedAdmin(prod);
             if (closing && !confirm(`'${prod.name}' 주문을 마감할까요?\n\n손님 화면에 '마감'으로 뜨고 담을 수 없습니다.\n재고 숫자는 그대로 둡니다.`)) return;
             const expired = !closing && gIsExpiredAdmin(prod);
@@ -27287,7 +27969,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     updatedAt: Date.now()
                 };
 
-                const adjKey = fGetAdjKey(prod.matchKey, prod.name);
+                const adjKey = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
                 const [ok1, ok2] = await Promise.all([
                     fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, updatedList),
                     fbPutRetry(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, 0)
@@ -27297,6 +27979,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 uploadGlobalAdjustments[adjKey] = 0;
 
                 uploadProducts = updatedList;
+                await gSyncSidStock(uploadProducts, index);   // [신규 2026-10-02] 같은 노출번호를 쓰는 복사본도 품절로
 
                 showToast(isOnsiteProd ? "품절 처리하고 손님 화면에서 숨겼습니다." : "상품이 품절 처리되었습니다.");
                 await loadProductsFromServer();
@@ -27357,12 +28040,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (!res.ok) throw new Error("Firebase 삭제 동기화 실패");
                 updatePublishedProductsTimestamp();
 
-                // Firebase 재고 조정값도 함께 제거
-                const adjKey = fGetAdjKey(prod.matchKey, prod.name);
-                await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
-                    method: 'DELETE'
-                }).catch(e => console.error("상품 삭제에 따른 재고 조정값 삭제 실패:", e));
-                delete uploadGlobalAdjustments[adjKey];
+                // Firebase 재고 조정값도 함께 제거 — [신규 2026-10-02] 같은 노출번호를 쓰는 상품이 남아 있으면 둔다
+                if (!gSidStillUsed(prod.sid, updatedList)) {
+                    const adjKey = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
+                    await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
+                        method: 'DELETE'
+                    }).catch(e => console.error("상품 삭제에 따른 재고 조정값 삭제 실패:", e));
+                    delete uploadGlobalAdjustments[adjKey];
+                }
 
                 uploadProducts = updatedList;
                 document.getElementById('product-count').innerText = uploadProducts.length;
@@ -27642,7 +28327,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             }
 
             const prevStock = prod.stock;
-            const adjKey = fGetAdjKey(prod.matchKey, prod.name);
+            const adjKey = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
             const prevAdj = uploadGlobalAdjustments[adjKey];
             const adjIsUnlimited = (prevAdj === 'unlimited' || (prevAdj !== undefined && String(prevAdj).startsWith('unlimited')));
             const curAdj = adjIsUnlimited ? 0 : (parseInt(prevAdj || 0) || 0);
@@ -27691,6 +28376,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const results = await Promise.all(jobs);
                 if (results.some(ok => !ok)) throw new Error(`저장 실패(재시도 후)`);
                 saved = true;
+                await gSyncSidStock(uploadProducts, index);   // [신규 2026-10-02] 같은 노출번호를 쓰는 복사본도 같은 재고로
                 gMarkSoldOut(prod, salesRealStock(prod));   // [신규] 0이 됐으면 품절된 날을 적어 둔다
             } catch (e) {
                 prod.stock = prevStock;
@@ -27838,7 +28524,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             setupDescBox(true); // [신규] 수정 모드에서는 상세설명을 접어 둔다 (버튼을 눌러 편다)
 
             const rawStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null) ? 9999 : parseInt(prod.stock);
-            const adjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name)] || 0);
+            const adjVal = parseInt(uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name, prod.sid)] || 0);
             const realStock = (rawStock >= 9999) ? 9999 : Math.max(0, rawStock + adjVal);
 
             const isUnlimited = (rawStock >= 9999);
@@ -27880,6 +28566,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // [수정] 적혀 있지 않으면 꺼진 것으로 본다 (기본이 꺼짐으로 바뀌었다)
             uploadSaleToToday = (prod.saleToToday === true || prod.saleToToday === "true");
             uploadSaleBadge = (prod.saleBadge === true || prod.saleBadge === "true");
+            uploadSaleBadgeText = String(prod.saleBadgeText || '').trim();
             // [신규] 보관방법 — 저장된 값이 없으면 분류(matchKey)에서 읽어 온다.
             //  예전 상품은 storage 없이 matchKey만 '냉동' 식으로 갖고 있어서, 그래야 버튼이 비어 보이지 않는다.
             uploadStorageType = (() => {
@@ -28748,7 +29435,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    다 나간 물건은 그렇게 잴 수가 없다(언제 비었는지 모른다). 대신 품절된 날을 쓴다.
                    품절된 날이 마지막 발주일보다 앞이면 지난 회차 이야기라 안 쓴다.
                    셈이 안 맞거나(재고>입고) 발주한 지 이틀도 안 됐으면 비워 둔다 — 억지 숫자는 오히려 헷갈린다. */
-                const soKey = fGetAdjKey(p.matchKey, p.name);
+                const soKey = fGetAdjKey(p.matchKey, p.name, p.sid);
                 const soRec = (gSoldOutAt || {})[soKey];
                 const soDate = (soRec && /^\d{4}-\d{2}-\d{2}$/.test(String(soRec.date || ''))) ? String(soRec.date) : '';
                 const soUsable = !!soDate && soDate > last.date;          // 이번 회차에 비었을 때만
@@ -28878,7 +29565,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const p = r.prod;
             const base = parseInt(p.stock || 0) || 0;   // 등록할 때 적은 수
             const adj = want - base;                    // 맞추는 데 필요한 조정값
-            const adjKey = fGetAdjKey(p.matchKey, p.name);
+            const adjKey = fGetAdjKey(p.matchKey, p.name, p.sid);
             try {
                 const res = await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(adj)
@@ -30982,6 +31669,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            적어 둔 달(date)이 시작점이고, 지우거나 고치기 전까지 그 뒤 모든 달에 그대로 붙는다.
            그외·매입은 적은 그 달에만 잡힌다. */
         function gExpenseItemsOf(month, kind) {
+            if (kind === 'fixed') {   // [수정 2026-10-02] 고정비는 달별 저장본에서 센다 (gFixedMonthInfo)
+                const fi = gFixedMonthInfo(month);
+                return fi.items.map((it, i) => ({ id: it.id || `fixm_${fi.src}_${i}`, kind: 'fixed', date: it.date || fi.src, title: it.title, amount: it.amount }));
+            }
             const out = [];
             Object.keys(manualExpenses || {}).forEach(id => {
                 const e = manualExpenses[id];
@@ -30991,6 +31682,40 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (kind === 'fixed' ? (m <= month) : (m === month)) out.push({ id, ...e });
             });
             return out.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        }
+
+        /* ===== [신규 2026-10-02] 고정비 — 달마다 따로 저장 (사장님 요청) =====
+           예전에는 고정비 한 줄이 적은 달부터 모든 달에 붙어서, 금액을 고치면 지난 달까지 같이 바뀌었다.
+           이제 달마다 한 벌씩 둔다: manual_expenses/fixm_YYYY-MM = { kind:'fixed_month', date:'YYYY-MM', items:[{title, amount}] }
+           · 저장 안 한 달은 그 앞에 마지막으로 저장한 달 것이 그대로 이어진다.
+           · 저장한 달이 하나도 없는 옛 달은 예전 방식(kind:'fixed' 줄이 적은 달부터 이어짐)으로 센다.
+           kind 이름이 새것이라 이미 올라가 있는 옛 주문관리는 이 줄을 모른 척한다. */
+        function gFixedSnapOf(month) {
+            const e = (manualExpenses || {})['fixm_' + month];
+            return (e && e.kind === 'fixed_month') ? e : null;
+        }
+        function gFixedSnapMonths() {
+            return Object.keys(manualExpenses || {})
+                .filter(id => /^fixm_\d{4}-\d{2}$/.test(id) && (manualExpenses[id] || {}).kind === 'fixed_month')
+                .map(id => id.slice(5)).sort();
+        }
+        // 그 달 고정비 — { src: 저장한 달('YYYY-MM') 또는 ''(예전 방식), items: [{title, amount}] }
+        function gFixedMonthInfo(month) {
+            const src = gFixedSnapMonths().filter(m => m <= month).pop() || '';
+            if (src) {
+                const items = Object.values((gFixedSnapOf(src) || {}).items || {}).filter(Boolean)
+                    .map(it => ({ title: String(it.title || ''), amount: parseInt(it.amount) || 0 }));
+                return { src, items };
+            }
+            const items = [];
+            Object.keys(manualExpenses || {}).forEach(id => {
+                const e = manualExpenses[id];
+                if (!e || e.kind !== 'fixed') return;
+                const m = fToMonthKey(e.date);
+                if (m && m <= month) items.push({ id, title: String(e.title || ''), amount: parseInt(e.amount) || 0, date: e.date });
+            });
+            items.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+            return { src: '', items };
         }
 
         function gExpenseSumOf(month, kind) {
@@ -31035,6 +31760,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (t && el) t.innerText = gMsDateLabel(el.value);
             // 잠깐 보여 줬던 칸은 도로 숨긴다
             if (el) el.style.cssText = 'position:absolute; left:10px; bottom:0; width:1px; height:1px; opacity:0; border:0; padding:0; pointer-events:none;';
+            if (typeof gFixedOn === 'function' && gFixedOn()) renderFixedBox(false);   // [신규 2026-10-02] 고정비 칸은 고른 달로
         }
 
 
@@ -31570,11 +32296,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (hint && !_expEditId) {
                 hint.innerText = isSale
                     ? '적어 넣은 칸만 덮어씁니다. 비워 두면 그 칸은 그대로 둡니다.'
-                    : (msEntryKind === 'expense' && msExpenseKind === 'fixed'
-                        ? '고정비는 적은 달부터 매달 이어집니다.'
-                        : '적을 때마다 한 줄씩 쌓입니다.');
+                    : '적을 때마다 한 줄씩 쌓입니다.';
                 hint.style.color = '#94a3b8';
             }
+            gSyncFixedPanel();   // [신규 2026-10-02] 지출 > 고정비면 달별 고정비 칸
         }
 
         /* ===== [신규] 직접 입력 팝업 =====
@@ -31682,6 +32407,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function editExpense(id) {
             const e = manualExpenses[id];
             if (!e) { showToast("찾지 못했습니다."); return; }
+            if (e.kind === 'fixed' || e.kind === 'fixed_month') { openFixedMonth(fToMonthKey(e.date)); return; }   // [신규 2026-10-02]
             _expEditId = id;
 
             setManualEntryKind(e.kind === 'buy' ? 'buy' : 'expense');
@@ -31719,16 +32445,154 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         function setExpenseKind(k) {
             msExpenseKind = (k === 'etc') ? 'etc' : 'fixed';
+            if (msExpenseKind === 'fixed' && _expEditId) {   // 그외를 고치다 고정비로 넘어가면 고치던 것은 놓는다
+                _expEditId = '';
+                document.getElementById('ms-exp-title').value = '';
+                document.getElementById('ms-exp-amount').value = '';
+                const cancel = document.getElementById('ms-cancel-edit');
+                if (cancel) cancel.style.display = 'none';
+            }
             ['ms-exp-fixed', 'ms-exp-etc'].forEach(id => {
                 const b = document.getElementById(id);
                 if (b) b.classList.toggle('active', (id === 'ms-exp-etc') === (msExpenseKind === 'etc'));
             });
             const hint = document.getElementById('ms-hint');
-            if (hint && msEntryKind === 'expense') {
-                hint.innerText = (msExpenseKind === 'fixed')
-                    ? '고정비는 적은 달부터 매달 이어집니다.'
-                    : '적을 때마다 한 줄씩 쌓입니다.';
+            if (hint && msEntryKind === 'expense' && !_expEditId) {
+                hint.innerText = '적을 때마다 한 줄씩 쌓입니다.';
+                hint.style.color = '#94a3b8';
             }
+            gSyncFixedPanel();
+        }
+
+        /* ===== [신규 2026-10-02] 달별 고정비 칸 ===== */
+        let _fixedDraft = { month: '', rows: [] };
+        let _fixedClearArmed = false;
+        function gFixedOn() { return msEntryKind === 'expense' && msExpenseKind === 'fixed'; }
+        function gFixedMonthOfInput() {
+            const m = fToMonthKey(gManualSaleKey());
+            if (m) return m;
+            const now = new Date();
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        // 지출 > 고정비면 값 두 칸 대신 달별 고정비 칸을 보인다
+        function gSyncFixedPanel() {
+            const on = gFixedOn();
+            const fields = document.getElementById('ms-fields');
+            const box = document.getElementById('ms-fixed-box');
+            if (fields) fields.style.display = on ? 'none' : 'grid';
+            if (box) box.style.display = on ? '' : 'none';
+            const btn = document.getElementById('ms-save-btn');
+            if (!on) {
+                if (btn && msEntryKind === 'expense') btn.innerText = _expEditId ? '💾 수정 저장' : '💾 지출 저장';
+                const t = document.getElementById('ms-date-text');
+                if (t) t.innerText = gMsDateLabel(gManualSaleKey());   // 고정비 칸에서 '10월'로 바꿔 둔 글씨를 날짜로
+                return;
+            }
+            if (btn) btn.innerText = '💾 이달 저장';
+            const hint = document.getElementById('ms-hint');
+            if (hint) { hint.innerText = '저장 안 한 달은 앞 달 것이 이어집니다.'; hint.style.color = '#94a3b8'; }
+            renderFixedBox(true);
+        }
+
+        // reload 가 참이거나 달이 바뀌었으면 저장된 값(없으면 앞 달 것)으로 칸을 새로 채운다
+        function renderFixedBox(reload) {
+            const month = gFixedMonthOfInput();
+            const fi = gFixedMonthInfo(month);
+            if (reload || _fixedDraft.month !== month) {
+                _fixedDraft = { month, rows: fi.items.map(it => ({ title: it.title, amount: it.amount || '' })) };
+                if (!_fixedDraft.rows.length) _fixedDraft.rows.push({ title: '', amount: '' });
+                _fixedClearArmed = false;
+            }
+            const y = month.slice(0, 4), mo = parseInt(month.slice(5), 10);
+            const t = document.getElementById('ms-date-text');
+            if (t) t.innerText = (y === String(new Date().getFullYear()) ? '' : y.slice(2) + '년 ') + mo + '월';
+            const title = document.getElementById('ms-fixed-title');
+            if (title) title.innerText = `🏠 ${mo}월 고정비`;
+            const own = !!gFixedSnapOf(month);
+            const src = document.getElementById('ms-fixed-src');
+            if (src) {
+                src.innerText = own ? '저장됨' : fi.src ? `${parseInt(fi.src.slice(5), 10)}월 것 이어짐` : (fi.items.length ? '예전 기록' : '');
+                src.style.color = own ? '#10b981' : '#94a3b8';
+            }
+            const clr = document.getElementById('ms-fixed-clear');
+            if (clr) {
+                clr.style.display = own ? '' : 'none';
+                clr.innerText = _fixedClearArmed ? '한 번 더' : '↺ 지우기';
+                clr.style.background = _fixedClearArmed ? '#dc2626' : '#fef2f2';
+                clr.style.color = _fixedClearArmed ? '#fff' : '#ef4444';
+            }
+            const inp = 'width:100%; height:40px; padding:8px 10px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:700; box-sizing:border-box; min-width:0;';
+            const rows = document.getElementById('ms-fixed-rows');
+            if (rows) rows.innerHTML = _fixedDraft.rows.map((r, i) => `<div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px; gap:6px; margin-bottom:6px;">
+                    <input type="text" value="${gEscapeHtml(String(r.title || ''))}" placeholder="예: 월세" oninput="_fixedDraft.rows[${i}].title = this.value" class="form-control" style="${inp}">
+                    <input type="number" min="0" value="${r.amount === '' ? '' : (parseInt(r.amount) || 0)}" placeholder="0" oninput="_fixedDraft.rows[${i}].amount = this.value; fixedSumPaint()" class="form-control" style="${inp}">
+                    <button type="button" onclick="removeFixedRow(${i})" title="빼기" style="height:40px; border:1.5px solid #fca5a5; background:#fef2f2; color:#ef4444; border-radius:9px; font-size:13px; font-weight:900; cursor:pointer;">✕</button>
+                </div>`).join('');
+            fixedSumPaint();
+        }
+        function fixedSumPaint() {
+            const sum = _fixedDraft.rows.reduce((a, r) => a + (parseInt(r.amount) || 0), 0);
+            const el = document.getElementById('ms-fixed-sum');
+            if (el) el.innerText = `합계 ${sum.toLocaleString()}원`;
+        }
+        function addFixedRow() {
+            _fixedDraft.rows.push({ title: '', amount: '' });
+            renderFixedBox(false);
+            const ins = document.querySelectorAll('#ms-fixed-rows input[type="text"]');
+            if (ins.length) ins[ins.length - 1].focus();
+        }
+        function removeFixedRow(i) {
+            _fixedDraft.rows.splice(i, 1);
+            if (!_fixedDraft.rows.length) _fixedDraft.rows.push({ title: '', amount: '' });
+            renderFixedBox(false);
+        }
+
+        // '이달 저장' — 칸에 있는 그대로 그 달 한 벌을 덮어쓴다 (다 비우고 저장하면 그 달 고정비 0원)
+        async function saveFixedMonth() {
+            const month = gFixedMonthOfInput();
+            const rows = _fixedDraft.rows.map(r => ({ title: String(r.title || '').trim(), amount: parseInt(r.amount) || 0 }));
+            if (rows.some(r => !r.title && r.amount > 0)) { showToast("항목 이름을 적어 주세요. (예: 월세)"); return; }
+            if (rows.some(r => r.title && r.amount <= 0)) { showToast("금액을 넣어 주세요."); return; }
+            const items = rows.filter(r => r.title && r.amount > 0);
+            const sum = items.reduce((a, r) => a + r.amount, 0);
+            const id = 'fixm_' + month;
+            const body = { kind: 'fixed_month', date: month, items, updatedAt: Date.now() };
+            showLoader("고정비 저장 중...");
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}manual_expenses/${id}.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                });
+                if (!res.ok) throw new Error('저장 실패 ' + res.status);
+                manualExpenses[id] = body;
+                showToast(`${parseInt(month.slice(5), 10)}월 고정비 ${sum.toLocaleString()}원 저장`);
+                renderFixedBox(true);
+                renderProfitReport();
+            } catch (e) {
+                console.error(e);
+                showToast("저장 실패: " + e.message);
+            } finally { hideLoader(); }
+        }
+
+        // 그 달 저장본 지우기 — 지우면 앞 달 것이 다시 이어진다. 한 번 더 눌러 확인받는다
+        function askClearFixedMonth() {
+            if (!_fixedClearArmed) {
+                _fixedClearArmed = true;
+                renderFixedBox(false);
+                setTimeout(() => { if (_fixedClearArmed) { _fixedClearArmed = false; if (gFixedOn()) renderFixedBox(false); } }, 6000);
+                return;
+            }
+            _fixedClearArmed = false;
+            deleteManualExpense('fixm_' + gFixedMonthOfInput());
+        }
+
+        // 예전 고정비 줄(달력 속내의 수정 단추)은 그 달 고정비 칸으로 연다
+        function openFixedMonth(month) {
+            if (!document.getElementById('direct-input-modal')) openDirectInput('expense');
+            else setManualEntryKind('expense');
+            const dEl = document.getElementById('ms-date');
+            if (dEl && fIsMonthKey(month) && fToMonthKey(dEl.value) !== month) dEl.value = `${month}-01`;
+            setExpenseKind('fixed');
         }
 
         async function saveManualExpense() {
@@ -31774,6 +32638,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // 저장 버튼 하나로 매입·매출·지출을 함께 다룬다
         function saveManualEntry() {
             if (msEntryKind === 'sale') return saveManualSale();
+            if (gFixedOn()) return saveFixedMonth();   // [신규 2026-10-02] 고정비는 그 달 한 벌을 통째로
             return saveManualExpense();   // 지출·매입은 같은 칸(항목+금액)을 쓴다
         }
 
@@ -31803,6 +32668,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 delete manualExpenses[id];
                 showToast("한 줄을 지웠습니다.");
                 renderProfitReport();
+                if (gFixedOn() && document.getElementById('ms-fixed-box')) renderFixedBox(true);   // [신규 2026-10-02]
                 // 달력 속내를 보고 있었다면 지운 줄이 바로 사라지게 다시 그린다
                 if (document.getElementById('ms-cal-body')) renderManualSaleCalendar();
             } catch (e) {
@@ -32005,7 +32871,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const dates = Object.keys(manualSales || {}).filter(k => !!fToMonthKey(k)).sort((a, b) => b.localeCompare(a));
             const expItems = Object.keys(manualExpenses || {})
                 .map(id => ({ id, ...(manualExpenses[id] || {}) }))
-                .filter(e => e.kind)
+                .filter(e => e.kind && e.kind !== 'fixed_month')
                 .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
             if (dates.length === 0 && expItems.length === 0) {
@@ -33493,6 +34359,255 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
 
         // 일괄 처리 툴바(Batch Action Bar)에서 발주 등록 함수
+        /* ===== [신규 2026-10-02] 가격표 — 고른 상품으로 '가격표 생성기.html'과 같은 모양의 A4 가격표를 새 창에 만든다 (사장님 요청)
+           · 한 장 = 생성기와 같은 칸: 말머리(초록 딱지) · 상품명 · 한줄소개 · 보관 딱지 · 가격
+             말머리 = 이름 앞 [대괄호] + 사다드림·오늘의추천 표시. 'OOO!! 이름'처럼 앞에 붙은 수식어는 한줄소개로 내린다
+           · 할인 상품은 판매가 자리에 할인가, 왼쪽에 생성기의 비교가 칸(정상가 ~~가격~~ + 'n원 할인')을 쓴다
+           · 창에서 말머리·이름·소개·가격을 눌러 고친다. 고친 것은 price_tag_edits/<상품 키>에 저장돼 다음에도 그대로 나온다
+             (상품 정보·주문서 상품명은 안 바뀐다). 단, 판매가·할인이 바뀌면 가격만 새 값으로 돌아간다
+           · ✕ 는 이번 인쇄에서만 뺀다. ↺ 는 고친 것을 지우고 상품 값으로 되돌린다
+           · 모양(CSS)·글씨 자동 줄임(adjustFontSize)은 생성기에서 옮겼다. 생성기를 고치면 여기도 같이 고칠 것 */
+        const PRICE_TAG_EDITS = 'price_tag_edits';
+        function gPriceTagOf(p) {
+            const heads = [];
+            const strip = str => {   // 맨 앞 [대괄호]들을 떼어 말머리로 모은다
+                const m = str.match(/^((?:\s*\[[^\]]*\])+)\s*/);
+                if (!m || str.length <= m[0].length) return str;
+                (m[1].match(/\[[^\]]*\]/g) || []).forEach(b => heads.push(b.slice(1, -1).trim()));
+                return str.slice(m[0].length);
+            };
+            let rest = strip(String((p && p.name) || '').trim());
+            const lm = rest.match(/^([^!?[\]()]{4,40}[!?]+)\s+(.{4,})$/);
+            const lead = lm ? lm[1].trim() : '';
+            if (lm) rest = strip(lm[2].trim());
+            if (isSadaListProduct(p)) heads.push('사다드림');
+            if (isRecommendListProduct(p)) heads.push('오늘의추천');
+            const seen = new Set();   // '오늘의 추천'·'오늘의추천'처럼 띄어쓰기만 다른 것은 하나로
+            const head = heads.filter(h => { const k = h.replace(/\s+/g, ''); if (!k || seen.has(k)) return false; seen.add(k); return true; }).join(' · ');
+            const price = Math.max(0, parseInt(p && p.price) || 0);
+            const yes = v => v === true || v === 'true';   // 상품 목록의 할인 표시와 같은 판단
+            const on = p && (p.useOptions == null || yes(p.useOptions)) && yes(p.useDiscount);
+            const type = (p && p.discountType === 'amount') ? 'amount' : 'rate';
+            const sale = on && price > 0 && gDiscHas(type, p.discountRate, p.discountAmount);
+            const now = sale ? gDiscApply(price, type, p.discountRate, p.discountAmount) : price;
+            const st = String((p && p.storage) || '');
+            const storage = st.includes('냉동') ? '🧊 냉동' : st.includes('냉장') ? '❄️ 냉장' : (st.includes('상온') || st.includes('실온')) ? '🌡️ 상온' : '';
+            return { key: gStableKeyOf(p), head, name: rest, desc: lead, storage, price: now,
+                     orig: sale && now < price ? price : 0, off: sale ? gDiscLabel(type, p.discountRate, p.discountAmount) + ' 할인' : '' };
+        }
+        // 상품 키에는 . / [ ] 같은 글자가 들어갈 수 있어 파이어베이스 자리 이름으로 쓸 수 있게 바꾼다
+        function gPriceTagDbKey(key) { return encodeURIComponent(String(key || '')).replace(/\./g, '%2E'); }
+        // 가격표 창이 부른다 — edit 가 null 이면 고친 것을 지운다 (상품 값으로 되돌림)
+        async function gPriceTagSave(key, edit) {
+            if (!key) throw new Error('상품 키 없음');
+            const url = `${FIREBASE_DB_URL}${PRICE_TAG_EDITS}/${encodeURIComponent(gPriceTagDbKey(key))}.json`;
+            const r = await fetch(url, edit ? { method: 'PUT', body: JSON.stringify({ ...edit, savedAt: Date.now() }) } : { method: 'DELETE' });
+            if (!r.ok) throw new Error('서버 응답 ' + r.status);
+            return true;
+        }
+        async function handleBatchPriceTag() {
+            if (uploadSelectedProductIndices.size === 0) { showToast('상품을 골라 주세요'); return; }
+            const prods = [...uploadSelectedProductIndices].sort((a, b) => a - b).map(i => uploadProducts[i]).filter(Boolean);
+            const w = window.open('', '_blank');   // 누른 순간에 열어야 팝업으로 안 막힌다 — 고친 것은 연 다음에 받는다
+            if (!w) { showToast('새 창이 막혔어요 · 팝업 허용'); return; }
+            w.document.write('<p style="font:700 14px sans-serif; padding:20px; color:#64748b;">불러오는 중…</p>');
+            let edits = {};
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}${PRICE_TAG_EDITS}.json?t=${Date.now()}`);
+                if (r.ok) edits = (await r.json()) || {};
+            } catch (e) { console.warn('가격표 고친 것 못 받음:', e); }
+            const tags = prods.map(p => {
+                const t = gPriceTagOf(p);
+                t.def = { head: t.head, name: t.name, desc: t.desc, price: t.price };   // ↺ 로 돌아갈 상품 값
+                const e = edits[gPriceTagDbKey(t.key)];
+                if (e) {
+                    ['head', 'name', 'desc'].forEach(f => { if (typeof e[f] === 'string') t[f] = e[f]; });
+                    // 가격은 고칠 때와 판매가·할인이 같을 때만 고친 값 — 그 사이 바뀌었으면 새 가격을 따른다
+                    if (e.price != null && Number(e.basePrice) === t.price && Number(e.baseOrig || 0) === t.orig) t.price = Math.max(0, parseInt(e.price) || 0);
+                    t.edited = true;
+                }
+                return t;
+            });
+            const json = JSON.stringify(tags).replace(/</g, '\\u003c');
+            w.document.open();
+            w.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>가격표 ${tags.length}장</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+:root { --primary-color:#222; --accent-color:#ff6d00; --discount-color:#888; }
+body { font-family:"Pretendard Variable", Pretendard, sans-serif; margin:0; padding:0; background:#f0f2f5; }
+[hidden] { display:none !important; }
+.bar { position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:10px; padding:10px 16px; background:#fff; border-bottom:1px solid #e2e8f0; }
+.bar b { font-size:14px; font-weight:800; color:#0f172a; white-space:nowrap; }
+.bar i { font-style:normal; font-size:12px; font-weight:700; color:#64748b; white-space:nowrap; }
+.bar button { margin-left:auto; height:38px; padding:0 22px; border:none; border-radius:10px; background:#28a745; color:#fff; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; white-space:nowrap; }
+[contenteditable] { cursor:text; }
+[contenteditable]:focus { outline:2px dashed #2563eb; outline-offset:1px; }
+.print-container { display:grid; grid-template-columns:repeat(2, 89mm); grid-template-rows:repeat(5, 54mm); gap:0.7mm; width:210mm; height:297mm; margin:20px auto; justify-content:center; position:relative; padding:8mm 14.5mm; box-sizing:border-box; background:white; box-shadow:0 4px 10px rgba(0,0,0,0.1); }
+.crop-mark { position:absolute; background:#ff0000; z-index:9999; }
+.crop-v { width:1.5pt; height:6mm; } .crop-h { height:1.5pt; width:12mm; }
+.crop-top { top:0; left:50%; transform:translateX(-50%); } .crop-bottom { bottom:0; left:50%; transform:translateX(-50%); }
+.crop-left { left:0; transform:translateY(-50%); } .crop-right { right:0; transform:translateY(-50%); }
+.price-tag { width:89mm; height:54mm; background:white; border:6.7pt solid #4caf20; border-radius:0; box-sizing:border-box; display:flex; overflow:hidden; position:relative; page-break-inside:avoid; }
+.delete-btn, .reset-btn { position:absolute; top:0; width:22px; height:22px; border:none; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:999; padding:0; }
+.delete-btn { right:0; background:rgba(220,53,69,0.1); color:#dc3545; }
+.delete-btn:hover { background:#dc3545; color:white; }
+.reset-btn { right:24px; background:rgba(37,99,235,0.1); color:#2563eb; }
+.reset-btn:hover { background:#2563eb; color:white; }
+.info-side { flex:1; padding:8px 8px 6px 8px; position:relative; display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
+.info-side.full { width:100%; padding:10px; display:flex; flex-direction:column; }
+.info-side.full .p-name { font-size:26px; margin-bottom:2px; }
+.info-side.full .p-desc { font-size:18px; margin-bottom:10px; }
+.info-side.full .p-badges { margin-bottom:5px; }
+.info-side.full .p-prices { position:static; margin-top:auto; display:flex; flex-direction:row; justify-content:space-between; align-items:flex-end; padding-bottom:5px; }
+.info-side.full .p-sale { font-size:40px; margin-top:5px; text-align:right; }
+.info-side.full .p-sale span { font-size:20px; }
+.p-badges { display:flex; gap:5px; margin-bottom:3px; }
+.badge-common { font-size:13px; font-weight:800; height:26px; line-height:24px; padding:0 10px; min-width:84px; border-radius:0; white-space:nowrap; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1px solid transparent; }
+.p-storage-inline { color:#444; background:#e2e6ea; border-color:#dae0e5; }
+.p-head { background:#e8f5e9; color:#2e7d32; border-color:#c8e6c9; }
+.p-head:empty { background:transparent; border:1px dashed #c8e6c9; }
+.p-head:empty::before { content:"말머리"; color:#a5d6a7; }
+.p-desc:empty::before { content:"한줄소개"; color:#cbd5e1; }
+.p-name { font-size:24px; font-weight:800; color:var(--primary-color); line-height:1.2; margin-bottom:4px; white-space:nowrap; }
+.p-desc { font-size:16px; color:#666; line-height:1.4; margin-bottom:6px; white-space:nowrap; }
+.p-prices { position:absolute; bottom:14px; left:10px; right:10px; display:flex; flex-direction:row; justify-content:space-between; align-items:flex-end; }
+.p-orig-box { display:flex; flex-direction:column; align-items:flex-start; margin-bottom:0; line-height:1.25; transform:translateY(1px); }
+.p-orig-line { display:flex; flex-direction:row; align-items:center; gap:6px; white-space:nowrap; }
+.p-orig-label { font-size:13px; color:var(--discount-color); font-weight:700; white-space:nowrap; }
+.p-orig-val-row { font-size:13px; color:var(--discount-color); position:relative; display:inline-block; }
+.p-orig-val { font-weight:600; position:relative; }
+.p-orig-val::after { content:""; position:absolute; left:-2px; top:52%; width:calc(100% + 4px); height:2px; background-color:var(--discount-color); transform:rotate(-10deg); transform-origin:center; }
+.p-info-text { font-size:10px; color:var(--discount-color); font-weight:600; margin-top:1px; display:block; width:100%; text-align:left; }
+.p-sale { font-size:38px; font-weight:900; color:var(--accent-color); line-height:0.8; margin-top:4px; text-align:right; white-space:nowrap; margin-left:auto; }
+.p-sale span { font-size:18px; margin-left:1px; }
+.p-num { font-weight:inherit; }
+.p-comma { font-size:0.75em !important; display:inline-block; margin-left:0 !important; }
+@media print {
+  .no-print, .p-head:empty { display:none !important; }
+  .p-desc:empty::before { content:none; }
+  body { background:white; padding:0; margin:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  @page { size:A4; margin:0 !important; }
+  html, body { width:210mm; height:297mm; margin:0 !important; padding:0 !important; overflow:visible !important; }
+  .print-container { margin:0 !important; padding:8mm 14.5mm !important; width:210mm !important; height:297mm !important; gap:0.7mm !important; box-shadow:none !important; page-break-after:always; }
+  [contenteditable]:focus { outline:none; }
+}
+</style></head><body>
+<div class="bar no-print"><b>🏷️ 가격표 <span id="cnt"></span>장</b><i id="st"></i><button onclick="window.print()">🖨️ 인쇄</button></div>
+<div id="area"></div>
+<script>
+var adjustFontSize = ${gPtAdjustFontSize.toString()};
+(${gPriceTagPopup.toString()})(${json});
+<\/script></body></html>`);
+            w.document.close();
+        }
+        // 가격표 생성기의 adjustFontSize 그대로 — 큰 글씨를 두고 안 들어가면 두 줄, 그래도 안 되면 줄인다 (가격표 창에 넣어 쓴다)
+        function gPtAdjustFontSize(el, maxAvailableSize, minSizeForSingleLine) {
+            var container = el.parentElement, style = window.getComputedStyle(container);
+            var maxWidth = container.offsetWidth - (parseInt(style.paddingLeft) + parseInt(style.paddingRight));
+            var fontSize = parseInt(window.getComputedStyle(el).fontSize);
+            if (maxAvailableSize && fontSize > maxAvailableSize) { fontSize = maxAvailableSize; el.style.fontSize = fontSize + 'px'; }
+            if (minSizeForSingleLine && el.scrollWidth > maxWidth) {
+                el.style.whiteSpace = 'normal'; el.style.wordBreak = 'keep-all'; el.style.display = '-webkit-box';
+                el.style.webkitLineClamp = '2'; el.style.webkitBoxOrient = 'vertical';
+                var maxHeight = fontSize * 2.8;
+                while (el.scrollHeight > maxHeight && fontSize > 8) { fontSize--; el.style.fontSize = fontSize + 'px'; maxHeight = fontSize * 2.8; }
+                return fontSize;
+            }
+            while (el.scrollWidth > maxWidth && fontSize > 8) { fontSize--; el.style.fontSize = fontSize + 'px'; }
+            return fontSize;
+        }
+        // 가격표 창 안에서 돈다 (주문관리 쪽 변수는 못 쓴다 — 저장만 window.opener.gPriceTagSave 로 부탁한다)
+        function gPriceTagPopup(T) {
+            var area = document.getElementById('area'), st = document.getElementById('st'), timers = {};
+            var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+            var won = function (v, split) { var s = Number(v || 0).toLocaleString(); return split ? s.split(',').join("<span class='p-comma'>,</span>") : s; };
+            var CROP = '<div class="crop-mark crop-v crop-top"></div><div class="crop-mark crop-v crop-bottom"></div>' +
+                '<div class="crop-mark crop-v" style="top:0; left:14.5mm;"></div><div class="crop-mark crop-v" style="top:0; right:14.5mm;"></div>' +
+                '<div class="crop-mark crop-v" style="bottom:0; left:14.5mm;"></div><div class="crop-mark crop-v" style="bottom:0; right:14.5mm;"></div>' +
+                ['8mm', '62.35mm', '117.05mm', '171.75mm', '226.45mm'].map(function (y) { return '<div class="crop-mark crop-h crop-left" style="top:' + y + ';"></div><div class="crop-mark crop-h crop-right" style="top:' + y + ';"></div>'; }).join('') +
+                '<div class="crop-mark crop-h crop-left" style="bottom:8mm;"></div><div class="crop-mark crop-h crop-right" style="bottom:8mm;"></div>';
+            function tagHtml(t, i) {
+                return '<div class="price-tag" data-i="' + i + '">' +
+                    '<button class="delete-btn no-print" title="이번 인쇄에서 빼기">✕</button>' +
+                    '<button class="reset-btn no-print" title="고친 것 되돌리기"' + (t.edited ? '' : ' hidden') + '>↺</button>' +
+                    '<div class="info-side full">' +
+                    '<div class="p-name" contenteditable="true">' + esc(t.name) + '</div>' +
+                    '<div class="p-desc" contenteditable="true">' + esc(t.desc) + '</div>' +
+                    '<div class="p-badges"><div class="badge-common p-head" contenteditable="true">' + esc(t.head) + '</div>' +
+                    (t.storage ? '<div class="badge-common p-storage-inline">' + t.storage + '</div>' : '') + '</div>' +
+                    '<div class="p-prices">' +
+                    (t.orig ? '<div class="p-orig-box"><div class="p-orig-line"><div class="p-orig-label">정상가</div><div class="p-orig-val-row"><span class="p-orig-val">' + won(t.orig) + '원</span></div></div>' +
+                        '<div class="p-info-text">' + esc(t.off) + '</div></div>' : '') +
+                    '<div class="p-sale"><b class="p-num" contenteditable="true">' + (t.price ? won(t.price, true) : '') + '</b><span>원</span></div>' +
+                    '</div></div></div>';
+            }
+            function fit(tag) {   // 생성기와 같이 — 이름 17px 아래면 두 줄, 소개는 이름보다 2px 작게
+                var n = tag.querySelector('.p-name'), d = tag.querySelector('.p-desc');
+                n.removeAttribute('style'); d.removeAttribute('style');
+                var size = adjustFontSize(n, null, 17);
+                if (d.textContent.trim()) adjustFontSize(d, size - 2);
+            }
+            function render() {
+                document.getElementById('cnt').textContent = T.length;
+                var html = '';
+                for (var i = 0; i < T.length; i += 10) html += '<div class="print-container">' + T.slice(i, i + 10).map(function (t, k) { return tagHtml(t, i + k); }).join('') + CROP + '</div>';
+                area.innerHTML = html;
+                (document.fonts ? document.fonts.ready : Promise.resolve()).then(function () { document.querySelectorAll('.price-tag').forEach(fit); });
+            }
+            function read(tag) {   // 화면 글씨 → T
+                var t = T[+tag.dataset.i];
+                t.head = tag.querySelector('.p-head').textContent.trim();
+                t.name = tag.querySelector('.p-name').textContent.trim();
+                t.desc = tag.querySelector('.p-desc').textContent.trim();
+                t.price = parseInt(tag.querySelector('.p-num').textContent.replace(/[^0-9]/g, '')) || 0;
+                return t;
+            }
+            function save(t) {
+                var same = t.head === t.def.head && t.name === t.def.name && t.desc === t.def.desc && t.price === t.def.price;
+                var edit = same ? null : { head: t.head, name: t.name, desc: t.desc, price: t.price, basePrice: t.def.price, baseOrig: t.orig || 0 };
+                var op = window.opener;
+                st.textContent = '저장 중…';
+                (op && !op.closed && op.gPriceTagSave ? op.gPriceTagSave(t.key, edit) : Promise.reject(new Error('주문관리 창이 닫혔어요')))
+                    .then(function () {
+                        t.edited = !same; st.textContent = '저장됨';
+                        var r = document.querySelector('.price-tag[data-i="' + T.indexOf(t) + '"] .reset-btn');
+                        if (r) r.hidden = same;
+                    })
+                    .catch(function (e) { st.textContent = '저장 실패'; console.error(e); });
+            }
+            area.addEventListener('input', function (ev) {
+                var el = ev.target; if (!el.isContentEditable) return;
+                if (!el.textContent.trim()) el.innerHTML = '';   // 다 지우면 빈칸 (말머리는 인쇄에서 빠진다)
+                var t = read(el.closest('.price-tag'));
+                clearTimeout(timers[t.key]); st.textContent = '';
+                timers[t.key] = setTimeout(function () { save(t); }, 800);
+            });
+            area.addEventListener('focusout', function (ev) {
+                var el = ev.target; if (!el.isContentEditable) return;
+                var tag = el.closest('.price-tag'), t = read(tag);
+                if (el.classList.contains('p-num')) el.innerHTML = t.price ? won(t.price, true) : '';
+                fit(tag);
+            });
+            area.addEventListener('keydown', function (ev) {   // 줄바꿈은 안 받는다 — Enter 는 고치기 끝
+                if (ev.key === 'Enter' && ev.target.isContentEditable) { ev.preventDefault(); ev.target.blur(); }
+            });
+            area.addEventListener('paste', function (ev) {   // 붙여넣기는 글씨만
+                if (!ev.target.isContentEditable) return;
+                ev.preventDefault();
+                document.execCommand('insertText', false, (ev.clipboardData.getData('text/plain') || '').replace(/\s*\n\s*/g, ' '));
+            });
+            area.addEventListener('click', function (ev) {
+                var b = ev.target.closest('button'); if (!b) return;
+                var t = T[+b.closest('.price-tag').dataset.i];
+                if (b.classList.contains('delete-btn')) { T.splice(T.indexOf(t), 1); render(); }
+                else if (b.classList.contains('reset-btn')) {
+                    t.head = t.def.head; t.name = t.def.name; t.desc = t.def.desc; t.price = t.def.price;
+                    render(); save(t);
+                }
+            });
+            render();
+        }
+
         function handleBatchPurchase() {
             if (uploadSelectedProductIndices.size === 0) {
                 showToast("발주할 상품을 선택해 주세요.");
