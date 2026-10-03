@@ -269,7 +269,8 @@
 
         // 로그아웃 (quiet = 묻지 않고)
         window.gStaffSignOut = async function (quiet) {
-            if (!quiet && !confirm('로그아웃할까요?')) return;
+            // [수정 2026-10-03] 화면 안 확인 창이 있으면 그것을 쓴다 (미리보기·웹뷰에서는 confirm() 이 바로 '취소'가 된다). 배달기사·가격표에는 없어 예전 창
+            if (!quiet && !(typeof psConfirm === 'function' ? await psConfirm('로그아웃할까요?', '로그아웃') : confirm('로그아웃할까요?'))) return;
             await auth.signOut();
             location.reload();
         };
@@ -3038,7 +3039,7 @@
                                 <div style="display:grid; grid-template-columns:minmax(0,0.6fr) minmax(0,1.2fr) minmax(0,0.8fr) minmax(0,1fr); gap:6px; align-items:stretch;">
                                     <button type="button" id="btn-tax-type" onclick="toggleFormTaxFree()" title="눌러서 과세·면세 바꾸기" style="width:100%; min-width:0; height:45px; box-sizing:border-box; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; background:#f1f5f9; color:#64748b; border:1.5px solid #e2e8f0;">과세</button>
                                     <input type="number" id="productPrice" class="form-control" placeholder="가격" min="0" required style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
-                                    <input type="number" id="productStock" class="form-control" placeholder="재고" min="0" required style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <input type="number" id="productStock" class="form-control" placeholder="재고" title="999를 넣으면 무제한" min="0" required onchange="gStock999ToUnlimited(this)" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <button type="button" id="btn-detail-option" class="price-option-btn" onclick="openDetailOptionSetting()" style="width:100%; min-width:0; height:45px; box-sizing:border-box; padding:0 8px; overflow:hidden; text-overflow:ellipsis;">상세옵션</button>
                                 </div>
                             </div>
@@ -3232,9 +3233,12 @@
                             <button type="button" id="ps-view-list" onclick="psSetView('list')">📋 목록</button>
                         </div>
                         <div class="ps-tools">
-                            <button type="button" id="ps-undo-btn" class="ps-tbtn" onclick="psUndo()" disabled title="되돌릴 것이 없어요" style="opacity:.45;">↩ 되돌리기</button>
-                            <button type="button" class="ps-tbtn" onclick="psSetView('cal'); psCalGoToday()">오늘</button>
+                            <!-- [수정 2026-10-03] 차례: ❔ · 오늘 · (폰만 Ctrl) · 되돌리기 (사장님 요청) -->
                             <button type="button" id="ps-help-btn" class="ps-tbtn" onclick="psToggleHelp()" title="쓰는 법">❔</button>
+                            <button type="button" class="ps-tbtn" onclick="psSetView('cal'); psCalGoToday()">오늘</button>
+                            <!-- [신규 2026-10-03] 폰용 Ctrl — 켜 두면 Ctrl 을 누르고 있는 것과 같다 (막대 누르기=더하기, 끌기=복사). 손가락 화면에서만 보인다 -->
+                            <button type="button" id="ps-ctrl-btn" class="ps-tbtn" onclick="psToggleCtrl()" title="Ctrl 처럼 — 켜면 막대를 눌러 여러 개 고르고, 끌면 복사해요" style="display:none;">Ctrl</button>
+                            <button type="button" id="ps-undo-btn" class="ps-tbtn" onclick="psUndo()" disabled title="되돌릴 것이 없어요" style="opacity:.45;">↩ 되돌리기</button>
                         </div>
                     </div>
                     <div class="ps-legend">
@@ -3242,13 +3246,14 @@
                         <span class="ps-chip" style="background:#dcfce7; color:#15803d;">판매중</span>
                         <span class="ps-chip" style="background:#fef3c7; color:#a16207;">마감</span>
                         <span class="ps-chip" style="background:#fee2e2; color:#b91c1c;">숨김</span>
-                        <span class="ps-legend-note"><span class="ps-dot" style="background:#16a34a;"></span>= 지금 상태 · <b>│</b> 마감 · 막대 끝 픽업</span>
+                        <!-- [삭제 2026-10-03] 범례 오른쪽 설명(● = 지금 상태 · │ 마감 · 막대 끝 픽업)은 뺐다 (사장님 요청). 그 설명은 ❔ 쓰는 법의 '보기' 줄로 옮겼다 -->
                     </div>
                     <div id="ps-help" class="ps-help" style="display:none;">
-                        <div><b>고르기</b> 막대 누르기(여러 개 가능) · 빈 곳을 끌어 한꺼번에 · 날짜 누르면 그 날 일정 · <b>Esc</b> 풀기</div>
-                        <div><b>옮기기</b> 막대를 날짜·시간 줄로 끌기 · <b>Ctrl</b>+끌기 복사 · 양 끝·세로선을 끌면 시작·픽업·마감만 · 폰은 길게 눌러 끌기</div>
+                        <div><b>보기</b> <span class="ps-dot" style="background:#16a34a;"></span> = 지금 상태 · <b>│</b> 마감 · 막대 끝 픽업</div>
+                        <div><b>고르기</b> 막대 누르기 · 여러 개는 <b>Ctrl</b>+누르기 · 빈 곳을 끌어 한꺼번에 · 날짜 누르면 그 날 일정 · <b>Esc</b> 풀기</div>
+                        <div><b>옮기기</b> 막대를 날짜·시간 줄로 끌기 · <b>Ctrl</b>+끌기 복사 · 양 끝·세로선을 끌면 시작·픽업·마감만 · 폰은 길게 눌러 끌기 (폰은 위 <b>Ctrl</b> 단추를 켜면 Ctrl 을 누른 것과 같아요)</div>
                         <div><b>고른 뒤</b> 🔗 합치기 · ✂️ 나누기 · <b>Delete</b> 지우기(상품은 그대로) · ↩ 되돌리기(<b>Ctrl+Z</b>)</div>
-                        <div><b>시간 줄</b> 날짜칸 안 다섯 줄 = 11·13·15·17·19시 · 위·아래 끝까지 굴리면 전달·다음달</div>
+                        <div><b>시간 줄</b> 날짜칸 안 여덟 줄 = 6·8·10·12·14·16·18·20시 · 위·아래 끝까지 굴리면 전달·다음달</div>
                     </div>
                     <div class="ps-cal-wrap">
                         <div id="ps-cal-box" class="ps-cal-scroll" onscroll="psCalOnScroll()" ondragover="psCalDragAutoScroll(event)" onmousedown="psMarqueeDown(event)"></div>
@@ -3844,7 +3849,8 @@
         .ps-cal-wrap { position: relative; }
         /* [신규 2026-10-01] 날짜칸 안 시간 다섯 줄 — 빈 줄엔 흐린 시각 글자, 막대를 끌어 올리면 파랗게 */
         #ps-cal-box .ps-bars { gap: 1px; }
-        .ps-slot { position: relative; min-height: 15px; display: flex; flex-direction: column; gap: 2px; border-top: 1px dashed #eef2f6; }
+        /* [수정 2026-10-03] 시간 줄이 다섯 줄 → 여덟 줄로 늘어 빈 줄 높이를 15px → 11px 로 줄였다 (한 화면에 4주가 들어가게) */
+        .ps-slot { position: relative; min-height: 11px; display: flex; flex-direction: column; gap: 2px; border-top: 1px dashed #eef2f6; }
         .ps-slot:first-child { border-top: none; }
         .ps-slot.over { background: #dbeafe; }
         /* 맨 왼쪽 시간 기둥 — 노출일정 달력에서만 8칸(기둥 + 7일)으로 쓴다 */
@@ -4821,7 +4827,7 @@
             if (!r) return;
             const me = window.gStaffMe || {};
             if (role === 'store' && !me.owner) return showToast('가게 권한은 사장님만 줄 수 있습니다.');
-            if (!confirm(`${r.name} (${r.phone}) 님을 ${role === 'store' ? '가게' : '기사'}로 허락할까요?\n확인코드: ${r.code}`)) return;
+            if (!await psConfirm(`${r.name} (${r.phone}) 님을 ${role === 'store' ? '가게' : '기사'}로 허락할까요?\n확인코드: ${r.code}`)) return;
             try {
                 await window.gStaffDb(`staff/${uid}.json`, { method: 'PUT', body: JSON.stringify({
                     role, name: r.name || '', email: r.email || '', phone: r.phone || '', device: r.device || '',
@@ -4834,14 +4840,14 @@
         }
         async function rejectStaff(uid) {
             const r = _staffData.req[uid];
-            if (!r || !confirm(`${r.name} 님의 신청을 거절할까요?`)) return;
+            if (!r || !await psConfirm(`${r.name} 님의 신청을 거절할까요?`)) return;
             try { await window.gStaffDb(`staff_requests/${uid}.json`, { method: 'DELETE' }); } catch (e) { showToast('거절하지 못했습니다: ' + e.message); }
             renderStaffAdmin(true);
         }
         async function setStaffRole(uid, role) {
             const s = _staffData.staff[uid];
             if (!s || uid === (window.gStaffMe || {}).uid || s.owner === true || !(window.gStaffMe || {}).owner) return;
-            if (!confirm(`${s.name} 님을 ${role === 'store' ? '가게' : '기사'}로 바꿀까요?`)) return;
+            if (!await psConfirm(`${s.name} 님을 ${role === 'store' ? '가게' : '기사'}로 바꿀까요?`)) return;
             try { await window.gStaffDb(`staff/${uid}/role.json`, { method: 'PUT', body: JSON.stringify(role) }); } catch (e) { showToast('바꾸지 못했습니다: ' + e.message); }
             renderStaffAdmin(true);
         }
@@ -4849,7 +4855,7 @@
             const s = _staffData.staff[uid];
             const _me = window.gStaffMe || {};
             if (!s || uid === _me.uid || s.owner === true || (s.role === 'store' && !_me.owner)) return;
-            if (!confirm(`${s.name} 님의 허락을 취소할까요?\n그 사람 정보(이름·전화번호·이메일)도 함께 지워집니다.`)) return;
+            if (!await psConfirm(`${s.name} 님의 허락을 취소할까요?\n그 사람 정보(이름·전화번호·이메일)도 함께 지워집니다.`)) return;
             try { await window.gStaffDb(`staff/${uid}.json`, { method: 'DELETE' }); showToast('허락을 취소했습니다.'); } catch (e) { showToast('취소하지 못했습니다: ' + e.message); }
             renderStaffAdmin(true);
         }
@@ -5227,7 +5233,7 @@
                         <span style="flex:0 0 auto; font-weight:800; color:#94a3b8;">${when(r.at)}</span>
                         <span style="flex:1; min-width:0; font-weight:800; color:#334155; word-break:break-all;">${gEscapeHtml(String(r.key).replace(/_+/g, ' '))}${r.node === 'option_stock' ? ' <span style="color:#94a3b8;">(옵션)</span>' : ''}</span>
                         <span style="flex:0 0 auto; font-weight:900; color:#dc2626; white-space:nowrap;">${r.before === null ? '없음' : r.before} → ${r.after}</span>
-                    </div>`).join('') + `<button type="button" onclick="if(confirm('재고 의심 기록을 지울까요?')){localStorage.removeItem('${STOCK_SUSPECT_KEY}'); gPaintStockSuspects();}" style="margin-top:8px; height:32px; padding:0 12px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">기록 지우기</button>`
+                    </div>`).join('') + `<button type="button" onclick="psConfirm('재고 의심 기록을 지울까요?', '지우기', true).then(ok => { if (ok) { localStorage.removeItem('${STOCK_SUSPECT_KEY}'); gPaintStockSuspects(); } })" style="margin-top:8px; height:32px; padding:0 12px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">기록 지우기</button>`
                 : `<div style="font-size:12px; font-weight:700; color:#94a3b8;">의심스러운 재고 변화가 없습니다.</div>`;
         }
         if (window.gStaffReady) window.gStaffReady.then(() => setTimeout(gStartStockWatch, 3000));
@@ -9381,7 +9387,7 @@
         // [1회성 복구] 예전 날짜파싱 버그로 인해 최근 10일 이내인데도 orders_archive로 잘못 옮겨진 주문을
         // 다시 orders로 되돌리는 함수. 여러 번 눌러도 안전(이미 복구된 건 대상에서 자동 제외).
         async function restoreRecentlyArchivedOrders() {
-            if (!confirm("최근 10일 이내인데 보관함(archive)에 잘못 들어가 있는 주문을 찾아 되돌립니다.\n계속하시겠습니까?")) return;
+            if (!await psConfirm("최근 10일 이내인데 보관함(archive)에 잘못 들어가 있는 주문을 찾아 되돌립니다.\n계속하시겠습니까?")) return;
 
             showLoader("♻️ 최근 주문 복구 대상 확인 중...");
             try {
@@ -9489,7 +9495,7 @@
                 return;
             }
 
-            if (!confirm(`30일 이상 지난 완료/취소 주문 ${archivableOrders.length}건을 보관함(아카이브)으로 이동하시겠습니까?\n\n이동 시 데이터 용량이 90% 대폭 줄어들어 1Mbps 로딩 속도가 15배 빨라집니다!`)) {
+            if (!await psConfirm(`30일 이상 지난 완료/취소 주문 ${archivableOrders.length}건을 보관함(아카이브)으로 이동하시겠습니까?\n\n이동 시 데이터 용량이 90% 대폭 줄어들어 1Mbps 로딩 속도가 15배 빨라집니다!`)) {
                 return;
             }
 
@@ -9915,7 +9921,7 @@
         // 수령 방법 (배달 <-> 픽업) 전환 처리 함수
         async function toggleShippingMethod(phone, orderKeysStr, targetMethod) {
             const label = targetMethod === '배달주문' ? '배달' : '픽업';
-            if (!confirm(`수령 방법을 ${label}(으)로 전환하시겠습니까?`)) return;
+            if (!await psConfirm(`수령 방법을 ${label}(으)로 전환하시겠습니까?`)) return;
             
             showLoader("수령 방법 변경 중...");
             const cleanPhone = String(phone).replace(/\D/g, "");
@@ -11345,7 +11351,7 @@
 
                 hideLoader();
                 if (phantoms === 0) { showToast("정리할 유령 주문이 없습니다."); return; }
-                if (!confirm(`상품명(item)이 없는 유령 주문 ${phantoms}건을 삭제합니다.\n(상품명과 주문일시가 있는 실제 주문은 절대 삭제되지 않습니다)\n\n진행할까요?`)) return;
+                if (!await psConfirm(`상품명(item)이 없는 유령 주문 ${phantoms}건을 삭제합니다.\n(상품명과 주문일시가 있는 실제 주문은 절대 삭제되지 않습니다)\n\n진행할까요?`)) return;
 
                 showLoader(`🧹 유령 주문 ${phantoms}건 삭제 중...`);
                 const del = await fetch(`${FIREBASE_DB_URL}orders.json`, {
@@ -11379,7 +11385,7 @@
                 return;
             }
 
-            if (!confirm(`정말로 취소된 주문 ${canceledOrders.length}건을 DB에서 영구 삭제하시겠습니까?`)) {
+            if (!await psConfirm(`정말로 취소된 주문 ${canceledOrders.length}건을 DB에서 영구 삭제하시겠습니까?`)) {
                 return;
             }
 
@@ -12685,7 +12691,7 @@
             // [신규] 노쇼 — 취소처럼 매출에서 빼고 노쇼로 적는다 (손님 주문서에는 '강제취소')
             const isNoShow = (newStatus === '노쇼');
             const st = isNoShow ? '취소' : newStatus;
-            if (st === '취소' && !confirm(isNoShow ? '이 고객의 미완료 건을 노쇼 처리할까요?' : '이 고객의 미완료 건을 취소 처리할까요?')) return;
+            if (st === '취소' && !await psConfirm(isNoShow ? '이 고객의 미완료 건을 노쇼 처리할까요?' : '이 고객의 미완료 건을 취소 처리할까요?')) return;
             showLoader(`[${newStatus === '픽업' ? '픽업완료' : newStatus}]로 변경 중...`);
             try {
                 const patchBody = Object.assign(getStatusPatchBody(st), isNoShow ? { noShow: Date.now() } : {});
@@ -13011,6 +13017,58 @@
 
                 let printHtml = '';
 
+                /* [신규 2026-10-03] 첫 주문 손님은 이름 앞에 * 를 붙인다 (사장님 요청).
+                   이 종이에 실린 주문 말고는 지금까지 주문(취소·배달비·포인트 줄 빼고)이 하나도 없으면 첫 주문이다.
+                   다른 주문이 '있는지'만 보면 되니, 종이에 실린 손님만 찾고 하나 나오면 그 손님은 거기서 끝낸다.
+                     ① 먼저 이미 받아 둔 주문(+기기에 담아 둔 보관함)에서 찾는다 — 데이터를 안 쓴다. 단골은 여기서 거의 다 빠진다.
+                     ② 그래도 첫 주문처럼 보이는 손님만 서버에 '주문 이름 목록'만 물어본다 (shallow — 내용은 안 받는다).
+                        기기의 보관함 사본이 없거나 오래됐어도 정확하게 가리려고. 주문 이름이 '주문 시각_상품명'이라 이름만 봐도 된다.
+                   서버에 못 물어보면 단골을 첫 손님으로 잘못 찍을 수 있으니 붙이지 않는다. */
+                {
+                    const _isRealRow = o => o && !isSalesCanceled(o) && !gIsFeeRow(o);
+                    const _mineOf = new Map();   // 종이에 실린 손님 → 이번 주문 시각 모음 (아직 다른 주문을 못 찾은 손님만 남긴다)
+                    const _foldersOf = new Map(); // 손님 → 주문이 들어 있을 수 있는 서랍 번호들
+                    Object.values(grouped).forEach(c => {
+                        const k = gCustKey(c.items[0]);
+                        const mine = new Set(c.items.filter(_isRealRow).map(o => String(o.timestamp || '')));
+                        if (!k || !mine.size) return;
+                        _mineOf.set(k, mine);
+                        const f = _foldersOf.get(k) || new Set([k]);
+                        c.items.forEach(o => { const p = String(o.phone || '').replace(/\D/g, ''); if (p) f.add(p); });
+                        _foldersOf.set(k, f);
+                    });
+                    const _canceledKeys = new Set();   // 취소된 주문 이름 — 서버 목록에 있어도 주문으로 치지 않는다
+                    for (const o of getSalesSourceOrders()) {
+                        if (!_mineOf.size) break;   // 다 가렸으면 그만 본다
+                        if (!o) continue;
+                        const k = gCustKey(o), mine = _mineOf.get(k);
+                        if (!mine) continue;
+                        if (isSalesCanceled(o)) { if (o.orderKey) _canceledKeys.add(String(o.orderKey)); continue; }
+                        if (_isRealRow(o) && !mine.has(String(o.timestamp || ''))) _mineOf.delete(k);   // 다른 주문이 있다 → 첫 주문 아님
+                    }
+                    // ② 남은 손님만 서버에 이름 목록을 물어본다
+                    const _mv = (typeof gMovedAlias === 'function') ? gMovedAlias() : {};
+                    await Promise.all([..._mineOf.keys()].map(async k => {
+                        const folders = _foldersOf.get(k) || new Set([k]);
+                        Object.keys(_mv).forEach(old => { if (_mv[old] === k) folders.add(old); });   // 번호를 옮긴 손님의 옛 서랍
+                        const pre = [..._mineOf.get(k)].map(ts => fSafeKey(ts) + '_');
+                        try {
+                            for (const p of folders) {
+                                for (const place of ['orders', 'orders_archive']) {
+                                    const r = await fetch(`${FIREBASE_DB_URL}${place}/${encodeURIComponent(p)}.json?shallow=true&t=${Date.now()}`);
+                                    if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+                                    const keys = Object.keys((await r.json()) || {});
+                                    const other = keys.some(key => !pre.some(x => key.startsWith(x))
+                                        && !_canceledKeys.has(key)
+                                        && !/_(배달비|배달비 차감|포인트 사용)(_\d+)?$/.test(key));
+                                    if (other) { _mineOf.delete(k); return; }   // 하나 나오면 끝
+                                }
+                            }
+                        } catch (e) { console.warn('첫 주문 확인 실패 — * 를 붙이지 않습니다:', k, e.message); _mineOf.delete(k); }
+                    }));
+                    Object.values(grouped).forEach(c => { if (_mineOf.has(gCustKey(c.items[0]))) c.firstOrder = true; });
+                }
+
                 /* [신규] 픽업 주문은 과세·면세 상품을 종이 두 장으로 나눠 뽑는다 (한쪽만 있으면 한 장).
                    장마다 그 장의 미입금 결제 바코드가 하나씩 붙는다. 배달비·모르는 상품은 과세 장으로 간다. */
                 const _itemFree = it => {
@@ -13019,14 +13077,33 @@
                     if (!code) { const p = (uploadProducts || []).find(p => p && p.name === String(it.item || '').trim()); code = p ? String(p.productCode || '').trim() : ''; }
                     return gIsTaxFreeCode(code);
                 };
+                /* [수정 2026-10-03] '포인트 사용'(마이너스) 줄은 과세 금액에서 먼저 빼고, 모자란 만큼 면세에서 뺀다 (사장님 요청).
+                   예전엔 포인트 줄이 늘 과세 장으로만 갔다. 과세 금액보다 포인트가 크면 과세 장이 마이너스가 돼 바코드가 안 붙고,
+                   면세 장 바코드는 포인트를 안 뺀 금액으로 찍혔다. (면세 10,000원 + 포인트 3,000P → 바코드 10,000원)
+                   면세 상품만 있으면 포인트 줄만 든 과세 장이 따로 나왔다 → 이제 한 장에 같이 넣는다. */
+                const _isPtRow = it => gFeeRowName(it) === "포인트 사용";
+                const _amtOf = it => parseInt(String(it.total || 0).replace(/,/g, "")) || 0;
+                const _isPaidRow = it => (it.paid === true || it.paid === "true" || String(it.paid).toUpperCase() === "TRUE");
                 const _printParts = [];
                 Object.values(grouped).forEach(c => {
                     if (c.shippingMethod === '배달주문') { _printParts.push(c); return; }
-                    const free = c.items.filter(_itemFree), tax = c.items.filter(it => !_itemFree(it));
+                    const pts = c.items.filter(_isPtRow);
+                    const free = c.items.filter(_itemFree), tax = c.items.filter(it => !_itemFree(it) && !_isPtRow(it));
                     // 한 종류뿐이면 한 장 — 과세·면세 표시는 두 장으로 나뉠 때만 붙인다 (면세만이면 합계금액 앞에 * 로 알린다)
-                    if (!free.length || !tax.length) { _printParts.push(Object.assign({}, c, { taxLabel: '', taxFreeOnly: free.length > 0 })); return; }
-                    _printParts.push(Object.assign({}, c, { items: tax, taxLabel: '과세', taxPair: true }));
-                    _printParts.push(Object.assign({}, c, { items: free, taxLabel: '면세', taxPair: true }));
+                    if (!free.length || !tax.length) { _printParts.push(Object.assign({}, c, { taxLabel: '', taxFreeOnly: free.length > 0 && !tax.length })); return; }
+                    // 두 장으로 나눌 때 포인트를 과세 장(아직 안 낸 금액만큼)부터 채우고 남는 건 면세 장으로
+                    const taxPts = [], freePts = [];
+                    if (pts.length) {
+                        const ptAll = -pts.reduce((a, it) => a + _amtOf(it), 0);
+                        const taxCap = Math.max(0, tax.filter(it => !_isPaidRow(it)).reduce((a, it) => a + _amtOf(it), 0));
+                        const toTax = Math.min(ptAll, taxCap), toFree = ptAll - toTax;
+                        const note = (toTax > 0 && toFree > 0) ? `${ptAll.toLocaleString()}P 중` : '';
+                        const ptLine = amt => Object.assign({}, pts[0], { qty: 1, price: -amt, total: -amt, ptNote: note });
+                        if (toTax > 0) taxPts.push(ptLine(toTax));
+                        if (toFree > 0) freePts.push(ptLine(toFree));
+                    }
+                    _printParts.push(Object.assign({}, c, { items: tax.concat(taxPts), taxLabel: '과세', taxPair: true }));
+                    _printParts.push(Object.assign({}, c, { items: free.concat(freePts), taxLabel: '면세', taxPair: true }));
                 });
                 _printParts.forEach(customer => {
                     const isDelivery = customer.shippingMethod === '배달주문';
@@ -13060,7 +13137,7 @@
                                         if (!isDelivery && gPastUnpickedOf(customer.phone).length) lines.push('미픽업 상품이 있습니다');
                                         return lines.length ? `<span style="display:inline-block; vertical-align:middle; margin-left:6px; font-size:12px; font-weight:800; line-height:1.35;">${lines.map(l => '▪ ' + l).join('<br>')}</span>` : '';
                                     })()}
-                                    <h2>${customer.name} (☎ ${displayPhone})</h2>
+                                    <h2>${customer.firstOrder ? '*' : ''}${customer.name} (☎ ${displayPhone})</h2>
                                     ${isDelivery ? `
                                         <div class="address-text">
                                             배송지: ${gApartmentPrintName(customer.address)}<br>
@@ -13105,14 +13182,21 @@
                         .reduce((a, it) => a + (parseInt(String(it.total || 0).replace(/,/g, "")) || 0), 0);
                     // [신규] 미입금을 과세·면세로 나눈다. 배달비·모르는 상품은 과세로 본다
                     let _unpaidFree = 0;
+                    let _unpaidPt = 0;   // [신규 2026-10-03] 안 낸 '포인트 사용' 합계 (양수)
                     printItems.forEach(it => {
                         if (it.paid === true || it.paid === "true" || String(it.paid).toUpperCase() === "TRUE") return;
+                        if (_isPtRow(it)) { _unpaidPt -= _amtOf(it); return; }
                         if (gIsFeeRow(it)) return;
                         let code = String(it.productCode || '').trim();
                         if (!code) { const p = (uploadProducts || []).find(p => p && p.name === String(it.item || '').trim()); code = p ? String(p.productCode || '').trim() : ''; }
                         if (gIsTaxFreeCode(code)) _unpaidFree += parseInt(String(it.total || 0).replace(/,/g, "")) || 0;
                     });
-                    const _unpaidTax = _unpaidSum - _unpaidFree;
+                    // [수정 2026-10-03] 포인트는 과세 바코드에서 먼저 빼고, 모자란 만큼 면세 바코드에서 뺀다 (사장님 요청).
+                    //  예전엔 과세에서만 빼서, 면세 상품만 있으면 면세 바코드가 포인트를 안 뺀 금액으로 찍혔다.
+                    const _taxBeforePt = _unpaidSum + _unpaidPt - _unpaidFree;
+                    const _ptOnTax = Math.min(_unpaidPt, Math.max(0, _taxBeforePt));
+                    const _unpaidTax = _taxBeforePt - _ptOnTax;
+                    _unpaidFree -= (_unpaidPt - _ptOnTax);
                     const _barNums = (!isDelivery && _unpaidSum > 0)
                         ? [[_unpaidTax, '29'], [_unpaidFree, '28']].filter(x => x[0] > 0).map(([amt, pre]) => gPayBarcodeNumber(amt, pre)) : [];
                     // [신규] 1,000~99,900원(100원 단위)은 토스에 한꺼번에 등록해 두었다 — * 를 붙이지 않는다
@@ -13129,7 +13213,9 @@
                         
                         // 1. 입금 완료 여부 뱃지 생성 (입고 상태 및 수령 여부는 전면 제외)
                         const isPaid = (it.paid === true || it.paid === "true" || String(it.paid).toUpperCase() === "TRUE");
-                        if (isPaid) {
+                        // [수정 2026-10-03] '포인트 사용' 줄은 돈을 받을 줄이 아니라서 입금 표시를 붙이지 않는다 (사장님 요청)
+                        if (_isPtRow(it)) {
+                        } else if (isPaid) {
                             statusBadge += ' <span style="font-size:10px; color:#000; font-weight:800; border:1.5px solid #000; padding:1px 3px; border-radius:2px; margin-left:4px; display:inline-block; line-height:1;">[입금완료]</span>';
                         } else {
                             statusBadge += ' <span style="font-size:10px; color:#000; font-weight:800; border:1.5px solid #000; padding:1px 3px; border-radius:2px; margin-left:4px; display:inline-block; line-height:1;">[미입금]</span>';
@@ -13137,7 +13223,7 @@
 
                         printHtml += `
                             <tr style="border-bottom:none;">
-                                <td style="padding:4px 0;">${it.item}${statusBadge}${gOptionLines(it.optionText, { cls: 'print-option' })}</td>
+                                <td style="padding:4px 0;">${it.item}${it.ptNote ? ` <span style="font-size:11px;">(${it.ptNote})</span>` : ''}${statusBadge}${gOptionLines(it.optionText, { cls: 'print-option' })}</td>
                                 <td class="text-right" style="padding:4px 0;">${it.qty}</td>
                                 <td class="text-right" style="padding:4px 0;">${(parseInt(String(it.total || 0).replace(/,/g, "")) || 0).toLocaleString()}원</td>
                             </tr>
@@ -13615,7 +13701,80 @@
         /* ===== [신규] 🗓️ 노출일정 탭 — 상품등록과 따로, 예약 공개·종료를 달력으로 관리한다 ===== */
         let psCalMonths = [];         // 지금 이어 붙여 보여주는 달들 'YYYY-MM' — 오래된→최신 차례
         // [신규 2026-10-01] 올라가는 시각은 이 다섯 칸 중에서만 고른다 (11·13·15·17·19시)
-        const PS_SLOTS = [11, 13, 15, 17, 19];
+        // [수정 2026-10-03] 올라가는 시각 — 6시부터 2시간마다 20시까지 (사장님 요청. 예전 11·13·15·17·19시는 한 시간씩 당겼다). 달력의 시간 줄도 이것을 따른다
+        const PS_SLOTS = [6, 8, 10, 12, 14, 16, 18, 20];
+        const PS_DEFAULT_SLOT = 14;   // 고르지 않았을 때 (예전 15시)
+
+        /* ===== [신규 2026-10-03] 시각 고르기 태엽 (사장님 요청) =====
+           시각 칸(select.gw-wheel)을 누르면 목록이 통째로 펼쳐지는 대신, 작은 태엽이 떠서 위아래로 돌려 고른다.
+             · 마우스 휠·손가락으로 돌려 찾고, 시각을 눌러야 그 시각으로 바뀐다 (Enter 는 가운데 줄 시각). 원래 칸의 onchange 가 그대로 돈다
+             · 바깥을 누르거나 Esc·화면이 굴러가면 아무것도 안 바꾸고 닫는다 — 원래 값 그대로 (사장님 요청)
+           원래 select 는 그대로 두고 값만 바꾸므로, 저장하는 코드는 하나도 안 바꿨다. */
+        (function () {
+            const ROW = 36, SHOW = 5, PAD = ROW * Math.floor(SHOW / 2);
+            const st = document.createElement('style');
+            st.textContent = `
+                .gw-pop { position:fixed; z-index:10050; background:#fff; border:1.5px solid #cbd5e1; border-radius:12px; box-shadow:0 10px 30px rgba(15,23,42,0.18); overflow:hidden; }
+                .gw-drum { height:${ROW * SHOW}px; overflow-y:auto; scroll-snap-type:y mandatory; padding:${PAD}px 0; box-sizing:border-box; scrollbar-width:none; overscroll-behavior:contain;
+                           -webkit-mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image:linear-gradient(transparent, #000 30%, #000 70%, transparent); }
+                .gw-drum::-webkit-scrollbar { display:none; }
+                .gw-item { height:${ROW}px; line-height:${ROW}px; text-align:center; scroll-snap-align:center; font-size:14px; font-weight:800; color:#94a3b8; cursor:pointer; user-select:none; white-space:nowrap; }
+                .gw-item.on { color:#0f172a; font-size:15.5px; }
+                .gw-band { position:absolute; left:6px; right:6px; top:${PAD}px; height:${ROW}px; border-radius:8px; background:rgba(37,99,235,0.09); border:1px solid rgba(37,99,235,0.25); box-sizing:border-box; pointer-events:none; }`;
+            document.head.appendChild(st);
+            let cur = null;   // { sel, pop, drum, start, top }
+            const idxOf = drum => Math.max(0, Math.min(drum.children.length - 1, Math.round(drum.scrollTop / ROW)));
+            // pick : 고른 줄 번호 (없으면 바꾸지 않고 닫는다)
+            function close(pick) {
+                if (!cur) return;
+                const { sel, pop, start } = cur; cur = null;
+                pop.remove();
+                if (typeof pick === 'number' && pick !== start && sel.isConnected) { sel.selectedIndex = pick; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+            }
+            function open(sel) {
+                close();
+                const r = sel.getBoundingClientRect();
+                const pop = document.createElement('div'); pop.className = 'gw-pop';
+                const drum = document.createElement('div'); drum.className = 'gw-drum';
+                [...sel.options].forEach((o, i) => {
+                    const d = document.createElement('div'); d.className = 'gw-item'; d.textContent = o.textContent;
+                    d.onclick = () => close(i);   // 눌러야 정해진다
+                    drum.appendChild(d);
+                });
+                pop.appendChild(drum);
+                const band = document.createElement('div'); band.className = 'gw-band'; pop.appendChild(band);
+                document.body.appendChild(pop);
+                const w = Math.max(r.width, 110), H = ROW * SHOW + 3;
+                let top = r.bottom + 4;
+                if (top + H > window.innerHeight - 8) top = Math.max(8, r.top - H - 4);   // 아래 자리가 없으면 위로
+                pop.style.left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8) + 'px';
+                pop.style.top = top + 'px'; pop.style.width = w + 'px';
+                const start = Math.max(0, sel.selectedIndex);
+                drum.scrollTop = start * ROW;
+                const paint = () => { const i = idxOf(drum); [...drum.children].forEach((c, k) => c.classList.toggle('on', k === i)); };
+                drum.addEventListener('scroll', paint); paint();
+                cur = { sel, pop, drum, start, top: r.top };
+            }
+            const wheelSel = e => (e.target && e.target.closest) ? e.target.closest('select.gw-wheel') : null;
+            // 브라우저 목록이 열리기 전에 가로챈다 (PC는 mousedown, 폰은 touchstart·click 에서 열린다)
+            ['mousedown', 'touchstart'].forEach(ev => document.addEventListener(ev, e => {
+                const s = wheelSel(e);
+                if (s) { e.preventDefault(); if (!s.disabled) open(s); return; }
+                if (cur && !cur.pop.contains(e.target)) close();   // 바깥 — 원래 값 그대로
+            }, { capture: true, passive: false }));
+            document.addEventListener('click', e => { if (wheelSel(e)) e.preventDefault(); }, true);
+            document.addEventListener('keydown', e => {
+                if (!cur) return;
+                if (e.key === 'Escape') { e.preventDefault(); close(); }
+                else if (e.key === 'Enter') { e.preventDefault(); close(idxOf(cur.drum)); }
+            }, true);
+            // 화면이 굴러가 칸이 움직였으면 태엽이 칸에서 떨어지므로 바꾸지 않고 닫는다 (태엽 안에서 돌리는 것·칸이 그대로인 것은 빼고)
+            document.addEventListener('scroll', e => {
+                if (!cur || e.target === cur.drum) return;
+                if (Math.abs(cur.sel.getBoundingClientRect().top - cur.top) > 3) close();
+            }, true);
+            window.addEventListener('resize', () => close());
+        })();
         function psSlotLabel(h, m) {
             return `${String(h).padStart(2, '0')}시${m ? ' ' + String(m).padStart(2, '0') + '분' : ''}`;   // 24시간제 두 자리 (13시·15시…)
         }
@@ -13743,11 +13902,13 @@
             const raw = p && p.sid && psSched[p.sid] && psSched[p.sid][rid];
             if (!raw || raw.stockApplied === true || raw.stock === undefined || raw.stock === null || raw.stock === '') return false;
             const n = Math.max(0, parseInt(raw.stock, 10) || 0);
+            // [신규 2026-10-03] 999 는 무제한 — 상품 재고를 비워(무제한) 시작한다 (사장님 요청, 다른 재고 칸과 같은 규칙)
+            const sv = (n === 999) ? '' : n;
             raw.stockApplied = true;   // 화면에서 먼저 막아 두 번 맞추지 않게
             const adjKey = fGetAdjKey(p.matchKey, p.name, p.sid);
-            const ok = await fbPatchProducts({ [`${idx}/stock`]: n, [`${idx}/updatedAt`]: Date.now() });
+            const ok = await fbPatchProducts({ [`${idx}/stock`]: sv, [`${idx}/updatedAt`]: Date.now() });
             if (!ok) { raw.stockApplied = false; return false; }
-            p.stock = n;
+            p.stock = sv;
             await fbPutRetry(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, 0);
             uploadGlobalAdjustments[adjKey] = 0;
             await psSchedPatch({ [`${p.sid}/${rid}/stockApplied`]: true });
@@ -13771,7 +13932,7 @@
             psUndoMark('이번 차례 재고');
             const v = String(value || '').trim();
             const n = v === '' ? null : Math.max(0, parseInt(v, 10) || 0);
-            if (await psItemSave(key, { stock: n, stockApplied: null })) showToast(n === null ? '📦 재고를 이어가요' : `📦 이번 차례가 시작하면 재고를 ${n}개로 맞춰요`);
+            if (await psItemSave(key, { stock: n, stockApplied: null })) showToast(n === null ? '📦 재고를 이어가요' : n === 999 ? '♾️ 이번 차례가 시작하면 재고를 무제한으로 해요' : `📦 이번 차례가 시작하면 재고를 ${n}개로 맞춰요`);
             renderProductScheduleCalendar();
         }
         // 올라갈 시각이 된 다음 차례를 지금 차례로 올린다 (앞 차례가 끝났거나 없을 때만). 마감까지 지나 버린 차례는 건너뛴다.
@@ -13996,11 +14157,46 @@
         }
 
         // 일정 고치기 — changes: releaseAt·expireAt·pickup·group·groupLabel·autoRepeat. 지금 차례면 상품 줄에도 옮겨 적는다.
+        /* [신규 2026-10-03] 판매 중인 일정 (사장님 요청) — 지금 차례이고 이미 올라간 일정.
+           손님이 이미 주문하고 있어서 시각·픽업일을 바꾸면 위험이 크다. 그래서
+             · 옮기기·올라감·마감·픽업일을 바꿀 때는 무조건 한 번 묻는다 (psConfirmLive)
+             · 마감은 픽업일 뒤로 못 간다 (psItemSave 에서 막는다) */
+        function psIsLive(it) { return !!it && psIsActive(it) && !psIsUpcoming(uploadProducts[it.idx]); }
+        async function psConfirmLive(keys, what) {
+            const live = (keys || []).map(psItem).filter(psIsLive);
+            if (!live.length) return true;
+            const names = live.slice(0, 3).map(x => (uploadProducts[x.idx] || {}).name || '').filter(Boolean).join(', ') + (live.length > 3 ? ` 외 ${live.length - 3}개` : '');
+            return psConfirm(`⚠️ 판매 중인 상품이에요\n${names}\n\n${what}\n손님 화면에 바로 반영되고, 이미 받은 주문은 안 바뀌어요.\n계속할까요?`, '바꾸기', true);
+        }
+        /* [신규 2026-10-03] 판매 중인데 숨겨진 상품의 마감을 지금보다 뒤로 미루면 다시 보이게 한다 (사장님 요청).
+           지금 일정이 노출시킨 상품이라, 마감을 미뤘다는 건 그 일정을 이어 판다는 뜻이다 — 묻지 않고 켠다.
+           마감을 당기거나 미뤄도 아직 지난 시각이면 노출은 그대로 둔다 (psApplyScheduleUpdate).
+           돌려주는 값: true(다시 보이기) · null(해당 상품 없음) */
+        async function psAskRevealOnExtend(keys, expFor) {
+            const now = Date.now();
+            const hidden = (keys || []).map(psItem).filter(it => {
+                if (!psIsLive(it)) return false;
+                const p = uploadProducts[it.idx];
+                const ne = Number(expFor(it)) || 0;
+                return p && (p.hide === true || p.hide === 'true') && ne > now && ne > (Number(it.expireAt) || 0);
+            });
+            if (!hidden.length) return null;
+            showToast(`👁️ 마감을 미뤄 숨겨져 있던 ${hidden.length}개 상품을 다시 보이게 했어요`);
+            return true;
+        }
         async function psItemSave(key, changes, quiet) {
             const it = psItem(key);
             if (!it) return false;
             const p = uploadProducts[it.idx];
             if (!p) return false;
+            // [신규 2026-10-03] 판매 중인 공동구매는 마감을 픽업일 뒤로 못 미룬다 (사장님 요청 — 픽업일이 따라가지 않아 날짜가 어긋난다)
+            if ('expireAt' in changes && changes.expireAt && psIsLive(it) && psIsGroupProd(p)) {
+                const pk = ('pickup' in changes && changes.pickup) ? changes.pickup : psItemPickup(it);
+                if (pk && fMsToDateKey(changes.expireAt) > pk) {
+                    showToast(`⚠️ 판매 중인 상품은 마감을 픽업일(${Number(pk.slice(5, 7))}/${Number(pk.slice(8))}) 뒤로 미룰 수 없어요`);
+                    return false;
+                }
+            }
             if (p.showWeekly === true) { showToast("🔁 '매주 노출' 상품은 일정을 걸 수 없어요"); return false; }
             const rel = ('releaseAt' in changes) ? (Number(changes.releaseAt) || null) : (Number(it.releaseAt) || null);
             const exp = ('expireAt' in changes) ? (Number(changes.expireAt) || null) : (Number(it.expireAt) || null);
@@ -14019,12 +14215,14 @@
                 const ch = {};
                 if ('releaseAt' in changes) ch.releaseAt = rel;
                 if ('expireAt' in changes) ch.expireAt = exp;
+                if (changes._reveal === true) ch._reveal = true;   // [신규 2026-10-03] 마감을 미루며 다시 보이게 하기로 했다
                 if ('pickup' in changes && psIsUpcoming(p)) ch.nextDate = changes.pickup || null;
                 if (Object.keys(ch).length && !(await psApplyScheduleUpdate(it.idx, ch))) return false;
                 if ('pickup' in changes && !psIsUpcoming(p) && changes.pickup && psPickupKey(p) !== changes.pickup) await psChangeLiveDate(it.idx, changes.pickup);
             } else if (!psIsActive(it)) {
                 if (await psPromoteDue()) autoApplyScheduledVisibility();
             }
+            if ('releaseAt' in changes || 'expireAt' in changes) await psSyncOnsiteHold(it.idx);   // [신규 2026-10-03] 고친 일정도 새로 올린 것처럼
             return true;
         }
         // 상품에 일정 더하기 — data: releaseAt·expireAt·pickup·group·groupLabel·autoRepeat (rid 를 주면 그 번호로)
@@ -14047,8 +14245,44 @@
             // [수정 2026-10-02] 다음 차례는 일정이 시작할 때(올라가는 시각)에만 상품에 영향을 준다 (사장님 요청) —
             //  미리 걸어 둔 일정은 상품의 노출·날짜를 건드리지 않고 기다렸다가, 시작 시각이 되면 지금 차례로 올라간다.
             //  (이미 시작 시각이 지난 일정을 걸었으면 바로 올린다)
+            // [수정 2026-10-03] 단, 상시판매 상품에 앞으로 올라갈 공동구매 일정을 걸면 그 자리에서 바로 숨긴다 (사장님 요청 — 일정 올리자마자).
+            //  공동구매로 팔 물건을 상시판매로 먼저 팔지 않게. 올라가는 시각이 되면 autoApplyScheduledVisibility 가 공동구매로 바꿔 다시 보인다.
             if (await psPromoteDue()) autoApplyScheduledVisibility();
+            await psSyncOnsiteHold(idx);
             return it;
+        }
+        /* [신규 2026-10-03] 상시판매 상품의 '공동구매 기다림' 숨김을 일정에 맞춘다 (사장님 요청 — 일정을 고치면 새로 올린 것처럼).
+           일정을 걸거나·옮기거나·지우거나·바꾸고 나면 늘 부른다.
+             · 앞으로 올라갈 일정이 있으면 → 숨긴다 (이미 숨겨져 있으면 그대로)
+             · 기다릴 일정이 없는데 이 일로 숨겨 둔 상품이면 → 다시 보이게 한다
+           공동구매로 이미 바뀐 상품(날짜 분류)은 해당 없다 — 그쪽은 올라감·마감이 노출을 맡는다. */
+        async function psSyncOnsiteHold(idx) {
+            const p = (uploadProducts || [])[idx];
+            if (!p || !p.sid || p.showWeekly === true || !psIsOnsiteProd(p)) return;
+            const now = Date.now();
+            const waiting = psItemsOfSid(p.sid).some(x => Number(x.releaseAt) > now);
+            const hidden = (p.hide === true || p.hide === 'true');
+            if (waiting && !hidden) await psHoldOnsite(idx, true);
+            else if (!waiting && p.schedHold === true) await psHoldOnsite(idx, false);
+        }
+        /* [신규 2026-10-03] 상시판매 상품 '공동구매 기다림' 숨김 (schedHold).
+           on=true  : 손님 화면에서 숨기고 schedHold 표시를 남긴다 (이 표시가 있어야 나중에 이 일 때문에 숨긴 것인 줄 안다)
+           on=false : 기다리던 일정을 다 지웠을 때 — 다시 보이게 하고 표시를 지운다. 일정을 걸기 전부터 손으로 숨겨 둔 상품(표시 없음)은 건드리지 않는다
+           [수정 2026-10-03] 기다리는 중에 손으로 숨기거나 보이게 해도 표시는 남는다 — 일정이 있으면 일정대로 (사장님 요청) */
+        async function psHoldOnsite(idx, on) {
+            const p = (uploadProducts || [])[idx];
+            if (!p) return false;
+            if (!on && p.schedHold !== true) return false;
+            const now = Date.now();
+            const f = on ? { showToday: false, showReserve: false, hide: true, schedHold: true, updatedAt: now }
+                         : { showToday: true, showReserve: true, hide: false, schedHold: null, updatedAt: now };
+            const patch = {};
+            Object.keys(f).forEach(k => { patch[`${idx}/${k}`] = f[k]; });
+            if (!(await fbPatchProducts(patch))) { showToast('⚠️ 상시판매 숨김을 바꾸지 못했어요 — 상품 목록에서 확인해 주세요'); return false; }
+            Object.assign(p, f);
+            updatePublishedProductsTimestamp();
+            showToast(on ? '🙈 공동구매 일정이 잡혀 상시판매에서 숨겼어요 — 올라가는 시각에 공동구매로 다시 보여요' : '👁️ 기다리던 공동구매 일정이 없어져 상시판매로 다시 보여요');
+            return true;
         }
         // 일정 지우기 — 일정만 없앤다. 지금 차례였으면 상품 줄의 일정 칸도 비운다(상품·재고는 그대로).
         async function psItemDelete(key) {
@@ -14063,6 +14297,7 @@
                 uploadProducts[it.idx].schedRid = null;
                 if (await psPromoteDue()) autoApplyScheduledVisibility();
             }
+            await psSyncOnsiteHold(it.idx);   // [신규 2026-10-03] 기다릴 일정이 더 없으면 상시판매로 다시 보이게
             psSelectedIdxs.delete(key);
             return true;
         }
@@ -14210,8 +14445,7 @@
             if (!base) return;
             const dDays = psDayDiff(base, dropKey);
             if (!dDays) return;
-            const live = keys.map(psItem).filter(it => it && psIsActive(it) && psIsGroupProd(uploadProducts[it.idx]) && !psIsUpcoming(uploadProducts[it.idx]));
-            if (live.length && !(await psConfirm(`판매 중인 상품 ${live.length}개의 픽업일을 지금 바로 ${dDays > 0 ? dDays + '일 뒤로' : (-dDays) + '일 앞으로'} 바꿔요.\n재고는 그대로이고, 이미 받은 주문의 날짜는 안 바뀌어요.`))) return;
+            if (!(await psConfirmLive(keys, `픽업일을 ${dDays > 0 ? dDays + '일 뒤로' : (-dDays) + '일 앞으로'} 바꿔요 (재고는 그대로).`))) { renderProductScheduleCalendar(); return; }   // [수정 2026-10-03] 무조건 경고
             let done = 0;
             for (const k of keys) {
                 const it = psItem(k);
@@ -14234,7 +14468,7 @@
             const it = psItem(key);
             if (!it || !value) { renderProductScheduleCalendar(); return; }
             const p = uploadProducts[it.idx];
-            if (psIsActive(it) && !psIsUpcoming(p) && !(await psConfirm(`판매 중인 상품의 픽업일을 지금 바로 ${value}로 바꿔요.\n재고는 그대로이고, 이미 받은 주문의 날짜는 안 바뀌어요.`))) { renderProductScheduleCalendar(); return; }
+            if (!(await psConfirmLive([key], `픽업일을 ${value}로 바꿔요 (재고는 그대로).`))) { renderProductScheduleCalendar(); return; }   // [수정 2026-10-03] 무조건 경고
             if (await psItemSetPickup(key, value)) showToast('🚚 픽업일을 바꿨어요');
             renderProductScheduleCalendar();
         }
@@ -14264,14 +14498,18 @@
             const keys = (group && group.length > 1 && cur) ? group : [key];
             const dDays = cur ? psDayDiff(fMsToDateKey(cur), dropKey) : 0;
             const slotHour = (mode === 'resize-start' && PS_SLOTS.includes(hour)) ? hour : null;
+            if (!(await psConfirmLive(keys, `${word} 날짜를 바꿔요.`))) { renderProductScheduleCalendar(); return; }   // [신규 2026-10-03]
+            const nvOf = g => { const k = g.key, v = Number(g[field]); return (k === key) ? newTs : (v ? psShiftTs(v, dDays, slotHour) : 0); };
+            const reveal = field === 'expireAt' ? await psAskRevealOnExtend(keys, nvOf) : null;   // [신규 2026-10-03]
             let done = 0;
             for (const k of keys) {
                 const g = psItem(k);
                 if (!g) continue;
-                const v = Number(g[field]);
-                const nv = (k === key) ? newTs : (v ? psShiftTs(v, dDays, slotHour) : 0);
+                const nv = nvOf(g);
                 if (!nv) continue;   // 그쪽 끝이 없는 일정은 건너뛴다
-                if (await psItemSave(k, field === 'expireAt' ? psExpireChanges(g, nv) : { releaseAt: nv })) done++;
+                const ch = field === 'expireAt' ? psExpireChanges(g, nv) : { releaseAt: nv };
+                if (reveal === true) ch._reveal = true;
+                if (await psItemSave(k, ch)) done++;
             }
             if (done) showToast(`📅 ${done > 1 ? done + '개 일정의 ' : ''}${word} 날짜를 옮겼어요`);
             renderProductScheduleCalendar();
@@ -14279,11 +14517,33 @@
         /* 그냥 끌면 이동, Ctrl(맥은 ⌘)을 누른 채 끌면 복사 — 복사는 같은 상품에 같은 모양의 일정을 하나 더 만든다(상품 줄은 그대로).
            시간 줄에 놓으면 끈 일정의 올라가는 시각이 '그 날 그 시각'이 되고, 같이 고른 일정들은 같은 날수만큼 옮기며 같은 시각으로 맞춘다.
            마감은 날짜만 같은 날수만큼 옮기고 시각은 정해 둔 그대로 둔다 (사장님 요청). 픽업일도 같은 날수만큼 같이. */
+        /* ===== [신규 2026-10-03] 폰용 Ctrl 단추 (사장님 요청) =====
+           폰에는 Ctrl 키가 없어서 여러 개 고르기·복사를 할 수 없었다. 도구줄의 [Ctrl] 단추를 켜 두면 Ctrl 을 누르고 있는 것과 똑같다.
+             · 켜 둠 : 막대를 누르면 지금 고른 것에 더하고(다시 누르면 뺀다), 길게 눌러 끌면 복사
+             · 꺼 둠 : 막대를 누르면 그 하나만 고르고, 끌면 옮기기 — PC 와 같은 규칙
+           다시 누를 때까지 켜진 채로 있다 (단추가 파랗게 보인다). PC 에서는 진짜 Ctrl 키를 쓰므로 단추를 숨긴다. */
+        let psCtrlLatch = false;
+        function psCtrlOn(ev) { return !!(ev && (ev.ctrlKey || ev.metaKey)) || psCtrlLatch; }
+        function psCtrlPaint() {
+            const b = document.getElementById('ps-ctrl-btn');
+            if (!b) return;
+            b.style.display = PS_DND ? 'none' : '';
+            b.style.background = psCtrlLatch ? '#2563eb' : '';
+            b.style.color = psCtrlLatch ? '#fff' : '';
+            b.style.borderColor = psCtrlLatch ? '#2563eb' : '';
+            b.textContent = psCtrlLatch ? 'Ctrl 켬' : 'Ctrl';
+        }
+        function psToggleCtrl() {
+            psCtrlLatch = !psCtrlLatch;
+            psCtrlPaint();
+            showToast(psCtrlLatch ? 'Ctrl 켬 — 막대를 누르면 더해 고르고, 끌면 복사해요' : 'Ctrl 끔 — 누르면 하나만 고르고, 끌면 옮겨요');
+        }
+        psCtrlPaint();
         async function psHandleDrop(event, dropKey, hour) {
             event.preventDefault();
             if (hour !== undefined) event.stopPropagation();   // 시간칸에 놓았으면 날짜칸이 한 번 더 받지 않게
             const key = psDragIdx, origStart = psDragOrigStart, mode = psDragMode, group = psDragGroup;
-            const isCopy = !!(event.ctrlKey || event.metaKey);
+            const isCopy = psCtrlOn(event);   // [수정 2026-10-03] 폰은 Ctrl 단추
             psDragIdx = null; psDragOrigStart = ''; psDragMode = 'move'; psDragGroup = null;
             if (key === null) return;
             psUndoMark(mode === 'move' ? (isCopy ? '복사' : '옮기기') : '길이 바꾸기');
@@ -14296,6 +14556,8 @@
             const relSame = it.releaseAt && slotHour !== null && new Date(Number(it.releaseAt)).getHours() === slotHour && !deltaDays;
             if (!deltaDays && (slotHour === null || relSame)) return;   // 안 끌었거나 같은 자리
             const keys = (group && group.length > 1) ? group : [key];
+            // [신규 2026-10-03] 판매 중인 일정을 옮기면 무조건 묻는다 (복사는 새 일정이라 묻지 않는다)
+            if (!isCopy && !(await psConfirmLive(keys, '일정을 옮겨요 — 올라감·마감 시각이 바뀌어요 (픽업일은 그대로).'))) { renderProductScheduleCalendar(); return; }
             const newGid = {};
             let done = 0;
             for (const k of keys) {
@@ -14547,6 +14809,29 @@
         }
 
 
+        /* [신규 2026-10-03] 달력은 최소 4주가 한 번에 보이게 높이를 맞춘다 (사장님 요청).
+           주마다 막대 줄 수가 달라 높이가 다르므로, 그린 주들 가운데 '이어진 4주'의 높이가 가장 큰 것에 맞춘다
+           — 어디로 굴려도 4주는 다 보인다. 예전엔 520px 로 고정이라 시간 줄이 여덟 줄이 된 뒤 2~3주만 보였다. */
+        function psCalFitHeight(box) {
+            // 폰은 4주가 다 안 보여도 된다 (사장님 요청) — 예전 높이(520px, CSS) 그대로
+            if (!PS_DND) { box.style.maxHeight = ''; return; }
+            const weeks = [...box.querySelectorAll('.ps-gutter')].map(g => g.getBoundingClientRect().height);
+            if (!weeks.length) return;
+            const grid = box.querySelector('.ms-cal-grid');
+            const gap = grid ? (parseFloat(getComputedStyle(grid).rowGap) || 0) : 0;
+            const head = box.querySelector('.ps-cal-weekhead');
+            const N = Math.min(4, weeks.length);
+            let best = 0;
+            for (let i = 0; i + N <= weeks.length; i++) {
+                let s = 0; for (let k = i; k < i + N; k++) s += weeks[k];
+                if (s > best) best = s;
+            }
+            const h = Math.ceil(best + gap * (N - 1) + (head ? head.getBoundingClientRect().height : 0) + 12);   // 12 = 위아래 여백·테두리
+            // [수정 2026-10-03] 화면에 달력이 통째로 들어오게 — 위에 붙는 메뉴줄·여백(약 150px)을 뺀 높이까지만 (사장님 요청: 잘리지 않게 적당히)
+            box.style.maxHeight = Math.max(Math.min(h, window.innerHeight - 150), 360) + 'px';
+        }
+        // 창 크기를 바꾸면 다시 맞춘다
+        window.addEventListener('resize', () => { const b = document.getElementById('ps-cal-box'); if (b && b.offsetParent) psCalFitHeight(b); });
         function renderProductScheduleCalendar() {
             const box = document.getElementById('ps-cal-box');
             if (!box || !psCalMonths.length) return;
@@ -14720,6 +15005,7 @@
             });
             html += `</div>`;   // ms-cal-grid 닫기
             box.innerHTML = html;
+            psCalFitHeight(box);   // [신규 2026-10-03] 4주는 늘 보이게
             psCalSyncThumb();
             psTouchInit();
             // [신규 2026-10-02] 달력 ↔ 일정 목록
@@ -14871,7 +15157,7 @@
             const cell = el && el.closest('#ps-cal-box [data-day]');
             const slot = el && el.closest('#ps-cal-box .ps-slot[data-slot]');
             if (!cell) { psDragIdx = null; psDragGroup = null; psDragMode = 'move'; return; }
-            psHandleDrop({ preventDefault() { }, stopPropagation() { }, ctrlKey: false, metaKey: false }, cell.dataset.day, slot ? Number(slot.dataset.slot) : undefined);
+            psHandleDrop({ preventDefault() { }, stopPropagation() { }, ctrlKey: psCtrlLatch, metaKey: false }, cell.dataset.day, slot ? Number(slot.dataset.slot) : undefined);   // [수정 2026-10-03] Ctrl 단추를 켜 두면 복사
         }
         function psTouchCancel() {
             if (!psTouch) return;
@@ -14887,7 +15173,7 @@
            일정 전부와 상품의 일정 관련 칸을 기억해 두었다가, 되돌릴 때 '그 뒤로 바뀐 칸만' 다시 쓴다. 최근 20번까지.
            새로고침하면 기억은 지워진다. 그 사이 주문으로 줄어든 재고(조정값)나 다른 기기에서 고친 것은 되돌리지 않는다. */
         const PS_UNDO_F = ['releaseAt', 'expireAt', 'nextDate', 'releaseApplied', 'expireApplied', 'announced', 'hide', 'showToday', 'showReserve',
-            'date', 'matchKey', 'schedRid', 'stock', 'repeatWeeks', 'scheduleLabel', 'announceText'];
+            'date', 'matchKey', 'schedRid', 'stock', 'repeatWeeks', 'scheduleLabel', 'announceText', 'schedHold'];
         let psUndoStack = [];
         let psUndoHold = false;   // 여러 번 이어 부르는 일(일정에 담기 등)은 한 번으로 친다
         function psUndoMark(label) {
@@ -14949,7 +15235,8 @@
         }
 
         /* [신규 2026-10-02] 노출일정 확인 창 — confirm() 창이 막히는 화면(웹뷰·미리보기)이 있어(눌러도 아무 일이 없다) 직접 그린다.
-           await psConfirm('물을 말', '확인 단추 글자', 빨강?) → true/false */
+           await psConfirm('물을 말', '확인 단추 글자', 빨강?) → true/false
+           [수정 2026-10-03] 노출일정뿐 아니라 주문관리의 확인 창(예전 confirm) 전부가 이것을 쓴다 — 미리보기에서 '카톡 올림 완료' 등이 안 눌리던 문제 (사장님 요청) */
         function psConfirm(msg, okText, danger) {
             return new Promise(resolve => {
                 let box = document.getElementById('ps-confirm-box');
@@ -15005,11 +15292,21 @@
         const PS_LAB = 'font-size:10.5px; font-weight:700; color:var(--text-sub); display:block; margin-bottom:2px;';
         const PS_DOTC = { on: '#16a34a', closed: '#ca8a04', hidden: '#dc2626' };
         function psTimeOptsHtml(relVal) {
-            const relTime = relVal ? relVal.slice(11, 16) : '15:00';
+            const relTime = relVal ? relVal.slice(11, 16) : `${String(PS_DEFAULT_SLOT).padStart(2, '0')}:00`;
             const slotVals = PS_SLOTS.map(h => `${String(h).padStart(2, '0')}:00`);
             return (slotVals.includes(relTime) ? [] : [relTime]).concat(slotVals).map(v => {
                 const [hh, mm] = v.split(':').map(Number);
                 return `<option value="${v}"${v === relTime ? ' selected' : ''}>${psSlotLabel(hh, mm)}${slotVals.includes(v) ? '' : ' (예전 시각)'}</option>`;
+            }).join('');
+        }
+        /* [신규 2026-10-03] 마감은 날짜 + 시(0~23시)로 고른다. 분은 없다 (사장님 요청).
+           예전에 분까지 적어 둔 마감은 '(예전 시각)'으로 맨 위에 남겨 보여 준다. 비어 있으면 15시 */
+        function psExpOptsHtml(expVal) {
+            const cur = expVal ? expVal.slice(11, 16) : '15:00';
+            const hours = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`);
+            return (hours.includes(cur) ? [] : [cur]).concat(hours).map(v => {
+                const [hh, mm] = v.split(':').map(Number);
+                return `<option value="${v}"${v === cur ? ' selected' : ''}>${psSlotLabel(hh, mm)}${hours.includes(v) ? '' : ' (예전 시각)'}</option>`;
             }).join('');
         }
         function psItemSummary(it) {
@@ -15035,10 +15332,13 @@
                         <div class="ps-f"><label>🕐 올라감</label>
                             <div class="ps-row">
                                 <input type="date" class="ps-in" id="ps-rel-date-${sid}" value="${relVal ? relVal.slice(0, 10) : ''}" onchange="psItemSetRelease('${kq}', ${G})">
-                                <select class="ps-in ps-in-time" id="ps-rel-hour-${sid}" onchange="psItemSetRelease('${kq}', ${G})">${psTimeOptsHtml(relVal)}</select>
+                                <select class="ps-in ps-in-time gw-wheel" id="ps-rel-hour-${sid}" onchange="psItemSetRelease('${kq}', ${G})">${psTimeOptsHtml(relVal)}</select>
                             </div></div>
                         <div class="ps-f"><label>🕕 마감</label>
-                            <input type="datetime-local" class="ps-in" value="${expVal}" onfocus="psFillDefaultTime(this)" onchange="psItemSetExpire('${kq}', this.value, ${G})"></div>
+                            <div class="ps-row">
+                                <input type="date" class="ps-in" id="ps-exp-date-${sid}" value="${expVal ? expVal.slice(0, 10) : ''}" onchange="psItemSetExpireParts('${kq}', ${G})">
+                                <select class="ps-in ps-in-time gw-wheel" id="ps-exp-hour-${sid}" onchange="psItemSetExpireParts('${kq}', ${G})">${psExpOptsHtml(expVal)}</select>
+                            </div></div>
                         <div class="ps-f"><label>🚚 픽업</label>
                             <input type="date" class="ps-in" value="${psItemPickup(it)}" onchange="${grp ? `psGroupSetPickup('${kq}', this.value)` : `psSetPickupFromInput('${kq}', this.value)`}"></div>
                     </div>
@@ -15047,7 +15347,7 @@
                     <div class="ps-sec-t">판매</div>
                     <div class="ps-g2">
                         ${grp ? '' : `<div class="ps-f"><label>📦 이번 차례 재고${it.stockApplied === true ? ' <span class="ps-ok">맞춤</span>' : ''}</label>
-                            <input type="number" min="0" inputmode="numeric" class="ps-in" value="${(it.stock === null || it.stock === undefined) ? '' : it.stock}" placeholder="지금 ${psNowStockText(it.idx)} · 비우면 이어가기" title="누르면 지금 재고가 들어가요. 안 고치면 그대로 이어가요" ${psStockInputEvents(key, it.idx)}></div>`}
+                            <input type="number" min="0" inputmode="numeric" class="ps-in" value="${(it.stock === null || it.stock === undefined) ? '' : it.stock}" placeholder="지금 ${psNowStockText(it.idx)} · 비우면 이어가기" title="누르면 지금 재고가 들어가요. 안 고치면 그대로 이어가요. 999 = 무제한" ${psStockInputEvents(key, it.idx)}></div>`}
                         <div class="ps-f"><label>🔁 반복</label>${repeatSel}</div>
                     </div>
                 </div>${grp ? '' : psToOnsiteHtml(key)}`;
@@ -15140,7 +15440,7 @@
                         ${members.map(k => { const x = psItem(k); const xp = uploadProducts[x.idx]; const xk = gEscapeHtml(k); return `<div class="ps-mrow">
                             <span class="ps-dot" style="background:${PS_DOTC[psLiveStateOf(x.idx)]};"></span>
                             <span class="ps-mname" onclick="editProduct(${x.idx})" title="상품 정보 고치기">${gEscapeHtml(xp.name)}</span>
-                            <input type="number" min="0" inputmode="numeric" class="ps-in ps-in-s" title="이번 차례 재고 — 누르면 지금 재고(${psNowStockText(x.idx)})가 들어가요. 안 고치면 그대로 이어가요" placeholder="${psNowStockText(x.idx)}" value="${(x.stock === null || x.stock === undefined) ? '' : x.stock}" ${psStockInputEvents(k, x.idx)}>
+                            <input type="number" min="0" inputmode="numeric" class="ps-in ps-in-s" title="이번 차례 재고 — 누르면 지금 재고(${psNowStockText(x.idx)})가 들어가요. 안 고치면 그대로 이어가요. 999 = 무제한" placeholder="${psNowStockText(x.idx)}" value="${(x.stock === null || x.stock === undefined) ? '' : x.stock}" ${psStockInputEvents(k, x.idx)}>
                             ${/* [신규 2026-10-03] 상품마다 '상시판매 전환' — 누르면 켜지고(체크한 것과 같다) 이 줄 아래에 분류탭·금액 칸이 열린다.
                                   한 번 더 누르면 꺼지고 칸도 닫힌다 (사장님 요청) */''}
                             <button type="button" class="ps-mbtn onsite${x.toOnsite === true ? ' on' : ''}" onclick="psItemSetToOnsite('${xk}', ${x.toOnsite === true ? 'false' : 'true'})" title="상시판매 전환 — 픽업일이 지나면 남은 재고로 상시판매">${x.toOnsite === true ? '✓ 상시' : '상시'}</button>
@@ -15173,20 +15473,32 @@
             psUndoMark('올라가는 시각');
             const sid = psSafeId(key);
             const d = (document.getElementById(`ps-rel-date-${sid}`) || {}).value || '';
-            const t = (document.getElementById(`ps-rel-hour-${sid}`) || {}).value || '15:00';
+            const t = (document.getElementById(`ps-rel-hour-${sid}`) || {}).value || `${String(PS_DEFAULT_SLOT).padStart(2, '0')}:00`;
             const ms = d ? new Date(`${d}T${t}`).getTime() : NaN;
             if (!d || isNaN(ms)) { renderProductScheduleCalendar(); return; }   // 올라가는 시각을 비우려면 일정을 지운다
+            if (!(await psConfirmLive(grp ? psGroupMembers(key) : [key], '올라가는 시각을 바꿔요.'))) { renderProductScheduleCalendar(); return; }   // [신규 2026-10-03]
             for (const k of (grp ? psGroupMembers(key) : [key])) await psItemSave(k, { releaseAt: ms });
             renderProductScheduleCalendar();
         }
+        // [신규 2026-10-03] 마감 날짜·시 두 칸을 합쳐 저장한다. 날짜를 비우면 마감을 지운다
+        function psItemSetExpireParts(key, grp) {
+            const sid = psSafeId(key);
+            const d = (document.getElementById(`ps-exp-date-${sid}`) || {}).value || '';
+            const t = (document.getElementById(`ps-exp-hour-${sid}`) || {}).value || '15:00';
+            return psItemSetExpire(key, d ? `${d}T${t}` : '', grp);
+        }
         async function psItemSetExpire(key, value, grp) {
             psUndoMark('마감 시각');
+            // [수정 2026-10-03] 예전 날짜·시각 칸은 시각을 안 고르면 0시로 들어와 15시로 바꿔 줬다. 이제 시를 따로 고르니 0시도 그대로 쓴다
             let v = value;
-            if (v && v.endsWith('T00:00')) v = v.slice(0, 10) + 'T15:00';
             const ms = v ? new Date(v).getTime() : NaN;
+            if (!(await psConfirmLive(grp ? psGroupMembers(key) : [key], v ? '마감 시각을 바꿔요.' : '마감을 지워요.'))) { renderProductScheduleCalendar(); return; }   // [신규 2026-10-03]
+            const reveal = (v && !isNaN(ms)) ? await psAskRevealOnExtend(grp ? psGroupMembers(key) : [key], () => ms) : null;   // [신규 2026-10-03]
             for (const k of (grp ? psGroupMembers(key) : [key])) {
                 const it = psItem(k);
-                await psItemSave(k, (v && !isNaN(ms)) ? psExpireChanges(it, ms) : { expireAt: null });
+                const ch = (v && !isNaN(ms)) ? psExpireChanges(it, ms) : { expireAt: null };
+                if (reveal === true) ch._reveal = true;
+                await psItemSave(k, ch);
             }
             renderProductScheduleCalendar();
         }
@@ -15194,8 +15506,7 @@
             psUndoMark('픽업일');
             if (!value) { renderProductScheduleCalendar(); return; }
             const ks = psGroupMembers(key).filter(k => { const x = psItem(k); return !!x; });
-            if (ks.some(k => { const x = psItem(k); return psIsActive(x) && !psIsUpcoming(uploadProducts[x.idx]); })
-                && !(await psConfirm(`판매 중인 상품의 픽업일을 지금 바로 ${value}로 바꿔요.\n재고는 그대로이고, 이미 받은 주문의 날짜는 안 바뀌어요.`))) { renderProductScheduleCalendar(); return; }
+            if (!(await psConfirmLive(ks, `픽업일을 ${value}로 바꿔요 (재고는 그대로).`))) { renderProductScheduleCalendar(); return; }   // [수정 2026-10-03] 무조건 경고
             let n = 0;
             for (const k of ks) if (await psItemSetPickup(k, value)) n++;
             if (n) showToast(`🚚 ${n}개 상품의 픽업일을 바꿨어요`);
@@ -15390,7 +15701,7 @@
             const p = (uploadProducts || [])[idx];
             if (!p) return;
             if (p.showWeekly === true) { showToast("🔁 '매주 노출' 상품은 일정을 걸 수 없어요"); return; }
-            const h = PS_SLOTS.includes(Number(hour)) ? Number(hour) : 15;
+            const h = PS_SLOTS.includes(Number(hour)) ? Number(hour) : PS_DEFAULT_SLOT;
             const rel = new Date(`${dateKey}T${String(h).padStart(2, '0')}:00`).getTime();
             const it = await psItemAdd(idx, { releaseAt: rel, ...psDefaultSchedule(p, rel) });
             if (it) { psAddSearchOpenFor = ''; psAddSearchQuery = ''; showToast('📅 일정을 걸었어요 · 마감·픽업일은 끌거나 카드에서 고쳐요'); }
@@ -15400,13 +15711,6 @@
 
         // [신규] 빈 시각 칸을 누르는 순간, 브라우저가 '지금 이 순간'으로 잡기 전에 먼저 오후 3시를 채워 둔다.
         //  값은 화면에만 보일 뿐 저장은 안 된다 — 그대로 두고 다른 곳을 누르면(onchange 없음) 아무 일도 안 생긴다.
-        function psFillDefaultTime(el) {
-            if (el.value) return;   // 이미 값이 있으면(=예약이 걸려 있으면) 안 건드린다
-            const d = new Date();
-            const p = (x) => String(x).padStart(2, '0');
-            el.value = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T15:00`;
-        }
-
         async function psUpdateAnnounceText(idx, value) {
             psUndoMark('공지문구');
             const prod = (uploadProducts || [])[idx];
@@ -15432,10 +15736,11 @@
         let psSelectedIdxs = new Set();   // 고른 일정 열쇠들 (이름은 예전 그대로)
         /* [수정 2026-10-03] Ctrl(맥은 ⌘)을 누르고 눌러야 여러 개를 고른다 (사장님 요청).
            그냥 누르면 그 막대 하나만 고르고(앞서 고른 것은 풀린다), 그것만 골라져 있을 때 다시 누르면 푼다.
-           폰(손가락 화면)은 Ctrl 이 없으므로 예전처럼 누를 때마다 더하고 뺀다. */
+           폰(손가락 화면)은 Ctrl 이 없어 예전엔 누를 때마다 더하고 뺐는데,
+           [수정 2026-10-03] 이제 폰도 도구줄의 [Ctrl] 단추를 켜야 더한다 — PC 와 같은 규칙 (사장님 요청) */
         function psSelectBar(key, ev) {
             const ms = psGroupMembers(key);
-            const add = !!(ev && (ev.ctrlKey || ev.metaKey)) || !PS_DND;
+            const add = psCtrlOn(ev);
             if (add) {
                 if (psSelectedIdxs.has(key)) ms.forEach(k => psSelectedIdxs.delete(k));
                 else ms.forEach(k => psSelectedIdxs.add(k));
@@ -15459,7 +15764,7 @@
             if (!box) return;
             const r = box.getBoundingClientRect();
             psMq = { x0: ev.clientX - r.left + box.scrollLeft, y0: ev.clientY - r.top + box.scrollTop, cx: ev.clientX, cy: ev.clientY,
-                add: !!(ev.ctrlKey || ev.metaKey), base: new Set(psSelectedIdxs), el: null, moved: false, hits: new Set() };
+                add: psCtrlOn(ev), base: new Set(psSelectedIdxs), el: null, moved: false, hits: new Set() };
             document.addEventListener('mousemove', psMarqueeMove);
             document.addEventListener('mouseup', psMarqueeUp);
             box.addEventListener('scroll', psMarqueeMove);
@@ -15636,6 +15941,12 @@
                 // [수정 2026-09-29] 마감 시각이 지나도 숨기지 않는다 — 손님 화면이 '마감'으로 보여 주고 막는다
                 const shouldShow = started;
                 showToday = shouldShow; showReserve = shouldShow; hide = !shouldShow;
+                /* [수정 2026-10-03] 이미 올라가 처리된 일정에서 올라감은 그대로 두고 마감·픽업만 바꾸면 노출은 지금 그대로 둔다 (사장님 요청).
+                   예전에는 마감을 미루면 손으로 숨겨 둔 상품까지 다시 보였다. */
+                if (started && newReleaseAt === prevReleaseAt && prod.releaseApplied === true && changes._reveal !== true) {
+                    showToday = (prod.showToday !== false); showReserve = (prod.showReserve !== false);
+                    hide = (prod.hide === true || prod.hide === 'true');
+                }
             } else {
                 // 예약을 전부 지운 경우 — 지금 노출 상태를 그대로 두고 수동 관리로 넘긴다
                 showToday = (prod.showToday !== false); showReserve = (prod.showReserve !== false);
@@ -15751,6 +16062,7 @@
                         }
                     }
                     if (p.nextDate) { patch[`${idx}/nextDate`] = null; p.nextDate = null; }
+                    if (p.schedHold) { patch[`${idx}/schedHold`] = null; p.schedHold = null; }   // [신규 2026-10-03] 기다림 숨김 끝
                     nextHide = false;
                     patch[`${idx}/releaseApplied`] = true;
                     p.releaseApplied = true;
@@ -16033,7 +16345,7 @@
             const p = uploadProducts[idx];
             if (!p) { showToast('상품을 찾지 못했어요 — 목록이 바뀐 것 같아요. 새로고침해 주세요.'); checkPendingAnnouncements(); return; }
             // [신규 2026-10-01] 실수로 누르면 배너에서 빠져 안내를 놓친다 — 한 번 더 묻는다 (사장님 요청)
-            if (!confirm(`${p.name || '이 상품'}\n\n카톡방에 다 올렸나요?\n완료하면 배너에서 빠집니다.`)) return;
+            if (!await psConfirm(`${p.name || '이 상품'}\n\n카톡방에 다 올렸나요?\n완료하면 배너에서 빠집니다.`)) return;
             const uid = (window.gStaffMe || {}).uid || '';
             if (!uid) { showToast('로그인 확인 중이에요 — 잠시 후 다시 눌러 주세요.'); return; }
             // [수정] 나만 닫는다 — 이 계정(uid) 밑에 별도 자리(announce_dismissed)에 기록한다.
@@ -17661,7 +17973,7 @@
             const msg = targets.length
                 ? `'${hit.label}' 분류를 지웁니다.\n\n이 분류의 상품 ${targets.length}개는 '기타'로 옮겨집니다.\n(나중에 각 상품에서 새 분류를 골라 주세요)\n\n진행할까요?`
                 : `'${hit.label}' 분류를 지웁니다.\n이 분류로 지정된 상품은 없습니다.\n\n진행할까요?`;
-            if (!confirm(msg)) return;
+            if (!await psConfirm(msg)) return;
 
             showLoader('🗂️ 분류 정리 중...');
             try {
@@ -18147,8 +18459,8 @@
         async function gGenSet(key, value) {
             const [path, label] = GEN_KEYS[key] || [];
             if (!path || !_gen || _gen[key] === value) return;
-            if (key === 'login' && !value && !confirm('로그인을 끄면 로그인 없이 주문서를 볼 수 있습니다. 끌까요?')) return;
-            if (key === 'productList' && !value && !confirm('상품목록을 숨기면 손님에게 상품이 하나도 안 보입니다. 숨길까요?')) return;
+            if (key === 'login' && !value && !await psConfirm('로그인을 끄면 로그인 없이 주문서를 볼 수 있습니다. 끌까요?')) return;
+            if (key === 'productList' && !value && !await psConfirm('상품목록을 숨기면 손님에게 상품이 하나도 안 보입니다. 숨길까요?')) return;
             try {
                 const r = await fetch(`${FIREBASE_DB_URL}${path}.json`, { method: 'PUT', body: JSON.stringify(value) });
                 if (!r.ok) throw new Error('서버 응답 ' + r.status);
@@ -18350,7 +18662,7 @@
             const x = _rva.reviews.find(v => v._code === code && v._rid === rid);
             if (!x) return;
             const ph = x._ph;
-            if (!confirm(`이 후기를 지울까요?\n\n${x.item || code}\n${x.text ? x.text.slice(0, 60) : '(별점만)'}\n\n${x.pts ? `준 포인트 ${x.pts}P도 함께 뺍니다.` : ''}`)) return;
+            if (!await psConfirm(`이 후기를 지울까요?\n\n${x.item || code}\n${x.text ? x.text.slice(0, 60) : '(별점만)'}\n\n${x.pts ? `준 포인트 ${x.pts}P도 함께 뺍니다.` : ''}`)) return;
             try {
                 await rvaFetch();   // 지우기 직전 최신으로
                 const up = { [`product_reviews/${code}/${rid}`]: null };
@@ -18382,7 +18694,7 @@
                 if (sign < 0) {
                     if (bal < PT_MIN_USE) return showToast(`${PT_MIN_USE.toLocaleString()}P부터 쓸 수 있습니다 (지금 ${bal.toLocaleString()}P).`);
                     if (amt > bal) return showToast(`남은 포인트(${bal.toLocaleString()}P)보다 많이 쓸 수 없습니다.`);
-                    if (!confirm(`${phone_(ph)} 손님 포인트 ${amt.toLocaleString()}P를 씁니다.\n남는 포인트: ${(bal - amt).toLocaleString()}P`)) return;
+                    if (!await psConfirm(`${phone_(ph)} 손님 포인트 ${amt.toLocaleString()}P를 씁니다.\n남는 포인트: ${(bal - amt).toLocaleString()}P`)) return;
                 }
                 const lid = `a_${Date.now().toString(36)}`, now = Date.now();
                 await rvaPatch({ [`point_logs/${ph}/${lid}`]: { amt: sign * amt, why: 'adjust', at: now, memo: memo || (sign < 0 ? '매장 사용' : '가게 조정') }, [`points/${ph}`]: { bal: bal + sign * amt, last: lid, at: now } });
@@ -18485,7 +18797,7 @@
             } catch (e) { showToast('바꾸지 못했습니다: ' + e.message); }
         }
         async function sgDelete(ph, id) {
-            if (!confirm('이 추천을 지울까요?')) return;
+            if (!await psConfirm('이 추천을 지울까요?')) return;
             try {
                 const r = await fetch(`${FIREBASE_DB_URL}product_suggestions/${ph}/${id}.json`, { method: 'DELETE' });
                 if (!r.ok) throw new Error('서버 응답 ' + r.status);
@@ -21378,7 +21690,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         async function deleteApartmentName(key, name) {
             if (!key) return;
-            if (!confirm(`'${name}' 구역을 없앨까요?\n담긴 주소도 함께 지워집니다.`)) return;
+            if (!await psConfirm(`'${name}' 구역을 없앨까요?\n담긴 주소도 함께 지워집니다.`)) return;
             showLoader("삭제 중...");
             try {
                 const res = await fetch(`${FIREBASE_DB_URL}apartment_custom/${key}.json`, { method: 'DELETE' });
@@ -22023,7 +22335,19 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    받을 때 autoApplyScheduledVisibility 가 노출을 켜고 픽업일을 바꾼다 (켜 두기만 해도 5분 안에 올라가게).
                    다른 기기가 이미 올렸으면 새로 받은 목록에선 처리됨이라 아무것도 안 바뀐다. */
                 const _nowMs = now.getTime();
-                const _due = (uploadProducts || []).some(p => p && p.showWeekly !== true && Number(p.releaseAt) && _nowMs >= Number(p.releaseAt) && p.releaseApplied !== true);
+                let _due = (uploadProducts || []).some(p => p && p.showWeekly !== true && Number(p.releaseAt) && _nowMs >= Number(p.releaseAt) && p.releaseApplied !== true);
+                /* [버그수정 2026-10-03] 위는 상품 줄에 옮겨 적힌 '지금 차례'만 본다. 아직 노출일정에서 기다리는 '다음 차례'는 상품 줄에 없어서,
+                   주문관리를 켜 둔 채로는 올라갈 시각이 지나도 안 올라가고 새로고침해야 올라갔다. 일정 쪽도 본다 (psPromoteDue 와 같은 잣대) */
+                if (!_due && typeof psSched === 'object') {
+                    _due = Object.keys(psSched).some(sid => {
+                        const pp = uploadProducts[psIdxOfSid(sid)];
+                        if (!pp || pp.showWeekly === true) return false;
+                        const items = psItemsOfSid(sid);
+                        const act = items.find(x => x.rid === pp.schedRid);
+                        if (act && !(Number(act.expireAt) && _nowMs >= Number(act.expireAt))) return false;   // 지금 차례가 아직 안 끝났다
+                        return items.some(x => x.rid !== pp.schedRid && Number(x.releaseAt) && _nowMs >= Number(x.releaseAt) && !(Number(x.expireAt) && _nowMs >= Number(x.expireAt)));
+                    });
+                }
                 if (_due) { try { await loadProductsFromServer(); } catch (e) { console.error('노출 예약 확인 실패:', e); } }
                 // [수정 2026-09-30] 예전 과일은 마감시각에 숨기지 않는다 (손님 화면에 '마감'으로 남는다). 날이 바뀐 뒤 처음 열 때 숨긴다
                 const needFruit = localStorage.getItem('moket_fruit_autohide_date') !== todayStr;
@@ -25007,7 +25331,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 byPhone.get(p).push(o.orderKey);
             });
 
-            if (!confirm(`${byPhone.size}명 · ${rows.length}건을 ${label}(으)로 바꿀까요?\n${fmtMD(day)} 것만 바뀝니다.`)) return;
+            if (!await psConfirm(`${byPhone.size}명 · ${rows.length}건을 ${label}(으)로 바꿀까요?\n${fmtMD(day)} 것만 바뀝니다.`)) return;
 
             const origConfirm = window.confirm;
             window.confirm = () => true;
@@ -25735,7 +26059,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const arr = Array.isArray(data) ? data : [];
             const idxs = gFruitsNeedingFresh(arr);
             if (!idxs.length) { showToast('신선을 켤 과일이 없습니다'); buildSubTabs(); return; }
-            if (!confirm(`과일 상품 ${idxs.length}개의 '신선'을 켭니다.\n\n신선식품은 받는 날에만 배달되어, 뒷날 상품과 한 배달로 섞을 수 없습니다.\n\n진행할까요?`)) return;
+            if (!await psConfirm(`과일 상품 ${idxs.length}개의 '신선'을 켭니다.\n\n신선식품은 받는 날에만 배달되어, 뒷날 상품과 한 배달로 섞을 수 없습니다.\n\n진행할까요?`)) return;
             const patch = {};
             idxs.forEach(i => { patch[`${i}/isFresh`] = true; patch[`${i}/updatedAt`] = Date.now(); });
             showLoader(`🍎 과일 ${idxs.length}개 신선 켜는 중...`);
@@ -26099,15 +26423,24 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 freshBtn.innerText = '신선';
                 freshBtn.title = '신선식품 — 받는 날을 지켜야 해서 뒷날 상품과 한 배달로 못 섞습니다';
                 freshBtn.style.cssText = 'width:100%; min-width:0; height:45px; padding:0 4px; border-radius:10px; font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap; box-sizing:border-box;';
+                /* [수정 2026-10-03] 사다드림을 고르면 이 단추를 '사다드림(신선)'으로, 켜진 모양으로 보인다 (사장님 요청).
+                   사다드림은 원래 신선식품처럼 받는 날을 지키는 상품이라(주문서 gIsDateBoundProduct) 따로 켤 필요가 없다.
+                   그래서 눌러도 바뀌지 않는다. 저장값(isFresh)은 예전처럼 끈 채로 둔다. */
                 const paintFresh = () => {
-                    const on = !!uploadIsFresh && kindSel.value !== 'sada';
+                    const sada = kindSel.value === 'sada';
+                    const on = sada || !!uploadIsFresh;
+                    freshBtn.innerText = sada ? '사다드림(신선)' : '신선';
+                    freshBtn.title = sada ? '사다드림은 늘 받는 날을 지켜요 (신선식품과 같음) — 바꿀 수 없어요'
+                        : '신선식품 — 받는 날을 지켜야 해서 뒷날 상품과 한 배달로 못 섞습니다';
                     freshBtn.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
                     freshBtn.style.background = on ? 'var(--primary-light)' : '#ffffff';
                     freshBtn.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
-                    freshBtn.style.opacity = kindSel.value === 'sada' ? '0.45' : '1';
+                    freshBtn.style.opacity = '1';
+                    freshBtn.style.cursor = sada ? 'not-allowed' : 'pointer';
+                    freshBtn.style.fontSize = sada ? '11.5px' : '13px';
                 };
                 freshBtn.onclick = () => {
-                    if (kindSel.value === 'sada') { showToast('사다드림은 신선식품과 같이 못 켭니다'); return; }
+                    if (kindSel.value === 'sada') return;   // 사다드림은 늘 켜진 것으로 본다 — 바꿀 수 없다
                     uploadIsFresh = !uploadIsFresh;
                     paintFresh();
                 };
@@ -26118,6 +26451,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     if (kindSel.value === 'sada') uploadIsFresh = false;
                     // [신규 2026-09-30] 과일·야채는 신선식품이 기본 (받는 날에만 배달). 필요 없으면 '신선'을 눌러 끈다
                     if (kindSel.value === 'fruit' || kindSel.value === 'veg') uploadIsFresh = true;
+                    // [신규 2026-10-03] 일반을 고르면 신선은 꺼진 채로 시작한다 (사장님 요청). 필요하면 '신선'을 눌러 켠다
+                    if (kindSel.value === 'group') uploadIsFresh = false;
                     paintFresh();
                     paintKind();
                     paintDateFace();   // [신규] 사다드림이 아니면 '날짜 없음'을 고를 수 있다
@@ -26187,6 +26522,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             try { paintAutoCodePrefix(); } catch (e) {}
         }
 
+        /* [신규 2026-10-03] 재고 칸에 999를 넣으면 무제한으로 바꾼다 (사장님 요청 — 상품 목록 재고 칸과 같은 규칙).
+           칸을 떠날 때(change) 본다 — 9999 를 치는 도중 999 에서 바뀌지 않게. */
+        function gStock999ToUnlimited(inp) {
+            if (parseInt(inp && inp.value, 10) !== 999) return;
+            const chk = document.getElementById('unlimitedStock');
+            if (chk && !chk.checked) { chk.checked = true; toggleUnlimitedStock(); }
+            showToast('♾️ 999 → 재고 무제한으로 바꿨어요');
+        }
         function toggleUnlimitedStock() {
             const isUnlimited = document.getElementById('unlimitedStock').checked;
             const stockInput = document.getElementById('productStock');
@@ -28099,11 +28442,25 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             box.innerHTML = `<div style="background:#fff; border-radius:14px; width:min(420px,100%); max-height:80vh; overflow:auto; padding:16px; box-sizing:border-box;">
                 <div style="font-size:14px; font-weight:900; margin-bottom:4px;">📅 일정에 담기 · 상품 ${picked.length}개</div>
                 <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:10px;">일정만 같이 쓰고, 재고·가격·공지문구는 상품마다 따로예요</div>
-                <div style="font-size:11.5px; font-weight:800; color:#475569; margin-bottom:4px;">새 일정 (마감·픽업일은 상품 날짜 기준으로 잡혀요)</div>
-                <div style="display:flex; gap:6px; margin-bottom:12px;">
-                    <input type="date" id="bsp-date" value="${d0.getFullYear()}-${p2(d0.getMonth() + 1)}-${p2(d0.getDate())}" style="flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
-                    <select id="bsp-hour" style="flex:0 0 auto; width:84px; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800;">${PS_SLOTS.map(h => `<option value="${h}"${h === 15 ? ' selected' : ''}>${psSlotLabel(h)}</option>`).join('')}</select>
-                    <button type="button" onclick="psBatchToNew()" style="flex:0 0 auto; padding:0 12px; height:38px; border:none; background:#2563eb; color:#fff; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">만들기</button>
+                <div style="font-size:11.5px; font-weight:800; color:#475569; margin-bottom:4px;">새 일정</div>
+                ${/* [수정 2026-10-03] 마감·픽업일도 여기서 같이 정한다 (사장님 요청).
+                      올라감을 바꾸면 마감·픽업일 기본값이 따라 바뀐다 — 손으로 고친 칸은 그대로 둔다. 고른 상품 모두 같은 마감·픽업일로 담긴다 */''}
+                <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="flex:0 0 auto; width:58px; white-space:nowrap; font-size:11.5px; font-weight:800; color:#475569;">🕐 올라감</span>
+                        <input type="date" id="bsp-date" value="${d0.getFullYear()}-${p2(d0.getMonth() + 1)}-${p2(d0.getDate())}" onchange="psBatchFillDefaults()" style="flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
+                        <select id="bsp-hour" class="gw-wheel" onchange="psBatchFillDefaults()" style="flex:0 0 auto; width:84px; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800;">${PS_SLOTS.map(h => `<option value="${h}"${h === PS_DEFAULT_SLOT ? ' selected' : ''}>${psSlotLabel(h)}</option>`).join('')}</select>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="flex:0 0 auto; width:58px; white-space:nowrap; font-size:11.5px; font-weight:800; color:#475569;">⏰ 마감</span>
+                        <input type="date" id="bsp-exp-date" oninput="this.dataset.touched='1'" style="flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
+                        <select id="bsp-exp-hour" class="gw-wheel" onchange="this.dataset.touched='1'" style="flex:0 0 auto; width:84px; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800;">${psExpOptsHtml('')}</select>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="flex:0 0 auto; width:58px; white-space:nowrap; font-size:11.5px; font-weight:800; color:#475569;">🚚 픽업</span>
+                        <input type="date" id="bsp-pickup" oninput="this.dataset.touched='1'" style="flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
+                    </div>
+                    <button type="button" onclick="psBatchToNew()" style="width:100%; height:38px; border:none; background:#2563eb; color:#fff; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">만들기</button>
                 </div>
                 <div style="font-size:11.5px; font-weight:800; color:#475569; margin-bottom:4px;">있는 일정에 담기</div>
                 <div style="display:flex; flex-direction:column; gap:5px;">
@@ -28114,6 +28471,27 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 </div>
                 <button type="button" onclick="document.getElementById('batch-sched-pick').remove()" style="margin-top:12px; width:100%; height:36px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">닫기</button>
             </div>`;
+            psBatchFillDefaults();
+        }
+        // [신규 2026-10-03] 일정에 담기 창 — 올라감 시각
+        function psBatchRelMs() {
+            const d = (document.getElementById('bsp-date') || {}).value, h = Number((document.getElementById('bsp-hour') || {}).value) || PS_DEFAULT_SLOT;
+            return d ? new Date(`${d}T${String(h).padStart(2, '0')}:00`).getTime() : null;
+        }
+        // [신규 2026-10-03] 마감·픽업일 칸을 기본값으로 채운다 (노출일정과 같은 규칙 — 고른 첫 상품 기준). 손으로 고친 칸은 건드리지 않는다
+        function psBatchFillDefaults() {
+            const rel = psBatchRelMs();
+            const first = [...uploadSelectedProductIndices].map(i => uploadProducts[i]).find(Boolean);
+            if (!rel || !first) return;
+            const def = psDefaultSchedule(first, rel);
+            const p2 = x => String(x).padStart(2, '0');
+            const ed = document.getElementById('bsp-exp-date'), eh = document.getElementById('bsp-exp-hour'), pk = document.getElementById('bsp-pickup');
+            if (def.expireAt) {
+                const t = new Date(def.expireAt);
+                if (ed && !ed.dataset.touched) ed.value = `${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())}`;
+                if (eh && !eh.dataset.touched) eh.innerHTML = psExpOptsHtml(`${ed.value}T${p2(t.getHours())}:${p2(t.getMinutes())}`);
+            }
+            if (pk && !pk.dataset.touched) pk.value = def.pickup || '';
         }
         function psBatchDone(n) {
             psUndoHold = false;
@@ -28133,16 +28511,22 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             psBatchDone(n);
         }
         async function psBatchToNew() {
-            const d = (document.getElementById('bsp-date') || {}).value, h = Number((document.getElementById('bsp-hour') || {}).value) || 15;
-            if (!d) return;
+            const rel = psBatchRelMs();
+            if (!rel) return;
+            // [수정 2026-10-03] 창에 적은 마감·픽업일로 담는다. 칸을 비웠으면 예전처럼 상품마다 기본값
+            const expD = (document.getElementById('bsp-exp-date') || {}).value || '', expH = (document.getElementById('bsp-exp-hour') || {}).value || '15:00';
+            const expRaw = expD ? `${expD}T${expH}` : '';
+            const pickRaw = (document.getElementById('bsp-pickup') || {}).value || '';
+            const exp = expRaw ? new Date(expRaw).getTime() : null;
+            if (exp && exp <= rel) { showToast('⚠️ 마감 시각은 올라가는 시각보다 뒤여야 해요'); return; }
+            if (exp && pickRaw && pickRaw < fMsToDateKey(exp)) { showToast('⚠️ 픽업일은 마감일과 같거나 뒤여야 해요'); return; }
             psUndoMark('일정에 담기'); psUndoHold = true;
-            const rel = new Date(`${d}T${String(h).padStart(2, '0')}:00`).getTime();
             const picked = [...uploadSelectedProductIndices].filter(i => uploadProducts[i]);
             const gid = picked.length > 1 ? psNewGroupId() : null;
             let n = 0;
             for (const i of picked) {
-                const p = uploadProducts[i];
-                if (await psItemAdd(i, { releaseAt: rel, ...psDefaultSchedule(p, rel), group: gid })) n++;
+                const def = psDefaultSchedule(uploadProducts[i], rel);
+                if (await psItemAdd(i, { releaseAt: rel, expireAt: exp || def.expireAt, pickup: pickRaw || def.pickup, group: gid })) n++;
             }
             psBatchDone(n);
         }
@@ -28436,6 +28820,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     patch[`${idx}/showReserve`] = visible;
                     patch[`${idx}/hide`] = !visible;
                     patch[`${idx}/updatedAt`] = stamp;
+                    // [수정 2026-10-03] 손으로 노출·숨김을 바꿔도 '공동구매 기다림' 표시는 그대로 둔다 — 일정이 있으면 일정대로 간다 (사장님 요청)
                 });
 
                 const ok = await fbPatchProducts(patch);
@@ -28571,7 +28956,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // [신규] 단일 상품 복제 처리 함수
         async function duplicateSingleProduct(index) {
             const prod = uploadProducts[index];
-            if (!confirm(`'${prod.name}' 상품을 복제하시겠습니까?`)) return;
+            if (!await psConfirm(`'${prod.name}' 상품을 복제하시겠습니까?`)) return;
             
             showLoader("👯 상품 복제 중...");
             try {
@@ -28618,9 +29003,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
 
         // [신규] 복제하기: 현재 수정 폼 내용을 '새 상품'으로 등록 (원본은 그대로 유지)
-        function duplicateFromForm(event) {
+        async function duplicateFromForm(event) {
             if (event) event.preventDefault();
-            if (!confirm("현재 내용으로 새 상품을 복제 등록합니다.\n(원본 상품은 그대로 남습니다. 같은 이름·날짜여도 새로 만들어집니다)\n\n진행할까요?")) return;
+            if (!await psConfirm("현재 내용으로 새 상품을 복제 등록합니다.\n(원본 상품은 그대로 남습니다. 같은 이름·날짜여도 새로 만들어집니다)\n\n진행할까요?")) return;
             uploadIsEditMode = false;
             uploadEditProductKey = null;
             uploadEditProductRef = null;
@@ -28640,7 +29025,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 : (parseInt(document.getElementById('productPrice').value) || 0);
             const desc = document.getElementById('productDesc').value.trim();
 
-            const isUnlimited = document.getElementById('unlimitedStock').checked;
+            // [수정 2026-10-03] 재고 999 는 무제한으로 본다 (gStock999ToUnlimited 와 같은 규칙)
+            const isUnlimited = document.getElementById('unlimitedStock').checked
+                || parseInt(document.getElementById('productStock').value, 10) === 999;
             let stock = isUnlimited ? "" : parseInt(document.getElementById('productStock').value);
             if (isUnlimited) stock = "";
 
@@ -29064,7 +29451,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 } else {
                     const dupIndex = updatedProducts.findIndex(p => p.name === name && p.date === date);
                     if (dupIndex > -1 && !forceDup) {
-                        if (!confirm("동일한 날짜에 같은 이름의 상품이 이미 등록되어 있습니다.\n덮어쓰시겠습니까?")) {
+                        if (!await psConfirm("동일한 날짜에 같은 이름의 상품이 이미 등록되어 있습니다.\n덮어쓰시겠습니까?")) {
                             hideLoader();
                             return;
                         }
@@ -29251,7 +29638,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             (gBracketList = gBracketList || []).push({ id: name, t });
         }
         async function gDeleteBracket(t) {
-            if (!confirm(`'${t}'을(를) 대괄호 목록에서 지울까요?\n\n이미 이 대괄호가 붙은 상품은 그대로 둡니다.`)) return;
+            if (!await psConfirm(`'${t}'을(를) 대괄호 목록에서 지울까요?\n\n이미 이 대괄호가 붙은 상품은 그대로 둡니다.`)) return;
             try {
                 const ids = (gBracketList || []).filter(x => x.t === t).map(x => x.id);
                 for (const id of ids) {
@@ -29354,9 +29741,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!prod) { showToast("상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요."); renderProductsList(); return; }
             const k = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
             const closing = !gIsClosedAdmin(prod);
-            if (closing && !confirm(`'${prod.name}' 주문을 마감할까요?\n\n손님 화면에 '마감'으로 뜨고 담을 수 없습니다.\n재고 숫자는 그대로 둡니다.`)) return;
+            if (closing && !await psConfirm(`'${prod.name}' 주문을 마감할까요?\n\n손님 화면에 '마감'으로 뜨고 담을 수 없습니다.\n재고 숫자는 그대로 둡니다.`)) return;
             const expired = !closing && gIsExpiredAdmin(prod);
-            if (expired && !confirm(`'${prod.name}'은(는) 노출일정의 마감 시각이 지나 마감된 상품입니다.\n\n풀면 그 마감 시각이 지워집니다. 풀까요?`)) return;
+            if (expired && !await psConfirm(`'${prod.name}'은(는) 노출일정의 마감 시각이 지나 마감된 상품입니다.\n\n풀면 그 마감 시각이 지워집니다. 풀까요?`)) return;
             try {
                 const r = await fetch(`${FIREBASE_DB_URL}product_closed/${encodeURIComponent(k)}.json`,
                     closing ? { method: 'PUT', body: JSON.stringify(true) } : { method: 'DELETE' });
@@ -29383,7 +29770,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                손님이 계속 보고 문의하게 된다. (날짜가 정해진 공동구매·당일 과일은
                '그날 품절'이라는 표시가 의미가 있어 예전처럼 보이는 채로 둔다) */
             const isOnsiteProd = !!gOnsiteTabCatOfList(prod);
-            if (!confirm(isOnsiteProd
+            if (!await psConfirm(isOnsiteProd
                 ? `'${prod.name}' 상품을 품절 처리하시겠습니까?\n\n상시판매 상품이라 손님 화면에서도 숨김 처리됩니다.`
                 : `'${prod.name}' 상품을 품절 처리하시겠습니까?`)) return;
 
@@ -29427,7 +29814,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         async function deleteProduct(index) {
             const prod = uploadProducts[index];
-            if (!confirm(`'${prod.name}' 상품을 삭제하시겠습니까?`)) return;
+            if (!await psConfirm(`'${prod.name}' 상품을 삭제하시겠습니까?`)) return;
 
             showLoader("🗑️ 상품 삭제 처리 중...");
             try {
@@ -29552,7 +29939,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             renderShelfManager();
         }
 
-        function removeShelfRow(i) {
+        async function removeShelfRow(i) {
             const s = shelfDraft[i];
             if (!s) return;
             const n = (Array.isArray(uploadProducts) ? uploadProducts : [])
@@ -29560,7 +29947,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const msg = n > 0
                 ? `'${s.label}' 선반을 지웁니다.\n여기 있던 상품 ${n}개는 '📦 미지정'으로 옮겨집니다.\n\n계속할까요?`
                 : `'${s.label}' 선반을 지웁니다. 계속할까요?`;
-            if (!confirm(msg)) return;
+            if (!await psConfirm(msg)) return;
             shelfDraftRemoved.push(s.key);
             shelfDraft.splice(i, 1);
             renderShelfManager();
@@ -29779,7 +30166,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const _wasShown = { today: prod.showToday, reserve: prod.showReserve, hide: prod.hide };
             const doReveal = !!gOnsiteTabCatOfList(prod)
                 && (wantUnlimited || newStock > 0)
-                && !gIsProductShown(prod);
+                && !gIsProductShown(prod)
+                && prod.schedHold !== true;   // [신규 2026-10-03] 공동구매 일정을 기다리며 숨긴 상품은 재고를 고쳐도 다시 켜지 않는다
             if (doReveal) {
                 prod.showToday = true;
                 prod.showReserve = true;
@@ -30251,7 +30639,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     delete p.desc;   // 목록에는 넣지 않는다
                 });
 
-                if (!confirm(`CSV의 상품 ${newList.length}개로 전체 상품 목록을 교체합니다.\n(현재 ${uploadProducts.length}개 → ${newList.length}개)\n\n※ 이미지는 이름+분류가 같은 기존 상품에서 자동으로 이어받습니다. 매칭 안 되는 상품은 이미지가 비어있게 됩니다.\n※ 되돌릴 수 없으니, 먼저 '목록 CSV'로 백업해 두는 걸 권장합니다.\n\n진행할까요?`)) return;
+                if (!await psConfirm(`CSV의 상품 ${newList.length}개로 전체 상품 목록을 교체합니다.\n(현재 ${uploadProducts.length}개 → ${newList.length}개)\n\n※ 이미지는 이름+분류가 같은 기존 상품에서 자동으로 이어받습니다. 매칭 안 되는 상품은 이미지가 비어있게 됩니다.\n※ 되돌릴 수 없으니, 먼저 '목록 CSV'로 백업해 두는 걸 권장합니다.\n\n진행할까요?`)) return;
 
                 showLoader(`📥 상품 ${newList.length}개 업로드 중...`);
                 await gBumpProdRev();   // [신규 2026-10-03] 목록을 통째로 바꾸니 순번도 모두 바뀐다 — 다른 기기의 순번 저장을 막는다
@@ -32364,7 +32752,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const poHits = (purchaseOrders || []).filter(po => po && dropSet.has(String(po.productCode || '').trim()));
             const arcHits = (purchaseArchive || []).filter(po => po && dropSet.has(String(po.productCode || '').trim()));
 
-            if (!confirm(`'${keep}' 하나로 합칩니다.\n\n없어지는 번호: ${drop.join(', ')}\n바뀌는 상품: ${prodHits.length}개\n바뀌는 발주: ${poHits.length + arcHits.length}건\n\n되돌리기 어렵습니다. 진행할까요?`)) return;
+            if (!await psConfirm(`'${keep}' 하나로 합칩니다.\n\n없어지는 번호: ${drop.join(', ')}\n바뀌는 상품: ${prodHits.length}개\n바뀌는 발주: ${poHits.length + arcHits.length}건\n\n되돌리기 어렵습니다. 진행할까요?`)) return;
 
             showLoader('🔗 번호 합치는 중...');
             try {
@@ -32991,7 +33379,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         async function deletePurchaseOrder(id, skipConfirm = false) {
             // [수정] 아래 버튼 줄에서 이미 두 번 눌러 확인했으면 다시 묻지 않는다.
             //  (confirm 창은 브라우저가 차단하면 그대로 false가 되어 삭제가 먹통이 된다)
-            if (!skipConfirm && !confirm("정말로 이 발주 내역을 삭제하시겠습니까?")) return;
+            if (!skipConfirm && !await psConfirm("정말로 이 발주 내역을 삭제하시겠습니까?")) return;
             showLoader("발주 내역 삭제 중...");
             try {
                 // [수정] 저장함에 있는 건은 저장함에서 지워야 한다.
