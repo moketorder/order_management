@@ -19094,6 +19094,7 @@
             await gLoadPrivateSettings();   // [신규 2026-10-03] 뺄 번호를 받은 뒤에 센다
             caApplyJoinSlots();   // [신규] 손님 정보를 받은 뒤 가입 시각을 접속 칸으로 보탠다
             caRows = null;
+            window.__caLoadedAt = Date.now();   // [신규 2026-10-03] 맨 위 '언제 받은 자료' 글
             renderCustomerAdmin();
         }
 
@@ -20635,15 +20636,19 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         <input type="text" id="ca-search" value="${gEscapeHtml(caQuery)}" oninput="caSetQuery(this.value)" oncompositionstart="caComposing=true" oncompositionend="caComposing=false; caSetQuery(this.value)" placeholder="🔍 이름·번호·주소"
                             style="flex:1 1 130px; min-width:110px; height:30px; padding:0 10px; border:1.5px solid #cbd5e1;
                                    border-radius:8px; font-size:12px; font-weight:700; box-sizing:border-box;">
-                        <button type="button" onclick="initCustomerAdmin(true)" title="손님 정보를 서버에서 다시 받아 옵니다"
-                            style="height:30px; width:34px; border:1.5px solid #cbd5e1; background:#fff; color:#64748b;
-                                   border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">🔄</button>
                     </div>
                 </div>`;
 
             /* [수정] 상품 조회는 손님 관리와 다른 이야기라 카드를 따로 뗐다. 맨 위에 두고,
                손님 관리 머리(칩·검색)는 그 아래 목록과 붙여 둔다. */
-            const visitCard = `<div class="card" style="background:#fff; border-radius:14px; padding:12px 14px; box-shadow:var(--shadow); margin-bottom:10px; border:1px solid var(--border);">${caVisitSummaryHtml(all)}</div>`;
+            // [수정 2026-10-03] 새로 받기 단추를 손님 탭 맨 위로 (사장님 요청 — 검색칸 옆 🔄 는 찾기 어려웠다). 언제 받은 자료인지도 적는다
+            const _la = window.__caLoadedAt ? new Date(window.__caLoadedAt) : null;
+            const topBar = `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
+                <span style="font-size:12px; font-weight:800; color:#64748b;">${_la ? `${String(_la.getHours()).padStart(2, '0')}:${String(_la.getMinutes()).padStart(2, '0')}에 받은 자료${window.__caFromCache ? ' (저장해 둔 것)' : ''}` : ''}</span>
+                <button type="button" onclick="initCustomerAdmin(true)" title="손님 정보·주문·접속 기록을 서버에서 다시 받아 옵니다"
+                    style="height:34px; padding:0 14px; border:1.5px solid #cbd5e1; background:#fff; color:#334155; border-radius:9px; font-size:13px; font-weight:900; cursor:pointer;">🔄 새로 받기</button>
+            </div>`;
+            const visitCard = topBar + `<div class="card" style="background:#fff; border-radius:14px; padding:12px 14px; box-shadow:var(--shadow); margin-bottom:10px; border:1px solid var(--border);">${caVisitSummaryHtml(all)}</div>`;
 
             // [수정 2026-10-03] 탈퇴 회원 관리 — 아이디·카카오 번호·탈퇴 일시·사라진 포인트·다시 가입한 날. 누르면 탈퇴 전 주문내역과 포인트 기록 (사장님 요청)
             if (caFilter === 'withdrawn') {
