@@ -5104,7 +5104,7 @@
                 const cleanPhone = String(item.phone || "").replace(/\D/g, "");
                 const customerKey = (!cleanPhone) ? (((String(item.name || "무명")).trim()) + "_비인증") : cleanPhone;
                 const ts = String(item.timestamp || "");
-                const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                const isCanceled = isSalesCanceled(item);
                 if (isCanceled) return;
 
                 if (!customerOrderSequences[customerKey]) {
@@ -7805,7 +7805,7 @@
             (items || []).forEach(item => {
                 const k = gCardKeyOf(item);
                 total.set(k, (total.get(k) || 0) + 1);
-                const c = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                const c = isSalesCanceled(item);
                 if (c) cancel.set(k, (cancel.get(k) || 0) + 1);
             });
             const out = new Set();
@@ -7820,7 +7820,7 @@
             const today = new Date(); today.setHours(0, 0, 0, 0);
             const keys = new Set();
             (rawOrders || []).forEach(o => {
-                const canceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                const canceled = isSalesCanceled(o);
                 if (canceled) return;
                 const st = String(o.status || '대기');
                 if (st === '픽업' || st === '배달완료' || st === '취소') return;
@@ -7846,7 +7846,7 @@
                 const status = item.status || '대기';
                 const asm = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
                 const paid = (item.paid === true || item.paid === "true");
-                const canceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                const canceled = isSalesCanceled(item);
                 const info = getOrderDateInfo(item);
                 const dateStr = info.dateStr || "기타";
                 const cardKey = `${item.name}_${item.phone}_${asm}_${dateStr}`; // 카드 그룹 키와 동일
@@ -7993,7 +7993,7 @@
         }
 
         function gOffsetFeeRows(items) {
-            const isCanceled = (it) => (it.canceled === true || it.canceled === "true" || String(it.canceled).toUpperCase() === "TRUE");
+            const isCanceled = (it) => isSalesCanceled(it);
             const amountOf = (it) => Math.abs(parseInt(String(it.total !== undefined ? it.total : it.price || 0).replace(/,/g, "")) || 0);
 
             const feeRows = items.filter(it => !isCanceled(it) && gFeeRowName(it) === "배달비");
@@ -8601,7 +8601,7 @@
                     filtered = filtered.filter(item => {
                         const status = item.status || "대기";
                         const actualShippingMethod = (item.shippingMethod === '배달주문' || (item.shippingMethod !== '매장픽업' && item.address && String(item.address).trim() !== "")) ? '배달주문' : '매장픽업';
-                        const canceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                        const canceled = isSalesCanceled(item);
                         if (statusFilter === '취소') return _fullCanceled.has(gCardKeyOf(item));
                         if (statusFilter === '대기') return status === '대기';
                         if (statusFilter === '입고') return status === '입고';
@@ -8791,7 +8791,7 @@
                         if (!it) return;
                         const ph = String(it.phone || '').replace(/\D/g, '');
                         if (!ph) return;
-                        const canceled = (it.canceled === true || it.canceled === "true" || String(it.canceled).toUpperCase() === "TRUE");
+                        const canceled = isSalesCanceled(it);
                         if (canceled && it.noShow) {
                             if (!noShowMap.has(ph)) noShowMap.set(ph, new Set());
                             noShowMap.get(ph).add(getOrderDateInfo(it).dateStr || String(it.timestamp || ''));
@@ -8856,8 +8856,8 @@
                     // [수정] 상쇄하고 남은 배달비는 상품 뒤, 취소 항목 앞에 오도록 한 단계 더 정렬한다.
                     const feeRank = (it) => (gIsFeeRow(it) ? 1 : 0);
                     const customerItems = [...customer.items].sort((a, b) => {
-                        const aC = (a.canceled === true || a.canceled === "true" || String(a.canceled).toUpperCase() === "TRUE");
-                        const bC = (b.canceled === true || b.canceled === "true" || String(b.canceled).toUpperCase() === "TRUE");
+                        const aC = isSalesCanceled(a);
+                        const bC = isSalesCanceled(b);
                         if (aC !== bC) return aC ? 1 : -1;
                         return feeRank(a) - feeRank(b);
                     });
@@ -8919,7 +8919,7 @@
                                 <td style="width:100px;">${parseInt(it.price || 0).toLocaleString()}원</td>
                                 <td style="width:100px;"><strong>${parseInt(it.total || 0).toLocaleString()}원</strong></td>
                                 <td style="width:120px; text-align:center;">
-                                    <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${customer.phone}', '${it.orderKey}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
+                                    <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${escapeArg(customer.phone)}', '${escapeArg(it.orderKey)}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
                                 </td>
                             </tr>
                         `;
@@ -8933,7 +8933,7 @@
                                         <span class="custom-checkbox"></span>
                                     </label>
                                     <span class="mobile-item-name">${it.item} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</span>
-                                    <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${customer.phone}', '${it.orderKey}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
+                                    <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${escapeArg(customer.phone)}', '${escapeArg(it.orderKey)}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
                                 </div>
                                 <div class="mobile-item-middle">
                                     <span>단가: ${parseInt(it.price || 0).toLocaleString()}원</span>
@@ -9027,8 +9027,8 @@
                                         <button type="button" class="customer-name no-print" onclick="showCustomerCardModal('${encodeURIComponent(customer.phone||'')}','${encodeURIComponent(customer.name||'')}')" style="font-size: 15px; font-weight: 800; color: var(--primary); background:none; border:none; padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:3px;" title="이 고객 주문 내역 보기">${customer.name}</button>
                                         <!-- [변경] 번호를 그대로 적는 대신 전화 / 문자 버튼. 번호는 눌렀을 때 뜨는 창과 툴팁에서 확인한다. -->
                                         <span class="contact-btn-group no-print" style="display:inline-flex; gap:6px; flex-shrink:0;">
-                                            <button type="button" class="contact-mini-btn call" onclick="handleCallClick(event, '${customer.phone}')" title="${customer.phone}(으)로 전화">📞 전화</button>
-                                            <button type="button" class="contact-mini-btn sms" onclick="handleSmsClick(event, '${customer.phone}')" title="${customer.phone}(으)로 문자">💬 문자</button>
+                                            <button type="button" class="contact-mini-btn call" onclick="handleCallClick(event, '${escapeArg(customer.phone)}')" title="${customer.phone}(으)로 전화">📞 전화</button>
+                                            <button type="button" class="contact-mini-btn sms" onclick="handleSmsClick(event, '${escapeArg(customer.phone)}')" title="${customer.phone}(으)로 문자">💬 문자</button>
                                         </span>
                                         <!-- [신규] 지난 날짜에 아직 안 찾아간 것이 있으면 알려 준다.
                                              오늘 물건을 건네면서 지난 것도 함께 챙겨 줄 수 있다.
@@ -9045,7 +9045,7 @@
                                                  드물지만(1.1%) 모르고 나가면 손님이 헛걸음하거나, 같이 실어 갈 것을 놓친다.
                                                  눌러 짝 카드로 옮겨 간다. 인쇄에도 남겨 배달기사가 챙길 수 있게 한다. -->
                                             ${pairCount > 0 ? `
-                                                <button type="button" onclick="gotoPairCard('${pairKey}')"
+                                                <button type="button" onclick="gotoPairCard('${escapeArg(pairKey)}')"
                                                     title="같은 날 ${isDelivery ? '픽업' : '배달'} 건도 있습니다 — 눌러서 보기"
                                                     style="flex-shrink:0; font-size:11px; font-weight:800; padding:3px 8px; border-radius:5px; border:1.5px solid #a5b4fc; background:#eef2ff; color:#4338ca; cursor:pointer; white-space:nowrap;">🔗 외 ${isDelivery ? '픽업' : '배달'} ${pairCount}건</button>
                                             ` : ''}
@@ -9056,7 +9056,7 @@
                                     <div class="info-row-2" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
                                         ${customer.kakaoName ? `<span class="kakao-badge" style="display:inline-block; vertical-align:middle;">💬 ${customer.kakaoName}${customer.kakaoRealName ? ` (${customer.kakaoRealName})` : ''}</span>` : ''}
                                         ${seqBadge}
-                                        ${customerItems.some(it => it.deliveryPhotoExists || it.deliveryPhoto) ? `<span class="photo-view-badge" style="font-size:11px; background:#f0fdf4; color:#16a34a; padding:2px 6px; border-radius:4px; font-weight:bold; cursor:pointer; display:inline-block; border:1px solid #bcf0da;" onclick="viewDeliveryPhoto('${customer.phone}', '${customerItems.find(it => it.deliveryPhotoExists || it.deliveryPhoto)?.orderKey}')">📸 배달사진</span>` : ''}
+                                        ${customerItems.some(it => it.deliveryPhotoExists || it.deliveryPhoto) ? `<span class="photo-view-badge" style="font-size:11px; background:#f0fdf4; color:#16a34a; padding:2px 6px; border-radius:4px; font-weight:bold; cursor:pointer; display:inline-block; border:1px solid #bcf0da;" onclick="viewDeliveryPhoto('${escapeArg(customer.phone)}', '${escapeArg(customerItems.find(it => it.deliveryPhotoExists || it.deliveryPhoto)?.orderKey)}')">📸 배달사진</span>` : ''}
                                     </div>
                                     
                                     
@@ -9127,13 +9127,13 @@
                                     <span class="total-price">${customer.totalPrice.toLocaleString()}원</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 6px;">
-                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid ${isDelivery ? 'var(--purple)' : 'var(--primary)'}; color: ${isDelivery ? 'var(--purple)' : 'var(--primary)'}; background: white; white-space: nowrap;" onclick="toggleShippingMethod('${customer.phone}', '${orderKeysStr}', '${isDelivery ? '매장픽업' : '배달주문'}')">
+                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid ${isDelivery ? 'var(--purple)' : 'var(--primary)'}; color: ${isDelivery ? 'var(--purple)' : 'var(--primary)'}; background: white; white-space: nowrap;" onclick="toggleShippingMethod('${escapeArg(customer.phone)}', '${escapeArg(orderKeysStr)}', '${isDelivery ? '매장픽업' : '배달주문'}')">
                                         ${isDelivery ? '📍 전환' : '🚚 전환'}
                                     </button>
-                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #d97706; color: #d97706; background: white; white-space: nowrap;" onclick="changeCustomerOrderDate('${customer.phone}', '${orderKeysStr}', '${isDelivery ? '배달일' : '픽업일'}')">
+                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #d97706; color: #d97706; background: white; white-space: nowrap;" onclick="changeCustomerOrderDate('${escapeArg(customer.phone)}', '${escapeArg(orderKeysStr)}', '${isDelivery ? '배달일' : '픽업일'}')">
                                         📅 변경
                                     </button>
-                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #64748b; color: #475569; background: white; white-space: nowrap;" onclick="openMemoModal('${customer.name}', '${customer.phone}', '${orderTime}')">📝 메모</button>
+                                    <button class="btn-action-sm no-print" style="padding: 4px 8px; font-weight: 800; cursor: pointer; border-radius: 6px; border: 1.5px solid #64748b; color: #475569; background: white; white-space: nowrap;" onclick="openMemoModal('${escapeArg(customer.name)}', '${escapeArg(customer.phone)}', '${escapeArg(orderTime)}')">📝 메모</button>
                                 </div>
                             </div>
                         </div>
@@ -9304,7 +9304,7 @@
                     if (item.isArchived === true) return;
 
                     const status = item.status || "대기";
-                    const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                    const isCanceled = isSalesCanceled(item);
                     const isCompleted = (status === '배달완료' || status === '픽업' || isCanceled);
 
                     if (isCompleted) {
@@ -9464,7 +9464,7 @@
             const archivableOrders = [];
             rawOrders.forEach(item => {
                 const status = item.status || "대기";
-                const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                const isCanceled = isSalesCanceled(item);
                 const isCompleted = (status === '배달완료' || status === '픽업' || isCanceled);
 
                 if (isCompleted) {
@@ -9796,7 +9796,7 @@
                 g.keys.push(key);
                 g.items += 1;
                 // 취소된 항목은 수량·합계에서 제외 (일괄바 숫자와 같은 기준)
-                const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                const isCanceled = isSalesCanceled(item);
                 if (isCanceled) return;
                 g.qty += parseInt(item.qty || 0) || 0;
                 g.amount += parseInt(item.total || 0) || 0;
@@ -9841,11 +9841,6 @@
             selectAllCb.checked = allSelected;
         }
 
-        // 5. 구글 스프레드시트 상태 동기화 헬퍼 (GAS 사용 중단으로 비활성화)
-        async function syncStatusToGoogleSheets(phone, timestamp, item, status) {
-            console.log('GAS sync disabled.');
-        }
-
         function getStatusPatchBody(status) {
             const isCancelAction = status === '취소';
             if (isCancelAction) {
@@ -9888,7 +9883,7 @@
         function gIsDeliveredRow(o) {
             if (!o) return false;
             const del = (o.delivered === true || o.delivered === 'true' || String(o.delivered).toUpperCase() === 'TRUE');
-            const can = (o.canceled === true || o.canceled === 'true' || String(o.canceled).toUpperCase() === 'TRUE');
+            const can = isSalesCanceled(o);
             return del && !can;
         }
         function gDelivSyncAfterStatus(prevRows, newStatus) {
@@ -9910,46 +9905,9 @@
             });
         }
 
-        // [신규] 주문관리에서 취소↔활성 전이 시 전역 재고 조정(복구/재차감).
-        // 상품의 실제 matchKey 기준 키로 계산해야 실재고에 반영됨. 취소상태 변화가 있을 때만 조정 → 중복 복구 방지.
-        /* [변경 2026-09-18] 주문관리에서는 주문 상태(취소·노쇼·취소 해제)로 재고를 돌리거나 줄이지 않는다.
-           상품 목록을 불러오기 전에 취소하면 엉뚱한 칸에 재고가 쌓였고, 지난 날짜 주문이 지금 판매분 재고에 더해졌다.
-           재고는 손님 주문서(주문·취소)와 상품관리에서 직접 고칠 때만 바뀐다. 아래 본문은 남겨 두되 쓰지 않는다. */
-        async function applyStockDeltaForCancel(order, wasCanceled, willBeCanceled){
-            return;
-            try {
-                wasCanceled = !!wasCanceled; willBeCanceled = !!willBeCanceled;
-                if (wasCanceled === willBeCanceled) return;                 // 취소상태 변화 없음 → 조정 안 함
-                const rawName = String((order && order.item) || '').replace(/\[취소\]/g, '').replace(/['"]/g, '').trim();
-                if (!rawName || rawName === '배달비') return;                // 배달비 등 재고 항목 아님
-                const prod = (typeof uploadProducts !== 'undefined' ? uploadProducts : []).find(p => p && (p.name === rawName || String(p.name).replace(/['"]/g, '') === rawName));
-                if (prod){
-                    const baseUnlimited = (prod.stock === '' || prod.stock == null || String(prod.stock).trim() === '무제한');
-                    if (baseUnlimited) return;                              // 무제한 상품은 조정 불필요
-                }
-                const keyMatchKey = (order.matchKey || (prod && prod.matchKey) || order.date || order.pickupDate || '');
-                const keyName = (prod && prod.name) ? prod.name : rawName;
-                const adjKey = fGetAdjKey(keyMatchKey, keyName);
-                const qty = parseInt(order.qty) || 1;
-                const delta = willBeCanceled ? qty : -qty;                  // 취소→+복구, 취소해제→-재차감
-                for (let attempt = 1; attempt <= 5; attempt++){
-                    try {
-                        const r = await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json?t=${Date.now()}`);
-                        if (!r.ok) throw new Error('읽기 실패');
-                        const cur = await r.json();
-                        if (cur === 'unlimited' || (cur !== null && String(cur).startsWith('unlimited'))) return; // 무제한
-                        const next = (parseInt(cur) || 0) + delta;
-                        const w = await fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, {
-                            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next)
-                        });
-                        if (!w.ok) throw new Error('쓰기 실패');
-                        if (typeof uploadGlobalAdjustments !== 'undefined' && uploadGlobalAdjustments) uploadGlobalAdjustments[adjKey] = next;
-                        return;
-                    } catch(e){ await new Promise(res => setTimeout(res, 300 * attempt)); }
-                }
-                console.error('취소 재고 조정 최종 실패:', adjKey);
-            } catch(e){ console.error('applyStockDeltaForCancel 오류:', e); }
-        }
+        /* [삭제 2026-10-03] applyStockDeltaForCancel (취소하면 재고를 돌려놓던 것).
+           2026-09-18부터 첫 줄에서 바로 돌아가게 막아 둔 채 다섯 곳에서 불리고만 있었다.
+           재고는 손님 주문서(주문·취소)와 상품관리에서 직접 고칠 때만 바뀐다. 옛 본문은 백업/주문관리.bak184_안쓰는코드정리전.html 에 있다. */
 
         // 수령 방법 (배달 <-> 픽업) 전환 처리 함수
         async function toggleShippingMethod(phone, orderKeysStr, targetMethod) {
@@ -10852,7 +10810,7 @@
             const pDate = String(pickupDate || "").trim();
             if (!cleanPhone || !pDate) return;
 
-            const isCanceled = (o) => (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+            const isCanceled = (o) => isSalesCanceled(o);
             const isDone = (o) => {
                 const rec = String(o.received || ""), del = String(o.delivered || "");
                 return o.received === true || rec === "픽업완료" || rec === "취소완료"
@@ -10993,6 +10951,9 @@
             return false;
         }
 
+        /* [수정 2026-10-03] 손님 이름·전화·주문 키(상품 이름이 들어 있다)를 단추에 넣을 때 이걸 거치지 않는 곳이 있었다.
+           이름이나 상품 이름에 따옴표(' 나 ")가 있으면 그 단추가 눌리지 않았다. 주문 카드의 상태·전화·문자·메모·배달사진·
+           픽업/배달 바꾸기·날짜 바꾸기 단추와 미입금 목록 전화 보기를 모두 이걸로 감쌌다. */
         function escapeArg(str) {
             if (!str) return "";
             return String(str)
@@ -11027,7 +10988,7 @@
             options.forEach(opt => {
                 const isActive = (isCanceled && opt.status === '취소') || (!isCanceled && currentStatus === opt.status);
                 optionsHtml += `
-                    <button type="button" onclick="selectItemStatus('${phone}', '${orderKey}', '${opt.status}')" style="
+                    <button type="button" onclick="selectItemStatus('${escapeArg(phone)}', '${escapeArg(orderKey)}', '${opt.status}')" style="
                         width: 100%; padding: 12px 16px; margin-bottom: 8px; border-radius: 10px;
                         border: 1.5px solid ${isActive ? opt.color : '#e2e8f0'};
                         background: ${isActive ? opt.bg : '#ffffff'}; color: ${opt.color};
@@ -11066,7 +11027,7 @@
            상태가 여러 칸(received·delivered·canceled)에 나뉘어 있어 한 곳에서 읽어 준다. */
         function gStatusLabelOf(o) {
             if (!o) return '';
-            const c = (o.canceled === true || o.canceled === 'true' || String(o.canceled).toUpperCase() === 'TRUE');
+            const c = isSalesCanceled(o);
             if (c) return o.noShow ? '노쇼' : '취소';
             const rec = String(o.received || ''), del = String(o.delivered || '');
             if (o.delivered === true || del === '배달완료') return '배달완료';
@@ -11108,12 +11069,9 @@
                 showToast(`상태를 [${_label}]로 변경 완료했습니다.`);
                 
                 // 로컬 데이터 갱신
-                const _wasCanceledS = target && (target.canceled === true || target.canceled === "true" || String(target.canceled).toUpperCase() === "TRUE");
                 const _prevDelS = (target && gIsDeliveredRow(target)) ? [Object.assign({}, target)] : [];
                 if (target) {
                     Object.assign(target, patchBody);
-                    syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
-                    await applyStockDeltaForCancel(target, _wasCanceledS, newStatus === '취소'); // [신규] 취소↔활성 시 재고 복구/재차감
                 }
                 gDelivSyncAfterStatus(_prevDelS, newStatus);   // [신규] 배달완료를 되돌렸으면 배달 기록도 맞춘다
 
@@ -11167,15 +11125,11 @@
                 showToast("이 고객의 모든 상품 상태가 변경되었습니다.");
                 
                 // 로컬 데이터 일괄 갱신
-                const _wasCanceledMap = customerItems.map(it => it && (it.canceled === true || it.canceled === "true" || String(it.canceled).toUpperCase() === "TRUE"));
                 const _prevDelC = customerItems.filter(gIsDeliveredRow).map(it => Object.assign({}, it));
                 customerItems.forEach(it => {
                     Object.assign(it, patchBody);
-                    syncStatusToGoogleSheets(it.phone, it.timestamp, it.item, newStatus);
                 });
                 gDelivSyncAfterStatus(_prevDelC, newStatus);   // [신규] 배달완료를 되돌렸으면 배달 기록도 맞춘다
-                // [신규] 취소↔활성 시 재고 복구/재차감 (같은 상품 경합 방지 위해 순차 처리)
-                for (let i = 0; i < customerItems.length; i++) await applyStockDeltaForCancel(customerItems[i], _wasCanceledMap[i], newStatus === '취소');
 
                 renderFilteredOrders();
 
@@ -11204,7 +11158,7 @@
             selectedItems.forEach(itemInfo => {
                 const [phone, orderKey] = itemInfo.split("|");
                 const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
-                const isCanceled = target && (target.canceled === true || target.canceled === "true" || String(target.canceled).toUpperCase() === "TRUE");
+                const isCanceled = target && isSalesCanceled(target);
 
                 if (isCanceled && newStatus !== '대기') {
                     return; // '대기'로 되돌리는 경우 외에 취소된 주문은 제외
@@ -11215,7 +11169,7 @@
                     const isReceived = target && (target.received === true || target.received === "true" || String(target.received).toUpperCase() === "TRUE");
                     if (isCanceled || isDelivered || isReceived) { skippedDone++; return; }
                 }
-                itemsToProcess.push({ phone, orderKey, target, wasCanceled: isCanceled });
+                itemsToProcess.push({ phone, orderKey, target });
             });
 
             if (itemsToProcess.length === 0) {
@@ -11249,7 +11203,6 @@
                         if (res.ok) {
                             if (target) {
                                 Object.assign(target, patchBody);
-                                syncStatusToGoogleSheets(target.phone, target.timestamp, target.item, newStatus);
                             }
                             if (newStatus !== '배달완료') {
                                 fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(phoneKey)}/${encodeURIComponent(orderKeyForPath)}.json`, {
@@ -11263,8 +11216,6 @@
                 
                 await Promise.all(promises);
 
-                // [신규] 취소↔활성 전이 시 재고 복구/재차감 (같은 상품 경합 방지 위해 순차 처리)
-                for (const it of itemsToProcess) await applyStockDeltaForCancel(it.target, it.wasCanceled, newStatus === '취소');
                 gDelivSyncAfterStatus(_prevDelB, newStatus);   // [신규] 배달완료를 되돌렸으면 배달 기록도 맞춘다
 
                 showToast(`${itemsToProcess.length}개 주문 항목의 상태를 일괄 변경했습니다.` + (skippedDone > 0 ? ` (완료/취소 ${skippedDone}건 제외)` : ``));
@@ -11302,7 +11253,7 @@
             selectedItems.forEach(itemInfo => {
                 const [phone, orderKey] = itemInfo.split("|");
                 const target = rawOrders.find(it => it.phone === phone && it.orderKey === orderKey);
-                const isCanceled = target && (target.canceled === true || target.canceled === "true" || String(target.canceled).toUpperCase() === "TRUE");
+                const isCanceled = target && isSalesCanceled(target);
                 
                 if (!isCanceled) {
                     itemsToProcess.push({ phone, orderKey, target });
@@ -11414,7 +11365,7 @@
         async function deleteCanceledOrders() {
             const canceledOrders = [];
             rawOrders.forEach(item => {
-                const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                const isCanceled = isSalesCanceled(item);
                 if (isCanceled) {
                     canceledOrders.push(item);
                 }
@@ -11513,7 +11464,7 @@
                 let matchStatus = true;
                 const status = item.status || "대기";
                 if (statusFilter !== 'all') {
-                    const _canceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                    const _canceled = isSalesCanceled(item);
                     if (statusFilter === '취소') matchStatus = _summaryFullCanceled.has(gCardKeyOf(item));
                     else if (statusFilter === '대기') matchStatus = status === '대기';
                     else if (statusFilter === '입고') matchStatus = status === '입고';
@@ -11828,7 +11779,7 @@
                         <tr>
                             <td>
                                 <div class="unpaid-table-name">${user.name}${user.kakaoName ? ` <span class="kakao-badge">💬 ${user.kakaoName}${user.kakaoRealName ? ` (${user.kakaoRealName})` : ''}</span>` : ''}</div>
-                                <div class="unpaid-table-phone"><a href="#" class="unpaid-phone-link blurred" onclick="revealPhone(event, this, '${user.phone}')">📞 ${user.phone}</a></div>
+                                <div class="unpaid-table-phone"><a href="#" class="unpaid-phone-link blurred" onclick="revealPhone(event, this, '${escapeArg(user.phone)}')">📞 ${user.phone}</a></div>
                             </td>
                             <td class="unpaid-table-items">${user.items}</td>
                             <td class="unpaid-table-amount">${user.amount.toLocaleString()}원</td>
@@ -11842,7 +11793,7 @@
                                 <span class="unpaid-card-amount">${user.amount.toLocaleString()}원</span>
                             </div>
                             <div class="unpaid-card-row">
-                                <span class="unpaid-card-phone"><a href="#" class="unpaid-phone-link blurred" onclick="revealPhone(event, this, '${user.phone}')">📞 ${user.phone}</a></span>
+                                <span class="unpaid-card-phone"><a href="#" class="unpaid-phone-link blurred" onclick="revealPhone(event, this, '${escapeArg(user.phone)}')">📞 ${user.phone}</a></span>
                             </div>
                             <div class="unpaid-card-items">
                                 📦 ${user.items}
@@ -12635,7 +12586,7 @@
             const today = new Date(); today.setHours(0,0,0,0);
             const items = [];
             (rawOrders || []).forEach(o => {
-                const canceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                const canceled = isSalesCanceled(o);
                 if (canceled) return;
                 const st = String(o.status || '대기');
                 if (st === '픽업' || st === '배달완료' || st === '취소') return; // 완료/취소 제외
@@ -12743,13 +12694,11 @@
                         what: "상태", from: gStatusLabelOf(t0), to: newStatus, note: "미완료 목록"
                     }]);
                 }));
-                // 로컬 rawOrders 갱신 + [신규] 취소↔활성 시 재고 복구/재차감(순차)
+                // 로컬 rawOrders 갱신
                 for (const r of refs){
                     const t = (rawOrders || []).find(o => (o.firebasePhoneKey === r.pk || String(o.phone || '').replace(/\D/g, '') === r.pk) && o.orderKey === r.ok);
                     if (t){
-                        const _wasCanceledO = (t.canceled === true || t.canceled === "true" || String(t.canceled).toUpperCase() === "TRUE");
                         Object.assign(t, patchBody);
-                        await applyStockDeltaForCancel(t, _wasCanceledO, st === '취소');
                     }
                 }
                 showToast(`[${newStatus === '픽업' ? '픽업완료' : newStatus}]로 변경했습니다.`);
@@ -13025,7 +12974,7 @@
                 rawOrders.forEach(item => {
                     const key = item.phone + "|" + item.orderKey;
                     if (selectedItems.has(key)) {
-                        const isCanceled = (item.canceled === true || item.canceled === "true" || String(item.canceled).toUpperCase() === "TRUE");
+                        const isCanceled = isSalesCanceled(item);
                         const isDelivered = (item.delivered === true || item.delivered === "true" || String(item.delivered).toUpperCase() === "TRUE");
                         const isReceived = (item.received === true || item.received === "true" || String(item.received).toUpperCase() === "TRUE");
                         if (isCanceled || isDelivered || isReceived) return; // 취소, 배달완료, 픽업완료 상품은 인쇄 대상에서 제외
@@ -13279,7 +13228,6 @@
         // 📦 MOKET 상품 업로드/관리 통합 탭 자바스크립트 로직 (충돌 무결성 방어 완벽 조치)
         // =========================================================================
 
-        const UPLOAD_API_URL = ""; // [비활성화] GAS 미사용 — 연결 해제
         // [신규] Cloudinary 사진 업로드 설정 — 아래 두 값을 실제 값으로 바꾸세요 (Cloudinary 콘솔에서 확인)
         const CLOUDINARY_CLOUD_NAME = "q36jlrdf";        // Cloudinary Cloud name
         const CLOUDINARY_UPLOAD_PRESET = "moket_image";  // Unsigned 업로드 프리셋
@@ -13298,7 +13246,12 @@
 
            [주의] 열쇠를 비우면 Cloudinary로 넘어가는데, Cloudinary 계정이 차단(401)돼
              지금은 그쪽도 올라가지 않는다. 비우지 말 것. */
-        const IMGBB_API_KEY = "0fac4d1e91ae657f1b1235e9d2f911d4";   // imgbb 열쇠
+        /* [수정 2026-10-03] 열쇠를 코드에 적어 두지 않는다.
+           이 파일은 깃허브에 그대로 올라가서, 적어 둔 열쇠는 누구나 볼 수 있었다 (남이 가져다 쓰면 한도가 금방 찬다).
+           이제 열쇠는 서버 settings/imgbb_key 에 두고, 가게 로그인한 사람만 읽는다 (규칙: settings 는 가게만).
+           넣고 바꾸는 곳 : 가게 관리 → ⚙️ 일반 → 🔑 사진 열쇠·직원 번호
+           열쇠가 한도에 걸리면 새 계정으로 받아 그 칸에 넣기만 하면 된다 (코드는 안 고친다). */
+        let IMGBB_API_KEY = "";   // imgbb 열쇠 — gLoadPrivateSettings 가 서버에서 채운다
 
         // [추가] 실시간 재고 매핑 헬퍼 함수 (상품 목록 렌더링 에러 해결)
         function fSafeKey(s) {
@@ -17550,14 +17503,12 @@
             showLoader('🗂️ 분류 정리 중...');
             try {
                 if (targets.length) {
-                    const updated = uploadProducts.map(p =>
+                    // [수정 2026-10-03] 들고 있던 목록 대신 서버 최신 목록에서 옮긴다 (gEditProducts)
+                    const updated = await gEditProducts(list => list.map(p =>
                         (p && String(p.displayTab || '') === key)
                             ? { ...p, displayTab: ONSITE_ETC.key, updatedAt: Date.now() }
-                            : p);
-                    const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated)
-                    });
-                    if (!res.ok) throw new Error('상품 분류 이동 실패');
+                            : p));
+                    if (!updated) throw new Error('상품 분류 이동 실패');
                     uploadProducts = updated;
                     updatePublishedProductsTimestamp();
                 }
@@ -17875,6 +17826,7 @@
                     login: lg === null ? true : lg === true,
                     hours: Object.assign({}, GEN_HOURS_DEFAULT, (hrs && typeof hrs === 'object') ? hrs : {})   // [신규] 매장 운영시간
                 };
+                await gLoadPrivateSettings(true);   // [신규 2026-10-03] 🔑 칸에 보여 줄 값
                 const t = new Date();
                 _genHoliday = { month: new Date(t.getFullYear(), t.getMonth(), 1), draft: _gen.holidays.slice() };
             }
@@ -17920,6 +17872,7 @@
                 + card('📱 손님 화면',
                     row('상품목록', seg('productList', G.productList, ['공개', '숨김']), G.productList ? '손님에게 상품이 보입니다' : '손님에게 상품이 안 보입니다 (가게 사람만 봄)')
                     + row('로그인', seg('login', G.login, ['강제', '끄기']), G.login ? '카카오 로그인해야 주문서가 열립니다' : '로그인 없이 주문서를 볼 수 있습니다'))
+                + card('🔑 사진 열쇠·직원 번호', gGenPrivateHtml(row))
                 + card('⚠️ 재고 의심 기록',
                     `<div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin:-4px 0 6px; line-height:1.5;">주문관리가 켜져 있는 동안, 주문도 상품 수정도 없이 재고 숫자가 바뀌면 여기에 남깁니다 (이 기기, 최근 30건).</div>
                     <div id="gen-stock-suspects"></div>`);
@@ -18039,6 +17992,54 @@
                 _gen[key] = value;
                 showToast(`${label} 설정을 바꿨습니다.`);
             } catch (e) { showToast(`${label} 설정을 바꾸지 못했습니다: ${e.message}`); }
+            renderGeneralAdmin(false);
+        }
+
+        /* ===== [신규 2026-10-03] 🔑 사진 열쇠·직원 번호 =====
+           코드에 적혀 있던 것을 서버 settings 로 옮겼다 (settings 는 가게 로그인한 사람만 읽고 쓴다).
+             · 사진 열쇠 : 상품 사진을 imgbb 에 올릴 때 쓴다. 저장된 값이 칸에 그대로 보인다 (사장님 요청 — 가게만 여는 화면이다)
+             · 직원 번호 : 접속·통계에서 뺄 번호. 가게 사람 명단에 적힌 번호는 따로 안 적어도 빠진다 */
+        function gGenPrivateHtml(row) {
+            const k = _gPrivRaw.key;
+            const inputCss = 'height:34px; padding:0 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:800; box-sizing:border-box;';
+            const btnCss = 'height:34px; padding:0 12px; border:none; background:var(--primary); color:#fff; border-radius:8px; font-size:12.5px; font-weight:900; cursor:pointer;';
+            return row('사진 열쇠 (imgbb)', `<span style="display:inline-flex; align-items:center; gap:6px;">
+                        <input id="gen-imgbb-key" type="text" autocomplete="off" spellcheck="false" placeholder="열쇠 넣기" value="${gEscapeHtml(k)}" style="width:290px; max-width:100%; font-family:monospace; ${inputCss}">
+                        <button type="button" onclick="gGenSaveImgbbKey()" style="${btnCss}">저장</button></span>`,
+                    k ? '저장돼 있음' : '<span style="color:#dc2626;">비어 있음 — 상품 사진을 올릴 수 없습니다</span>')
+                + `<div style="padding:8px 0 0; border-top:1px solid #f1f5f9;">
+                    <div style="font-size:13px; font-weight:800; color:#334155;">통계에서 뺄 번호</div>
+                    <div style="font-size:11px; font-weight:700; color:#94a3b8; margin:2px 0 6px;">시험 계정처럼 가게 사람 명단에 없는 번호만 적어요. 한 줄에 하나씩.</div>
+                    <textarea id="gen-staff-phones" rows="3" style="width:100%; padding:8px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:800; box-sizing:border-box; resize:vertical;">${gEscapeHtml(_gPrivRaw.phones.join('\n'))}</textarea>
+                    <button type="button" onclick="gGenSaveStaffPhones()" style="width:100%; height:40px; margin-top:8px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:900; cursor:pointer;">번호 저장</button>
+                </div>`;
+        }
+        async function gGenSaveImgbbKey() {
+            const v = String((document.getElementById('gen-imgbb-key') || {}).value || '').trim();
+            if (!/^[A-Za-z0-9]{16,64}$/.test(v)) return showToast('열쇠를 바르게 넣어 주세요 (영문·숫자).');
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}settings/imgbb_key.json`, { method: 'PUT', body: JSON.stringify(v) });
+                if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                await gLoadPrivateSettings(true);
+                showToast('사진 열쇠를 저장했습니다.');
+            } catch (e) { showToast('사진 열쇠를 저장하지 못했습니다: ' + e.message); }
+            renderGeneralAdmin(false);
+        }
+        async function gGenSaveStaffPhones() {
+            const raw = String((document.getElementById('gen-staff-phones') || {}).value || '');
+            const list = [], bad = [];
+            raw.split(/[\n,]+/).map(x => x.trim()).filter(Boolean).forEach(x => {   // 한 줄에 하나 (010 1234 5678 처럼 띄어 써도 된다)
+                const s = x.replace(/\D/g, '');
+                if (/^010\d{8}$/.test(s)) { if (!list.includes(s)) list.push(s); } else bad.push(x);
+            });
+            if (bad.length) return showToast('번호를 다시 봐 주세요: ' + bad.join(', '));
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}settings/staff_phones.json`, { method: 'PUT', body: JSON.stringify(list) });
+                if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                await gLoadPrivateSettings(true);
+                caRows = null;   // 손님 화면을 다음에 열 때 새로 센다
+                showToast(`통계에서 뺄 번호 ${list.length}개를 저장했습니다.`);
+            } catch (e) { showToast('번호를 저장하지 못했습니다: ' + e.message); }
             renderGeneralAdmin(false);
         }
 
@@ -18491,6 +18492,7 @@
                 }
             } catch (e) { console.error('손님 정보 불러오기 실패:', e); window.__caSaved = {}; }
             await _visitsP;
+            await gLoadPrivateSettings();   // [신규 2026-10-03] 뺄 번호를 받은 뒤에 센다
             caApplyJoinSlots();   // [신규] 손님 정보를 받은 뒤 가입 시각을 접속 칸으로 보탠다
             caRows = null;
             renderCustomerAdmin();
@@ -18505,10 +18507,10 @@
         const VISITS_CACHE_KEY = 'moket_visits_days';
         const VISIT_LOOKBACK = 30;     // 구경만·발길 끊김을 가리는 고정 잣대
         const VISIT_KEEP_DAYS = 90;    // 기기에 담아 두는 날수
-        const CA_STAFF_PHONES = new Set([
-            '01097299279', '01027799279',   // 모켓1234 (사장님 시험 계정)
-            '01092752181'                   // 강성훈 · kkk · 깡깡이
-        ]);
+        /* [수정 2026-10-03] 접속·통계에서 뺄 가게 사람·시험 계정 번호도 코드에 적지 않는다 (깃허브에 그대로 보였다).
+           두 곳에서 모은다 : ① 가게 사람 명단(staff)에 적힌 번호  ② settings/staff_phones (시험 계정처럼 명단에 없는 번호)
+           ② 는 가게 관리 → ⚙️ 일반 → 🔑 사진 열쇠·직원 번호 에서 고친다. 채우기는 gLoadPrivateSettings. */
+        const CA_STAFF_PHONES = new Set();
         function caDayKey(d) {
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
@@ -20135,7 +20137,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const roadHits = {};  // 아파트 → { 도로명: 건수 }  (실제 주문에서 뽑는다)
             const unmatched = {}; // 정규화 주소 → { display, raw, count }
             (rawOrders || []).forEach(o => {
-                const isCanceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                const isCanceled = isSalesCanceled(o);
                 if (isCanceled) return;
                 if (!gApartInRange(o, _bounds)) return;
                 const full = `${o.address || ''} ${o.addressDetail || ''}`.trim();
@@ -20449,7 +20451,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!normMatch) return 0;
             let hit = 0;
             (rawOrders || []).forEach(o => {
-                const isCanceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                const isCanceled = isSalesCanceled(o);
                 if (isCanceled) return;
                 if (gNormAddr(`${o.address || ''} ${o.addressDetail || ''}`).includes(normMatch)) hit++;
             });
@@ -20629,7 +20631,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const _bounds = gApartRangeBounds();   // 위에서 고른 기간을 그대로 따른다
 
             (rawOrders || []).forEach(o => {
-                const isCanceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                const isCanceled = isSalesCanceled(o);
                 if (isCanceled) return;
                 if (!gApartInRange(o, _bounds)) return;
                 const full = `${o.address || ''} ${o.addressDetail || ''}`.trim();
@@ -20768,7 +20770,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             let totalAmount = 0;
 
             (rawOrders || []).forEach(o => {
-                const isCanceled = (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE");
+                const isCanceled = isSalesCanceled(o);
                 if (isCanceled) return;
                 if (!gApartInRange(o, _bounds)) return;
                 const full = `${o.address || ''} ${o.addressDetail || ''}`.trim();
@@ -24189,7 +24191,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     if (!it) return;
                     const ph = String(it.phone || '').replace(/\D/g, '');
                     if (!ph) return;
-                    if (it.canceled === true || it.canceled === 'true' || String(it.canceled).toUpperCase() === 'TRUE') return;
+                    if (isSalesCanceled(it)) return;
                     if (gIsHandedOver(it.status)) return;
                     if (gIsFeeRow(it)) return;
                     const ds = getOrderDateInfo(it).dateStr;
@@ -24416,7 +24418,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const tKey = gTodayKey();
             return (rawOrders || []).filter(o => {
                 if (!o) return false;
-                if (o.canceled === true || o.canceled === 'true' || String(o.canceled).toUpperCase() === 'TRUE') return false;
+                if (isSalesCanceled(o)) return false;
                 if (gIsHandedOver(o.status)) return false;
                 if (gIsFeeRow(o)) return false;
                 if (/\[취소\]/.test(String(o.item || ''))) return false;
@@ -24747,7 +24749,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             showLoader(`${rows.length}건 [${newStatus}] 업데이트 중...`);
             try {
                 const patchBody = getStatusPatchBody(newStatus);
-                const wasCanceled = rows.map(o => isSalesCanceled(o));
                 const _prevDelK = rows.filter(gIsDeliveredRow).map(o => Object.assign({}, o));   // [신규] 배달 기록 맞추기용
 
                 await Promise.all(rows.map(o => {
@@ -24763,7 +24764,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                                그러면 o 는 옛 목록의 줄이라 고쳐도 화면에 안 나온다 → 지금 목록의 같은 줄도 고친다 */
                             const _cur = (rawOrders || []).find(x => x !== o && x.orderKey === o.orderKey && String(x.firebasePhoneKey || x.phone || '') === String(o.firebasePhoneKey || o.phone || ''));
                             if (_cur) Object.assign(_cur, patchBody);
-                            syncStatusToGoogleSheets(o.phone, o.timestamp, o.item, newStatus);
                             if (newStatus !== '배달완료') {
                                 fetch(`${FIREBASE_DB_URL}delivery_photos/${encodeURIComponent(phoneKey)}/${encodeURIComponent(o.orderKey)}.json`, { method: 'DELETE' })
                                     .catch(e => console.error('배달사진 이미지 삭제 실패:', e));
@@ -24772,9 +24772,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     });
                 }));
 
-                for (let i = 0; i < rows.length; i++) {
-                    await applyStockDeltaForCancel(rows[i], wasCanceled[i], newStatus === '취소');
-                }
                 gDelivSyncAfterStatus(_prevDelK, newStatus);   // [신규] 배달완료를 되돌렸으면 배달 기록도 맞춘다
 
                 showToast(skippedDone > 0
@@ -25197,7 +25194,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             (rawOrders || []).forEach(it => {
                 if (!it) return;
                 if (String(it.phone || '').replace(/\D/g, '') !== key) return;
-                if (it.canceled === true || it.canceled === "true" || String(it.canceled).toUpperCase() === "TRUE") return;
+                if (isSalesCanceled(it)) return;
                 if (gIsHandedOver(it.status)) return;
                 if (gIsFeeRow(it)) return;
                 const info = getOrderDateInfo(it);
@@ -25866,7 +25863,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 noDateBtn.style.cssText = 'position:absolute; right:4px; top:50%; transform:translateY(-50%); z-index:2;'
                     + ' height:26px; padding:0 7px; border:1px solid var(--border); border-radius:7px; background:#f8fafc;'
                     + ' color:var(--text-sub); font-family:inherit; font-size:11px; font-weight:800; cursor:pointer;';
-                // 사다드림만 빼고 모두 '날짜 없음'을 고를 수 있다 (사다드림은 주문 마감일이 있어야 한다)
+                // 사다드림만 빼고 모두 '날짜 없음'을 고를 수 있다 (사다드림은 픽업·배달일이 있어야 한다)
+                // [수정 2026-10-03] 예전 주석에 '주문 마감일'이라고 적혀 있었는데, 이 날짜는 손님이 받는 픽업·배달일이다.
+                //  상품에는 마감일 칸이 없다 (사장님 확인)
                 const isFruitKind = () => ['fruit', 'veg', 'group'].includes(uploadKind) && !(document.getElementById('productIsSada') || {}).checked;
 
                 const paintDateFace = () => {
@@ -26144,10 +26143,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 : (mk === '과일') ? 'F' : 'P';
             const code = gNextProductCode(pre);
             try {
-                const r = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ [`${index}/productCode`]: code })
-                });
+                const r = await gPatchProductsRes({ [`${index}/productCode`]: code });
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 prod.productCode = code;   // 화면이 들고 있는 것도 맞춰 둔다
                 updatePublishedProductsTimestamp();   // [버그수정] 번호가 바뀌었다고 알린다. 안 알리면 주문서가 옛 상품을 계속 쓰고, 새 주문에 옛 번호가 적힌다
@@ -27281,6 +27277,80 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             return false;
         }
 
+        /* ===== [신규 2026-10-03] 상품 목록 안전하게 고쳐 쓰기 (gEditProducts) =====
+           예전에는 상품을 지우거나·복제하거나·품절로 바꿀 때 이 화면이 들고 있던 목록 전체를 그대로 PUT했다.
+           폰과 가게 PC를 같이 켜 두면, 늦게 저장한 쪽이 먼저 저장한 쪽의 수정(가격·숨김 등)을 소리 없이 되돌렸다.
+           이제는 이렇게 한다.
+             1) 저장 직전에 서버에서 최신 목록을 받는다. 이때 '잠금표(ETag)'도 같이 받는다
+             2) 그 최신 목록 위에서 고칠 상품을 이름·분류·날짜로 다시 찾아 고친다 (fn)
+             3) 잠금표를 붙여 저장한다. 그 사이 다른 기기가 먼저 저장했으면 서버가 거절(412)하고,
+                1)부터 다시 한다. 그래서 두 기기의 수정이 모두 남는다
+           손님 주문서가 재고를 잡을 때 쓰는 방식과 같다.
+           fn 은 여러 번 불릴 수 있으니 안에서 서버에 쓰거나 화면 값을 바꾸지 않는다 (받은 목록만 고쳐서 돌려준다).
+           fn 이 배열이 아닌 것을 돌려주면 아무것도 쓰지 않고 null 을 돌려준다.
+           opt.shift : 상품을 빼는 일처럼 뒤 상품의 순번이 당겨지는 저장이면 true (아래 순서표를 올린다) */
+        function gSameProd(a, b) {
+            return !!(a && b && a.name === b.name
+                && String(a.matchKey || '') === String(b.matchKey || '')
+                && String(a.date || '') === String(b.date || ''));
+        }
+        async function gEditProducts(fn, opt) {
+            const O = opt || {};
+            const url = `${FIREBASE_DB_URL}published_products.json`;
+            for (let attempt = 1; attempt <= 6; attempt++) {
+                const g = await fetch(`${url}?t=${Date.now()}`, { headers: { 'X-Firebase-ETag': 'true' } });
+                if (!g.ok) throw new Error('상품 목록을 받지 못했습니다 (서버 응답 ' + g.status + ')');
+                const etag = g.headers.get('ETag');
+                if (!etag) throw new Error('상품 목록 잠금표(ETag)를 받지 못했습니다');
+                const data = await g.json();
+                const rawLen = Array.isArray(data) ? data.length : (data && typeof data === 'object' ? Object.keys(data).length : 0);
+                const fresh = Array.isArray(data) ? data.filter(p => p != null)
+                    : (data && typeof data === 'object') ? Object.values(data).filter(p => p != null) : [];
+                const next = await fn(fresh.map(p => Object.assign({}, p)));
+                if (!Array.isArray(next)) return null;
+                // 빈 칸(null)이 끼어 있던 목록을 채워 쓰는 것도 순번이 당겨지는 일이다
+                const shift = !!O.shift || fresh.length !== rawLen;
+                if (shift) await gBumpProdRev();
+                const w = await fetch(url, { method: 'PUT', headers: { 'if-match': etag, 'Content-Type': 'application/json' }, body: JSON.stringify(next) });
+                if (w.ok) return next;
+                if (w.status !== 412) throw new Error('상품 목록을 저장하지 못했습니다 (서버 응답 ' + w.status + ')');
+                await new Promise(r => setTimeout(r, 200 * attempt));   // 다른 기기가 먼저 저장했다 → 새로 받아 다시
+            }
+            throw new Error('다른 기기의 저장과 계속 겹쳤습니다. 잠시 뒤 다시 해 주세요.');
+        }
+
+        /* ===== [신규 2026-10-03] 상품 순서표 (settings/products_rev) =====
+           상품 하나만 고치는 저장(fbPatchProducts)은 '몇 번째 상품'이라는 순번으로 쓴다.
+           그런데 다른 기기에서 상품을 지우면 뒤 상품들의 순번이 하나씩 당겨져서,
+           옛 목록을 들고 있는 기기가 고친 값이 엉뚱한 상품(바로 뒤 상품)에 들어갈 수 있었다.
+           그래서 순번이 당겨지는 저장을 할 때마다 순서표를 바꿔 두고,
+           순번으로 쓰기 전에 내 목록을 받을 때의 순서표와 지금 서버의 순서표가 같은지 본다.
+           다르면 쓰지 않고 목록을 새로 받는다. (settings 자리라 규칙은 그대로 — 가게만 읽고 쓴다) */
+        let _gProdRev = null, _gProdReloading = false;
+        async function gReadProdRev() {
+            try { const r = await fetch(`${FIREBASE_DB_URL}settings/products_rev.json?t=${Date.now()}`); return r.ok ? await r.json() : undefined; }
+            catch (e) { return undefined; }   // 못 읽으면 막지 않는다 (undefined)
+        }
+        async function gBumpProdRev() {
+            const v = Date.now();
+            const r = await fetch(`${FIREBASE_DB_URL}settings/products_rev.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) });
+            if (!r.ok) throw new Error('상품 순서표를 바꾸지 못했습니다 (서버 응답 ' + r.status + ')');
+            _gProdRev = v;
+        }
+        function gReloadProductsSoon() {
+            if (_gProdReloading) return;
+            _gProdReloading = true;
+            loadProductsFromServer().then(() => {
+                try { buildManageCategoryTabs(); buildSubTabs(); renderProductsList(); } catch (e) { }
+            }).finally(() => { _gProdReloading = false; });
+        }
+
+        // [신규 2026-10-03] 순번으로 한 칸 쓰는 곳(식별번호 붙이기 등)도 순서표 확인을 거치게 한다.
+        //   예전 fetch 자리에 그대로 끼울 수 있게 응답 모양({ ok, status })으로 돌려준다.
+        async function gPatchProductsRes(patch) {
+            const ok = await fbPatchProducts(patch);
+            return { ok, status: ok ? 200 : 409, json: async () => null };
+        }
         /* [신규] 상품 목록 '부분 저장'.
            published_products는 배열이라 인덱스를 키로 PATCH한다. ({"167/showToday": true} 꼴)
 
@@ -27289,8 +27359,18 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            그러면 이 화면을 연 뒤에 다른 기기·다른 탭에서 바꾼 값까지 옛날 값으로 되돌아간다.
            폰 두 대로 함께 상품을 손보면 나중에 저장한 쪽이 먼저 한 쪽의 작업을 통째로 지웠다.
            PATCH는 적어 준 칸만 바꾸므로, 남이 바꾼 다른 상품은 그대로 남는다. */
-        async function fbPatchProducts(patch, maxTries = 4) {
+        async function fbPatchProducts(patch, maxTries = 4, freshList = false) {
             if (!patch || Object.keys(patch).length === 0) return true;
+            // [신규 2026-10-03] 순번이 그 사이 당겨졌으면 쓰지 않는다 (위 '상품 순서표').
+            //   freshList : 방금 서버에서 받은 목록의 순번이라 확인할 필요가 없을 때 true
+            if (!freshList) {
+                const cur = await gReadProdRev();
+                if (cur !== undefined && String(cur == null ? '' : cur) !== String(_gProdRev == null ? '' : _gProdRev)) {
+                    showToast('다른 기기에서 상품을 지워 순서가 바뀌었습니다. 목록을 새로 받으니 다시 해 주세요.');
+                    gReloadProductsSoon();
+                    return false;
+                }
+            }
             let lastErr = null;
             for (let attempt = 1; attempt <= maxTries; attempt++) {
                 try {
@@ -27381,6 +27461,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 await gLoadCodeLabels();   // [신규] 번호 이름표 (F·S 번호 옆에 무엇인지 붙여 준다)
                 await gLoadTaxFree(true);   // [신규] 과세·면세 표
                 const _closedP = gLoadClosedAdmin();   // [신규] 마감 표 (몇 바이트)
+                { const _rv = await gReadProdRev(); if (_rv !== undefined) _gProdRev = _rv; }   // [신규 2026-10-03] 순서표는 목록보다 먼저 받는다 (늦게 받으면 옛 목록에 새 순서표가 붙는다)
                 const [res, stockRes] = await Promise.all([
                     fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`),
                     fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 재고 로드 실패:", e); return { ok: false }; })
@@ -28333,15 +28414,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const toDelete = [];
                 idxSet.forEach(idx => { if (uploadProducts[idx]) toDelete.push(uploadProducts[idx]); });
 
-                // 선택된 인덱스를 제외한 새 목록
-                const updatedList = uploadProducts.filter((_, i) => !idxSet.has(i));
-
-                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatedList)
-                });
-                if (!res.ok) throw new Error("Firebase 삭제 동기화 실패");
+                // [수정 2026-10-03] 서버 최신 목록에서 고른 상품만 뺀다 (gEditProducts — 순번 대신 이름·분류·날짜로 찾는다)
+                const updatedList = await gEditProducts(list => list.filter(p => !toDelete.some(d => gSameProd(p, d))), { shift: true });
+                if (!updatedList) throw new Error("Firebase 삭제 동기화 실패");
                 updatePublishedProductsTimestamp();
 
                 // 각 상품의 Firebase 재고 조정값도 함께 제거 (병렬)
@@ -28385,8 +28460,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             
             showLoader("👯 상품 복제 중...");
             try {
-                let updatedProducts = [...uploadProducts];
-                
                 // 새로운 복제본 상품 객체 구성 (이름 뒤에 '(복사본)' 추가)
                 const copyObj = {
                     ...prod,
@@ -28394,8 +28467,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     sid: gStockBySid ? gSidForCode(prod.productCode) : null,   // [신규 2026-10-02] 복제본은 재고를 따로 센다 — 같은 식별번호 다음 노출번호(_2, _3 …)
                     updatedAt: Date.now()
                 };
-                
-                updatedProducts.push(copyObj);
                 
                 // 재고 정보 연계용 키 생성 및 초기 0값 설정
                 const isUnlimited = (copyObj.stock === undefined || copyObj.stock === null || copyObj.stock === "");
@@ -28410,13 +28481,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 });
                 
                 // 2. Firebase 상품 정보(published_products) 리스트 등록
-                const writeRes = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatedProducts)
-                });
-                
-                if (!writeRes.ok) throw new Error("복제 상품 데이터베이스 반영 실패");
+                //    [수정 2026-10-03] 서버 최신 목록 맨 뒤에 붙인다 (gEditProducts)
+                const updatedProducts = await gEditProducts(list => [...list, copyObj]);
+                if (!updatedProducts) throw new Error("복제 상품 데이터베이스 반영 실패");
                 updatePublishedProductsTimestamp();
                 
                 uploadProducts = updatedProducts;
@@ -28473,7 +28540,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                예전 당일 상품과 똑같이 저장한다 (matchKey 과일·야채·기타, 날짜 비움, kind 없음).
                주문서·자동 작업이 이 셋을 '예전 당일'로 알아봐서, 올린 날 하루 팔고
                마감시각이 지나면 '마감', 다음 날 자동으로 숨는다. 일반 공구는 예전 당일의 '기타' 자리를 쓴다.
-               사다드림은 주문 마감일이 있어야 해서 날짜가 꼭 필요하다. */
+               사다드림은 픽업·배달일이 있어야 해서 날짜가 꼭 필요하다.
+               [수정 2026-10-03] 예전엔 '주문 마감일'이라고 적혀 있었다. 이 날짜(matchKey·date)는 픽업·배달일이고,
+                상품에는 마감일이 없다 (사장님 확인). 주문서도 이 날짜를 주문의 배달일로 그대로 적는다. */
             const _noDateFruit = (uploadCurrentTab === 'reserve' && !String(catVal || '').trim()
                 && ['fruit', 'veg', 'group'].includes(uploadKind) && !(document.getElementById('productIsSada') || {}).checked);
             if (_noDateFruit) {
@@ -28920,7 +28989,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    목록 전체를 PUT하면, 방금 최신 목록을 받아 왔더라도 그 사이에 다른 기기가
                    바꾼 값이 있으면 되돌려 버린다. 한 칸만 쓰면 남의 상품은 건드리지 않는다. */
                 const _writeOk = (_savedIdx >= 0)
-                    ? await fbPatchProducts({ [_savedIdx]: updatedProducts[_savedIdx] })
+                    ? await fbPatchProducts({ [_savedIdx]: updatedProducts[_savedIdx] }, 4, true)   // 방금 받은 최신 목록의 순번
                     : await fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, updatedProducts);
 
                 if (!_writeOk) throw new Error("Firebase 배포 실패");
@@ -29180,25 +29249,28 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             showLoader("🔴 품절 처리 중...");
             try {
-                let updatedList = [...uploadProducts];
-                updatedList[index] = {
-                    ...prod,
-                    stock: 0,
-                    ...(isOnsiteProd ? { showToday: false, showReserve: false, hide: true } : {}),
-                    updatedAt: Date.now()
-                };
+                // [수정 2026-10-03] 들고 있던 목록 통째가 아니라, 서버 최신 목록에서 이 상품만 품절로 바꾼다 (gEditProducts)
+                let soldIdx = -1;
+                const updatedList = await gEditProducts(list => {
+                    soldIdx = list.findIndex(p => gSameProd(p, prod));
+                    if (soldIdx < 0) return null;
+                    list[soldIdx] = {
+                        ...list[soldIdx],
+                        stock: 0,
+                        ...(isOnsiteProd ? { showToday: false, showReserve: false, hide: true } : {}),
+                        updatedAt: Date.now()
+                    };
+                    return list;
+                });
+                if (!updatedList) throw new Error("이미 지워졌거나 찾지 못했습니다. 목록을 새로고침해 주세요.");
 
                 const adjKey = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
-                const [ok1, ok2] = await Promise.all([
-                    fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, updatedList),
-                    fbPutRetry(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, 0)
-                ]);
-                if (!ok1) throw new Error("Firebase 업데이트 실패(재시도 후)");
+                if (!(await fbPutRetry(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, 0))) throw new Error("재고를 0으로 바꾸지 못했습니다(재시도 후)");
                 updatePublishedProductsTimestamp();
                 uploadGlobalAdjustments[adjKey] = 0;
 
                 uploadProducts = updatedList;
-                await gSyncSidStock(uploadProducts, index);   // [신규 2026-10-02] 같은 노출번호를 쓰는 복사본도 품절로
+                await gSyncSidStock(uploadProducts, soldIdx);   // [신규 2026-10-02] 같은 노출번호를 쓰는 복사본도 품절로
 
                 showToast(isOnsiteProd ? "품절 처리하고 손님 화면에서 숨겼습니다." : "상품이 품절 처리되었습니다.");
                 await loadProductsFromServer();
@@ -29221,42 +29293,23 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             try {
                 /* [수정] 삭제는 목록에서 한 칸을 빼는 일이라 뒤 순번이 전부 당겨진다.
                    그래서 이것만은 목록 전체를 다시 써야 한다. 다만 화면이 들고 있던 옛 목록이 아니라
-                   저장 직전에 서버에서 받은 최신 목록에서 빼야, 다른 기기가 그 사이 바꾼 내용이 남는다. */
-                let base = [...uploadProducts];
-                try {
-                    const freshRes = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
-                    if (freshRes.ok) {
-                        const freshData = await freshRes.json();
-                        if (Array.isArray(freshData)) base = freshData.filter(p => p !== null);
-                        else if (freshData && typeof freshData === 'object') base = Object.values(freshData).filter(p => p !== null);
-                    }
-                } catch (e) {
-                    console.warn('최신 상품 목록 받기 실패 — 화면의 목록으로 진행:', e);
-                }
-
+                   저장 직전에 서버에서 받은 최신 목록에서 빼야, 다른 기기가 그 사이 바꾼 내용이 남는다.
+                   [수정 2026-10-03] 받고 나서 쓰기 전 사이에 다른 기기가 저장해도 잠금표로 막고 다시 한다 (gEditProducts).
+                   예전에는 받기에 실패하면 화면의 옛 목록으로 그냥 덮어썼는데, 이제는 저장하지 않는다. */
                 // 최신 목록에서 '지울 상품'을 이름·분류·날짜로 다시 찾는다 (순번은 이미 달라졌을 수 있다)
-                let delIdx = base.findIndex(p => p
-                    && p.name === prod.name
-                    && String(p.matchKey || '') === String(prod.matchKey || '')
-                    && String(p.date || '') === String(prod.date || ''));
-                if (delIdx < 0) {
+                const updatedList = await gEditProducts(list => {
+                    const delIdx = list.findIndex(p => gSameProd(p, prod));
+                    if (delIdx < 0) return null;
+                    list.splice(delIdx, 1);
+                    return list;
+                }, { shift: true });
+                if (!updatedList) {
                     hideLoader();
                     showToast("이미 지워졌거나 찾지 못했습니다. 목록을 새로고침해 주세요.");
                     await loadProductsFromServer();
                     renderProductsList();
                     return;
                 }
-
-                let updatedList = [...base];
-                updatedList.splice(delIdx, 1);
-
-                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatedList)
-                });
-
-                if (!res.ok) throw new Error("Firebase 삭제 동기화 실패");
                 updatePublishedProductsTimestamp();
 
                 // Firebase 재고 조정값도 함께 제거 — [신규 2026-10-02] 같은 노출번호를 쓰는 상품이 남아 있으면 둔다
@@ -29417,8 +29470,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (!ok) throw new Error('선반 저장 실패');
 
                 if (movedProducts.length > 0) {
-                    const ok2 = await fbPutRetry(`${FIREBASE_DB_URL}published_products.json`, uploadProducts);
-                    if (!ok2) throw new Error('상품 저장 실패');
+                    // [수정 2026-10-03] 서버 최신 목록에서 지운 선반의 상품만 '미지정'으로 옮긴다 (gEditProducts)
+                    const next = await gEditProducts(list => list.map(p => {
+                        if (!p) return p;
+                        const q = { ...p };
+                        if (removed.has(String(q.shelf || ''))) { q.shelf = SHELF_UNSET; q.updatedAt = Date.now(); }
+                        if (removed.has(String(q.shelfPrev || ''))) delete q.shelfPrev;
+                        return q;
+                    }));
+                    if (!next) throw new Error('상품 저장 실패');
+                    uploadProducts = next;
                     updatePublishedProductsTimestamp();
                 }
 
@@ -30052,6 +30113,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (!confirm(`CSV의 상품 ${newList.length}개로 전체 상품 목록을 교체합니다.\n(현재 ${uploadProducts.length}개 → ${newList.length}개)\n\n※ 이미지는 이름+분류가 같은 기존 상품에서 자동으로 이어받습니다. 매칭 안 되는 상품은 이미지가 비어있게 됩니다.\n※ 되돌릴 수 없으니, 먼저 '목록 CSV'로 백업해 두는 걸 권장합니다.\n\n진행할까요?`)) return;
 
                 showLoader(`📥 상품 ${newList.length}개 업로드 중...`);
+                await gBumpProdRev();   // [신규 2026-10-03] 목록을 통째로 바꾸니 순번도 모두 바뀐다 — 다른 기기의 순번 저장을 막는다
                 const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newList)
                 });
@@ -30077,8 +30139,30 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         /* [신규] 사진을 어디로 올릴지 고르는 문. 위 IMGBB_API_KEY가 채워져 있으면 imgbb,
            비어 있으면 예전처럼 Cloudinary로 보낸다. 부르는 쪽은 이 함수만 알면 된다. */
         async function uploadImage(fileOrDataUri, label) {
+            await gLoadPrivateSettings();
             if (String(IMGBB_API_KEY || '').trim()) return uploadToImgbb(fileOrDataUri, label);
-            return uploadToCloudinary(fileOrDataUri, label);
+            // [수정 2026-10-03] 예전에는 열쇠가 없으면 Cloudinary로 넘겼지만, 그쪽은 계정이 막혀(401) 알 수 없는 오류만 났다.
+            //   이제는 어디서 열쇠를 넣는지 바로 알려 준다.
+            throw new Error('사진 열쇠가 없습니다. 가게 관리 → ⚙️ 일반 → 🔑 사진 열쇠·직원 번호에서 넣어 주세요.');
+        }
+
+        /* ===== [신규 2026-10-03] 서버에 둔 가게 전용 값 불러오기 =====
+           사진 열쇠(settings/imgbb_key)와 통계에서 뺄 번호(settings/staff_phones + 가게 사람 명단의 번호).
+           한 번 받으면 다시 안 받는다. 일반 화면에서 고치면 force 로 새로 받는다. */
+        let _gPrivP = null, _gPrivRaw = { key: '', phones: [] };
+        function gLoadPrivateSettings(force) {
+            if (_gPrivP && !force) return _gPrivP;
+            _gPrivP = (async () => {
+                const get = async p => { try { const r = await fetch(`${FIREBASE_DB_URL}${p}.json?t=${Date.now()}`); return r.ok ? await r.json() : null; } catch (e) { return null; } };
+                const [key, phones, staff] = await Promise.all(['settings/imgbb_key', 'settings/staff_phones', 'staff'].map(get));
+                const norm = v => { const s = String(v || '').replace(/\D/g, ''); return /^010\d{8}$/.test(s) ? s : ''; };
+                _gPrivRaw = { key: typeof key === 'string' ? key.trim() : '', phones: (Array.isArray(phones) ? phones : []).map(norm).filter(Boolean) };
+                IMGBB_API_KEY = _gPrivRaw.key;
+                CA_STAFF_PHONES.clear();
+                _gPrivRaw.phones.forEach(ph => CA_STAFF_PHONES.add(ph));
+                if (staff && typeof staff === 'object') Object.values(staff).forEach(s => { const ph = norm(s && s.phone); if (ph) CA_STAFF_PHONES.add(ph); });
+            })();
+            return _gPrivP;
         }
 
         /* [신규] imgbb 업로드. Cloudinary와 같은 모양으로 주소 한 줄을 돌려준다.
@@ -30212,6 +30296,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             attachRealtimeListeners();
             autoRefreshArchiveWeekly();       // [신규] 마지막 갱신 7일 넘으면 자동 1회 갱신
             gAutoHideRun();                   // [수정] 15시 과일 마감 + 날짜 지난 상품 숨김 (상품 목록은 한 번만 받는다)
+            gLoadPrivateSettings();           // [신규 2026-10-03] 사진 열쇠·통계에서 뺄 번호 (서버 settings)
             setTimeout(() => { try { rvaPaintCount(); ptaExpireDaily(); } catch (e) { } }, 4000);   // [신규 2026-10-02] 후기 NEW 숫자 · 1년 지난 포인트 정리
             sgPaintCount(); setInterval(sgPaintCount, 5 * 60 * 1000);   // [신규] 손님 추천 — 안 본 것 수
             setInterval(gAutoHideRun, 5 * 60 * 1000); // 앱을 켜둔 채 15시나 자정을 넘겨도 잡히게 5분마다 체크
@@ -30251,7 +30336,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             selectedItems.forEach(itemKey => {
                 const [phone, orderKey] = itemKey.split("|");
                 const orderItem = rawOrders.find(o => o.phone === phone && o.orderKey === orderKey);
-                const isCanceled = orderItem && (orderItem.canceled === true || orderItem.canceled === "true" || String(orderItem.canceled).toUpperCase() === "TRUE");
+                const isCanceled = orderItem && isSalesCanceled(orderItem);
                 if (!isCanceled) {
                     itemsToProcess.push({ phone, orderKey, orderItem });
                 }
@@ -30343,7 +30428,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                                 orderItem.deliveryPhoto = null;
                                 orderItem.deliveryPhotoExists = true;
                                 orderItem.deliveryPhotoTime = nowTime;
-                                syncStatusToGoogleSheets(phone, orderItem.timestamp, orderItem.item, "배달완료");
                             }
                         });
                         promises.push(p);
@@ -31686,9 +31770,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     const code = String(c.hits[0].po.productCode || '').trim();
                     if (/^[PFS]\d+$/.test(code)) patch[`${c.idx}/productCode`] = code;
                 });
-                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
-                });
+                const res = await gPatchProductsRes(patch);
                 if (!res.ok) throw new Error('저장 실패 ' + res.status);
                 updatePublishedProductsTimestamp();   // [버그수정] 번호가 바뀌었다고 알린다. 안 알리면 주문서가 옛 상품을 계속 쓰고, 새 주문에 옛 번호가 적힌다
                 targets.forEach(c => {
@@ -31738,10 +31820,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             showLoader("식별번호 연결 중...");
             try {
-                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ [`${c.idx}/productCode`]: newCode })
-                });
+                const res = await gPatchProductsRes({ [`${c.idx}/productCode`]: newCode });
                 if (!res.ok) throw new Error('저장 실패 ' + res.status);
                 if (uploadProducts[c.idx]) uploadProducts[c.idx].productCode = newCode;
                 updatePublishedProductsTimestamp();   // [버그수정] 번호가 바뀌었다고 알린다. 안 알리면 주문서가 옛 상품을 계속 쓰고, 새 주문에 옛 번호가 적힌다
@@ -32345,9 +32424,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (Object.keys(patch).length === 0) return 0;
 
                 // published_products는 배열이라 인덱스를 키로 PATCH한다 (다른 값은 건드리지 않는다)
-                const res = await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
-                });
+                const res = await gPatchProductsRes(patch);
                 if (!res.ok) throw new Error('상품 식별번호 저장 실패 ' + res.status);
                 updatePublishedProductsTimestamp();   // [버그수정] 번호가 바뀌었다고 알린다. 안 알리면 주문서가 옛 상품을 계속 쓰고, 새 주문에 옛 번호가 적힌다
 
@@ -32672,10 +32749,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     const _p = uploadProducts[_pi];
                     if (_p && !/^[PFS]\d+$/.test(String(_p.productCode || '').trim()) && /^[PFS]\d+$/.test(productCode)) {
                         try {
-                            await fetch(`${FIREBASE_DB_URL}published_products.json`, {
-                                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ [`${_pi}/productCode`]: productCode })
-                            });
+                            await gPatchProductsRes({ [`${_pi}/productCode`]: productCode });
                             _p.productCode = productCode;
                             updatePublishedProductsTimestamp();   // [버그수정] 번호가 바뀌었다고 알린다. 안 알리면 주문서가 옛 상품을 계속 쓰고, 새 주문에 옛 번호가 적힌다
                         } catch (e) { console.warn('상품에 식별번호 연결 실패:', e); }
@@ -33543,7 +33617,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             (rawOrders || []).forEach(it => {
                 if (!it) return;
                 if (!(it.paid === true || it.paid === "true")) return;
-                if (it.canceled === true || it.canceled === "true" || String(it.canceled).toUpperCase() === "TRUE") return;
+                if (isSalesCanceled(it)) return;
                 if (String(it.item || '').includes('[배달합산]')) return;   // 표시용 줄이라 금액이 겹친다
                 if (getOrderDateInfo(it).dateStr !== day) return;
                 const amt = parseInt(it.total || 0) || 0;
