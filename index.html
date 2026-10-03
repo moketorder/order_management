@@ -19033,10 +19033,16 @@
             });
             const items = ranked.sort((a, b) => b.n - a.n).slice(0, 20).map(({ sid, name }) => ({ sid, name }));
             const sig = JSON.stringify(items);
-            if (sig === _gHomePopLast) return;
             _gHomePopAt = Date.now();
-            fetch(`${FIREBASE_DB_URL}settings/home_popular.json`, { method: 'PUT', body: JSON.stringify({ at: Date.now(), items }) })
+            const put = () => fetch(`${FIREBASE_DB_URL}settings/home_popular.json`, { method: 'PUT', body: JSON.stringify({ at: Date.now(), v: 2, items }) })
                 .then(r => { if (r.ok) _gHomePopLast = sig; }).catch(() => { });
+            if (sig !== _gHomePopLast) { put(); return; }
+            /* [수정 2026-10-04] 순위가 그대로여도 서버 값이 내 것과 같은지 본다 (사장님: 순위가 또 2개뿐).
+               새로고침 안 한 옛 판 주문관리 창이 끝난 상품 위주의 옛 순위로 덮어써도, 새 판이 10분 안에 바로잡는다.
+               순위 20개(약 1.5KB)만 받는다. */
+            fetch(`${FIREBASE_DB_URL}settings/home_popular.json`).then(r => r.ok ? r.json() : null).then(v => {
+                if (!v || v.v !== 2 || JSON.stringify(v.items || []) !== sig) put();
+            }).catch(() => { });
         }
         // [신규 2026-10-03] 주문이 없어도 상품을 올리거나 내리면 순위가 바뀌므로 10분마다 한 번 더 본다 (바뀌었을 때만 저장)
         setInterval(() => { try { gHomePopularPublish(); } catch (e) { } }, 10 * 60000);
