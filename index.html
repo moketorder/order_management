@@ -2940,10 +2940,9 @@
                                 <div class="segment-control" id="upload-main-seg" style="display: grid; grid-template-columns: repeat(2, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px;">
                                     <!-- [수정 2026-09-30] 당일판매·예약판매를 '공동구매' 하나로 합쳤다. 날짜가 오늘이면 당일, 뒷날이면 예약.
                                          안쪽 값은 저장된 자료와 이어져 있어 그대로 쓴다 (공동구매 = reserve).
-                                         '예전 당일'은 날짜 없이 올라간 옛 과일·야채를 고칠 때만 나타난다. -->
+                                         [수정 2026-10-03] '예전 당일'·코스트코 칸은 지웠다 (사장님 요청). 날짜 없는 과일은 공동구매의 '없음'으로 올린다. -->
                                     <div class="segment-btn active" data-tab="reserve" onclick="selectMainTab('reserve')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🗓️ 공동구매</div>
                                     <div class="segment-btn" data-tab="onsite" onclick="selectMainTab('onsite')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📦 상시판매</div>
-                                    <div class="segment-btn" data-tab="fruit" onclick="selectMainTab('fruit')" style="display:none; text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🚚 예전 당일</div>
                                 </div>
                             </div>
 
@@ -3819,6 +3818,10 @@
         .ps-mname:hover { color: #1d4ed8; text-decoration: underline; }
         .ps-mbtn { flex: 0 0 auto; height: 28px; padding: 0 9px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; border-radius: 7px; font-size: 11px; font-weight: 800; cursor: pointer; }
         .ps-mbtn.danger { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
+        /* [신규 2026-10-03] 묶음 일정의 상품별 '상시' 단추 — 꺼짐은 회색, 켜짐(전환 걸어 둠)은 초록 */
+        .ps-mbtn.onsite { border-color: #e2e8f0; background: #f8fafc; color: #64748b; }
+        .ps-mbtn.onsite.on { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+        .ps-monsite { margin: -2px 0 2px; padding: 8px 10px; border: 1px dashed #cbd5e1; border-radius: 9px; background: #f8fafc; }
         /* 여러 칸에 걸친 막대의 이름 — 첫 칸 밖으로 이어지는 칸까지 펼친다 (막대 조각은 overflow:hidden 이라 이름 칸만 밖으로 꺼낸다) */
         .ps-bar:has(.ps-lab) { overflow: visible; z-index: 1; }
         .ps-lab { position: absolute; left: 4px; top: 0; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
@@ -13791,6 +13794,122 @@
             return n;
         }
 
+        /* ===== [신규 2026-10-03] 끝나면 상시판매로 전환 (사장님 요청) =====
+           노출일정 카드에서 '끝나면 상시판매'를 켜 두면, 그 차례의 픽업일이 지난 자정부터
+           재고가 남았으면(무제한 포함 — 켜 뒀다는 건 팔 물건이 있다는 뜻) 상시판매로 돌려 계속 판다.
+            · 분류탭: 카드에서 고른 것, 안 골랐으면 예전 상시판매 분류탭(onsiteTabPrev 또는 지금 분류탭)
+            · 금액: 카드에 적었으면 그 금액으로 바꾸고, 비우면 그대로
+            · 분류(matchKey): 보관방법(storage, 냉동·냉장·상온) → 없으면 '상시판매' — 상시판매 등록과 같은 규칙
+              ([수정 2026-10-03] 예전 분류값을 따로 남기던 onsiteKeyPrev 는 뺐다. 보관방법은 공동구매로 바뀌어도 상품에 남아 있다)
+            · 일정 칸(올라감·마감 등)은 상품 줄에서 비운다 — 안 비우면 지난 마감 시각 때문에 손님 화면이 '마감'으로 막는다
+              (일정 자체는 노출일정에 기록으로 남는다)
+            · 품절(재고 0)이면 넘기지 않는다 — 날짜가 지나 자동 숨김으로 내려간다
+           주문관리를 열 때 돈다 (다른 자동 작업과 같다). 한 번 처리하면 일정에 toOnsiteDone 을 남긴다. */
+        // 이 상품이 상시판매로 돌아갈 때 쓸 분류탭 (예전 것). 없으면 ''
+        function psPrevOnsiteTab(p) {
+            const valid = new Set(ONSITE_CATS.map(c => c.key));
+            const d = String((p && p.displayTab) || ''), prev = String((p && p.onsiteTabPrev) || '');
+            return valid.has(d) ? d : (valid.has(prev) ? prev : '');
+        }
+        async function psConvertEndedToOnsite() {
+            const today = gTodayISO();
+            const valid = new Set(ONSITE_CATS.map(c => c.key));
+            let n = 0;
+            for (const sid of Object.keys(psSched)) {
+                const idx = psIdxOfSid(sid);
+                const p = uploadProducts[idx];
+                if (!p || !p.schedRid) continue;
+                const raw = psSched[sid][p.schedRid];
+                if (!raw || raw.toOnsite !== true || raw.toOnsiteDone) continue;
+                const pickup = psIsGroupProd(p) ? toISODate(p.matchKey) : toISODate(raw.pickup || '');
+                if (!pickup || today <= pickup) continue;            // 픽업일이 지난 자정부터
+                const done = async (why) => { raw.toOnsiteDone = why; await psSchedPatch({ [`${sid}/${p.schedRid}/toOnsiteDone`]: why }); };
+                const st = salesRealStock(p);
+                if (st !== Infinity && !(st > 0)) { await done('soldout'); continue; }   // 품절이면 넘기지 않는다
+                const tab = valid.has(String(raw.toOnsiteTab || '')) ? raw.toOnsiteTab : psPrevOnsiteTab(p);
+                if (!tab) { console.warn('상시판매 전환 — 분류탭이 없어 건너뜀:', p.name); continue; }
+                const stg = String(p.storage || '');
+                const mk = ['냉동', '냉장', '상온'].includes(stg) ? stg : '상시판매';
+                const price = parseInt(raw.toOnsitePrice, 10);
+                const now = Date.now();
+                const f = {
+                    matchKey: mk, date: '', kind: null, displayTab: tab, nextDate: null,
+                    releaseAt: null, expireAt: null, releaseApplied: null, expireApplied: null, announced: null,
+                    schedRid: null, schedGroup: null, schedGroupLabel: null,
+                    onsiteTabPrev: null,
+                    hide: false, showToday: true, showReserve: true, updatedAt: now
+                };
+                if (price > 0) f.price = price;
+                const patch = {};
+                Object.keys(f).forEach(k => { patch[`${idx}/${k}`] = f[k]; });
+                if (!(await fbPatchProducts(patch))) continue;
+                Object.assign(p, f);
+                await done(true);
+                // 손으로 해 둔 [마감]이 있으면 푼다 (상시판매로 다시 파는 것이므로)
+                const ck = fGetAdjKey(p.matchKey, p.name, p.sid);
+                if (uploadClosedMap[ck] === true || uploadClosedMap[encodeURIComponent(ck)] === true) {
+                    try {
+                        const r = await fetch(`${FIREBASE_DB_URL}product_closed/${encodeURIComponent(ck)}.json`, { method: 'DELETE' });
+                        if (r.ok) { delete uploadClosedMap[ck]; delete uploadClosedMap[encodeURIComponent(ck)]; }
+                    } catch (e) { console.warn('상시판매 전환 — 마감 풀기 실패:', e); }
+                }
+                n++;
+            }
+            if (n) { updatePublishedProductsTimestamp(); showToast(`🏪 ${n}개 상품을 상시판매로 돌렸어요`); }
+            return n;
+        }
+        // 노출일정 카드의 '끝나면 상시판매' 칸
+        async function psItemSetToOnsite(key, on) {
+            const it = psItem(key);
+            if (!it) return;
+            const p = uploadProducts[it.idx];
+            if (on && !psPrevOnsiteTab(p) && !it.toOnsiteTab) showToast('🏪 상시판매 분류탭을 골라 주세요');
+            if (await psItemSave(key, { toOnsite: on ? true : null, toOnsiteDone: null }, true))
+                showToast(on ? '🏪 픽업일이 지나면 재고가 남은 만큼 상시판매로 돌려요' : '상시판매 전환을 껐어요');
+            renderProductScheduleCalendar();
+        }
+        async function psItemSetToOnsiteTab(key, v) {
+            await psItemSave(key, { toOnsiteTab: v || null }, true);
+            renderProductScheduleCalendar();
+        }
+        async function psItemSetToOnsitePrice(key, v) {
+            const n = parseInt(String(v || '').replace(/[^\d]/g, ''), 10);
+            await psItemSave(key, { toOnsitePrice: n > 0 ? n : null }, true);
+            renderProductScheduleCalendar();
+        }
+        // 카드에 넣을 칸 (단독 일정에만)
+        // fieldsOnly=true 면 체크박스 줄 없이 분류탭·금액 칸만 (묶음 일정의 '상시' 단추 아래에 쓴다)
+        function psToOnsiteHtml(key, fieldsOnly) {
+            const it = psItem(key);
+            const p = uploadProducts[it.idx];
+            const kq = gEscapeHtml(key);
+            const on = it.toOnsite === true;
+            const prev = psPrevOnsiteTab(p);
+            const doneTxt = it.toOnsiteDone === true ? ' <span class="ps-ok">전환됨</span>' : (it.toOnsiteDone === 'soldout' ? ' <span class="ps-ok">품절이라 안 함</span>' : '');
+            // [수정 2026-10-03] 예전 상시판매 분류탭이 있으면 '자동 (…)' 대신 그 탭을 바로 골라 둔다 (사장님 요청).
+            //  안 바꾸고 두면 저장값은 비어 있고, 전환할 때 같은 예전 탭이 들어간다.
+            const curTab = it.toOnsiteTab || prev;
+            const tabOpts = (prev ? '' : `<option value="">분류탭 고르기</option>`)
+                + ONSITE_CATS.map(c => `<option value="${c.key}"${curTab === c.key ? ' selected' : ''}>${gEscapeHtml(c.label)}</option>`).join('');
+            const needTab = on && !prev && !it.toOnsiteTab;
+            const fields = `<div class="ps-g2">
+                        <div class="ps-f"><label>분류탭</label>
+                            <select class="ps-in" onchange="psItemSetToOnsiteTab('${kq}', this.value)"${needTab ? ' style="border-color:#fca5a5; color:#dc2626;"' : ''}>${tabOpts}</select></div>
+                        <div class="ps-f"><label>상시판매 금액</label>
+                            <input type="number" min="0" inputmode="numeric" class="ps-in" value="${Number(it.toOnsitePrice) > 0 ? Number(it.toOnsitePrice) : ''}" placeholder="지금 ${(Number(p.price) || 0).toLocaleString()}원 · 비우면 그대로" onchange="psItemSetToOnsitePrice('${kq}', this.value)"></div>
+                    </div>`;
+            if (fieldsOnly) return `<div style="font-size:11px; font-weight:700; color:var(--text-sub); margin-bottom:6px;">🏪 상시판매 전환 — 픽업일이 지나면 남은 재고로${doneTxt}</div>${fields}`;
+            // [수정 2026-10-03] 제목 '끝나면'을 '상시판매 전환' 체크박스 하나로 합쳤다 (사장님 요청)
+            return `<div class="ps-sec">
+                    <label class="ps-sec-t" style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="픽업일이 지난 자정부터, 재고가 남았으면 상시판매로 돌려 계속 팝니다">
+                        <input type="checkbox" ${on ? 'checked' : ''} onchange="psItemSetToOnsite('${kq}', this.checked)"><span class="custom-checkbox" style="margin-right:0;"></span>
+                        상시판매 전환${doneTxt}
+                        ${on ? '<span style="font-weight:700; color:var(--text-sub); letter-spacing:0;">— 픽업일이 지나면 남은 재고로</span>' : ''}
+                    </label>
+                    ${on ? fields : ''}
+                </div>`;
+        }
+
         /* 예전 방식에서 옮기기 — 상품 줄에 적혀 있던 일정과, 노출일정 복사·반복으로 생겼던 복사본 줄을 일정 데이터베이스로 옮긴다.
            · 같은 노출번호 줄 중 가장 앞 줄이 상품으로 남고, 나머지 복사본 줄의 일정은 그 상품의 일정이 된 뒤 줄은 없어진다.
            · 지금 손님에게 보이는 차례(올라간 일정)가 복사본 줄에 있으면, 그 상태(노출·날짜·마감 표시 등)를 남는 줄로 옮긴다.
@@ -13888,7 +14007,9 @@
             if (rel && exp && exp <= rel) { showToast('⚠️ 마감 시각은 올라가는 시각보다 뒤여야 해요'); return false; }
             const ov = psItemOverlap(it.sid, rel, exp, it.rid);
             if (ov) { psOverlapToast(ov); return false; }
-            const fields = ['releaseAt', 'expireAt', 'pickup', 'group', 'groupLabel', 'autoRepeat', 'stock', 'stockApplied'];
+            // [수정 2026-10-03] 끝나면 상시판매 전환 칸(toOnsite…)도 함께 저장한다 — psConvertEndedToOnsite 참고
+            const fields = ['releaseAt', 'expireAt', 'pickup', 'group', 'groupLabel', 'autoRepeat', 'stock', 'stockApplied',
+                'toOnsite', 'toOnsiteTab', 'toOnsitePrice', 'toOnsiteDone'];
             const patch = {};
             fields.forEach(f => { if (f in changes) patch[`${it.sid}/${it.rid}/${f}`] = (changes[f] === undefined || changes[f] === '' ? null : changes[f]); });
             if (!(await psSchedPatch(patch))) return false;
@@ -13987,6 +14108,27 @@
            올라가는 순간 상품 날짜(date·matchKey)를 그 날로 바꾼다 — 재고는 노출번호(sid)로 세므로 날짜가 바뀌어도 그대로 이어진다.
            이미 팔고 있는 상품은 끝을 끌면 그 자리에서 날짜를 바꾸고, 재고는 그대로 이어진다 (번호 옮기기 전 상품은 남은 재고를 새 열쇠로 옮긴다). */
         function psIsGroupProd(p) { return !!p && /^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(String(p.matchKey || '').trim()); }
+
+        /* ===== [신규 2026-10-03] 상시판매 상품을 노출일정으로 올리면 '공동구매 일반'이 된다 (사장님 요청) =====
+           노출일정에 날짜(픽업일)를 넣었다는 건 그 날짜로 공동구매를 한다는 뜻이다.
+           예전에는 상시판매 그대로 올라가서, 마감이 지나면 상시판매 탭에 회색 '마감' 카드로 계속 남았다.
+           이제 올라가는 순간 분류(matchKey)·날짜를 픽업일로, 종류를 일반(kind:'group')으로 바꾸고 분류탭은 지운다.
+            · 그러면 손님 화면 공동구매(날짜 묶음)에 뜨고, 날짜가 지나면 자동 숨김이 내려 준다.
+            · 재고·[마감] 표시는 노출번호(sid)로 세므로 그대로 이어진다 (상시판매 상품은 모두 노출번호가 있다).
+            · 상시판매로 되돌릴 때 쓰라고 예전 분류탭을 onsiteTabPrev 에 남겨 둔다. 보관방법(storage)은 그대로 남으니 따로 안 적는다. */
+        function psIsOnsiteProd(p) { return !!p && !psIsGroupProd(p) && !!gOnsiteTabCatOfList(p); }
+        // 공동구매로 바꿀 때 쓸 픽업일 — 넘겨받은 값, 지금 차례 일정의 픽업일, 마감 날, 올라가는 날 차례로
+        function psOnsitePickup(p, rel, exp, pickup) {
+            const sch = p && p.sid && p.schedRid && psSched[p.sid] && psSched[p.sid][p.schedRid];
+            return toISODate(pickup || '') || toISODate((sch && sch.pickup) || '') || fMsToDateKey(exp) || fMsToDateKey(rel) || '';
+        }
+        // 상품 줄에 적을 값 (patch 꼴: { 칸: 값 })
+        function psOnsiteToGroupFields(p, key) {
+            return {
+                date: key, matchKey: key, kind: 'group', displayTab: null, nextDate: null,
+                onsiteTabPrev: String(p.displayTab || '') || null
+            };
+        }
         function psIsUpcoming(p) { return !!p && Number(p.releaseAt) > 0 && (Date.now() < Number(p.releaseAt) || p.releaseApplied !== true); }
         function psAddDays(key, n) { const [y, m, d] = key.split('-').map(Number); return fMsToDateKey(new Date(y, m - 1, d + n).getTime()); }
         // 올라가는 순간 쓸 픽업일 — 적어 둔 nextDate, 없으면 지금 날짜가 올라가는 날 뒤면 그대로, 아니면 마감 같은 날
@@ -14235,12 +14377,23 @@
                 const n = await psEnsureRepeats();
                 showToast(`🔁 ${w === 1 ? '매주' : w + '주마다'} 반복 · ${n ? '다음 차례 ' + n + '개를 만들었어요' : '4주 안에 만들 차례가 없어요'}`);
             } else {
+                /* [수정 2026-10-03] 반복을 끄면 아직 안 올라간 일정을 묻지 않고 바로 지운다 (사장님 요청).
+                   예전에는 '저절로 만든(autoRepeat)' 것만 골라 지울지 물었는데, 일정을 고친 뒤 껐을 때
+                   지울 것이 걸러지지 않아 반복 일정이 다 남았다. 이제 저절로 만든 것인지와 상관없이
+                   지금 차례가 아니고 올라가는 시각이 아직 안 된 일정은 모두 지운다.
+                   단, 상품마다 한 번도 올라간 적이 없으면(모두 아직 안 올라감) 가장 이른 일정 하나는 남긴다. */
+                const now = Date.now();
                 const sids = new Set(idxs.map(i => uploadProducts[i].sid));
-                const future = psAllItems().filter(x => sids.has(x.sid) && x.autoRepeat === true && !psIsActive(x) && Number(x.releaseAt) > Date.now());
-                if (future.length && (await psConfirm(`반복을 껐어요.\n저절로 만든, 아직 안 올라간 일정 ${future.length}개도 지울까요?`, '지우기', true))) {
-                    for (const x of future) await psItemDelete(x.key);
-                    showToast(`🗑️ 일정 ${future.length}개를 지웠어요`);
-                } else showToast('🔁 반복을 껐어요');
+                const del = [];
+                sids.forEach(s => {
+                    const all = psItemsOfSid(s);
+                    const notRun = all.filter(x => !psIsActive(x) && Number(x.releaseAt) > now)
+                        .sort((a, b) => Number(a.releaseAt) - Number(b.releaseAt));
+                    const anyRun = all.length > notRun.length;   // 지금 차례이거나 이미 올라간 일정이 있다
+                    del.push(...(anyRun ? notRun : notRun.slice(1)));
+                });
+                for (const x of del) await psItemDelete(x.key);
+                showToast(del.length ? `🔁 반복을 끄고 아직 안 올라간 일정 ${del.length}개를 지웠어요` : '🔁 반복을 껐어요');
             }
             renderProductScheduleCalendar();
             if (typeof renderProductsList === 'function') renderProductsList();
@@ -14553,7 +14706,7 @@
                             xLine = `<div class="ps-xl" style="left:${b.expPct}%" draggable="${PS_DND}" ondragstart="psResizeDragStart(event, '${kq}', 'end')" title="마감 — 끌어서 마감 날짜 조절"></div>`;
                         }
                     }
-                    namesHtml += `<div class="ps-bar${isStart ? ' s' : ''}${isEnd ? ' e' : ''}${isCut ? ' cut' : ''}${b.past ? ' ps-past' : ''}" data-key="${kq}" data-start="${b.start}" style="${bgCss} color:${fg}; cursor:grab;${selShadow}" title="${gEscapeHtml(b.nm)} · ${b.tip} · 일정 ${word} · 지금 ${ST[b.live][2]} · 끌어서 날짜 옮기기(Ctrl+끌면 복사) · 양 끝을 끌면 시작/${b.pk ? '픽업' : '마감'} 날짜만 조절${b.pk ? ' · 세로선을 끌면 마감 날짜 조절' : ''} · 눌러서 고른 뒤 Delete로 지우기" draggable="${PS_DND}" ondragstart="psDragStart(event, '${kq}', '${b.start}')" onclick="event.stopPropagation(); psSelectBar('${kq}')">${lHandle}${label}${xLine}${rHandle}</div>`;
+                    namesHtml += `<div class="ps-bar${isStart ? ' s' : ''}${isEnd ? ' e' : ''}${isCut ? ' cut' : ''}${b.past ? ' ps-past' : ''}" data-key="${kq}" data-start="${b.start}" style="${bgCss} color:${fg}; cursor:grab;${selShadow}" title="${gEscapeHtml(b.nm)} · ${b.tip} · 일정 ${word} · 지금 ${ST[b.live][2]} · 끌어서 날짜 옮기기(Ctrl+끌면 복사) · 양 끝을 끌면 시작/${b.pk ? '픽업' : '마감'} 날짜만 조절${b.pk ? ' · 세로선을 끌면 마감 날짜 조절' : ''} · 눌러서 고른 뒤 Delete로 지우기" draggable="${PS_DND}" ondragstart="psDragStart(event, '${kq}', '${b.start}')" onclick="event.stopPropagation(); psSelectBar('${kq}', event)">${lHandle}${label}${xLine}${rHandle}</div>`;
                 }
                 namesHtml += `</div>`;   // ps-slot 닫기
                 });
@@ -14897,7 +15050,7 @@
                             <input type="number" min="0" inputmode="numeric" class="ps-in" value="${(it.stock === null || it.stock === undefined) ? '' : it.stock}" placeholder="지금 ${psNowStockText(it.idx)} · 비우면 이어가기" title="누르면 지금 재고가 들어가요. 안 고치면 그대로 이어가요" ${psStockInputEvents(key, it.idx)}></div>`}
                         <div class="ps-f"><label>🔁 반복</label>${repeatSel}</div>
                     </div>
-                </div>`;
+                </div>${grp ? '' : psToOnsiteHtml(key)}`;
         }
 
         // 일정 카드 하나 (상품 하나의 일정) — 기본은 접어 두고, 누르면 펼쳐서 고친다
@@ -14923,11 +15076,12 @@
                 ${open ? `<div class="ps-card-b">
                     ${psSwapFor === key ? psProductPickHtml('swap', key) : ''}
                     ${psAddToFor === key ? psProductPickHtml('addto', key) : ''}
+                    ${/* [수정 2026-10-03] 달력 이름을 맨 위로 — 여러 상품 일정 카드의 '일정 이름'과 같은 자리 (사장님 요청) */''}
+                    <div class="ps-f" style="margin-bottom:8px;"><label>달력 이름</label>
+                        <input type="text" class="ps-in" value="${gEscapeHtml(prod.scheduleLabel || '')}" placeholder="비우면 상품명 (예: 김치, 자몽음료)" onchange="psUpdateScheduleLabel(${it.idx}, this.value)"></div>
                     ${psSchedFieldsHtml(key, false)}
                     <div class="ps-sec">
                         <div class="ps-sec-t">상품</div>
-                        <div class="ps-f"><label>달력 이름</label>
-                            <input type="text" class="ps-in" value="${gEscapeHtml(prod.scheduleLabel || '')}" placeholder="비우면 상품명 (예: 김치, 자몽음료)" onchange="psUpdateScheduleLabel(${it.idx}, this.value)"></div>
                         <div class="ps-f"><label>카톡 문구</label>
                             <textarea rows="2" class="ps-in ps-ta" placeholder="비우면 상세설명 · 설명도 없으면 상품명·가격" onchange="psUpdateAnnounceText(${it.idx}, this.value)">${gEscapeHtml(prod.announceText || '')}</textarea></div>
                     </div>
@@ -14987,9 +15141,12 @@
                             <span class="ps-dot" style="background:${PS_DOTC[psLiveStateOf(x.idx)]};"></span>
                             <span class="ps-mname" onclick="editProduct(${x.idx})" title="상품 정보 고치기">${gEscapeHtml(xp.name)}</span>
                             <input type="number" min="0" inputmode="numeric" class="ps-in ps-in-s" title="이번 차례 재고 — 누르면 지금 재고(${psNowStockText(x.idx)})가 들어가요. 안 고치면 그대로 이어가요" placeholder="${psNowStockText(x.idx)}" value="${(x.stock === null || x.stock === undefined) ? '' : x.stock}" ${psStockInputEvents(k, x.idx)}>
+                            ${/* [신규 2026-10-03] 상품마다 '상시판매 전환' — 누르면 켜지고(체크한 것과 같다) 이 줄 아래에 분류탭·금액 칸이 열린다.
+                                  한 번 더 누르면 꺼지고 칸도 닫힌다 (사장님 요청) */''}
+                            <button type="button" class="ps-mbtn onsite${x.toOnsite === true ? ' on' : ''}" onclick="psItemSetToOnsite('${xk}', ${x.toOnsite === true ? 'false' : 'true'})" title="상시판매 전환 — 픽업일이 지나면 남은 재고로 상시판매">${x.toOnsite === true ? '✓ 상시' : '상시'}</button>
                             <button type="button" class="ps-mbtn" onclick="psGroupDetach('${xk}')" title="같은 시각 그대로, 이 상품만 따로인 일정으로">떼기</button>
                             <button type="button" class="ps-mbtn danger" onclick="psGroupRemove('${xk}')" title="이 상품의 이 일정을 지워요 (상품은 그대로)">빼기</button>
-                        </div>`; }).join('')}
+                        </div>${x.toOnsite === true ? `<div class="ps-monsite">${psToOnsiteHtml(k, true)}</div>` : ''}`; }).join('')}
                         </div>
                         ${psAddToFor === first ? psProductPickHtml('addto', first) : ''}
                     </div>
@@ -15273,17 +15430,27 @@
         // 막대 고르기 — 누를 때마다 더하거나 뺀다. 한 일정에 담긴 상품들은 막대 하나라 같이 골라진다.
         //  막대를 고르면 날짜 선택은 풀고, 아래 칸엔 고른 막대의 일정 카드가 나온다 (막대·날짜는 따로 고른다)
         let psSelectedIdxs = new Set();   // 고른 일정 열쇠들 (이름은 예전 그대로)
-        function psSelectBar(key) {
+        /* [수정 2026-10-03] Ctrl(맥은 ⌘)을 누르고 눌러야 여러 개를 고른다 (사장님 요청).
+           그냥 누르면 그 막대 하나만 고르고(앞서 고른 것은 풀린다), 그것만 골라져 있을 때 다시 누르면 푼다.
+           폰(손가락 화면)은 Ctrl 이 없으므로 예전처럼 누를 때마다 더하고 뺀다. */
+        function psSelectBar(key, ev) {
             const ms = psGroupMembers(key);
-            if (psSelectedIdxs.has(key)) ms.forEach(k => psSelectedIdxs.delete(k));
-            else ms.forEach(k => psSelectedIdxs.add(k));
+            const add = !!(ev && (ev.ctrlKey || ev.metaKey)) || !PS_DND;
+            if (add) {
+                if (psSelectedIdxs.has(key)) ms.forEach(k => psSelectedIdxs.delete(k));
+                else ms.forEach(k => psSelectedIdxs.add(k));
+            } else {
+                const only = psSelectedIdxs.size === ms.length && ms.every(k => psSelectedIdxs.has(k));
+                psSelectedIdxs = new Set(only ? [] : ms);
+            }
             psCalOpenDay = '';
             psAddSearchOpenFor = '';
             renderProductScheduleCalendar();
         }
 
         /* 끌어서 한꺼번에 고르기 (PC 마우스) — 막대가 아닌 빈 곳에서 눌러 끌면 네모가 그려지고, 네모에 걸친 막대를 모두 고른다.
-           Shift·Ctrl 을 누른 채 끌면 지금 고른 것에 더한다(안 누르면 새로 고른다). 조금도 안 끌고 떼면 날짜칸 누르기로 친다. */
+           Ctrl(맥은 ⌘)을 누른 채 끌면 지금 고른 것에 더한다(안 누르면 새로 고른다). 조금도 안 끌고 떼면 날짜칸 누르기로 친다.
+           [수정 2026-10-03] 더하기는 Ctrl 로만 — 막대 누르기와 같은 규칙 (사장님 요청). 예전엔 Shift 도 됐다. */
         let psMq = null;
         function psMarqueeDown(ev) {
             if (ev.button !== 0) return;
@@ -15292,7 +15459,7 @@
             if (!box) return;
             const r = box.getBoundingClientRect();
             psMq = { x0: ev.clientX - r.left + box.scrollLeft, y0: ev.clientY - r.top + box.scrollTop, cx: ev.clientX, cy: ev.clientY,
-                add: !!(ev.shiftKey || ev.ctrlKey || ev.metaKey), base: new Set(psSelectedIdxs), el: null, moved: false, hits: new Set() };
+                add: !!(ev.ctrlKey || ev.metaKey), base: new Set(psSelectedIdxs), el: null, moved: false, hits: new Set() };
             document.addEventListener('mousemove', psMarqueeMove);
             document.addEventListener('mouseup', psMarqueeUp);
             box.addEventListener('scroll', psMarqueeMove);
@@ -15495,6 +15662,13 @@
                 else if (changes.nextDate) liveDate = changes.nextDate;
                 if (freshDate === toISODate(prod.matchKey)) freshDate = '';
             }
+            // [신규 2026-10-03] 상시판매 상품인데 이번 저장으로 바로 올라가게 됐으면 그 자리에서 공동구매 일반으로 바꾼다.
+            //  (아직 안 올라간 예약이면 올라가는 순간 autoApplyScheduledVisibility 가 바꾼다)
+            let onsiteFields = null;
+            if (!isGroup && newReleaseAt && !nowUpcoming && psIsOnsiteProd(prod)) {
+                const ok = psOnsitePickup(prod, newReleaseAt, newExpireAt, changes.nextDate);
+                if (ok) onsiteFields = psOnsiteToGroupFields(prod, ok);
+            }
 
             const patch = {
                 [`${idx}/releaseAt`]: newReleaseAt,
@@ -15509,6 +15683,7 @@
                 [`${idx}/updatedAt`]: now
             };
             if (freshDate) { patch[`${idx}/date`] = freshDate; patch[`${idx}/matchKey`] = freshDate; }
+            if (onsiteFields) Object.keys(onsiteFields).forEach(k => { patch[`${idx}/${k}`] = onsiteFields[k]; });
             // [신규 2026-10-02] 한 일정에 여러 상품 — 묶음 번호·일정 이름·반복
             ['schedGroup', 'schedGroupLabel', 'repeatWeeks'].forEach(f => { if (f in changes) patch[`${idx}/${f}`] = changes[f] || null; });
             if (!hasSchedule) { patch[`${idx}/schedGroup`] = null; patch[`${idx}/schedGroupLabel`] = null; }
@@ -15523,6 +15698,7 @@
                 prod.expireApplied = expireApplied;
                 prod.nextDate = (isGroup && nowUpcoming) ? newNext : null;
                 if (freshDate) { prod.date = freshDate; prod.matchKey = freshDate; }
+                if (onsiteFields) Object.assign(prod, onsiteFields);
                 ['schedGroup', 'schedGroupLabel', 'repeatWeeks'].forEach(f => { if (`${idx}/${f}` in patch) prod[f] = patch[`${idx}/${f}`]; });
                 prod.updatedAt = now;
                 if (liveDate) await psChangeLiveDate(idx, liveDate);
@@ -15565,6 +15741,14 @@
                     if (nk && nk !== toISODate(p.matchKey)) {
                         patch[`${idx}/date`] = nk; patch[`${idx}/matchKey`] = nk;
                         p.date = nk; p.matchKey = nk;
+                    }
+                    // [신규 2026-10-03] 상시판매 상품이면 공동구매 일반으로 바꿔 올린다 — psOnsiteToGroupFields 참고
+                    if (!nk && psIsOnsiteProd(p)) {
+                        const ok = psOnsitePickup(p, releaseAt, expireAt);
+                        if (ok) {
+                            const f = psOnsiteToGroupFields(p, ok);
+                            Object.keys(f).forEach(k => { patch[`${idx}/${k}`] = f[k]; p[k] = f[k]; });
+                        }
                     }
                     if (p.nextDate) { patch[`${idx}/nextDate`] = null; p.nextDate = null; }
                     nextHide = false;
@@ -15992,7 +16176,11 @@
            보관방법을 따로 지정하지 않았어도 분류(matchKey)가 냉동/냉장/상온이면 그것으로 본다.
            지정도 분류도 없으면 아무것도 안 붙인다. */
         function gListStorageBadge(prod){
-            const s = String((prod && prod.storage) || '') + ' ' + String((prod && prod.matchKey) || '');
+            /* [수정 2026-10-03] 보관방법(storage)이 있으면 그것만 본다. 분류(matchKey)는 보관방법이 비었을 때만 본다.
+               예전엔 둘을 이어 붙여 보느라, 보관방법이 냉장인데 분류가 냉동인 상품(스트링치즈)에 '냉동'이 붙었다.
+               상시판매 보관 분류 칸을 없애면서 보관방법 단추가 기준이 됐다. 주문서 gStorageBadge 와 같은 규칙. */
+            const st = String((prod && prod.storage) || '').trim();
+            const s = st || String((prod && prod.matchKey) || '');
             let label, bg, fg;
             if (/냉동/.test(s))      { label = '❄️ 냉동'; bg = '#eef4ff'; fg = '#1d4ed8'; }
             else if (/냉장/.test(s)) { label = '🧊 냉장'; bg = '#eafaf2'; fg = '#047857'; }
@@ -17349,17 +17537,11 @@
         function rebuildDisplayTabGroups() {
             // [수정 2026-09-30] 당일판매·예약판매를 '공동구매' 하나로 합쳤다. 주문서 공동구매의 종류 탭(공구·과일·사다드림·추석선물)과 같다.
             //  예전 값 today-reserve(오늘의 상품)는 고르는 목록에서 뺐고, 이미 그 값인 상품은 주문서가 '공구'로 본다.
+            /* [수정 2026-10-03] 분류탭은 상시판매에서만 쓴다 (사장님 요청). 공동구매 묶음(일반·과일·야채·사다드림·추석선물)은 뺐다.
+               이제 '분류탭이 onsite-… 이면 상시판매'가 상시판매를 가르는 열쇠다. 공동구매 상품은 분류탭을 비워 저장한다.
+               공동구매 안의 종류는 등록 줄의 '종류'(kind)가 맡는다.
+               ※ 추석선물 탭(chuseok)도 같이 빠졌다. 내년 추석에 다시 쓰려면 종류에 '추석선물'을 더하는 식으로 다시 만들어야 한다. */
             DISPLAY_TAB_GROUPS = [
-                {
-                    group: '공동구매',
-                    items: [
-                        { key: 'reserve', label: '일반', desc: '날짜별로 묶여 보이는 일반 공동구매 상품' },
-                        { key: 'today-fruit', label: '과일·야채', desc: '과일·야채 탭 (보통은 등록 칸의 종류로 저절로 들어갑니다)' },
-                        { key: 'sada', label: '사다드림', desc: '무료배달 기준 제외 · 대행료 적용 대상' },
-                        // [신규] 철 따라 쓰는 칸. 여기로 지정한 상품이 있을 때만 주문서에 탭이 생긴다.
-                        { key: 'chuseok', label: '추석선물', desc: '추석 선물 묶음 — 지정한 상품이 있을 때만 손님 화면에 탭이 생깁니다' }
-                    ]
-                },
                 {
                     // [수정] 보관방법(냉동·냉장·상온) 대신 음식 종류로 나눈다.
                     //  손님은 '무엇을 먹을지'로 찾지 '어디에 보관하는지'로 찾지 않기 때문.
@@ -17405,27 +17587,27 @@
             btn.title = on
                 ? `분류탭: ${gDisplayTabLabel(uploadDisplayTab)} (눌러서 바꾸기)`
                 : '주문서에서 보일 탭을 고릅니다. 지정하면 기존 분류보다 우선합니다.';
-            btn.style.border = `1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}`;
-            btn.style.background = on ? 'var(--primary-light)' : '#ffffff';
-            btn.style.color = on ? 'var(--primary)' : 'var(--text-sub)';
-
-            // 해제 단추 — 지정된 것이 있을 때만 눈에 띄게 (없으면 옅게 두어 누를 것이 없음을 알린다)
-            const clr = document.getElementById('btn-display-tab-clear');
-            if (clr) {
-                clr.style.border = `1.5px solid ${on ? '#fca5a5' : 'var(--border)'}`;
-                clr.style.background = on ? '#fef2f2' : '#f8fafc';
-                clr.style.color = on ? '#dc2626' : '#cbd5e1';
-                clr.style.cursor = on ? 'pointer' : 'default';
+            /* [신규 2026-10-03] 상시판매는 분류탭이 꼭 있어야 한다 (사장님 요청 — 저장할 때 막는다, submitForm 참고).
+               안 골랐으면 단추를 붉게 두어 골라야 한다는 것을 알린다. */
+            const need = !on && uploadCurrentTab === 'onsite';
+            if (need) {
+                btn.innerText = '분류탭 (필수)';
+                btn.title = '상시판매는 분류탭을 꼭 골라야 저장됩니다.';
             }
+            btn.style.border = `1.5px solid ${on ? 'var(--primary)' : need ? '#fca5a5' : 'var(--border)'}`;
+            btn.style.background = on ? 'var(--primary-light)' : need ? '#fef2f2' : '#ffffff';
+            btn.style.color = on ? 'var(--primary)' : need ? '#dc2626' : 'var(--text-sub)';
         }
 
         /* [신규] 상세 분류 줄의 세 번째 칸으로 들어가는 분류탭 버튼.
            [수정] 그 칸을 다시 2:1로 쪼개, 오른쪽에 '지정 해제(✕)' 단추를 둔다.
            한 번 고른 분류탭을 되돌리려면 창을 열어 같은 것을 다시 눌러야 했는데,
-           그 방법을 아는 사람만 쓸 수 있어서 여기서 바로 지울 수 있게 했다. */
+           그 방법을 아는 사람만 쓸 수 있어서 여기서 바로 지울 수 있게 했다.
+           [수정 2026-10-03] ✕는 다시 뺐다 (사장님 요청). 분류탭 설정 창에서 고른 칸을 한 번 더 누르면 지워진다.
+            이제 분류탭 단추 한 칸만 내준다. */
         function makeDisplayTabBtn() {
             const wrap = document.createElement('div');
-            // [수정] 분류탭 단추와 ✕ 를 바깥 줄의 칸으로 그대로 내보낸다 (세 칸이 똑같은 너비가 되게)
+            // 분류탭 단추를 바깥 줄의 칸으로 그대로 내보낸다
             wrap.style.cssText = "display:contents;";
 
             const btn = document.createElement('button');
@@ -17437,27 +17619,8 @@
                 + ' overflow:hidden; text-overflow:ellipsis; box-sizing:border-box; text-align:center;'
                 + ' transition:var(--transition);';
 
-            const clr = document.createElement('button');
-            clr.type = 'button';
-            clr.id = 'btn-display-tab-clear';
-            clr.innerText = '✕';
-            clr.title = '분류탭 지정 해제';
-            clr.onclick = clearDisplayTab;
-            clr.style.cssText = 'width:100%; min-width:0; height:45px; padding:0; border-radius:10px;'
-                + ' font-family:inherit; font-size:14px; font-weight:900; cursor:pointer;'
-                + ' box-sizing:border-box; transition:var(--transition);';
-
             wrap.appendChild(btn);
-            wrap.appendChild(clr);
             return wrap;
-        }
-
-        // 분류탭 지정을 지운다 (지정 없음으로 되돌린다)
-        function clearDisplayTab() {
-            if (!uploadDisplayTab) { showToast("지정된 분류탭이 없습니다."); return; }
-            uploadDisplayTab = '';
-            updateDisplayTabUI();
-            showToast("분류탭 지정을 해제했습니다.");
         }
 
         /* ===== [신규] 상시판매 분류 이름 고치기 / 추가하기 =====
@@ -17603,7 +17766,7 @@
                 `<span onclick="closeDisplayTabSetting()" style="font-size:22px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
                 `</div>` +
                 `<div style="flex:1; overflow-y:auto; padding:14px 18px;">` +
-                `<div style="font-size:12px; font-weight:700; color:var(--text-sub); margin-bottom:10px; line-height:1.55;">여기서 고른 탭에 <b>우선</b> 노출됩니다. 고른 것을 다시 누르면 해제되고, 그때는 기존 분류 방법대로 보입니다.<br>고른 값은 <b>등록/수정 완료</b>를 눌러야 실제로 저장됩니다.</div>` +
+                `<div style="font-size:12px; font-weight:700; color:var(--text-sub); margin-bottom:10px; line-height:1.55;">상시판매 상품이 손님 화면에서 들어갈 탭입니다. 꼭 하나 골라야 저장됩니다. 고른 것을 다시 누르면 해제됩니다.<br>고른 값은 <b>등록/수정 완료</b>를 눌러야 실제로 저장됩니다.</div>` +
                 html +
                 `</div>` +
                 `<div style="padding:14px 18px; border-top:1px solid var(--border); display:flex; gap:8px;">` +
@@ -17624,8 +17787,7 @@
             if (!modal) return;
             modal.querySelectorAll('[data-dt-key]').forEach(el => {
                 el.classList.toggle('active', el.dataset.dtKey === uploadDisplayTab);
-            });
-        }
+            });        }
 
         // [수정] '없음' 칸을 없앤 대신, 고른 것을 다시 누르면 해제된다(= 없음).
         function pickDisplayTab(key) {
@@ -17633,7 +17795,6 @@
             updateDisplayTabUI();
             syncDisplayTabRows(); // 모달을 다시 만들지 않고 선택 표시만 갱신
         }
-
         // [신규] 취소하면 창을 열기 전 값으로 되돌린다 (확인과 구분되도록)
         function cancelDisplayTabSetting() {
             uploadDisplayTab = displayTabBeforeEdit;
@@ -17649,7 +17810,9 @@
         let uploadEditIsSada = false; // [신규] 수정 시 '사다드림' 체크 상태를 기억해 폼에 반영
         let uploadEditIsRecommend = false; // [신규] 수정 시 '오늘의추천'(과채류) 체크 상태를 기억해 폼에 반영
         let uploadIsFresh = false;         // [신규] 공동구매 칸의 '신선식품' 선택 상태 (사다드림과 하나만 켜진다)
-        let uploadSelectedDate = new Date().toISOString().split('T')[0];
+        // [수정 2026-10-03] 새 상품은 날짜를 비워 두고 시작한다 (사장님 요청). 안 고르고 저장하면 '날짜 없음'으로 올라간다.
+        //  예전에는 오늘 날짜가 미리 들어가 있었다.
+        let uploadSelectedDate = '';
         let uploadManageDeliveryType = "reserve";
         let uploadManageKind = 'all';   // [신규 2026-09-30] 공동구매 목록의 종류 줄 (all·group·fruit·veg·sada·fresh)
         let uploadManageTab = "today-fruit";
@@ -25749,13 +25912,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         // [수정] 상시판매 보관/분류에 '과일'을 추가. 과일은 선반에 두지 않으므로 선반위치는 '미지정'만 쓴다.
         //  (과일을 맨 앞에 두면 새 상품 기본값이 과일이 되어 버려서, 기존처럼 냉동이 기본이 되도록 뒤에 붙였다)
+        // [수정 2026-10-03] 등록 화면에서 고르는 칸은 없앴다. 예전 상품이 갖고 있는 분류 값을 알아보는 데만 쓴다.
         const onsiteCategories = ["냉동", "냉장", "상온", "과일"];
-        const fruitCategories = [
-            { key: "과일", label: "과일" },
-            { key: "야채", label: "야채" },
-            { key: "기타", label: "기타" }
-        ];
-        const costcoCategories = ["코스트코 냉동", "코스트코 냉장", "코스트코 상온"];
         /* [수정] 보관분류(냉동·냉장·상온·과일)별로 고를 수 있는 선반을 막던 표(SHELF_GROUPS)는 없앴다.
            냉동 상품을 상온 선반에 잠깐 올려 두는 일도 실제로는 생기는데 고를 수가 없었다.
            이제 어떤 상품이든 모든 선반을 고를 수 있고, 선반 목록은 '⚙️ 선반 관리'에서 정한다. */
@@ -25811,27 +25969,22 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
 
         function selectMainTab(tab) {
+            // [수정 2026-10-03] 등록 칸은 공동구매(reserve)·상시판매(onsite) 둘뿐이다. 그 밖의 값이 오면 공동구매로 연다.
+            if (tab !== 'reserve' && tab !== 'onsite') tab = 'reserve';
             uploadCurrentTab = tab;
             document.querySelectorAll('#tab-upload .segment-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.tab === tab);
             });
-            // [신규] '예전 당일'은 날짜 없는 옛 과일을 고칠 때만 보인다
-            {
-                const _old = document.querySelector('#upload-main-seg .segment-btn[data-tab="fruit"]');
-                const _seg = document.getElementById('upload-main-seg');
-                if (_old) _old.style.setProperty('display', (tab === 'fruit') ? 'flex' : 'none', 'important');   // .segment-btn 이 display 를 !important 로 잡고 있다
-                if (_seg) _seg.style.gridTemplateColumns = (tab === 'fruit') ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)';
-            }
-
             const container = document.getElementById('categoryContainer');
             container.innerHTML = '';
 
             if (tab === 'reserve') {
-                document.getElementById('categoryLabel').innerText = "날짜  ·  종류  ·  신선  ·  추천  ·  분류탭";
+                // [수정 2026-10-03] 분류탭 칸은 뺐다 — 분류탭은 상시판매에서만 쓴다 (사장님 요청)
+                document.getElementById('categoryLabel').innerText = "날짜  ·  종류  ·  신선  ·  추천";
                 // [수정 2026-09-30] 공동구매 하나로 합쳤다 — 날짜 · 종류(과일·야채·사다드림·일반) · 신선식품 · 오늘의추천 · 분류탭
                 const row = document.createElement('div');
                 // [수정] flex로는 날짜칸·고르는칸의 고유 폭 때문에 세 칸이 균등해지지 않았다. 격자로 못 박는다.
-                row.style.cssText = "display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1.2fr) repeat(2, minmax(0,0.8fr)) minmax(0,1fr) 44px; gap:6px; align-items:stretch;";
+                row.style.cssText = "display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1.2fr) repeat(2, minmax(0,0.8fr)); gap:6px; align-items:stretch;";
 
                 /* [수정] 날짜칸이 'YYYY-MM-DD'를 다 못 보여 주고 잘렸다. 연도는 거의 안 바뀌므로
                    화면에는 '8/23(토)'만 보여 준다. 브라우저가 정하는 날짜칸 표시 형식은 바꿀 수 없어서,
@@ -25856,14 +26009,18 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 /* [신규 2026-09-30] 과일·야채·일반 공구는 '날짜 없음'으로도 올린다 (예전 당일처럼 올린 날 하루 판다).
                    날짜칸 오른쪽 작은 '없음' 단추로 날짜를 비운다. 다시 날짜칸을 누르면 날짜를 고를 수 있다.
                    사다드림은 날짜가 꼭 있어야 해서 이 단추가 안 보인다. */
+                /* [수정 2026-10-03] '없음' 글자 단추를 ✕로 바꿨다 (사장님 요청) — 고른 날짜를 지우는 느낌으로.
+                   날짜는 비운 채로 시작하고('날짜 선택'), 안 고르고 저장하면 '날짜 없음'으로 올라간다.
+                   ✕는 날짜를 골랐을 때만 보인다. */
                 const noDateBtn = document.createElement('button');
                 noDateBtn.type = 'button';
-                noDateBtn.innerText = '없음';
-                noDateBtn.title = '날짜 없이 올리기 (올린 날 하루만 팝니다)';
-                noDateBtn.style.cssText = 'position:absolute; right:4px; top:50%; transform:translateY(-50%); z-index:2;'
-                    + ' height:26px; padding:0 7px; border:1px solid var(--border); border-radius:7px; background:#f8fafc;'
-                    + ' color:var(--text-sub); font-family:inherit; font-size:11px; font-weight:800; cursor:pointer;';
+                noDateBtn.innerText = '✕';
+                noDateBtn.title = '고른 날짜 지우기 (날짜 없이 올리면 올린 날 하루만 팝니다)';
+                noDateBtn.style.cssText = 'position:absolute; right:5px; top:50%; transform:translateY(-50%); z-index:2;'
+                    + ' width:24px; height:24px; padding:0; border:none; border-radius:50%; background:#f1f5f9;'
+                    + ' color:#94a3b8; font-family:inherit; font-size:12px; font-weight:900; line-height:24px; cursor:pointer;';
                 // 사다드림만 빼고 모두 '날짜 없음'을 고를 수 있다 (사다드림은 픽업·배달일이 있어야 한다)
+                // [수정 2026-10-03] 사다드림도 안 고르면 막지 않고 오늘 날짜로 저장한다 — submitForm 참고
                 // [수정 2026-10-03] 예전 주석에 '주문 마감일'이라고 적혀 있었는데, 이 날짜는 손님이 받는 픽업·배달일이다.
                 //  상품에는 마감일 칸이 없다 (사장님 확인)
                 const isFruitKind = () => ['fruit', 'veg', 'group'].includes(uploadKind) && !(document.getElementById('productIsSada') || {}).checked;
@@ -25871,11 +26028,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const paintDateFace = () => {
                     const v = String(input.value || '').trim();
                     const fruitish = isFruitKind();
-                    dateFace.innerText = v ? fmtMD(v) : (fruitish ? '날짜 없음' : '날짜 선택');
-                    dateFace.style.color = v ? 'var(--text-main)' : (fruitish ? 'var(--primary)' : 'var(--text-sub)');
-                    // 날짜가 있을 때만 '없음' 단추를 보인다 (이미 비었으면 누를 일이 없다)
-                    noDateBtn.style.display = (fruitish && v) ? '' : 'none';
-                    dateFace.style.paddingRight = (fruitish && v) ? '40px' : '';
+                    // [수정 2026-10-03] 비어 있으면 늘 '날짜 선택'으로 보인다. 저장은 사다드림이 아니면 '날짜 없음'으로 된다.
+                    dateFace.innerText = v ? fmtMD(v) : '날짜 선택';
+                    dateFace.style.color = v ? 'var(--text-main)' : 'var(--text-sub)';
+                    dateFace.title = v ? '' : (fruitish ? '안 고르면 날짜 없음으로 올라갑니다' : '안 고르면 오늘 날짜로 올라갑니다 (오늘 하루 판매)');
+                    // 날짜가 있을 때만 ✕를 보인다 (이미 비었으면 지울 것이 없다)
+                    noDateBtn.style.display = v ? '' : 'none';
+                    dateFace.style.paddingRight = v ? '28px' : '';
                 };
                 noDateBtn.onclick = (e) => {
                     e.preventDefault(); e.stopPropagation();
@@ -25975,98 +26134,46 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 row.appendChild(segWrap);
                 row.appendChild(freshBtn);
                 row.appendChild(makeRecommendToggle());
-                row.appendChild(makeDisplayTabBtn());
                 container.appendChild(row);
             }
             else if (tab === 'onsite') {
-                document.getElementById('categoryLabel').innerText = "보관 분류  ·  위치(선반)  ·  분류탭";
-                // [신규] 왼쪽=보관분류(냉동/냉장/상온), 오른쪽=선반위치(장소) 반반 배치
+                /* [수정 2026-10-03] 보관 분류(냉동·냉장·상온·과일) 고르는 칸을 없앴다 (사장님 요청).
+                   아래 '보관방법' 단추(냉동·냉장·상온)와 같은 것을 두 번 고르고 있었고,
+                   음식 종류는 분류탭(과일·신선, 국·탕·찌개 …)이 맡는다.
+                   이제 저장할 때 분류(matchKey)는 보관방법 단추 값을 따른다 — submitForm 참고.
+                   다른 코드가 categoryValue 칸을 찾으므로 보이지 않는 칸으로 남겨 둔다. */
+                // [수정 2026-10-03] 분류탭을 앞으로, 선반위치를 뒤로 (사장님 요청)
+                document.getElementById('categoryLabel').innerText = "분류탭  ·  위치(선반)";
+                /* [신규 2026-10-03] 노출일정으로 공동구매가 됐던 상품을 고치다가 상시판매로 바꾸면,
+                   그때 남겨 둔 예전 분류탭(onsiteTabPrev)을 자동으로 넣어 준다 (사장님 요청). 이미 골랐으면 건드리지 않는다. */
+                if (uploadIsEditMode && !uploadDisplayTab) {
+                    const _ep = (uploadProducts || [])[uploadEditProductKey];
+                    const _prev = String((_ep && _ep.onsiteTabPrev) || '');
+                    if (ONSITE_CATS.some(c => c.key === _prev)) uploadDisplayTab = _prev;
+                }
                 const row = document.createElement('div');
-                row.style.cssText = "display:grid; grid-template-columns:repeat(3, minmax(0,1fr)) 44px; gap:8px; align-items:stretch;";
+                /* 칸: 분류탭 단추 · 선반
+                   [수정 2026-10-03] ✕(분류탭 지우기)는 모든 줄에서 뺐다 (사장님 요청) — makeDisplayTabBtn 참고. */
+                row.style.cssText = "display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; align-items:stretch;";
 
-                const select = document.createElement('select');
-                select.id = 'categoryValue';
-                select.className = 'form-control';
-                select.style.width = '100%';
-                select.style.minWidth = '0';
-                onsiteCategories.forEach(cat => {
-                    const opt = document.createElement('option');
-                    opt.value = cat;
-                    // [수정] 보관분류 '과일'도 보이는 이름은 '과일·신선'으로. (분류탭 이름과 맞춘다)
-                    //  저장되는 값(cat)은 '과일' 그대로다 — 이미 등록된 상품들이 이 값을 쓰고 있다.
-                    opt.innerText = (cat === "냉동" ? "🧊냉동" : cat === "냉장" ? "❄️냉장" : cat === "상온" ? "🌡️상온" : cat === "과일" ? "🥬과일·신선" : cat);
-                    select.appendChild(opt);
-                });
+                const hiddenCat = document.createElement('input');
+                hiddenCat.type = 'hidden';
+                hiddenCat.id = 'categoryValue';
+                hiddenCat.value = '상시판매';
 
                 const shelfSelect = document.createElement('select');
                 shelfSelect.id = 'productShelf';
                 shelfSelect.className = 'form-control';
                 shelfSelect.style.width = '100%';
                 shelfSelect.style.minWidth = '0';
-                // [신규] 보관분류 바뀌면 선반 옵션도 관련된 것만 갱신
-                select.onchange = () => {
-                    populateShelfOptions();
-                    // [신규] 상시판매에서 보관분류 '과일'을 고르면 주문서 분류탭도 '상시판매 › 과일·신선'으로 맞춰 준다.
-                    //  (안 그러면 분류가 과일이라 당일판매 과일 쪽에 섞여 버린다. 이미 다른 탭을 골라 뒀으면 건드리지 않는다)
-                    if (select.value === '과일' && !uploadDisplayTab) {
-                        uploadDisplayTab = 'onsite-fruit';
-                        updateDisplayTabUI();
-                    }
-                };
 
-                row.appendChild(select);
-                row.appendChild(shelfSelect);
+                row.appendChild(hiddenCat);
                 row.appendChild(makeDisplayTabBtn());
+                row.appendChild(shelfSelect);
                 container.appendChild(row);
                 // 현재 보관분류(기본 냉동, 수정 시엔 이후 editProduct가 다시 세팅)에 맞춰 선반 옵션 채움
                 populateShelfOptions(uploadIsEditMode ? (uploadEditShelf || '') : '');
             }
-            else if (tab === 'fruit') {
-                document.getElementById('categoryLabel').innerText = "분류  ·  오늘의추천  ·  분류탭";
-                // [신규] 왼쪽=분류, 오른쪽=오늘의추천 체크 (공동구매 탭의 사다드림 버튼과 같은 모양)
-                const row = document.createElement('div');
-                row.style.cssText = "display:grid; grid-template-columns:repeat(3, minmax(0,1fr)) 44px; gap:8px; align-items:stretch;";
-
-                const select = document.createElement('select');
-                select.id = 'categoryValue';
-                select.className = 'form-control';
-                select.style.width = '100%';   // [수정] 격자 한 칸을 꽉 채운다
-                select.style.minWidth = '0';
-                fruitCategories.forEach(cat => {
-                    const opt = document.createElement('option');
-                    opt.value = cat.key;
-                    opt.innerText = cat.label;
-                    select.appendChild(opt);
-                });
-
-                // 체크 시 상품명 앞에 [오늘의추천] 말머리를 자동으로 붙여 저장한다.
-                //  [수정] 앞에 있던 네모 체크표시는 뺐다. 옆 칸(분류·분류탭)과 같은 버튼 모양으로 두고
-                //  켜졌는지는 색으로만 구분한다. 저장 로직이 읽는 체크박스는 숨겨서 그대로 둔다.
-                row.appendChild(select);
-                row.appendChild(makeRecommendToggle());
-                row.appendChild(makeDisplayTabBtn());
-                container.appendChild(row);
-            }
-            else if (tab === 'costco') {
-                document.getElementById('categoryLabel').innerText = "코스트코 소분류  ·  분류탭";
-                const row = document.createElement('div');
-                row.style.cssText = "display:grid; grid-template-columns:repeat(2, minmax(0,1fr)) 44px; gap:8px; align-items:stretch;";
-                const select = document.createElement('select');
-                select.id = 'categoryValue';
-                select.className = 'form-control';
-                select.style.width = '100%';
-                select.style.minWidth = '0';
-                costcoCategories.forEach(cat => {
-                    const opt = document.createElement('option');
-                    opt.value = cat;
-                    opt.innerText = cat;
-                    select.appendChild(opt);
-                });
-                row.appendChild(select);
-                row.appendChild(makeDisplayTabBtn());
-                container.appendChild(row);
-            }
-
             // [신규] 탭별로 박스 높이가 달라지지 않도록 카테고리 영역의 모든 컨트롤 높이를 45px로 통일
             container.querySelectorAll('select, input').forEach(el => {
                 el.style.height = '45px';
@@ -26183,7 +26290,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     }
                 } else if (prod.matchKey) {
                     const mKey = String(prod.matchKey);
-                    if (mKey.includes("냉동") || mKey.includes("냉장") || mKey.includes("상온") || mKey.includes("실온")) {
+                    // [수정 2026-10-03] 보관방법 없이 올린 상시판매는 분류가 '상시판매'라 그 글자가 그대로 찍혔다
+                    if (mKey.includes("냉동") || mKey.includes("냉장") || mKey.includes("상온") || mKey.includes("실온") || mKey.includes("상시판매")) {
                         dateStr = "당일구매";
                     } else {
                         dateStr = mKey;
@@ -27475,7 +27583,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 checkAndRunWeeklyProductsAutoUpdate(data);
 
                 // [신규] 날짜가 지난 상품은 숨겨 둔다 (손님이 받는 목록을 가볍게)
-                gAutoHidePastProducts(data);
+                //  [수정 2026-10-03] 끝나기를 기다렸다가 상시판매 전환을 돌린다 (전환이 숨김보다 나중에 저장돼야 다시 보인다)
+                window._gPastHideP = gAutoHidePastProducts(data);
 
                 if (stockRes && stockRes.ok) {
                     uploadGlobalAdjustments = await stockRes.json() || {};
@@ -27517,6 +27626,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     for (let w = 0; w < 50 && gSidMigrating; w++) await new Promise(r => setTimeout(r, 200));   // 다른 곳에서 붙이는 중이면 끝날 때까지 기다린다
                     const mig = await psMigrateToSchedules();
                     if (mig > 0) { renderProductsList(); showToast('📅 일정을 따로 관리하도록 옮겼어요'); }
+                    // [신규 2026-10-03] 픽업일이 지난 차례 중 '끝나면 상시판매'를 켠 상품을 상시판매로 돌린다.
+                    //  다음 차례를 올리기(psPromoteDue) 전에 돌려야 끝난 차례를 알아본다.
+                    try { await window._gPastHideP; } catch (e) {}
+                    await psConvertEndedToOnsite();
                     await psPromoteDue();
                     autoApplyScheduledVisibility();   // [신규] 상품 자료를 받을 때마다 예약 공개·종료 시각에 맞춰 노출도 같이 맞춘다
                     const n = await psEnsureRepeats();
@@ -27692,6 +27805,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 else if (mKey === "냉동") displayTitle = "🧊 냉동 상품";
                 else if (mKey === "냉장") displayTitle = "❄️ 냉장 상품";
                 else if (mKey === "상온") displayTitle = "🌡️ 상온/실온 상품";
+                // [신규 2026-10-03] 보관방법을 안 고르고 올린 상시판매 상품
+                else if (mKey === "상시판매") displayTitle = "📦 상시판매 (보관방법 없음)";
                 else if (mKey === "과일") displayTitle = "🍎 과일";
                 else if (mKey === "야채") displayTitle = "🥬 야채";
                 else if (mKey === "기타") displayTitle = "📦 기타";
@@ -28549,10 +28664,35 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 matchKey = (uploadKind === 'veg') ? '야채' : (uploadKind === 'fruit') ? '과일' : '기타';
                 date = '';
             }
+            /* [신규 2026-10-03] 사다드림도 날짜를 안 고르면 '오늘 하루 판매'로 올린다 (사장님 요청).
+               사다드림은 날짜(픽업·배달일)가 꼭 있어야 주문서가 목록에 띄우고 주문에 배달일을 적으므로,
+               날짜를 비우지 않고 오늘 날짜를 넣는다. 그러면 오늘 마감시각이 지나면 '마감', 내일이면 날짜가 지나 목록에서 빠진다. */
+            if (uploadCurrentTab === 'reserve' && !String(catVal || '').trim()
+                && (document.getElementById('productIsSada') || {}).checked) {
+                matchKey = gTodayISO();
+                date = matchKey;
+            }
+            /* [수정 2026-10-03] 상시판매는 보관 분류 칸이 없어졌다 (사장님 요청).
+               분류(matchKey)는 보관방법 단추(냉동·냉장·상온) 값을 그대로 쓰고, 안 골랐으면 '상시판매'로 둔다.
+               주문서·통계·재고가 모두 이 두 가지를 상시판매로 알아본다.
+               예전 '과일' 분류 상품도 고쳐 저장하면 이렇게 바뀐다 (음식 종류는 분류탭이 그대로 지킨다). */
+            if (uploadCurrentTab === 'onsite') {
+                matchKey = uploadStorageType || '상시판매';
+                date = '';
+                /* [신규 2026-10-03] 상시판매는 분류탭(음식 종류)을 꼭 골라야 저장된다 (사장님 요청).
+                   안 고르면 주문서에서 '기타' 탭으로 흘러가 손님이 찾기 어렵다.
+                   (이름으로 짐작해 넣는 자동 지정도 만들어 봤지만, 사장님이 직접 고르는 쪽으로 정했다) */
+                if (!String(uploadDisplayTab || '').startsWith('onsite-')) {
+                    showToast("상시판매는 분류탭을 골라주세요.");
+                    updateDisplayTabUI();
+                    return;
+                }
+            }
 
             // [신규] 분류(matchKey)가 비면 주문서에서 어느 카테고리에도 못 들어가고
             //  공동구매 전체상품에 '날짜 없는 빈 그룹'으로 새어 나온다. 저장 자체를 막는다.
             if (!String(matchKey || '').trim()) {
+                // [수정 2026-10-03] 공동구매는 날짜를 비워도 늘 값이 채워지므로(날짜 없음 / 사다드림은 오늘) 여기 걸릴 일이 거의 없다
                 showToast(uploadCurrentTab === 'reserve'
                     ? "공동구매 날짜를 선택해주세요."
                     : "카테고리를 선택해주세요.");
@@ -28584,7 +28724,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             //  (예전에는 이름에 붙여 저장해서, 이름을 고칠 때마다 말머리가 겹쳐 쌓였다)
             //  위에서 이름의 [오늘의추천] 말머리를 이미 떼어냈으므로, 예전 상품도 한 번 저장하면 이름이 깨끗해진다.
             const _recChkEl = document.getElementById('productIsRecommend');
-            const _isRecommendChecked = ((uploadCurrentTab === 'fruit' || uploadCurrentTab === 'reserve') && !!_recChkEl && _recChkEl.checked);
+            const _isRecommendChecked = (uploadCurrentTab === 'reserve' && !!_recChkEl && _recChkEl.checked);
 
             // [신규] 공동구매 칸의 '신선식품' 선택. 지금은 값만 저장한다(주문서 동작은 아직 없음).
             //  사다드림과 하나만 켜지므로, 사다드림이면 신선식품은 꺼진 것으로 본다.
@@ -28671,8 +28811,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         const hit = Object.keys(_labMap).find(c => /^[PFS]\d+$/.test(c) && String(_labMap[c]).trim() === _typed);
                         if (hit) _productCode = hit;
                     }
-                    const _isFruitNew = (uploadCurrentTab === 'reserve' && uploadKind === 'fruit')
-                        || (uploadCurrentTab === 'fruit' && String(matchKey || '').trim() === '과일') || productCodePrefixPick === 'F';
+                    const _isFruitNew = (uploadCurrentTab === 'reserve' && uploadKind === 'fruit') || productCodePrefixPick === 'F';
                     if (!_productCode && _isFruitNew) {
                         const nm = _tight(name);
                         // 한 글자 과일(배·감·귤)은 '합배송'·'배추'처럼 다른 낱말 속에 잘 숨어 있어, 따로 떨어진 낱말일 때만 본다
@@ -28702,7 +28841,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                        이미 있는 갈래에 이어 붙일 생각이면 '🔍 번호 찾기'로 고르면 된다. */
                     // [변경] 단추로 고른 갈래가 있으면 그것을 쓴다
                     const _pre = productCodePrefixPick || (_isSadaChecked ? 'S'
-                        : ((uploadCurrentTab === 'fruit' && String(matchKey || '').trim() === '과일') || (uploadCurrentTab === 'reserve' && uploadKind === 'fruit')) ? 'F'
+                        : (uploadCurrentTab === 'reserve' && uploadKind === 'fruit') ? 'F'
                         : 'P');
                     productCodePrefixPick = '';
                     // 이미 쓰는 가장 큰 번호 다음으로 새 번호를 만든다
@@ -28768,7 +28907,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     hide: !(showToday || showReserve || showWeekly),
                     // [신규] 주문서에서 이 상품이 들어갈 탭. 빈 값이면 기존 방식(이름·분류로 판단)을 그대로 쓴다.
                     // [수정 2026-09-20] 특가라고 '오늘의 상품'으로 못박던 것을 뺐다. 고른 분류탭 그대로 저장한다.
-                    displayTab: (uploadDisplayTab || ""),
+                    // [수정 2026-10-03] 분류탭은 상시판매만 갖는다. 공동구매로 저장하면 예전 값(사다드림·추석선물·당일 과일 등)도 지운다.
+                    displayTab: (uploadCurrentTab === 'onsite' ? (uploadDisplayTab || "") : ""),
                     // [신규] 이름 위 작은 줄 — 대괄호(nameTags)·수식어(nameLead). 상품명에는 넣지 않는다
                     nameTags: (() => { const t = gNameFieldsRead().tags; return t.length ? t : null; })(),
                     nameLead: gNameFieldsRead().lead || null,
@@ -29712,7 +29852,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (dTab.startsWith("onsite-")) tabType = "onsite";
             else if (dTab === "today-fruit" || dTab === "today-reserve") tabType = "fruit";
             else if (dTab === "reserve" || dTab === "sada") tabType = "reserve";
-            else if (dTab === "costco") tabType = "costco";
 
             /* [신규] 분류탭이 가리키는 대분류에 이 상품의 분류(matchKey)를 담을 칸이 없으면 쓰지 않는다.
                저장할 때 matchKey는 그 칸의 값으로 다시 쓰이는데, 칸에 없는 값이면 첫 항목으로 튕겨
@@ -29720,10 +29859,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                그런 상품은 예전처럼 matchKey 기준 대분류로 연다. */
             if (tabType) {
                 const _fits =
-                    (tabType === 'onsite') ? (mKey === '' || onsiteCategories.includes(mKey)) :
-                    (tabType === 'fruit') ? (mKey === '' || fruitCategories.some(c => c.key === mKey)) :
-                    (tabType === 'reserve') ? /^(?:\d{4}|\d{2})[.\-\/]\d{1,2}[.\-\/]\d{1,2}$/.test(mKey) :
-                    (tabType === 'costco') ? costcoCategories.includes(mKey) : true;
+                    (tabType === 'onsite') ? (mKey === '' || onsiteCategories.includes(mKey) || mKey === '상시판매') :
+                    (tabType === 'fruit') ? (mKey === '' || ['과일', '야채', '기타'].includes(mKey)) :
+                    (tabType === 'reserve') ? /^(?:\d{4}|\d{2})[.\-\/]\d{1,2}[.\-\/]\d{1,2}$/.test(mKey) : true;
                 if (!_fits) tabType = "";
             }
 
@@ -29735,11 +29873,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     // [수정] 과채류 matchKey에서 '_예약' 접미사 제거(2026-08-09) 이후 대응 — '예약' 포함 여부와 무관하게 과일탭으로 인식
                     tabType = "fruit";
                 } else if (mKey.includes("코스트코")) {
-                    tabType = "costco";
+                    // [수정 2026-10-03] 코스트코 칸을 지웠다. 혹시 남은 옛 코스트코 상품은 상시판매로 연다
+                    //  (보관방법은 '코스트코 냉동'의 냉동을 읽어 채운다)
+                    tabType = "onsite";
                 }
             }
 
             /* [신규 2026-09-30] 날짜 없는 옛 당일 상품(과일·야채·기타)도 '공동구매' 칸으로 연다.
+               ('fruit'는 여기까지만 쓰는 표시다. 등록 칸 '예전 당일'은 2026-10-03에 지웠다)
                '예전 당일' 칸은 따로 두지 않는다. 날짜는 '날짜 없음', 종류는 분류대로(과일·야채·일반) 골라 둔다.
                그대로 저장하면 공동구매 쪽 '날짜 없음' 저장이 예전 당일과 같은 모양으로 다시 적는다. */
             let _legacyKind = '';
@@ -35461,8 +35602,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (productCodePrefixPick) return productCodePrefixPick;
             const sada = !!(document.getElementById('productIsSada') || {}).checked;
             if (uploadCurrentTab === 'reserve' && sada) return 'S';
-            const cat = String((document.getElementById('categoryValue') || {}).value || '').trim();
-            if (uploadCurrentTab === 'fruit' && cat === '과일') return 'F';
             if (uploadCurrentTab === 'reserve' && uploadKind === 'fruit') return 'F';
             return 'P';
         }
@@ -35488,9 +35627,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             view.placeholder = `자동 (${pre})`;
             // [신규] 새 번호(자동)이고 과세·면세를 손대지 않았으면, 과일은 면세·그 밖은 과세를 기본으로 둔다
             if (typeof uploadFormTaxTouched !== 'undefined' && !uploadFormTaxTouched) {
-                const _cat = String((document.getElementById('categoryValue') || {}).value || '').trim();
-                uploadFormTaxFree = (uploadCurrentTab === 'fruit' && (_cat === '과일' || _cat === '야채'))
-                    || (uploadCurrentTab === 'reserve' && (uploadKind === 'fruit' || uploadKind === 'veg'));
+                uploadFormTaxFree = (uploadCurrentTab === 'reserve' && (uploadKind === 'fruit' || uploadKind === 'veg'));
                 uploadFormTaxAuto = true;
                 paintFormTaxFree();
             }
