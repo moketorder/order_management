@@ -5259,6 +5259,7 @@
                 _ordersRenderTimer = setTimeout(() => {
                     _ordersRenderTimer = null;
                     processOrdersSnapshot(ordersByPhone);
+                    try { gHomePopularPublish(); } catch (e) { }   // [신규 2026-10-03] 손님 홈 '주문이 많아요' 순서
                     // [신규] 주문 달력이 열려 있으면 같이 새로 그린다 (상태를 바꾼 뒤 옛 값이 남아 다시 눌러야 바뀌던 것)
                     if (isRealtimeFirstLoadDone && typeof calRefreshIfOpen === 'function') gKeepScroll(calRefreshIfOpen);
                     if (!isRealtimeFirstLoadDone) {
@@ -18292,7 +18293,7 @@
             if (reload || !_gen) {
                 box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
                 const get = async p => { try { const r = await fetch(`${FIREBASE_DB_URL}${p}.json?t=${Date.now()}`); return r.ok ? await r.json() : null; } catch (e) { return null; } };
-                const [d, fee, sat, sun, hol, pl, lg, ts, hrs] = await Promise.all(["delivery_status", "delivery_fee", "saturday_as_weekday", "sunday_as_weekday", "public_holidays", "product_list_enabled", "login_entry_enabled", "today_sale", "store_hours"].map(get));
+                const [d, fee, sat, sun, hol, pl, lg, ts, hrs, hn] = await Promise.all(["delivery_status", "delivery_fee", "saturday_as_weekday", "sunday_as_weekday", "public_holidays", "product_list_enabled", "login_entry_enabled", "today_sale", "store_hours", "settings/home_notice"].map(get));
                 _gen = {
                     delivery: d === true,
                     fee: (fee === null || isNaN(parseInt(fee))) ? 3000 : parseInt(fee),
@@ -18302,7 +18303,8 @@
                     holidays: gGenPruneHolidays(hol || []),
                     productList: pl === null ? true : !!pl,
                     login: lg === null ? true : lg === true,
-                    hours: Object.assign({}, GEN_HOURS_DEFAULT, (hrs && typeof hrs === 'object') ? hrs : {})   // [신규] 매장 운영시간
+                    hours: Object.assign({}, GEN_HOURS_DEFAULT, (hrs && typeof hrs === 'object') ? hrs : {}),   // [신규] 매장 운영시간
+                    homeNotice: (hn && typeof hn === 'object') ? { on: hn.on !== false, text: String(hn.text || '') } : { on: false, text: '' }   // [신규 2026-10-03] 홈 가게 소식
                 };
                 await gLoadPrivateSettings(true);   // [신규 2026-10-03] 🔑 칸에 보여 줄 값
                 const t = new Date();
@@ -18339,7 +18341,7 @@
                     + ['pickup', 'delivery'].map(k => row(k === 'pickup' ? '픽업' : '배달',
                         `<input id="gen-hours-${k}" type="text" maxlength="40" value="${gEscapeHtml(G.hours[k])}" style="width:190px; height:34px; padding:0 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:800; box-sizing:border-box;">`)).join('')
                     + `<button type="button" onclick="gGenSaveHours()" style="width:100%; height:40px; margin-top:10px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:900; cursor:pointer;">운영시간 저장</button>`)
-                + card('🕒 당일판매', gGenTodaySaleHtml(G, row))
+                + card('🕒 오늘 주문 마감', gGenTodaySaleHtml(G, row))   // [수정 2026-10-03] '당일판매' → '오늘 주문 마감' (사장님 요청 — 당일판매 칸이 없어졌다. 저장 자리 today_sale·동작은 그대로)
                 + card('🚚 배달',
                     row('배달 주문', seg('delivery', G.delivery, ['켜기', '끄기']), G.delivery ? '손님이 배달 주문을 할 수 있습니다' : '배달 주문 단추가 막혀 있습니다')
                     + row('배달비', `<span style="display:inline-flex; align-items:center; gap:6px;">
@@ -18347,6 +18349,11 @@
                         <span style="font-size:13px; font-weight:800; color:#475569;">원</span>
                         <button type="button" onclick="gGenSaveFee()" style="height:34px; padding:0 12px; border:none; background:var(--primary); color:#fff; border-radius:8px; font-size:12.5px; font-weight:900; cursor:pointer;">저장</button>
                     </span>`, `지금 ${G.fee.toLocaleString()}원`))
+                + card('🏠 홈 가게 소식',
+                    `<div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin:-4px 0 6px; line-height:1.5;">손님 주문서 홈 맨 위 '가게 소식'에 나옵니다. 한 줄에 한 가지씩 적어 주세요. 둘째 줄부터는 손님이 접을 수 있어요.</div>`
+                    + `<textarea id="gen-home-notice" rows="3" maxlength="300" placeholder="예) 한글날(금) 육회 공동구매 올렸어요" style="width:100%; padding:9px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:700; line-height:1.5; box-sizing:border-box; resize:vertical; font-family:inherit;">${gEscapeHtml(G.homeNotice.text)}</textarea>`
+                    + `<label style="display:flex; align-items:center; gap:7px; margin-top:8px; font-size:13px; font-weight:800; color:#334155; cursor:pointer;"><input id="gen-home-notice-on" type="checkbox" ${G.homeNotice.on ? 'checked' : ''} style="width:17px; height:17px;">손님 홈에 보이기</label>`
+                    + `<button type="button" onclick="gGenSaveHomeNotice()" style="width:100%; height:40px; margin-top:10px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:900; cursor:pointer;">가게 소식 저장</button>`)
                 + card('📱 손님 화면',
                     row('상품목록', seg('productList', G.productList, ['공개', '숨김']), G.productList ? '손님에게 상품이 보입니다' : '손님에게 상품이 안 보입니다 (가게 사람만 봄)')
                     + row('로그인', seg('login', G.login, ['강제', '끄기']), G.login ? '카카오 로그인해야 주문서가 열립니다' : '로그인 없이 주문서를 볼 수 있습니다'))
@@ -18420,12 +18427,12 @@
                         : `늘 <b style="color:${open ? '#16a34a' : '#dc2626'};">${open ? '열림' : '닫힘'}</b> · 시간과 상관없이 바꿀 때까지 그대로입니다`)
                 + (mode === 'auto' ? row('시간', `<span style="display:inline-flex; align-items:center; gap:6px;">${timeIn('gen-ts-open', ts.open || '00:00')}<span style="font-weight:800; color:#94a3b8;">~</span>${timeIn('gen-ts-close', ts.close || '15:00')}
                         <button type="button" onclick="gGenTsSaveTimes()" style="height:34px; padding:0 12px; border:none; background:var(--primary); color:#fff; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">저장</button></span>`,
-                    '여는 시각 ~ 마감 시각 · 휴무일은 따로 쉽니다') : '');
+                    '여는 시각 ~ 마감 시각 · 지나면 오늘 받는 상품이 마감되고, 손님 홈에 「당일배송 마감」이 떠요 · 휴무일은 따로 쉽니다') : '');
         }
         // [신규] 운영 방식 고르기 — 열기·닫기는 계속, 자동은 시간대로
         function gGenTsMode(m) {
             if (m === 'auto') return gGenTsPatch({ auto: true, manual: null, manualDate: null, manualUntil: null }, '정한 시간에 저절로 열고 닫습니다.');
-            gGenTsPatch({ auto: false, manual: m, manualDate: gGenTsYmd(), manualUntil: null }, m === 'open' ? '당일판매를 열었습니다.' : '당일판매를 닫았습니다.');
+            gGenTsPatch({ auto: false, manual: m, manualDate: gGenTsYmd(), manualUntil: null }, m === 'open' ? '오늘 주문을 열었습니다.' : '오늘 주문을 닫았습니다.');
         }
         async function gGenTsPatch(patch, msg) {
             try {
@@ -18435,7 +18442,7 @@
                 Object.keys(patch).forEach(k => { if (patch[k] === null) delete _gen.ts[k]; });
                 showToast(msg);
                 renderGeneralAdmin();
-            } catch (e) { showToast('당일판매 설정을 바꾸지 못했습니다: ' + e.message); }
+            } catch (e) { showToast('오늘 주문 마감 설정을 바꾸지 못했습니다: ' + e.message); }
         }
         function gGenTsAuto(v) {
             const ts = _gen.ts || {};
@@ -18449,13 +18456,13 @@
             const ts = _gen.ts || {};
             const until = (ts.auto !== false) ? gGenTsNextSwitch(ts) : null;   // 자동이면 다음 자동 시각까지
             gGenTsPatch({ manual: v, manualDate: gGenTsYmd(), manualUntil: until },
-                (v === 'open' ? '당일판매를 열었습니다.' : '당일판매를 닫았습니다.') + (until ? ` (${gGenTsUntilLabel(until)})` : ''));
+                (v === 'open' ? '오늘 주문을 열었습니다.' : '오늘 주문을 닫았습니다.') + (until ? ` (${gGenTsUntilLabel(until)})` : ''));
         }
         function gGenTsSaveTimes() {
             const o = (document.getElementById('gen-ts-open') || {}).value || '', c = (document.getElementById('gen-ts-close') || {}).value || '';
             if (!/^\d{2}:\d{2}$/.test(o) || !/^\d{2}:\d{2}$/.test(c)) { showToast('시각을 넣어 주세요.'); return; }
             if (gGenTsHM(o, 0) >= gGenTsHM(c, 0)) { showToast('마감 시각이 여는 시각보다 늦어야 합니다.'); return; }
-            gGenTsPatch({ open: o, close: c }, `당일판매 ${o} ~ ${c}로 저장했습니다.`);
+            gGenTsPatch({ open: o, close: c }, `오늘 주문 ${o} ~ ${c}로 저장했습니다.`);
         }
 
         const GEN_KEYS = { delivery: ['delivery_status', '배달'], sat: ["saturday_as_weekday", "토요일"], sun: ["sunday_as_weekday", "일요일"], productList: ['product_list_enabled', '상품목록'], login: ['login_entry_enabled', '로그인'] };
@@ -18592,13 +18599,22 @@
                 // 이 화면을 본 것으로 적어 둔다 (다음에 열 때부터 NEW 가 빠진다)
                 try { localStorage.setItem(RV_SEEN_KEY, String(Date.now())); } catch (e) { }
                 if (!_rva.reviews.length) { box.innerHTML = `<div class="card" style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">아직 받은 후기가 없습니다.</div>`; return; }
+                /* [수정 2026-10-03] 쓴 사람을 가게만 알아보게 (사장님 요청). 손님 화면은 예전처럼 가린 이름(모***4)이고,
+                   여기서는 review_keys 로 찾은 번호 → 손님 별명(포인트 탭과 같은 이름)을 보여 주고 누르면 손님 카드를 연다. */
+                if (!window.__caSaved && !_rva.cust) {
+                    try { const cr = await fetch(`${FIREBASE_DB_URL}customers.json?t=${Date.now()}`); _rva.cust = cr.ok ? ((await cr.json()) || {}) : {}; } catch (e) { _rva.cust = {}; }
+                }
+                const rvName = ptaNameMap();
+                const who = x => x._ph
+                    ? `<span onclick="showCustomerCardModal('${encodeURIComponent(x._ph)}','${encodeURIComponent(rvName[x._ph] || '')}')" title="손님 카드 보기" style="cursor:pointer; font-weight:900; color:#2563eb; text-decoration:underline; text-underline-offset:3px;">${E(rvName[x._ph] || '이름 없음')}</span> · ${E(phone(x._ph))}`
+                    : '쓴 사람 모름';
                 box.innerHTML = _rva.reviews.map(x => {
                     const isNew = (x.at || 0) > seen;
                     return `<div class="card" style="background:#fff; border-radius:14px; padding:13px 15px; margin-bottom:10px; border:1px solid var(--border); ${x.hidden ? 'opacity:.55;' : ''}">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
                             <div style="min-width:0;">
                                 <div style="font-size:14px; font-weight:900; color:#0f172a; word-break:keep-all;">${isNew ? '<span style="color:#dc2626; font-size:11px; font-weight:900; letter-spacing:.3px; margin-right:5px;">NEW</span>' : ''}<span style="color:#f5b301;">★ ${Number(x.stars) || 0}</span> ${E(x.item || x._code)}</div>
-                                <div style="margin-top:3px; font-size:11.5px; font-weight:700; color:#94a3b8;">${E(x.name || '')} · ${E(phone(x._ph))} · ${when(x.at)} · ${E(x._code)} · <b style="color:#16a34a;">${x.pts || 0}P</b>${x.hidden ? ' · <b style="color:#dc2626;">숨김</b>' : ''}</div>
+                                <div style="margin-top:3px; font-size:11.5px; font-weight:700; color:#94a3b8;">${who(x)} · ${when(x.at)} · ${E(x._code)} · <b style="color:#16a34a;">${x.pts || 0}P</b>${x.hidden ? ' · <b style="color:#dc2626;">숨김</b>' : ''}</div>
                             </div>
                             <div style="display:flex; gap:5px; flex-shrink:0;">
                                 <button type="button" onclick="rvaReply('${E(x._code)}','${E(x._rid)}')" style="height:30px; padding:0 10px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; color:#334155;">답글</button>
@@ -18850,6 +18866,50 @@
                 _gen.hours = { pickup, delivery };
                 showToast('운영시간을 저장했습니다.');
             } catch (e) { showToast('운영시간을 저장하지 못했습니다: ' + e.message); }
+            renderGeneralAdmin(false);
+        }
+
+        /* [신규 2026-10-03] 손님 홈 '주문이 많아요' 줄 (사장님 요청).
+           손님 주문서는 남의 주문을 못 보므로(규칙), 주문관리가 세어서 순서만 적어 둔다.
+             settings/home_popular = { at, items: [{ sid, name }, …] }  — 최근 14일, 주문한 손님 수가 많은 순 20개
+           · 몇 개 팔렸는지(숫자)는 적지 않는다. 손님 화면에 순서만 있으면 되고, 매출을 밖에 드러낼 이유가 없다.
+           · 주문이 들어올 때마다 다시 세지만, 순서가 바뀌었을 때만, 10분에 한 번까지만 저장한다 (데이터 아끼기). */
+        let _gHomePopLast = '', _gHomePopAt = 0;
+        function gHomePopularPublish() {
+            if (!isRealtimeFirstLoadDone || Date.now() - _gHomePopAt < 10 * 60000) return;
+            const since = Date.now() - 14 * 86400000;
+            const who = new Map();   // 상품 → 주문한 손님 모음
+            const nameOf = new Map();
+            (rawOrders || []).forEach(o => {
+                if (!o || isSalesCanceled(o) || gIsFeeRow(o)) return;
+                const d = parseTimestampToDate(o.timestamp);
+                if (!d || d.getTime() < since) return;
+                const nm = String(o.item || '').replace(/\[취소\]/g, '').trim();
+                if (!nm) return;
+                const k = String(o.sid || '').trim() || ('명:' + nm);
+                if (!who.has(k)) { who.set(k, new Set()); nameOf.set(k, nm); }
+                who.get(k).add(gCustKey(o) || String(o.phone || ''));
+            });
+            const items = [...who.entries()].sort((a, b) => b[1].size - a[1].size).slice(0, 20)
+                .map(([k]) => ({ sid: k.startsWith('명:') ? '' : k, name: nameOf.get(k) }));
+            const sig = JSON.stringify(items);
+            if (sig === _gHomePopLast) return;
+            _gHomePopAt = Date.now();
+            fetch(`${FIREBASE_DB_URL}settings/home_popular.json`, { method: 'PUT', body: JSON.stringify({ at: Date.now(), items }) })
+                .then(r => { if (r.ok) _gHomePopLast = sig; }).catch(() => { });
+        }
+
+        /* [신규 2026-10-03] 홈 가게 소식 — 손님 주문서(ver5) 홈 맨 위에 나온다. settings/home_notice = { on, text, at }
+           손님이 읽을 수 있게 규칙관리에 settings/home_notice 읽기를 열어 두어야 한다 (게시 필요). */
+        async function gGenSaveHomeNotice() {
+            const text = String((document.getElementById('gen-home-notice') || {}).value || '').replace(/\r/g, '').trim();
+            const on = !!(document.getElementById('gen-home-notice-on') || {}).checked;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}settings/home_notice.json`, { method: 'PUT', body: JSON.stringify({ on, text, at: Date.now() }) });
+                if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                _gen.homeNotice = { on, text };
+                showToast(on && text ? '가게 소식을 저장했습니다. 손님 홈에 나옵니다.' : '가게 소식을 저장했습니다. 손님 홈에는 안 나옵니다.');
+            } catch (e) { showToast('가게 소식을 저장하지 못했습니다: ' + e.message); }
             renderGeneralAdmin(false);
         }
 
@@ -27773,8 +27833,24 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const rawLen = Array.isArray(data) ? data.length : (data && typeof data === 'object' ? Object.keys(data).length : 0);
                 const fresh = Array.isArray(data) ? data.filter(p => p != null)
                     : (data && typeof data === 'object') ? Object.values(data).filter(p => p != null) : [];
-                const next = await fn(fresh.map(p => Object.assign({}, p)));
+                const copies = fresh.map(p => Object.assign({}, p));
+                const origOf = new Map(copies.map((c, i) => [c, fresh[i]]));
+                const next = await fn(copies);
                 if (!Array.isArray(next)) return null;
+                // [신규 2026-10-03] 숨김 → 노출로 바뀐 상품(복사해서 새로 생긴 노출 상품 포함)에 노출 시각을 적는다 (위 shownAt)
+                try {
+                    const now = Date.now();
+                    // 고치는 쪽이 새 객체로 바꿔 돌려줘도 원래 상품을 찾게 이름·분류·번호로 한 번 더 찾는다 (못 찾으면 새로 생긴 상품)
+                    const findOrig = p => origOf.get(p) || fresh.find(o => o && o.name === p.name && o.matchKey === p.matchKey && String(o.sid || '') === String(p.sid || '') && !next.includes(o));
+                    const seenOrig = new Set();
+                    next.forEach(p => {
+                        if (!p || typeof p !== 'object') return;
+                        let o = findOrig(p);
+                        if (o && seenOrig.has(o)) o = null;   // 같은 원본이 두 번 나오면 뒤엣것은 복사본
+                        if (o) seenOrig.add(o);
+                        if (gProdVisibleNow(p) && !gProdVisibleNow(o)) p.shownAt = now;
+                    });
+                } catch (e) { }
                 // 빈 칸(null)이 끼어 있던 목록을 채워 쓰는 것도 순번이 당겨지는 일이다
                 const shift = !!O.shift || fresh.length !== rawLen;
                 if (shift) await gBumpProdRev();
@@ -27826,8 +27902,39 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            그러면 이 화면을 연 뒤에 다른 기기·다른 탭에서 바꾼 값까지 옛날 값으로 되돌아간다.
            폰 두 대로 함께 상품을 손보면 나중에 저장한 쪽이 먼저 한 쪽의 작업을 통째로 지웠다.
            PATCH는 적어 준 칸만 바꾸므로, 남이 바꾼 다른 상품은 그대로 남는다. */
+        /* ===== [신규 2026-10-03] 노출로 바뀐 시각 shownAt (사장님 요청) =====
+           손님 주문서 홈 '새로 올라왔어요'는 노출로 바뀐 때가 최근인 상품부터 보여 준다.
+           숨김 → 노출로 바뀌는 저장마다 그 상품에 shownAt(지금 시각)을 같이 적는다.
+             · 새로 등록하면서 노출  · 노출 단추(여럿 고르기 포함)  · 노출일정 시각이 되어 자동 노출
+             · 끝나면 상시판매로 바뀜 · 재고를 채워 다시 보임      · 복사해서 노출된 새 상품
+           이미 보이던 상품을 고치는 것은 노출로 '바뀐' 게 아니라서 시각을 건드리지 않는다.
+           상품이 손님에게 보이는지 = 숨김(hide)이 아니고, gIsProductShown 이 보인다고 할 때. */
+        function gProdVisibleNow(p) {
+            return !!p && p.hide !== true && p.hide !== 'true' && gIsProductShown(p);
+        }
+        // 부분 저장(fbPatchProducts)에 넣을 패치를 보고, 숨김 → 노출로 바뀌는 상품에 shownAt 을 붙인다
+        function gStampShownAt(patch) {
+            const now = Date.now(), byIdx = {};
+            Object.keys(patch).forEach(k => {
+                const m = /^(\d+)(?:\/(.+))?$/.exec(k);
+                if (m) (byIdx[m[1]] = byIdx[m[1]] || []).push([m[2] || '', patch[k]]);
+            });
+            Object.keys(byIdx).forEach(i => {
+                const ents = byIdx[i];
+                const whole = ents.find(e => e[0] === '');
+                if (!whole && !ents.some(([f]) => ['showToday', 'showReserve', 'show', 'hide'].includes(f))) return;   // 노출과 상관없는 저장
+                const after = whole ? Object.assign({}, whole[1]) : Object.assign({}, (uploadProducts || [])[+i] || {});
+                if (!whole) ents.forEach(([f, v]) => { if (!f.includes('/')) after[f] = v; });
+                let before = (uploadProducts || [])[+i];
+                if (before && after.name && before.name !== after.name) before = (uploadProducts || []).find(p => p && p.name === after.name && p.matchKey === after.matchKey);
+                if (!gProdVisibleNow(after) || gProdVisibleNow(before)) return;
+                if (whole) patch[i] = Object.assign({}, whole[1], { shownAt: now });
+                else patch[`${i}/shownAt`] = now;
+            });
+        }
         async function fbPatchProducts(patch, maxTries = 4, freshList = false) {
             if (!patch || Object.keys(patch).length === 0) return true;
+            try { gStampShownAt(patch); } catch (e) { console.warn('노출 시각 붙이기 실패:', e); }   // [신규 2026-10-03]
             // [신규 2026-10-03] 순번이 그 사이 당겨졌으면 쓰지 않는다 (위 '상품 순서표').
             //   freshList : 방금 서버에서 받은 목록의 순번이라 확인할 필요가 없을 때 true
             if (!freshList) {
