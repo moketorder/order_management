@@ -18555,7 +18555,7 @@
              review_keys 는 남겨 두어 같은 주문 줄로 다시 써서 포인트를 또 받지 못하게 한다.
            · 가게가 포인트를 바꿀 때는 잔액을 기록 합계로 다시 맞춘다 (여러 기기가 같이 써도 어긋나지 않게).
            · 받은 지 1년 지난 포인트는 하루 한 번 '1년 지나 사라짐'으로 뺀다 (먼저 받은 포인트부터 쓴 것으로 본다). */
-        const PT_WHY = { review: '후기 포인트', use: '주문에 사용', refund: '주문 취소로 돌려받음', expire: '1년 지나 사라짐', delete: '후기 삭제', adjust: '가게 조정' };
+        const PT_WHY = { review: '후기 포인트', use: '주문에 사용', refund: '주문 취소로 돌려받음', expire: '1년 지나 사라짐', delete: '후기 삭제', adjust: '가게 조정', withdraw: '탈퇴로 사라짐' };
         const PT_MIN_USE = 1000;
         let _rva = { tab: 'rv', reviews: [], keys: {}, points: {}, logs: {}, q: '', pick: '' };
         const RV_SEEN_KEY = 'moket_review_seen_at';
@@ -19074,6 +19074,11 @@
                     } catch (e) { console.warn('손님 정보 캐시 저장 실패:', e); }
                 }
             } catch (e) { console.error('손님 정보 불러오기 실패:', e); window.__caSaved = {}; }
+            // [신규 2026-10-03] 탈퇴 회원 기록 (withdrawn_logs) — 작아서 매번 새로 받는다
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}withdrawn_logs.json?t=${Date.now()}`);
+                window.__caWLogs = (r.ok ? await r.json() : null) || {};
+            } catch (e) { window.__caWLogs = window.__caWLogs || {}; }
             await _visitsP;
             await gLoadPrivateSettings();   // [신규 2026-10-03] 뺄 번호를 받은 뒤에 센다
             caApplyJoinSlots();   // [신규] 손님 정보를 받은 뒤 가입 시각을 접속 칸으로 보탠다
@@ -20411,6 +20416,106 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
         function caSetFilter(v) { caFilter = v; renderCustomerAdmin(); }
 
+        /* [신규 2026-10-03] 탈퇴 회원 관리 (사장님 요청)
+           · withdrawn_logs/<번호>/<탈퇴시각> = { at, name(아이디), lostPts(사라진 포인트), pending(안 받은 주문 수), rejoinedAt(다시 가입한 때) } — 손님 주문서가 탈퇴할 때 쓴다
+           · 이 기록이 생기기 전에 탈퇴한 손님은 customers 의 탈퇴 표시로만 안다 (아이디·포인트는 '기록 없음')
+           · 주문내역은 주문 기록에서 그 번호의 탈퇴 전 주문을 찾는다 (주문 기록은 법에 따라 남긴다) */
+        function caWithdrawnList() {
+            const L = window.__caWLogs || {}, out = [], seen = new Set();
+            Object.entries(L).forEach(([ph, byAt]) => Object.values(byAt || {}).forEach(v => {
+                if (!v || !Number(v.at)) return;
+                const phone = String(ph).replace(/\D/g, '');
+                seen.add(phone + '_' + Number(v.at));
+                out.push({ phone, at: Number(v.at), name: String(v.name || ''), lostPts: Number(v.lostPts) || 0, pending: Number(v.pending) || 0, rejoinedAt: Number(v.rejoinedAt) || 0, logged: true });
+            }));
+            const saved = window.__caSaved || {};
+            Object.entries(saved).forEach(([k, v]) => {
+                if (!v || !Number(v.withdrawnAt)) return;
+                const phone = String(k).replace(/\D/g, ''), at = Number(v.withdrawnAt);
+                if (seen.has(phone + '_' + at)) return;
+                // 기록 전 탈퇴 — 지금도 탈퇴 상태면 그대로, 다시 가입했으면 '다시 가입함'
+                out.push({ phone, at, name: '', lostPts: null, pending: null, rejoinedAt: v.withdrawn ? 0 : -1, logged: false });
+            });
+            return out.sort((a, b) => b.at - a.at);
+        }
+        function caWFmt(t) {
+            if (!t || t < 0) return '';
+            const d = new Date(t);
+            return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+        const caWPhone = p => { const d = String(p || '').replace(/\D/g, ''); return d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}` : d; };
+        const caWEsc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        window.__caWOpen = window.__caWOpen || '';
+        function caWithdrawnRowHtml(w) {
+            const id = `${w.phone}_${w.at}`, open = window.__caWOpen === id;
+            const rejoin = w.rejoinedAt > 0 ? `<span style="color:#16a34a;">${caWFmt(w.rejoinedAt).slice(0, 10)} 다시 가입</span>`
+                : (w.rejoinedAt < 0 ? `<span style="color:#16a34a;">다시 가입함</span>` : `<span style="color:#94a3b8;">다시 가입 안 함</span>`);
+            const pts = w.lostPts === null ? '<span style="color:#cbd5e1;">포인트 기록 없음</span>'
+                : (w.lostPts > 0 ? `<span style="color:#dc2626;">${w.lostPts.toLocaleString()}P 사라짐</span>` : '<span style="color:#94a3b8;">포인트 0P</span>');
+            return `<div class="card" style="background:#fff; border-radius:12px; padding:10px 12px; box-shadow:var(--shadow); border:1px solid var(--border); margin-bottom:8px;">
+                <div onclick="caWToggle('${id}')" style="cursor:pointer;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+                        <b style="font-size:15px; color:#0f172a;">${w.name ? caWEsc(w.name) : '<span style="color:#94a3b8;">(아이디 기록 없음)</span>'}</b>
+                        <span style="font-size:12px; font-weight:800; color:#64748b;">${open ? '접기 ▲' : '자세히 ▼'}</span>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:4px 10px; margin-top:4px; font-size:12px; font-weight:700; color:#475569;">
+                        <span>📱 ${caWPhone(w.phone)}</span>
+                        <span>🚫 ${caWFmt(w.at)} 탈퇴</span>
+                        ${pts}
+                        ${w.pending ? `<span style="color:#ea580c;">탈퇴 때 안 받은 주문 ${w.pending}건</span>` : ''}
+                        ${rejoin}
+                    </div>
+                </div>
+                ${open ? `<div style="margin-top:10px; border-top:1px dashed #e2e8f0; padding-top:10px;">${caWDetailHtml(w)}</div>` : ''}
+            </div>`;
+        }
+        function caWToggle(id) {
+            window.__caWOpen = window.__caWOpen === id ? '' : id;
+            renderCustomerAdmin(true);
+            if (window.__caWOpen) caWLoadPoints(id.split('_')[0]);
+        }
+        // 탈퇴 전 주문내역 (그 탈퇴 시각보다 앞, 바로 앞 탈퇴보다 뒤)
+        function caWDetailHtml(w) {
+            const prev = caWithdrawnList().filter(x => x.phone === w.phone && x.at < w.at);
+            const from = prev.length ? Math.max(...prev.map(x => x.at)) : 0;
+            const src = (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : (rawOrders || []));
+            const list = src.filter(o => {
+                if (!o || gCustKey(o) !== w.phone) return false;
+                const t = parseTimestampToDate(o.timestamp);
+                return t && t.getTime() < w.at && t.getTime() >= from;
+            }).sort((a, b) => (parseTimestampToDate(b.timestamp) || 0) - (parseTimestampToDate(a.timestamp) || 0));
+            const st = o => isSalesCanceled(o) ? '<span style="color:#94a3b8;">취소</span>'
+                : (String(o.delivered || '').includes('완료') || o.delivered === true) ? '<span style="color:#16a34a;">배달완료</span>'
+                : (String(o.received || '').includes('완료') || o.received === true) ? '<span style="color:#16a34a;">픽업완료</span>'
+                : '<span style="color:#ea580c;">안 받음</span>';
+            const total = list.filter(o => !isSalesCanceled(o)).reduce((n, o) => n + (parseInt(o.total) || 0), 0);
+            const ordersHtml = list.length
+                ? list.slice(0, 50).map(o => `<div style="display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid #f8fafc; font-size:12px;">
+                        <span style="min-width:0;"><span style="color:#94a3b8; font-weight:700;">${caWEsc(String(o.timestamp || '').replace(/^\d{4}년\s*/, '').replace(/\s*\d{1,2}:\d{2}(:\d{2})?$/, ''))}</span> <b style="color:#334155;">${caWEsc(o.item)}</b> <span style="color:#64748b;">${caWEsc(o.qty || '')}개 · ${(parseInt(o.total) || 0).toLocaleString()}원</span></span>
+                        <span style="flex:0 0 auto; font-weight:800;">${st(o)}</span></div>`).join('')
+                  + (list.length > 50 ? `<div style="font-size:11px; color:#94a3b8; padding-top:4px;">… 외 ${list.length - 50}건</div>` : '')
+                : '<div style="font-size:12px; color:#94a3b8;">탈퇴 전 주문이 없어요.</div>';
+            const pt = (window.__caWPts || {})[w.phone];
+            const ptRows = pt ? pt.filter(x => x.at <= w.at && x.at >= from) : [];
+            const ptHtml = pt === undefined ? '<div style="font-size:12px; color:#94a3b8;">불러오는 중…</div>'
+                : (!ptRows.length ? '<div style="font-size:12px; color:#94a3b8;">포인트 기록이 없어요.</div>'
+                : ptRows.map(x => `<div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px; ${x.why === 'withdraw' ? 'font-weight:800; color:#dc2626;' : 'color:#475569;'}">
+                        <span>${caWFmt(x.at)} · ${caWEsc((typeof PT_WHY !== 'undefined' && PT_WHY[x.why]) || x.why)}${x.memo ? ' · ' + caWEsc(x.memo) : ''}</span>
+                        <b>${x.amt > 0 ? '+' : ''}${(Number(x.amt) || 0).toLocaleString()}P</b></div>`).join(''));
+            return `<div style="font-size:13px; font-weight:900; color:#0f172a; margin-bottom:4px;">🧾 탈퇴 전 주문내역 <span style="font-size:12px; color:#64748b; font-weight:700;">${list.length}건 · 취소 빼고 ${total.toLocaleString()}원</span></div>${ordersHtml}
+                <div style="font-size:13px; font-weight:900; color:#0f172a; margin:12px 0 4px;">💰 포인트 기록</div>${ptHtml}`;
+        }
+        window.__caWPts = window.__caWPts || {};
+        async function caWLoadPoints(phone) {
+            if (window.__caWPts[phone] !== undefined) return;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}point_logs/${phone}.json?t=${Date.now()}`);
+                const d = (r.ok ? await r.json() : null) || {};
+                window.__caWPts[phone] = Object.values(d).filter(Boolean).map(x => ({ at: Number(x.at) || 0, amt: Number(x.amt) || 0, why: String(x.why || ''), memo: x.memo || '' })).sort((a, b) => a.at - b.at);
+            } catch (e) { window.__caWPts[phone] = []; }
+            if (caFilter === 'withdrawn') renderCustomerAdmin(true);
+        }
+
         function renderCustomerAdmin(listOnly) {
             const box = document.getElementById('cust-admin-body');
             if (!box) return;
@@ -20424,7 +20529,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const nBrowse = all.filter(r => r.browser).length;              // [신규]
             const nGone = all.filter(r => r.visit && r.visit.gone).length;   // [신규]
             const nNoShow = all.filter(r => r.noShow).length;   // [신규]
-            const WD = (window.__caWithdrawn || []).slice().sort((a, b) => b.at - a.at);   // [신규] 탈퇴 목록
+            const WD = caWithdrawnList();   // [수정 2026-10-03] 탈퇴 회원 — 탈퇴 기록(withdrawn_logs)과 지금 탈퇴 상태를 합친다
 
             let list = caFilter === 'delivery' ? all.filter(r => r.way === '배달')
                      : caFilter === 'pickup' ? all.filter(r => r.way === '픽업')
@@ -20516,16 +20621,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                손님 관리 머리(칩·검색)는 그 아래 목록과 붙여 둔다. */
             const visitCard = `<div class="card" style="background:#fff; border-radius:14px; padding:12px 14px; box-shadow:var(--shadow); margin-bottom:10px; border:1px solid var(--border);">${caVisitSummaryHtml(all)}</div>`;
 
-            // [신규] 탈퇴 목록 — 번호와 탈퇴한 날만 (개인정보·주문내역은 보이지 않는다)
+            // [수정 2026-10-03] 탈퇴 회원 관리 — 아이디·카카오 번호·탈퇴 일시·사라진 포인트·다시 가입한 날. 누르면 탈퇴 전 주문내역과 포인트 기록 (사장님 요청)
             if (caFilter === 'withdrawn') {
-                const dg = caQuery.replace(/\D/g, '');
-                const rows = WD.filter(w => !dg || w.phone.includes(dg));
-                const ymd = t => { if (!t) return ''; const d = new Date(t); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`; };
+                const q = caQuery.trim(), dg = q.replace(/\D/g, '');
+                const rows = WD.filter(w => !q || (dg && w.phone.includes(dg)) || (w.name && w.name.includes(q)));
                 const wHtml = rows.length
-                    ? `<div class="card" style="background:#fff; border-radius:14px; padding:6px 14px; box-shadow:var(--shadow); border:1px solid var(--border);">`
-                      + rows.map(w => `<div style="display:flex; justify-content:space-between; gap:10px; padding:9px 2px; border-bottom:1px solid #f1f5f9; font-size:13px; font-weight:800; color:#475569;">
-                            <span>${fmtPhone(w.phone)}</span><span style="color:#94a3b8; font-weight:700;">${ymd(w.at)} 탈퇴</span></div>`).join('')
-                      + `</div>`
+                    ? `<div style="font-size:12px; color:#64748b; font-weight:700; margin:0 2px 8px;">탈퇴 ${rows.length}건 · 누르면 탈퇴 전 주문내역과 포인트 기록이 보여요. 개인정보(주소·연락처)는 지워졌어요.</div>`
+                      + rows.map(caWithdrawnRowHtml).join('')
                     : `<div style="padding:34px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">탈퇴한 손님이 없습니다.</div>`;
                 const wBox = document.getElementById('ca-list');
                 if (listOnly && wBox) { wBox.innerHTML = wHtml; return; }
