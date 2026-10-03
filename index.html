@@ -13484,7 +13484,7 @@
                 const p = list[i];
                 if (!p) continue;
                 const hid = (p.hide === true || p.hide === 'true');
-                const released = !p.releaseAt || Date.now() >= Number(p.releaseAt);
+                const released = !p.releaseAt || Date.now() >= psOpenAt(p.releaseAt);   // [수정 2026-10-03] 그날 0시부터
                 if (!released || hid) continue;              // 손님에게 안 보이는 줄
                 if (!gIsClosedAdmin(p)) return 'on';          // 판매 중인 줄이 하나라도 있으면 판매중
                 best = 'closed';
@@ -13828,6 +13828,10 @@
         function psItemsOfSid(sid) { return Object.keys(psSched[sid] || {}).map(rid => psItem(psKey(sid, rid))).filter(Boolean); }
         function psAllItems() { return Object.keys(psSched).flatMap(psItemsOfSid).filter(it => it.idx >= 0); }
         function psIsActive(it) { const p = it && uploadProducts[it.idx]; return !!p && p.schedRid === it.rid; }
+        /* [신규 2026-10-03] 노출은 그날 0시부터 (사장님 요청).
+           일정의 '시각'(releaseAt)은 이제 카톡 홍보 알림(🔔) 시각일 뿐이고, 손님 화면에 올리는 것은 그 날짜 0시에 한다.
+           노출을 정하는 곳은 모두 psOpenAt(releaseAt) 와 견준다. 🔔 알림만 releaseAt 그대로 본다 */
+        function psOpenAt(t) { t = Number(t) || 0; if (!t) return 0; const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
         function psNewRid() { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
         // 이 일정의 픽업일 — 공동구매(날짜 상품)의 지금 차례면 상품에 적힌 대로, 그 밖에는 일정에 적어 둔 날.
         //  [수정 2026-10-02] 날짜 없는 상품(상시판매 등)도 일정에 픽업일을 둘 수 있다 (사장님 요청) — 이때는 달력 표시용이고 상품 날짜는 안 바뀐다
@@ -13962,7 +13966,7 @@
                 const act = items.find(it => it.rid === p.schedRid);
                 const actEnded = !act || (Number(act.expireAt) && now >= Number(act.expireAt));
                 if (!actEnded) continue;
-                const due = items.filter(it => it.rid !== p.schedRid && Number(it.releaseAt) && now >= Number(it.releaseAt) && !(Number(it.expireAt) && now >= Number(it.expireAt)));
+                const due = items.filter(it => it.rid !== p.schedRid && Number(it.releaseAt) && now >= psOpenAt(it.releaseAt) && !(Number(it.expireAt) && now >= Number(it.expireAt)));   // [수정 2026-10-03] 그날 0시부터
                 if (!due.length) continue;
                 const pick = due.reduce((a, b) => Number(b.releaseAt) > Number(a.releaseAt) ? b : a);
                 if (await psActivate(pick, true)) n++;
@@ -14276,7 +14280,7 @@
             const p = (uploadProducts || [])[idx];
             if (!p || !p.sid || p.showWeekly === true || !psIsOnsiteProd(p)) return;
             const now = Date.now();
-            const waiting = psItemsOfSid(p.sid).some(x => Number(x.releaseAt) > now);
+            const waiting = psItemsOfSid(p.sid).some(x => psOpenAt(x.releaseAt) > now);   // [수정 2026-10-03] 그날 0시 전까지 기다림
             const hidden = (p.hide === true || p.hide === 'true');
             if (waiting && !hidden) await psHoldOnsite(idx, true);
             else if (!waiting && p.schedHold === true) await psHoldOnsite(idx, false);
@@ -14297,7 +14301,7 @@
             if (!(await fbPatchProducts(patch))) { showToast('⚠️ 상시판매 숨김을 바꾸지 못했어요 — 상품 목록에서 확인해 주세요'); return false; }
             Object.assign(p, f);
             updatePublishedProductsTimestamp();
-            showToast(on ? '🙈 공동구매 일정이 잡혀 상시판매에서 숨겼어요 — 올라가는 시각에 공동구매로 다시 보여요' : '👁️ 기다리던 공동구매 일정이 없어져 상시판매로 다시 보여요');
+            showToast(on ? '🙈 공동구매 일정이 잡혀 상시판매에서 숨겼어요 — 그날 0시에 공동구매로 다시 보여요' : '👁️ 기다리던 공동구매 일정이 없어져 상시판매로 다시 보여요');
             return true;
         }
         // 일정 지우기 — 일정만 없앤다. 지금 차례였으면 상품 줄의 일정 칸도 비운다(상품·재고는 그대로).
@@ -14380,7 +14384,7 @@
                 onsiteTabPrev: String(p.displayTab || '') || null
             };
         }
-        function psIsUpcoming(p) { return !!p && Number(p.releaseAt) > 0 && (Date.now() < Number(p.releaseAt) || p.releaseApplied !== true); }
+        function psIsUpcoming(p) { return !!p && Number(p.releaseAt) > 0 && (Date.now() < psOpenAt(p.releaseAt) || p.releaseApplied !== true); }
         function psAddDays(key, n) { const [y, m, d] = key.split('-').map(Number); return fMsToDateKey(new Date(y, m - 1, d + n).getTime()); }
         // 올라가는 순간 쓸 픽업일 — 적어 둔 nextDate, 없으면 지금 날짜가 올라가는 날 뒤면 그대로, 아니면 마감 같은 날
         function psPlannedPickup(p) {
@@ -14665,7 +14669,7 @@
                 const del = [];
                 sids.forEach(s => {
                     const all = psItemsOfSid(s);
-                    const notRun = all.filter(x => !psIsActive(x) && Number(x.releaseAt) > now)
+                    const notRun = all.filter(x => !psIsActive(x) && psOpenAt(x.releaseAt) > now)
                         .sort((a, b) => Number(a.releaseAt) - Number(b.releaseAt));
                     const anyRun = all.length > notRun.length;   // 지금 차례이거나 이미 올라간 일정이 있다
                     del.push(...(anyRun ? notRun : notRun.slice(1)));
@@ -14867,7 +14871,7 @@
                 const hidden = (prod.hide === true || prod.hide === 'true');
                 const _now = Date.now(), _relT = Number(it.releaseAt) || 0, _expT = Number(it.expireAt) || 0;
                 let st;
-                if (_relT && _now < _relT) st = 'soon';
+                if (_relT && _now < psOpenAt(_relT)) st = 'soon';   // [수정 2026-10-03] 그날 0시부터 판매중
                 else if (!active) st = (_expT && _now >= _expT) ? 'closed' : 'soon';   // 지난 차례는 마감, 올라갈 때가 됐는데 아직 안 올린 차례는 예약대기
                 else st = (!_expT || _now < _expT) ? 'on' : (hidden ? 'hidden' : 'closed');
                 const live = psLiveStateOf(it.idx);
@@ -14884,7 +14888,7 @@
                 bars.push({ key: it.key, idx: it.idx, nm, st, live, slot, start: s0, end: e0, pk, expKey: ek, group: it.group || null, past: !active && !!_expT && _now >= _expT,
                     expPct: expD ? Math.round((expD.getHours() + expD.getMinutes() / 60) / 24 * 100) : null,
                     relMin, relKey: rk, timeTag: (relD && !(relD.getMinutes() === 0 && PS_SLOTS.includes(relD.getHours()))) ? psSlotLabel(relD.getHours(), relD.getMinutes()) : '',
-                    tip: `${it.releaseAt ? fFmtSchedTime(it.releaseAt) + ' 올라감' : ''}${it.releaseAt && it.expireAt ? ' ~ ' : ''}${it.expireAt ? fFmtSchedTime(it.expireAt) + ' 마감' : ''}${pk ? ` · 🚚 ${Number(pk.slice(5, 7))}/${Number(pk.slice(8))} 픽업` : ''}` });
+                    tip: `${it.releaseAt ? fFmtSchedTime(it.releaseAt) + ' 알림(그날 0시 노출)' : ''}${it.releaseAt && it.expireAt ? ' ~ ' : ''}${it.expireAt ? fFmtSchedTime(it.expireAt) + ' 마감' : ''}${pk ? ` · 🚚 ${Number(pk.slice(5, 7))}/${Number(pk.slice(8))} 픽업` : ''}` });
             });
             // 한 일정에 담긴 상품들(group 같은 일정)은 막대 하나로 — 이름은 일정 이름 또는 '첫 상품 외 N'
             {
@@ -15327,7 +15331,7 @@
         }
         function psItemSummary(it) {
             const pk = psItemPickup(it);
-            return [it.releaseAt ? fFmtSchedTime(it.releaseAt) + ' 올라감' : '', it.expireAt ? fFmtSchedTime(it.expireAt) + ' 마감' : '',
+            return [it.releaseAt ? fFmtSchedTime(it.releaseAt) + ' 알림' : '', it.expireAt ? fFmtSchedTime(it.expireAt) + ' 마감' : '',
                 pk ? `🚚 ${Number(pk.slice(5, 7))}/${Number(pk.slice(8))} 픽업` : ''].filter(Boolean).join(' · ');
         }
         // 일정 칸(올라가는 시각·마감·픽업·반복) — key 는 단독 일정 또는 묶음의 첫 일정 열쇠, grp=true 면 묶음 전체에 적용
@@ -15345,7 +15349,7 @@
             return `<div class="ps-sec">
                     <div class="ps-sec-t">일정</div>
                     <div class="ps-g3">
-                        <div class="ps-f"><label>🕐 올라감</label>
+                        <div class="ps-f"><label title="그 날짜 0시에 손님 화면에 올라가요. 이 시각에는 카톡 홍보 알림(🔔)만 떠요">📣 노출일·카톡 알림</label>
                             <div class="ps-row">
                                 <input type="date" class="ps-in" id="ps-rel-date-${sid}" value="${relVal ? relVal.slice(0, 10) : ''}" onchange="psItemSetRelease('${kq}', ${G})">
                                 <select class="ps-in ps-in-time gw-wheel" id="ps-rel-hour-${sid}" onchange="psItemSetRelease('${kq}', ${G})">${psTimeOptsHtml(relVal)}</select>
@@ -15378,7 +15382,7 @@
             const open = psRowOpen.has(key) !== !!forceOpen;
             const sum = psItemSummary(it);
             const now = Date.now();
-            const tag = psIsActive(it) ? '' : (Number(it.releaseAt) > now ? '다음 차례' : '지난 차례');
+            const tag = psIsActive(it) ? '' : (psOpenAt(it.releaseAt) > now ? '다음 차례' : '지난 차례');
             const armed = psClearArmedIdx === key;
             return `<div class="ps-card${open ? ' open' : ''}">
                 <div class="ps-card-h" onclick="psToggleRow('${kq}')">
@@ -15953,7 +15957,7 @@
             const hasSchedule = !!(newReleaseAt || newExpireAt);
             let showToday, showReserve, hide;
             if (hasSchedule) {
-                const started = !newReleaseAt || now >= newReleaseAt;
+                const started = !newReleaseAt || now >= psOpenAt(newReleaseAt);   // [수정 2026-10-03] 그날 0시부터 노출
                 // [수정 2026-09-29] 마감 시각이 지나도 숨기지 않는다 — 손님 화면이 '마감'으로 보여 주고 막는다
                 const shouldShow = started;
                 showToday = shouldShow; showReserve = shouldShow; hide = !shouldShow;
@@ -15973,7 +15977,7 @@
                지금 시각 기준으로 이미 지난 쪽은 바로 '처리됨'으로 표시해 둔다.
                시각을 새로 바꿨는데(=이 함수가 불렸는데) 아직 안 지난 쪽은 false로 되돌려서,
                나중에 그 시각이 되면 autoApplyScheduledVisibility가 한 번은 작동하게 한다. */
-            const releaseApplied = hasSchedule ? (!!newReleaseAt && now >= newReleaseAt) : null;
+            const releaseApplied = hasSchedule ? (!!newReleaseAt && now >= psOpenAt(newReleaseAt)) : null;   // [수정 2026-10-03] 그날 0시 기준
             const expireApplied = hasSchedule ? (!!newExpireAt && now >= newExpireAt) : null;
 
             /* [신규 2026-10-02] 픽업일 — 아직 안 올라간 예약이면 nextDate 로 적어 둔다.
@@ -16060,7 +16064,7 @@
                 if (!p) return;
                 if (onlySid && String(p.sid) !== String(onlySid)) return;
                 if (p.showWeekly === true) return;   // 매주 노출 상품은 예약을 안 쓴다
-                if (Number(p.releaseAt) && now >= Number(p.releaseAt) && p.releaseApplied !== true) snaps.push([p, JSON.parse(JSON.stringify(p))]);
+                if (Number(p.releaseAt) && now >= psOpenAt(p.releaseAt) && p.releaseApplied !== true) snaps.push([p, JSON.parse(JSON.stringify(p))]);
                 const releaseAt = Number(p.releaseAt) || 0;
                 const expireAt = Number(p.expireAt) || 0;
                 if (!releaseAt && !expireAt) return;
@@ -16068,7 +16072,7 @@
                 let nextHide = null;   // 이번에 바꿀 노출값. null이면 노출값은 안 건드린다.
 
                 // 올라가는 시각 — 아직 한 번도 안 켰고 시각이 됐으면 켠다
-                if (releaseAt && now >= releaseAt && p.releaseApplied !== true) {
+                if (releaseAt && now >= psOpenAt(releaseAt) && p.releaseApplied !== true) {   // [수정 2026-10-03] 그날 0시에 올린다 (시각은 🔔 알림용)
                     /* [신규 2026-10-02] 올라가는 순간 상품 날짜를 정해 둔 배달·픽업일로 바꾼 뒤 올린다 (재고는 노출번호로 이어진다) */
                     const nk = psPlannedPickup(p);
                     if (nk && nk !== toISODate(p.matchKey)) {
@@ -16164,13 +16168,29 @@
                 document.body.appendChild(box);
             }
             const E = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-            box.innerHTML = `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
-                    <b style="color:#c2410c;">⚠️ 자동 처리 실패 ${L.length}건 — 인터넷·로그인을 확인하고 다시 해 주세요</b>
-                    <button type="button" onclick="window.__gReleaseFails=[]; gReleaseFailPaint();" style="border:none; background:none; font-size:16px; color:#9a3412; cursor:pointer;" title="닫기">✕</button>
-                </div>` + L.map(x => `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 0; border-top:1px solid #fed7aa;">
-                    <span style="min-width:0; color:#431407; font-weight:700;">${x.kind === 'hide' ? '🙈 지난 상품 숨기기' : '📅 올리기'} · ${E(String(x.name).slice(0, 24))}</span>
-                    <button type="button" onclick="gReleaseRetry('${E(x.key)}', this)" style="flex:0 0 auto; height:30px; padding:0 10px; border:1.5px solid #fb923c; background:#fff; color:#c2410c; border-radius:8px; font-weight:900; cursor:pointer;">${x.kind === 'hide' ? '다시 숨기기' : '다시 올리기'}</button>
-                </div>`).join('');
+            /* [수정 2026-10-03] 실패한 것을 한 알림에 모아 보여 주고, 단추 하나로 한꺼번에 다시 한다 (사장님 요청) */
+            const rel = L.filter(x => x.kind !== 'hide'), hid = L.filter(x => x.kind === 'hide');
+            const names = rel.map(x => `<li>${E(String(x.name).slice(0, 30))}</li>`).join('');
+            box.innerHTML = `<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                    <b style="color:#c2410c; line-height:1.4;">⚠️ 자동 처리가 안 된 것이 있어요 — 인터넷·로그인을 확인하고 다시 해 주세요</b>
+                    <button type="button" onclick="window.__gReleaseFails=[]; gReleaseFailPaint();" style="flex:0 0 auto; border:none; background:none; font-size:16px; color:#9a3412; cursor:pointer;" title="닫기">✕</button>
+                </div>
+                <div style="margin:6px 0 8px; color:#431407; font-weight:700; max-height:120px; overflow:auto;">
+                    ${rel.length ? `<div>📅 노출 못 한 상품 ${rel.length}개</div><ul style="margin:2px 0 4px 18px; padding:0;">${names}</ul>` : ''}
+                    ${hid.length ? `<div>🙈 날짜 지난 상품 숨기기 (${E(hid.map(x => x.name).join(', '))})</div>` : ''}
+                </div>
+                <button type="button" id="g-release-retry-all" onclick="gReleaseRetryAll(this)" style="width:100%; height:38px; border:none; background:#ea580c; color:#fff; border-radius:9px; font-size:14px; font-weight:900; cursor:pointer;">🔁 모두 다시 하기</button>`;
+        }
+        // [신규 2026-10-03] 실패한 것을 차례로 한 번씩 다시 — 끝나면 남은 것만 알림에 둔다
+        async function gReleaseRetryAll(btn) {
+            const keys = window.__gReleaseFails.map(x => x.key);
+            if (!keys.length) return;
+            if (btn) { btn.disabled = true; btn.innerText = '다시 하는 중…'; }
+            const _t = window.showToast; window.showToast = () => { };   // 하나씩 뜨는 안내는 모아서 한 번만
+            try { for (const k of keys) await gReleaseRetry(k); } finally { window.showToast = _t; }
+            const left = window.__gReleaseFails.filter(x => keys.includes(x.key)).length;
+            showToast(left ? `⚠️ ${keys.length}개 중 ${left}개는 또 실패했어요. 잠시 뒤 다시 해 주세요` : `✅ ${keys.length}개 모두 처리했어요`);
+            gReleaseFailPaint();
         }
         // 그 상품만 다시 — 다음 차례가 아직 상품 줄에 안 올라왔으면 먼저 올리고(psActivate), 노출을 켠다
         async function gReleaseRetry(key, btn) {
@@ -16191,7 +16211,7 @@
                         const items = psItemsOfSid(x.sid);
                         const act = items.find(it => it.rid === p.schedRid);
                         const actEnded = !act || (Number(act.expireAt) && now >= Number(act.expireAt));
-                        const due = items.filter(it => it.rid !== p.schedRid && Number(it.releaseAt) && now >= Number(it.releaseAt) && !(Number(it.expireAt) && now >= Number(it.expireAt)));
+                        const due = items.filter(it => it.rid !== p.schedRid && Number(it.releaseAt) && now >= psOpenAt(it.releaseAt) && !(Number(it.expireAt) && now >= Number(it.expireAt)));
                         if (actEnded && due.length) await psActivate(due.reduce((a, b) => Number(b.releaseAt) > Number(a.releaseAt) ? b : a), true);
                     }
                     ok = await autoApplyScheduledVisibility(x.sid);
@@ -22664,7 +22684,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    다른 기기가 이미 올렸으면 새로 받은 목록에선 처리됨이라 아무것도 안 바뀐다. */
                 const _nowMs = now.getTime();
                 // [수정 2026-10-03] 걸린 상품 이름도 모은다 — 같은 상품이 계속 걸리면 아래에서 30분에 한 번만 다시 받는다
-                const _dueNames = (uploadProducts || []).filter(p => p && p.showWeekly !== true && Number(p.releaseAt) && _nowMs >= Number(p.releaseAt) && p.releaseApplied !== true).map(p => String(p.sid || p.name));
+                const _dueNames = (uploadProducts || []).filter(p => p && p.showWeekly !== true && Number(p.releaseAt) && _nowMs >= psOpenAt(p.releaseAt) && p.releaseApplied !== true).map(p => String(p.sid || p.name));
                 let _due = _dueNames.length > 0;
                 /* [버그수정 2026-10-03] 위는 상품 줄에 옮겨 적힌 '지금 차례'만 본다. 아직 노출일정에서 기다리는 '다음 차례'는 상품 줄에 없어서,
                    주문관리를 켜 둔 채로는 올라갈 시각이 지나도 안 올라가고 새로고침해야 올라갔다. 일정 쪽도 본다 (psPromoteDue 와 같은 잣대) */
@@ -22675,7 +22695,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         const items = psItemsOfSid(sid);
                         const act = items.find(x => x.rid === pp.schedRid);
                         if (act && !(Number(act.expireAt) && _nowMs >= Number(act.expireAt))) return false;   // 지금 차례가 아직 안 끝났다
-                        return items.some(x => x.rid !== pp.schedRid && Number(x.releaseAt) && _nowMs >= Number(x.releaseAt) && !(Number(x.expireAt) && _nowMs >= Number(x.expireAt)));
+                        return items.some(x => x.rid !== pp.schedRid && Number(x.releaseAt) && _nowMs >= psOpenAt(x.releaseAt) && !(Number(x.expireAt) && _nowMs >= Number(x.expireAt)));
                     }).forEach(sid => _dueNames.push(String(sid)));
                     _due = _dueNames.length > 0;
                 }
@@ -22697,6 +22717,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 // [수정 2026-09-30] 예전 과일은 마감시각에 숨기지 않는다 (손님 화면에 '마감'으로 남는다). 날이 바뀐 뒤 처음 열 때 숨긴다
                 const needFruit = localStorage.getItem('moket_fruit_autohide_date') !== todayStr;
                 const needPast = localStorage.getItem('moket_autohide_day') !== todayStr;
+                // [신규 2026-10-03] 카톡 홍보 알림(🔔)은 노출(0시)과 따로 정한 시각에 뜬다 — 켜 둔 채로도 5분 안에 뜨게 여기서 맞춘다
+                try { if (typeof checkPendingAnnouncements === 'function') checkPendingAnnouncements(); } catch (e) { }
                 if (!needFruit && !needPast) return;
                 // [신규 2026-10-03] 숨기기가 실패해 오늘 안 끝났으면 다시 받는 것도 30분에 한 번만 (실패할 때마다 5분마다 340KB를 받던 것)
                 if (window.__gAhTryAt && _nowMs - window.__gAhTryAt < 30 * 60000) return;
@@ -28444,7 +28466,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const _repScore = (p, i) => {
                 const now = Date.now();
                 if (gIsProductShown(p) && !gIsExpiredAdmin(p)) return [3, -i];
-                if (Number(p.releaseAt) > now) return [2, -Number(p.releaseAt)];
+                if (psOpenAt(p.releaseAt) > now) return [2, -Number(p.releaseAt)];
                 return [1, -i];
             };
             const _rep = {}, _cnt = {};
@@ -28608,8 +28630,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     let scheduleBadge = '';
                     {
                         const _now = Date.now();
-                        if (prod.releaseAt && _now < Number(prod.releaseAt)) {
-                            scheduleBadge = `<span title="이 시각에 자동으로 노출됩니다" style="font-size: 10px; font-weight: 800; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🕐 ${fFmtSchedTime(prod.releaseAt)} 공개</span>`;
+                        if (prod.releaseAt && _now < psOpenAt(prod.releaseAt)) {   // [수정 2026-10-03] 그날 0시에 노출
+                            const _od = new Date(psOpenAt(prod.releaseAt));
+                            scheduleBadge = `<span title="이 날 0시에 자동으로 노출됩니다 (카톡 알림은 ${fFmtSchedTime(prod.releaseAt)})" style="font-size: 10px; font-weight: 800; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🕐 ${_od.getMonth() + 1}/${_od.getDate()} 0시 공개</span>`;
                         } else if (prod.expireAt) {
                             scheduleBadge = `<span title="이 시각에 자동으로 숨겨집니다" style="font-size: 10px; font-weight: 800; background: #fff7ed; color: #d97706; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🕕 ${fFmtSchedTime(prod.expireAt)} 종료</span>`;
                         }
@@ -28812,7 +28835,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const picked = [...uploadSelectedProductIndices].filter(i => uploadProducts[i]);
             if (!picked.length) return;
             const now = Date.now();
-            const units = psUnitsOf(psAllItems().filter(it => Number(it.releaseAt) > now).map(it => it.key));
+            const units = psUnitsOf(psAllItems().filter(it => psOpenAt(it.releaseAt) > now).map(it => it.key));
             units.sort((a, b) => Number(psItem(a[0]).releaseAt) - Number(psItem(b[0]).releaseAt));
             let box = document.getElementById('batch-sched-pick');
             if (!box) { box = document.createElement('div'); box.id = 'batch-sched-pick'; document.body.appendChild(box); }
@@ -28827,7 +28850,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                       올라감을 바꾸면 마감·픽업일 기본값이 따라 바뀐다 — 손으로 고친 칸은 그대로 둔다. 고른 상품 모두 같은 마감·픽업일로 담긴다 */''}
                 <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="flex:0 0 auto; width:58px; white-space:nowrap; font-size:11.5px; font-weight:800; color:#475569;">🕐 올라감</span>
+                        <span title="그 날짜 0시에 손님 화면에 올라가요. 이 시각에는 카톡 홍보 알림(🔔)만 떠요" style="flex:0 0 auto; width:58px; white-space:nowrap; font-size:11.5px; font-weight:800; color:#475569;">📣 노출일</span>
                         <input type="date" id="bsp-date" value="${d0.getFullYear()}-${p2(d0.getMonth() + 1)}-${p2(d0.getDate())}" onchange="psBatchFillDefaults()" style="flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
                         <select id="bsp-hour" class="gw-wheel" onchange="psBatchFillDefaults()" style="flex:0 0 auto; width:84px; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800;">${PS_SLOTS.map(h => `<option value="${h}"${h === PS_DEFAULT_SLOT ? ' selected' : ''}>${psSlotLabel(h)}</option>`).join('')}</select>
                     </div>
