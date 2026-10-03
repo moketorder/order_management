@@ -19016,14 +19016,30 @@
                 if (!who.has(k)) { who.set(k, new Set()); nameOf.set(k, nm); }
                 who.get(k).add(gCustKey(o) || String(o.phone || ''));
             });
-            const items = [...who.entries()].sort((a, b) => b[1].size - a[1].size).slice(0, 20)
-                .map(([k]) => ({ sid: k.startsWith('명:') ? '' : k, name: nameOf.get(k) }));
+            /* [수정 2026-10-03] 지금 손님 화면에 올라가 있는 상품끼리만 순위를 매긴다 (사장님 요청).
+               예전엔 최근 2주 전체로 세서, 1위~20위가 거의 다 이미 끝난 공동구매(샤인머스켓·홍로 사과 …)라
+               손님 홈에는 1개만 나왔다.
+               같은 노출번호(sid)로 다시 올린 상품은 예전 판매분 주문도 합쳐 센다 — 단골 상품이 바로 위로 온다.
+               노출번호가 없는 옛 주문은 상품 이름이 같으면 같은 상품으로 본다. */
+            const seen = new Set(), ranked = [];
+            (uploadProducts || []).forEach(p => {
+                if (!p || !gProdVisibleNow(p)) return;
+                const sid = String(p.sid || '').trim(), nm = String(p.name || '').trim();
+                const key = sid || ('명:' + nm);
+                if (!nm || seen.has(key)) return;   // 노출일정 복사본은 한 번만
+                seen.add(key);
+                const buyers = new Set([...(sid && who.get(sid) || []), ...(who.get('명:' + nm) || [])]);
+                if (buyers.size) ranked.push({ sid, name: nm, n: buyers.size });
+            });
+            const items = ranked.sort((a, b) => b.n - a.n).slice(0, 20).map(({ sid, name }) => ({ sid, name }));
             const sig = JSON.stringify(items);
             if (sig === _gHomePopLast) return;
             _gHomePopAt = Date.now();
             fetch(`${FIREBASE_DB_URL}settings/home_popular.json`, { method: 'PUT', body: JSON.stringify({ at: Date.now(), items }) })
                 .then(r => { if (r.ok) _gHomePopLast = sig; }).catch(() => { });
         }
+        // [신규 2026-10-03] 주문이 없어도 상품을 올리거나 내리면 순위가 바뀌므로 10분마다 한 번 더 본다 (바뀌었을 때만 저장)
+        setInterval(() => { try { gHomePopularPublish(); } catch (e) { } }, 10 * 60000);
 
         /* [신규 2026-10-03] 홈 가게 소식 — 손님 주문서(ver5) 홈 맨 위에 나온다. settings/home_notice = { on, text, at }
            손님이 읽을 수 있게 규칙관리에 settings/home_notice 읽기를 열어 두어야 한다 (게시 필요). */
