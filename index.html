@@ -22574,24 +22574,44 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    받을 때 autoApplyScheduledVisibility 가 노출을 켜고 픽업일을 바꾼다 (켜 두기만 해도 5분 안에 올라가게).
                    다른 기기가 이미 올렸으면 새로 받은 목록에선 처리됨이라 아무것도 안 바뀐다. */
                 const _nowMs = now.getTime();
-                let _due = (uploadProducts || []).some(p => p && p.showWeekly !== true && Number(p.releaseAt) && _nowMs >= Number(p.releaseAt) && p.releaseApplied !== true);
+                // [수정 2026-10-03] 걸린 상품 이름도 모은다 — 같은 상품이 계속 걸리면 아래에서 30분에 한 번만 다시 받는다
+                const _dueNames = (uploadProducts || []).filter(p => p && p.showWeekly !== true && Number(p.releaseAt) && _nowMs >= Number(p.releaseAt) && p.releaseApplied !== true).map(p => String(p.sid || p.name));
+                let _due = _dueNames.length > 0;
                 /* [버그수정 2026-10-03] 위는 상품 줄에 옮겨 적힌 '지금 차례'만 본다. 아직 노출일정에서 기다리는 '다음 차례'는 상품 줄에 없어서,
                    주문관리를 켜 둔 채로는 올라갈 시각이 지나도 안 올라가고 새로고침해야 올라갔다. 일정 쪽도 본다 (psPromoteDue 와 같은 잣대) */
                 if (!_due && typeof psSched === 'object') {
-                    _due = Object.keys(psSched).some(sid => {
+                    Object.keys(psSched).filter(sid => {
                         const pp = uploadProducts[psIdxOfSid(sid)];
                         if (!pp || pp.showWeekly === true) return false;
                         const items = psItemsOfSid(sid);
                         const act = items.find(x => x.rid === pp.schedRid);
                         if (act && !(Number(act.expireAt) && _nowMs >= Number(act.expireAt))) return false;   // 지금 차례가 아직 안 끝났다
                         return items.some(x => x.rid !== pp.schedRid && Number(x.releaseAt) && _nowMs >= Number(x.releaseAt) && !(Number(x.expireAt) && _nowMs >= Number(x.expireAt)));
-                    });
+                    }).forEach(sid => _dueNames.push(String(sid)));
+                    _due = _dueNames.length > 0;
                 }
-                if (_due) { try { await loadProductsFromServer(); } catch (e) { console.error('노출 예약 확인 실패:', e); } }
+                /* [신규 2026-10-03] 데이터 새는 것 막기 (사장님 요청).
+                   올라갈 시각이 지났는데 어떤 까닭으로 안 올라가는 상품이 있으면, 예전엔 5분마다 상품 전체(약 340KB)를 다시 받았다 — 켜 두면 하루 100MB.
+                   같은 상품들이 또 걸리면 30분에 한 번만 다시 받고, 처음 한 번은 사장님께 알린다. 걸린 상품이 바뀌면 바로 받는다 */
+                if (_due) {
+                    const sig = _dueNames.slice().sort().join(',');
+                    const st = window.__gDueState || (window.__gDueState = { sig: '', at: 0, warned: '' });
+                    if (sig !== st.sig || _nowMs - st.at >= 30 * 60000) {
+                        st.sig = sig; st.at = _nowMs;
+                        try { await loadProductsFromServer(); } catch (e) { console.error('노출 예약 확인 실패:', e); }
+                    } else if (st.warned !== sig) {
+                        st.warned = sig;
+                        const nm = _dueNames.slice(0, 3).map(k => { const p = uploadProducts[psIdxOfSid(k)]; return p ? String(p.name).slice(0, 16) : k; }).join(', ');
+                        if (typeof showToast === 'function') showToast(`⚠️ 올라갈 시각이 지났는데 안 올라간 상품이 있어요: ${nm}${_dueNames.length > 3 ? ` 외 ${_dueNames.length - 3}개` : ''} — 노출일정을 확인해 주세요`);
+                    }
+                }
                 // [수정 2026-09-30] 예전 과일은 마감시각에 숨기지 않는다 (손님 화면에 '마감'으로 남는다). 날이 바뀐 뒤 처음 열 때 숨긴다
                 const needFruit = localStorage.getItem('moket_fruit_autohide_date') !== todayStr;
                 const needPast = localStorage.getItem('moket_autohide_day') !== todayStr;
                 if (!needFruit && !needPast) return;
+                // [신규 2026-10-03] 숨기기가 실패해 오늘 안 끝났으면 다시 받는 것도 30분에 한 번만 (실패할 때마다 5분마다 340KB를 받던 것)
+                if (window.__gAhTryAt && _nowMs - window.__gAhTryAt < 30 * 60000) return;
+                window.__gAhTryAt = _nowMs;
                 const res = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
                 if (!res.ok) return;
                 const data = await res.json() || {};
