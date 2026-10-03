@@ -3980,7 +3980,18 @@
         .cc-big .cc-cell { min-height:48px; padding:4px 2px; border-radius:7px; }
         .cc-big .cc-cell b { font-size:11.5px; }
         .cc-big .cc-cell span { font-size:10px; }
-        @media (max-width: 480px) { .cc-big { width:100%; } .cc-big .cc-cell { min-height:40px; } .cc-big .cc-cell b { font-size:10px; } .cc-big .cc-cell span { font-size:8.5px; } }
+        .cc-cell i { font-style:normal; }
+        .cc-big .cc-cell span.amt { font-weight:900; }
+        /* [수정 2026-10-03] 폰에서 숫자가 안 보였다 — 그림을 빼고 숫자를 키운다. 칸 위부터 조회 · 주문 · 금액 (사장님 요청) */
+        @media (max-width: 480px) {
+            .cc-big { width:100%; }
+            .cc-big .cc-cell { min-height:58px; padding:3px 0; border-radius:6px; }
+            .cc-big .cc-cell b { font-size:10px; opacity:.7; }
+            .cc-big .cc-cell span { font-size:12px; font-weight:900; line-height:1.25; letter-spacing:-0.03em; }
+            .cc-big .cc-cell span.amt { font-size:11px; }
+            .cc-big .cc-cell i { display:none; }
+            .cc-big .cc-legend { font-size:11px; }
+        }
         .cv-cal-wd { display:grid; grid-template-rows:repeat(7, 12px); gap:2px; font-size:9px;font-weight:700; color:#94a3b8; }
         .cv-cal-wd span { display:flex; align-items:center; line-height:1; }
         .cv-flow { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:6px; margin:2px 0 10px; }
@@ -19645,12 +19656,21 @@
             return { bg: steps[i], fg: i >= 6 ? '#fff' : '#334155' };
         }
         // 칸 하나 — 날짜 위, 아래 두 줄(조회 · 주문)
+        // [신규 2026-10-03] 금액을 만 단위로 — 2,122,500 → 212만, 57,600 → 5.8만 (사장님 요청)
+        function ccMan(n) {
+            n = Number(n) || 0;
+            if (n <= 0) return '';
+            if (n >= 100000) return Math.round(n / 10000).toLocaleString() + '만';
+            return (Math.max(1, Math.round(n / 1000)) / 10) + '만';
+        }
         function ccCellHtml(day, look, ord, opt) {
             const o = opt || {};
             const sh = o.shade;
             const style = sh ? `background:${sh.bg}; border-color:${sh.bg}; color:${sh.fg};` : '';
+            // [수정 2026-10-03] 그림(👀🛒)은 <i>에 따로 담아 폰에서는 감춘다 — 좁은 칸에서 숫자가 작아지던 까닭 (사장님 요청)
             const sub = (look || ord)
-                ? `<span>${look ? '👀' + look : '&nbsp;'}</span><span>${ord ? '🛒' + ord : '&nbsp;'}</span>`
+                ? `<span>${look ? '<i>👀</i>' + look : '&nbsp;'}</span><span>${ord ? '<i>🛒</i>' + ord : '&nbsp;'}</span>`
+                  + (o.amt !== undefined ? `<span class="amt">${ccMan(o.amt) || '&nbsp;'}</span>` : '')
                 : '';
             return `<div class="cc-cell${o.cls ? ' ' + o.cls : ''}" style="${style}"${o.attr || ''}><b>${day}</b>${sub}</div>`;
         }
@@ -19677,18 +19697,20 @@
             // 그 달의 주문 건수 (한 번 주문 = 1건, 가게 사람·취소·배달비 뺌)
             const monthDays = [];
             for (let i = 1; i <= last; i++) monthDays.push(`${caSumMonth}-${String(i).padStart(2, '0')}`);
-            const ordCnt = new Map(), ordWho = new Map();
+            const ordCnt = new Map(), ordWho = new Map(), ordAmt = new Map();
             caOrdersInDays(monthDays, true).forEach(o => {
                 ordCnt.set(o.d, (ordCnt.get(o.d) || 0) + 1);
+                ordAmt.set(o.d, (ordAmt.get(o.d) || 0) + (o.amt || 0));   // [신규 2026-10-03] 그날 주문 금액
                 if (!ordWho.has(o.d)) ordWho.set(o.d, new Set());
                 ordWho.get(o.d).add(o.key);
             });
             // 색 진하기는 그 달에서 가장 많은 날을 기준으로 잡는다
+            // [수정 2026-10-03] 칸 숫자를 사람 수로 바꿔서 색도 사람 수로 잡는다 (사장님 요청)
             let maxLook = 1, maxOrd = 1;
             monthDays.forEach(d => {
                 const vv = V[d]; let lk = 0;
-                if (vv) Object.keys(vv).forEach(ph => { if (!CA_STAFF_PHONES.has(ph)) lk += caVisitCount(vv[ph]); });
-                maxLook = Math.max(maxLook, lk); maxOrd = Math.max(maxOrd, ordCnt.get(d) || 0);
+                if (vv) Object.keys(vv).forEach(ph => { if (!CA_STAFF_PHONES.has(ph)) lk++; });
+                maxLook = Math.max(maxLook, lk); maxOrd = Math.max(maxOrd, (ordWho.get(d) || new Set()).size);
             });
             const cells = [];
             for (let i = 0; i < lead; i++) cells.push('<div class="cc-cell empty"></div>');
@@ -19700,9 +19722,11 @@
                 const ord = ordCnt.get(d) || 0, ow = (ordWho.get(d) || new Set()).size;
                 const future = d > todayKey;
                 const cls = (future ? 'fut' : '') + (d === todayKey ? ' today' : '');
-                const tip = `${caMdLabel(d)} · 조회 ${lookWho}명 ${look}건${ord ? ` │ 주문 ${ow}명 ${ord}건` : ''}`;
-                const shade = (caHeatMode === 'ord') ? ccShade(ord, maxOrd, CC_ORANGE) : ccShade(look, maxLook, CC_BLUE);
-                cells.push(ccCellHtml(day, look, ord, { cls, shade, attr: ` title="${tip}"` }));
+                const amt = ordAmt.get(d) || 0;
+                const tip = `${caMdLabel(d)} · 조회 ${lookWho}명 ${look}건${ord ? ` │ 주문 ${ow}명 ${ord}건 · ${amt.toLocaleString()}원` : ''}`;
+                const shade = (caHeatMode === 'ord') ? ccShade(ow, maxOrd, CC_ORANGE) : ccShade(lookWho, maxLook, CC_BLUE);
+                // [수정 2026-10-03] 칸에는 건수 대신 사람 수 — 몇 명이 봤고 몇 명이 샀나 (사장님 요청). 건수는 칸에 마우스를 두면 보인다
+                cells.push(ccCellHtml(day, lookWho, ow, { cls, shade, attr: ` title="${tip}"`, amt }));
             });
             const canNext = new Date(y, m - 1, 1) < new Date(now.getFullYear(), now.getMonth(), 1);
             return `<div class="cc-cal cc-big">
@@ -19713,7 +19737,7 @@
                 </div>
                 <div class="cc-wd">${['월','화','수','목','금','토','일'].map(w => `<span>${w}</span>`).join('')}</div>
                 <div class="cc-grid">${cells.join('')}</div>
-                <div class="cc-legend">👀 조회 · 🛒 주문</div>
+                <div class="cc-legend">칸 위부터 👀 본 사람 · 🛒 산 사람 · 금액(만 원)</div>
             </div>`;
         }
 
