@@ -19291,12 +19291,19 @@
             while (d >= end) { out.push(caDayKey(d)); d.setDate(d.getDate() - 1); }
             return out;
         }
-        function caSelDays() { return caVisitFrom ? caRangeDays(caVisitFrom, caVisitTo) : caLastDays(caVisitPeriod); }
-        function caSelLabel() {
-            if (!caVisitFrom) return caPeriodLabel(caVisitPeriod);
-            return caVisitFrom === caVisitTo ? caMdLabel(caVisitFrom) : `${caMdLabel(caVisitFrom)} ~ ${caMdLabel(caVisitTo)}`;
+        /* [수정 2026-10-04] 기간 단추(오늘·7일·30일·90일·날짜)를 없앴다 (사장님 요청).
+           이제 '상품 조회' 달력에서 보고 있는 달이 기간이다 — 요약·요일·시간대 표·손님 목록의 조회 숫자가 모두 그 달 기준.
+           이번 달이면 1일부터 오늘까지. (caVisitPeriod·caVisitFrom 은 예전 단추용으로 남아 있지만 쓰지 않는다) */
+        function caSelDays() {
+            const ym = caSumMonth || caMonthKeyOf(new Date());
+            const [y, m] = ym.split('-').map(Number);
+            const last = new Date(y, m, 0).getDate(), today = caLastDays(1)[0];
+            const out = [];
+            for (let d = last; d >= 1; d--) { const k = `${ym}-${String(d).padStart(2, '0')}`; if (k <= today) out.push(k); }
+            return out;   // [최근 날 → 1일]
         }
-        function caIsOneDay() { return caVisitFrom ? (caVisitFrom === caVisitTo) : caVisitPeriod === 1; }
+        function caSelLabel() { const ym = caSumMonth || caMonthKeyOf(new Date()); return `${parseInt(ym.slice(5, 7), 10)}월`; }
+        function caIsOneDay() { return false; }
 
         function caPeriodBtns() {
             const today = caLastDays(1)[0];
@@ -19817,8 +19824,8 @@
             const d = new Date(y, m - 1 + step, 1), now = new Date();
             if (d > new Date(now.getFullYear(), now.getMonth(), 1)) return;
             caSumMonth = caMonthKeyOf(d);
-            renderCustomerAdmin();
-            caEnsureMonthVisits(caSumMonth).then(() => renderCustomerAdmin()).catch(() => { });
+            caAfterSelChange();   // [수정 2026-10-04] 달이 곧 기간 — 손님 목록 숫자까지 다시 센다
+            caEnsureMonthVisits(caSumMonth).then(() => caAfterSelChange()).catch(() => { });
         }
         function caSumCalHtml() {
             const now = new Date();
@@ -20293,7 +20300,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             const ctl = `<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <b style="font-size:14px; font-weight:900; color:#0f172a;">👀 상품 조회</b>
-                <span class="cv-per-wrap" style="margin:0;">${caPeriodBtns()}</span>
+                <span style="font-size:12px; font-weight:800; color:#64748b;">${caSelLabel()} · 아래 달력을 넘기면 함께 바뀌어요</span>
             </div>`;
             const box = (text, body) => `<div>${ctl}
                 <details ${caVisitOpen ? 'open' : ''} ontoggle="caSetVisitOpen(this.open)" style="margin-top:6px;">
