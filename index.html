@@ -35898,6 +35898,49 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
 
     <!-- 인쇄용 숨김 영역 (CSS @media print가 활성화될 때만 나타남) -->
     <div id="print-area" class="print-only"></div>
+
+    <!-- [신규 2026-10-04] 창이 떠 있는 동안 뒤 화면 멈추기 (사장님 요청 — 주문서·주문관리·배달기사 세 앱 공통)
+         화면을 거의 다 덮는 창(위치 고정·보임·불투명)이 하나라도 떠 있으면 뒤 화면을 그 자리에 고정하고, 다 닫히면 보던 자리로 돌려놓는다.
+         예전엔 body 에 overflow:hidden 만 걸어서 아이폰·카카오톡 안 브라우저에서는 그래도 뒤가 굴러갔다.
+         창을 열고 닫을 때마다 부를 필요 없이 화면이 바뀌는 것을 지켜보다 알아서 맞춘다.
+         빼고 싶은 큰 덮개가 있으면 그 칸에 data-no-scroll-lock 을 붙인다. -->
+    <script>
+    (function () {
+        let lockY = null, raf = 0;
+        function covers(el) {
+            if (!el || el.nodeType !== 1 || el.hasAttribute('data-no-scroll-lock')) return false;
+            const cs = getComputedStyle(el);
+            if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') return false;
+            if (parseFloat(cs.opacity) < 0.05) return false;
+            const r = el.getBoundingClientRect();
+            return r.width >= window.innerWidth * 0.9 && r.height >= window.innerHeight * 0.85;
+        }
+        function anyOpen() {
+            for (const el of document.body.children) if (covers(el)) return true;
+            return false;
+        }
+        function lock() {
+            if (lockY !== null) return;
+            lockY = window.scrollY || 0;
+            const b = document.body.style;
+            b.position = 'fixed'; b.top = (-lockY) + 'px'; b.left = '0'; b.right = '0'; b.width = '100%';
+        }
+        function unlock() {
+            if (lockY === null) return;
+            const y = lockY; lockY = null;
+            const b = document.body.style;
+            b.position = ''; b.top = ''; b.left = ''; b.right = ''; b.width = '';
+            window.scrollTo(0, y);
+        }
+        function check() { raf = 0; if (anyOpen()) lock(); else unlock(); }
+        function soon() { if (!raf) raf = requestAnimationFrame(check); }
+        new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden', 'open'] });
+        document.addEventListener('transitionend', soon, true);
+        window.addEventListener('resize', soon);
+        window.gScrollLockCheck = soon;   // 필요하면 직접 불러도 된다
+        soon();
+    })();
+    </script>
 </body>
 
 </html>
