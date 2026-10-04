@@ -4421,26 +4421,10 @@
                          고른 결과는 바로 아랫줄(profit-range-label)에 글로 나온다.
                          [수정] '전체'는 뺐다. 매입은 어차피 2026년 8월부터만 세므로
                          '전체'와 '올해'가 사실상 같은 기간이라 헷갈렸다. 대신 '직접'을 넣는다. -->
-                    <div style="display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:5px; align-items:center;">
-                        <button type="button" class="profit-range-btn" data-range="month" onclick="setProfitRange('month')">이번 달</button>
-                        <button type="button" class="profit-range-btn" data-range="3m" onclick="setProfitRange('3m')">3개월</button>
-                        <button type="button" class="profit-range-btn" data-range="6m" onclick="setProfitRange('6m')">6개월</button>
-                        <button type="button" class="profit-range-btn" data-range="year" onclick="setProfitRange('year')">올해</button>
-                        <button type="button" class="profit-range-btn" data-range="custom" onclick="setProfitRange('custom')">직접</button>
-                        <button type="button" class="profit-range-btn" onclick="renderProfitReport()" style="color:#4338ca; border-color:#c7d2fe;" title="매입·매출을 다시 계산합니다">🔄 갱신</button>
-                    </div>
-
-                    <!-- [신규] '직접'을 눌렀을 때만 나오는 기간 칸.
-                         이 표는 달 단위로만 묶어 세므로 날짜가 아니라 '달'을 고른다.
-                         (8월 15일~9월 10일처럼 골라도 8월·9월을 통째로 셀 수밖에 없어
-                          날짜로 고르게 하면 숫자가 고른 기간과 다르게 보인다) -->
-                    <div id="profit-custom-row" style="display:none; margin-top:8px;">
-                        <div style="display:flex; gap:6px; align-items:center;">
-                            <input type="month" id="profit-from-month" onchange="onProfitCustomMonthChange()" class="form-control" style="flex:1 1 0; min-width:0; height:38px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800; box-sizing:border-box; background:#fff;">
-                            <span style="font-size:12px; font-weight:800; color:#94a3b8; flex:0 0 auto;">~</span>
-                            <input type="month" id="profit-to-month" onchange="onProfitCustomMonthChange()" class="form-control" style="flex:1 1 0; min-width:0; height:38px; padding:7px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800; box-sizing:border-box; background:#fff;">
-                        </div>
-                    </div>
+                    <!-- [수정 2026-10-04] 기간 고르기를 새로 짰다 (사장님 요청 — 월별로만 보면 된다).
+                         ‹ 연도 › 와 1~12월 단추. 한 달을 누르면 그 달만, 두 달을 차례로 누르면 그 사이 (예: 7월 → 9월 = 7~9월).
+                         그리는 것은 paintProfitRangeButtons() 가 한다. -->
+                    <div id="profit-period-box"></div>
                     <!-- [수정] '✍️ 직접 입력' 단추는 뺐다.
                          아래 요약칸(매입·매출·지출) 이름 옆에 각각 ✍️ 단추를 두어,
                          적으려는 종류가 이미 골라진 채로 열리게 했다. -->
@@ -33868,10 +33852,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         const PROFIT_BUY_FROM_MONTH = '2026-08';
 
         // [수정] 처음 열면 이번 달만 센다 (예전 기본은 6개월이라 이번 달 성적이 묻혔다)
-        let profitRangeKind = 'month';
-        // [신규] '직접'으로 고른 기간 (YYYY-MM). 비어 있으면 자료에 있는 처음~끝.
-        let profitCustomFrom = '';
-        let profitCustomTo = '';
+        // [수정 2026-10-04] 기간은 늘 '시작 달 ~ 끝 달'(YYYY-MM)로 고른다. 처음엔 이번 달
+        let profitRangeKind = 'custom';
+        let profitCustomFrom = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+        let profitCustomTo = profitCustomFrom;
+        let profitYear = new Date().getFullYear();   // 달 단추에 펼쳐 둔 해
+        let profitPick = 'from';                     // 다음에 누르는 달이 시작인지(from) 끝인지(to)
         let manualSales = {};            // { 'YYYY-MM-DD': { pos, transfer } }
         let manualSalesLoaded = false;
 
@@ -35287,11 +35273,74 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             renderProfitReport();
         }
 
-        // [신규] 지금 보고 있는 기간 버튼에 색을 넣는다 ('🔄 갱신'은 기간이 아니므로 뺀다)
+        /* [수정 2026-10-04] 기간 고르기 — 달력처럼 한 달씩 넘긴다 (사장님 요청).
+           · 한 달 보기 : ‹ 2026년 9월 › [기간] 🔄
+           · 기간 보기  : ‹ 2026.07 › ~ ‹ 2026.09 › (3개월) [한 달로] 🔄 — 시작 달·끝 달을 따로 넘긴다
+           · 앞으로 올 달, 매입을 세기 전 달(PROFIT_BUY_FROM_MONTH 앞)로는 못 넘어간다 */
+        let profitMode = 'month';   // month | range
+        function profitAddMonth(k, n) {
+            const [y, m] = k.split('-').map(Number);
+            const d = new Date(y, m - 1 + n, 1);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        }
         function paintProfitRangeButtons() {
-            document.querySelectorAll('.profit-range-btn[data-range]').forEach(b => {
-                b.classList.toggle('active', b.getAttribute('data-range') === profitRangeKind);
-            });
+            const box = document.getElementById('profit-period-box');
+            if (!box) return;
+            const now = fProfitMonthKey(new Date()), MIN = PROFIT_BUY_FROM_MONTH;
+            const f = profitCustomFrom || now, t = profitCustomTo || now;
+            const ym = k => `${k.slice(0, 4)}년 ${parseInt(k.slice(5), 10)}월`;
+            const dot = k => `${k.slice(0, 4)}.${k.slice(5)}`;
+            const btn = 'height:38px; border:1.5px solid #cbd5e1; background:#fff; color:#334155; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap;';
+            const arrow = (which, n, off) => `<button type="button" ${off ? 'disabled' : `onclick="profitStep('${which}', ${n})"`} style="${btn} width:38px; font-size:16px; ${off ? 'color:#cbd5e1; cursor:default; background:#f8fafc;' : ''}">${n < 0 ? '‹' : '›'}</button>`;
+            const refresh = `<button type="button" onclick="renderProfitReport()" title="매입·매출을 다시 계산합니다" style="${btn} width:38px; color:#4338ca; border-color:#c7d2fe;">🔄</button>`;
+            if (profitMode !== 'range') {
+                box.innerHTML = `<div style="display:flex; align-items:center; gap:6px;">
+                    ${arrow('one', -1, t <= MIN)}
+                    <b style="flex:1 1 auto; text-align:center; font-size:16px; font-weight:900; color:#0f172a;">${ym(t)}</b>
+                    ${arrow('one', 1, t >= now)}
+                    <button type="button" onclick="profitSetMode('range')" style="${btn} padding:0 12px;">기간</button>
+                    ${refresh}
+                </div>`;
+                return;
+            }
+            const n = (parseInt(t.slice(0, 4), 10) - parseInt(f.slice(0, 4), 10)) * 12 + parseInt(t.slice(5), 10) - parseInt(f.slice(5), 10) + 1;
+            box.innerHTML = `<div style="display:flex; align-items:center; gap:4px;">
+                    ${arrow('from', -1, f <= MIN)}
+                    <b style="flex:1 1 0; min-width:0; text-align:center; font-size:14px; font-weight:900; color:#0f172a;">${dot(f)}</b>
+                    ${arrow('from', 1, f >= now)}
+                    <span style="flex:0 0 auto; font-weight:900; color:#94a3b8;">~</span>
+                    ${arrow('to', -1, t <= MIN)}
+                    <b style="flex:1 1 0; min-width:0; text-align:center; font-size:14px; font-weight:900; color:#0f172a;">${dot(t)}</b>
+                    ${arrow('to', 1, t >= now)}
+                </div>
+                <div style="display:flex; align-items:center; gap:6px; margin-top:7px;">
+                    <span style="flex:1 1 auto; font-size:12.5px; font-weight:800; color:#059669;">${n}개월 합계</span>
+                    <button type="button" onclick="profitSetMode('month')" style="${btn} padding:0 12px;">한 달로</button>
+                    ${refresh}
+                </div>`;
+        }
+        // which: one(한 달 보기) | from(시작 달) | to(끝 달). 시작이 끝을 넘으면 같이 밀린다
+        function profitStep(which, n) {
+            const now = fProfitMonthKey(new Date()), MIN = PROFIT_BUY_FROM_MONTH;
+            const clamp = k => (k < MIN ? MIN : (k > now ? now : k));
+            let f = profitCustomFrom || now, t = profitCustomTo || now;
+            if (which === 'one') { t = clamp(profitAddMonth(t, n)); f = t; }
+            else if (which === 'from') { f = clamp(profitAddMonth(f, n)); if (f > t) t = f; }
+            else { t = clamp(profitAddMonth(t, n)); if (t < f) f = t; }
+            profitCustomFrom = f; profitCustomTo = t; profitRangeKind = 'custom';
+            renderProfitReport();
+        }
+        function profitSetMode(m) {
+            profitMode = (m === 'range') ? 'range' : 'month';
+            const now = fProfitMonthKey(new Date());
+            const t = profitCustomTo || now;
+            if (profitMode === 'month') { profitCustomFrom = t; profitCustomTo = t; }
+            else if ((profitCustomFrom || t) === t) {   // 처음 펼치면 끝 달 기준 앞 석 달로 시작 (매입을 세기 전 달은 빼고)
+                const f = profitAddMonth(t, -2);
+                profitCustomFrom = f < PROFIT_BUY_FROM_MONTH ? PROFIT_BUY_FROM_MONTH : f;
+            }
+            profitRangeKind = 'custom';
+            renderProfitReport();
         }
 
         function fProfitMonthKey(d) {
@@ -35405,14 +35454,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             const label = document.getElementById('profit-range-label');
             if (label) {
-                let kindLabel = { month: '이번 달', '3m': '3개월', '6m': '6개월', year: '올해', custom: '직접' }[profitRangeKind] || '';
-                // [신규] '직접'은 고른 기간을 그대로 보여 준다. 자료가 없을 때도 무엇을 골랐는지 남는다.
-                if (profitRangeKind === 'custom' && (profitCustomFrom || profitCustomTo)) {
-                    kindLabel = `직접 ${profitCustomFrom || '처음'} ~ ${profitCustomTo || '끝'}`;
-                }
-                label.innerText = months.length
-                    ? `${kindLabel} · ${months[months.length - 1]} ~ ${months[0]} (${months.length}개월)`
-                    : `${kindLabel} · 자료 없음`;
+                // [수정 2026-10-04] 고른 기간을 '2026년 7월 ~ 9월 (3개월)'처럼 적는다
+                const _f = profitCustomFrom || fProfitMonthKey(new Date()), _t = profitCustomTo || _f;
+                const _ym = k => `${k.slice(0, 4)}년 ${parseInt(k.slice(5), 10)}월`;
+                const _n = (parseInt(_t.slice(0, 4), 10) - parseInt(_f.slice(0, 4), 10)) * 12 + parseInt(_t.slice(5), 10) - parseInt(_f.slice(5), 10) + 1;
+                const kindLabel = _f === _t ? _ym(_f)
+                    : (_f.slice(0, 4) === _t.slice(0, 4) ? `${_ym(_f)} ~ ${parseInt(_t.slice(5), 10)}월` : `${_ym(_f)} ~ ${_ym(_t)}`) + ` (${_n}개월)`;
+                label.innerText = months.length ? `📅 ${kindLabel}` : `📅 ${kindLabel} · 자료 없음`;
             }
 
             // [신규] 보정 창에서도 '이 달 계산 잔액'을 보여 줘야 해서 계산 결과를 남겨 둔다
