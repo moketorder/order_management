@@ -33856,8 +33856,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         let profitRangeKind = 'custom';
         let profitCustomFrom = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
         let profitCustomTo = profitCustomFrom;
-        let profitYear = new Date().getFullYear();   // 달 단추에 펼쳐 둔 해
-        let profitPick = 'from';                     // 다음에 누르는 달이 시작인지(from) 끝인지(to)
         let manualSales = {};            // { 'YYYY-MM-DD': { pos, transfer } }
         let manualSalesLoaded = false;
 
@@ -35273,74 +35271,96 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             renderProfitReport();
         }
 
-        /* [수정 2026-10-04] 기간 고르기 — 달력처럼 한 달씩 넘긴다 (사장님 요청).
-           · 한 달 보기 : ‹ 2026년 9월 › [기간] 🔄
-           · 기간 보기  : ‹ 2026.07 › ~ ‹ 2026.09 › (3개월) [한 달로] 🔄 — 시작 달·끝 달을 따로 넘긴다
-           · 앞으로 올 달, 매입을 세기 전 달(PROFIT_BUY_FROM_MONTH 앞)로는 못 넘어간다 */
-        let profitMode = 'month';   // month | range
+        /* [수정 2026-10-04] 기간 고르기 — [월 | 기간 | 연도] (사장님 요청).
+           · 월   : ‹ 2026년 9월 › 한 달씩 넘긴다
+           · 기간 : [연도▾][월▾] ~ [연도▾][월▾] 로 시작 달·끝 달을 고른다 (시작이 끝을 넘으면 같이 맞춘다)
+           · 연도 : ‹ 2026년 › 한 해 합계 (올해는 이번 달까지, 매입을 세기 전 달은 빼고)
+           · 앞으로 올 달, 매입을 세기 전 달(PROFIT_BUY_FROM_MONTH 앞)은 고를 수 없다 */
+        let profitMode = 'month';   // month | range | year
         function profitAddMonth(k, n) {
             const [y, m] = k.split('-').map(Number);
             const d = new Date(y, m - 1 + n, 1);
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        }
+        function profitClampMonth(k) {
+            const now = fProfitMonthKey(new Date());
+            return k < PROFIT_BUY_FROM_MONTH ? PROFIT_BUY_FROM_MONTH : (k > now ? now : k);
         }
         function paintProfitRangeButtons() {
             const box = document.getElementById('profit-period-box');
             if (!box) return;
             const now = fProfitMonthKey(new Date()), MIN = PROFIT_BUY_FROM_MONTH;
             const f = profitCustomFrom || now, t = profitCustomTo || now;
-            const ym = k => `${k.slice(0, 4)}년 ${parseInt(k.slice(5), 10)}월`;
-            const dot = k => `${k.slice(0, 4)}.${k.slice(5)}`;
+            const minY = parseInt(MIN.slice(0, 4), 10), nowY = parseInt(now.slice(0, 4), 10);
             const btn = 'height:38px; border:1.5px solid #cbd5e1; background:#fff; color:#334155; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer; white-space:nowrap;';
-            const arrow = (which, n, off) => `<button type="button" ${off ? 'disabled' : `onclick="profitStep('${which}', ${n})"`} style="${btn} width:38px; font-size:16px; ${off ? 'color:#cbd5e1; cursor:default; background:#f8fafc;' : ''}">${n < 0 ? '‹' : '›'}</button>`;
+            const offSt = 'color:#cbd5e1; cursor:default; background:#f8fafc;';
+            const arrow = (fn, off, ch) => `<button type="button" ${off ? 'disabled' : `onclick="${fn}"`} style="${btn} width:40px; font-size:16px; ${off ? offSt : ''}">${ch}</button>`;
             const refresh = `<button type="button" onclick="renderProfitReport()" title="매입·매출을 다시 계산합니다" style="${btn} width:38px; color:#4338ca; border-color:#c7d2fe;">🔄</button>`;
-            if (profitMode !== 'range') {
-                box.innerHTML = `<div style="display:flex; align-items:center; gap:6px;">
-                    ${arrow('one', -1, t <= MIN)}
-                    <b style="flex:1 1 auto; text-align:center; font-size:16px; font-weight:900; color:#0f172a;">${ym(t)}</b>
-                    ${arrow('one', 1, t >= now)}
-                    <button type="button" onclick="profitSetMode('range')" style="${btn} padding:0 12px;">기간</button>
+            const tab = (m, l) => `<button type="button" onclick="profitSetMode('${m}')" style="flex:1 1 0; height:32px; border:none; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;
+                background:${profitMode === m ? '#fff' : 'transparent'}; color:${profitMode === m ? '#059669' : '#64748b'}; box-shadow:${profitMode === m ? '0 1px 3px rgba(0,0,0,.12)' : 'none'};">${l}</button>`;
+            const tabs = `<div style="display:flex; gap:3px; background:#e2e8f0; padding:3px; border-radius:10px; margin-bottom:8px;">${tab('month', '월')}${tab('range', '기간')}${tab('year', '연도')}</div>`;
+            let body = '';
+            if (profitMode === 'range') {
+                const sel = 'flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:9px; padding:0 4px; font-size:13px; font-weight:800; color:#0f172a; background:#fff;';
+                const ySel = (which, k) => `<select onchange="profitPick('${which}', this.value + '-' + '${k.slice(5)}')" style="${sel}">` +
+                    Array.from({ length: nowY - minY + 1 }, (_, i) => minY + i).map(y => `<option value="${y}"${String(y) === k.slice(0, 4) ? ' selected' : ''}>${y}년</option>`).join('') + `</select>`;
+                const mSel = (which, k) => `<select onchange="profitPick('${which}', '${k.slice(0, 4)}-' + this.value)" style="${sel}">` +
+                    Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(m => {
+                        const kk = `${k.slice(0, 4)}-${m}`, off = kk < MIN || kk > now;
+                        return `<option value="${m}"${m === k.slice(5) ? ' selected' : ''}${off ? ' disabled' : ''}>${parseInt(m, 10)}월</option>`;
+                    }).join('') + `</select>`;
+                const n = (parseInt(t.slice(0, 4), 10) - parseInt(f.slice(0, 4), 10)) * 12 + parseInt(t.slice(5), 10) - parseInt(f.slice(5), 10) + 1;
+                body = `<div style="display:flex; align-items:center; gap:4px;">${ySel('from', f)}${mSel('from', f)}<span style="flex:0 0 auto; font-weight:900; color:#94a3b8;">~</span>${ySel('to', t)}${mSel('to', t)}</div>
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:7px;">
+                        <span style="flex:1 1 auto; font-size:12.5px; font-weight:800; color:#059669;">${n}개월 합계</span>${refresh}
+                    </div>`;
+            } else if (profitMode === 'year') {
+                const Y = parseInt(t.slice(0, 4), 10);
+                body = `<div style="display:flex; align-items:center; gap:6px;">
+                    ${arrow(`profitYearStep(-1)`, Y <= minY, '‹')}
+                    <b style="flex:1 1 auto; text-align:center; font-size:16px; font-weight:900; color:#0f172a;">${Y}년 전체</b>
+                    ${arrow(`profitYearStep(1)`, Y >= nowY, '›')}
                     ${refresh}
                 </div>`;
-                return;
+            } else {
+                body = `<div style="display:flex; align-items:center; gap:6px;">
+                    ${arrow(`profitMonthStep(-1)`, t <= MIN, '‹')}
+                    <b style="flex:1 1 auto; text-align:center; font-size:16px; font-weight:900; color:#0f172a;">${t.slice(0, 4)}년 ${parseInt(t.slice(5), 10)}월</b>
+                    ${arrow(`profitMonthStep(1)`, t >= now, '›')}
+                    ${refresh}
+                </div>`;
             }
-            const n = (parseInt(t.slice(0, 4), 10) - parseInt(f.slice(0, 4), 10)) * 12 + parseInt(t.slice(5), 10) - parseInt(f.slice(5), 10) + 1;
-            box.innerHTML = `<div style="display:flex; align-items:center; gap:4px;">
-                    ${arrow('from', -1, f <= MIN)}
-                    <b style="flex:1 1 0; min-width:0; text-align:center; font-size:14px; font-weight:900; color:#0f172a;">${dot(f)}</b>
-                    ${arrow('from', 1, f >= now)}
-                    <span style="flex:0 0 auto; font-weight:900; color:#94a3b8;">~</span>
-                    ${arrow('to', -1, t <= MIN)}
-                    <b style="flex:1 1 0; min-width:0; text-align:center; font-size:14px; font-weight:900; color:#0f172a;">${dot(t)}</b>
-                    ${arrow('to', 1, t >= now)}
-                </div>
-                <div style="display:flex; align-items:center; gap:6px; margin-top:7px;">
-                    <span style="flex:1 1 auto; font-size:12.5px; font-weight:800; color:#059669;">${n}개월 합계</span>
-                    <button type="button" onclick="profitSetMode('month')" style="${btn} padding:0 12px;">한 달로</button>
-                    ${refresh}
-                </div>`;
+            box.innerHTML = tabs + body;
         }
-        // which: one(한 달 보기) | from(시작 달) | to(끝 달). 시작이 끝을 넘으면 같이 밀린다
-        function profitStep(which, n) {
-            const now = fProfitMonthKey(new Date()), MIN = PROFIT_BUY_FROM_MONTH;
-            const clamp = k => (k < MIN ? MIN : (k > now ? now : k));
-            let f = profitCustomFrom || now, t = profitCustomTo || now;
-            if (which === 'one') { t = clamp(profitAddMonth(t, n)); f = t; }
-            else if (which === 'from') { f = clamp(profitAddMonth(f, n)); if (f > t) t = f; }
-            else { t = clamp(profitAddMonth(t, n)); if (t < f) f = t; }
-            profitCustomFrom = f; profitCustomTo = t; profitRangeKind = 'custom';
-            renderProfitReport();
+        function profitSetRange(f, t) { profitCustomFrom = f; profitCustomTo = t; profitRangeKind = 'custom'; renderProfitReport(); }
+        // 월: 한 달씩
+        function profitMonthStep(n) {
+            const t = profitClampMonth(profitAddMonth(profitCustomTo || fProfitMonthKey(new Date()), n));
+            profitSetRange(t, t);
+        }
+        // 연도: 한 해씩 (1월~12월, 올해는 이번 달까지)
+        function profitYearRange(Y) { return [profitClampMonth(`${Y}-01`), profitClampMonth(`${Y}-12`)]; }
+        function profitYearStep(n) {
+            const Y = parseInt((profitCustomTo || fProfitMonthKey(new Date())).slice(0, 4), 10) + n;
+            const [f, t] = profitYearRange(Y);
+            profitSetRange(f, t);
+        }
+        // 기간: 연도·월을 고른다. 시작이 끝을 넘으면 같이 맞춘다
+        function profitPick(which, k) {
+            k = profitClampMonth(k);
+            let f = profitCustomFrom || k, t = profitCustomTo || k;
+            if (which === 'from') { f = k; if (f > t) t = f; } else { t = k; if (t < f) f = t; }
+            profitSetRange(f, t);
         }
         function profitSetMode(m) {
-            profitMode = (m === 'range') ? 'range' : 'month';
+            profitMode = ['range', 'year'].includes(m) ? m : 'month';
             const now = fProfitMonthKey(new Date());
             const t = profitCustomTo || now;
-            if (profitMode === 'month') { profitCustomFrom = t; profitCustomTo = t; }
-            else if ((profitCustomFrom || t) === t) {   // 처음 펼치면 끝 달 기준 앞 석 달로 시작 (매입을 세기 전 달은 빼고)
-                const f = profitAddMonth(t, -2);
-                profitCustomFrom = f < PROFIT_BUY_FROM_MONTH ? PROFIT_BUY_FROM_MONTH : f;
-            }
-            profitRangeKind = 'custom';
-            renderProfitReport();
+            if (profitMode === 'month') return profitSetRange(t, t);
+            if (profitMode === 'year') { const [f2, t2] = profitYearRange(parseInt(t.slice(0, 4), 10)); return profitSetRange(f2, t2); }
+            // 기간: 처음 펼치면 끝 달 기준 앞 석 달로 시작
+            const f = (profitCustomFrom && profitCustomFrom !== t) ? profitCustomFrom : profitClampMonth(profitAddMonth(t, -2));
+            profitSetRange(f, t);
         }
 
         function fProfitMonthKey(d) {
