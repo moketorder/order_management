@@ -15181,8 +15181,13 @@
         // [신규] 누른 날짜가 달력 칸 한가운데로 오게 부드럽게 옮긴다
         function psCalCenterOn(key, behavior) {
             const box = document.getElementById('ps-cal-box');
-            const cell = box && box.querySelector(`[data-day="${key}"]`);
-            if (!cell) return;
+            let cell = box && box.querySelector(`[data-day="${key}"]`);
+            // [수정 2026-10-05] 일요일 칸은 숨겨져 있다 — 숨은 칸이면 다음 날(월요일) 칸으로 맞춘다
+            for (let i = 1; cell && !cell.offsetParent && i <= 2; i++) {
+                const nx = box.querySelector(`[data-day="${psAddDays(key, i)}"]`);
+                if (nx) cell = nx;
+            }
+            if (!cell || !cell.offsetParent) return;
             const top = cell.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
             psCalSuppressFor(700);   // 옮기는 동안 위·아래 끝에 닿았다고 달을 덧붙이지 않게
             box.scrollTo({ top: Math.max(0, top - (box.clientHeight - cell.offsetHeight) / 2), behavior: behavior || 'smooth' });
