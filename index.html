@@ -4911,7 +4911,11 @@
         .ps-slot:first-child { border-top: none; }
         .ps-slot.over { background: #dbeafe; }
         /* 맨 왼쪽 시간 기둥 — 노출일정 달력에서만 8칸(기둥 + 7일)으로 쓴다 */
-        #ps-cal-box .ms-cal-grid { grid-template-columns: 22px repeat(7, minmax(0,1fr)); }
+        #ps-cal-box .ms-cal-grid { grid-template-columns: 22px repeat(6, minmax(0,1fr)); }
+        /* [수정 2026-10-05] 일요일 칸은 화면에서만 숨긴다 (날짜·자료는 그대로) — 월~토 6칸을 고르게 넓힌다 (사장님 요청) */
+        #ps-cal-box .ms-cal-cell.ms-cal-sun, #ps-cal-box .ms-cal-cell.ps-sun-pad, .ps-cal-scroll .ps-cal-weekhead .ps-sun-head { display: none; }
+        /* [수정 2026-10-05] 달력 보기일 때는 노출일정 화면을 PC 창 너비만큼 넓힌다 (목록·판매기록 보기는 그대로 760px) */
+        #tab-admin-product-schedule > .container:has(#ps-view-cal.on) { max-width: none !important; }
         #ps-cal-box .ms-cal-cell.ps-gutter { background: transparent; border-color: transparent; cursor: default; padding-left: 0; padding-right: 0; outline: none; }
         .ps-gutter .ps-slot { border-top-color: transparent; }
         .ps-gutter .ps-bar-empty { margin: 0; }
@@ -4923,7 +4927,7 @@
             .ps-cal-rail-track { position: absolute; top: 6px; bottom: 6px; left: 50%; width: 4px; margin-left: -2px; background: #e2e8f0; border-radius: 2px; }
             .ps-cal-thumb { position: absolute; left: 3px; right: 3px; top: 0; height: 64px; background: #64748b; border-radius: 10px; }
         }
-        .ps-cal-scroll .ps-cal-weekhead { display: grid; grid-template-columns: 22px repeat(7, minmax(0,1fr)); gap: 3px;
+        .ps-cal-scroll .ps-cal-weekhead { display: grid; grid-template-columns: 22px repeat(6, minmax(0,1fr)); gap: 3px;
             position: sticky; top: 0; background: #fff; z-index: 3; padding: 4px 0 2px; }
         .ps-cal-scroll .ps-cal-month-label { font-size: 12px; font-weight: 900; color: #475569; text-align: center; padding: 10px 0 4px; }
         /* [신규] 지금 안 보고 있는 달(펼친 날이 없으면 오늘이 있는 달, 있으면 그 날의 달)은 날짜를 흐리게 해서
@@ -15311,10 +15315,10 @@
                 return g + `</div></div>`;
             };
             const PS_DOT = { on: '#16a34a', hidden: '#dc2626', closed: '#ca8a04' };
-            let html = `<div class="ps-cal-weekhead"><div></div>` + ['일', '월', '화', '수', '목', '금', '토'].map(w => `<div class="ms-cal-head">${w}</div>`).join('') + `</div>`;
+            let html = `<div class="ps-cal-weekhead"><div></div>` + ['일', '월', '화', '수', '목', '금', '토'].map(w => `<div class="ms-cal-head${w === '일' ? ' ps-sun-head' : ''}">${w}</div>`).join('') + `</div>`;   // 일요일은 CSS로 숨김
             html += `<div class="ms-cal-grid">`;
             html += gutterHtml(0);
-            for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty"></div>`;
+            for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty${i === 0 ? ' ps-sun-pad' : ''}"></div>`;   // 첫 빈칸 = 일요일 자리 (숨김)
 
             dateKeys.forEach((key, i) => {
                 const w = Math.floor((lead + i) / 7);
@@ -15341,7 +15345,7 @@
                     // [수정 2026-10-02] 이름이 첫 칸에서 잘리지 않게 — 이 주 안에서 막대가 이어지는 칸 수만큼 이름 자리를 넓힌다
                     const spanDays = Math.min(psDayDiff(key, b.end), 6 - dow) + 1;
                     const labTxt = dot + timeTag + (Number((uploadProducts[b.idx] || {}).repeatWeeks) ? '🔁' : '') + gEscapeHtml(b.nm);   // 🔁 = 반복 일정
-                    const label = (isStart || dow === 0 || isMonthStart)
+                    const label = (isStart || dow === 0 || dow === 1 || isMonthStart)   // 일요일을 숨겨서 월요일에도 이름을 단다
                         ? (spanDays > 1 ? `<span class="ps-lab" style="width:calc(${spanDays * 100}% - 14px);">${labTxt}</span>` : labTxt) : '';
                     const [bg, fg, word] = ST[b.st];
                     const selected = psSelectedIdxs.has(b.key);
