@@ -3495,6 +3495,7 @@
                      사장님이 고른 것은 여기서 바로 DB에 저장한다.
                        sourcing/picks/<주시작일>/<요일순서>  식단표에서 고른 상품 (이 상품 / 1~3순위)
                        sourcing/direct/<번호>               밴드 상품 목록에서 직접 판매 표시한 상품
+                       sourcing/onsite/<상품코드>           상시판매 상품을 달력에 끌어다 놓은 것 (밴드 상품과 검색어가 같으면 그것도 4주 동안 추천에서 뺀다)
                      금요일 구성을 짤 때 최근 4주 안에 고른 상품은 다시 추천하지 않는다. -->
                 <div id="purchase-section-sourcing" class="purchase-sub-section" style="display: none;">
                     <style>
@@ -3563,6 +3564,16 @@
                         #purchase-section-sourcing .src-tag.alt { background:var(--src-pick); color:var(--src-pick-ink); }
                         #purchase-section-sourcing .src-tag.direct { background:#e2e8f0; color:#334155; }
                         #purchase-section-sourcing .src-tag button { border:none; background:transparent; cursor:pointer; font-weight:900; color:inherit; padding:0 2px; font-size:11px; line-height:1; }
+                        #purchase-section-sourcing .src-tag.onsite { background:#ede9fe; color:#5b21b6; }
+                        #purchase-section-sourcing .src-onsite { background:#fff; border:1px solid var(--src-line); border-radius:12px; padding:8px 10px; margin-bottom:10px; }
+                        #purchase-section-sourcing .src-onsite summary { cursor:pointer; font-weight:900; font-size:13px; color:#5b21b6; }
+                        #purchase-section-sourcing .src-onsite .bar { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:8px 0 6px; }
+                        #purchase-section-sourcing .src-onsite .cats button { border:1.5px solid #ddd6fe; background:#fff; color:#5b21b6; border-radius:999px; padding:3px 9px; font-size:11.5px; font-weight:800; cursor:pointer; font-family:inherit; }
+                        #purchase-section-sourcing .src-onsite .cats button.on { background:#5b21b6; border-color:#5b21b6; color:#fff; }
+                        #purchase-section-sourcing .src-onsite .chips { display:flex; flex-wrap:wrap; gap:5px; max-height:180px; overflow:auto; }
+                        #purchase-section-sourcing .src-ochip { border:1.5px solid #ddd6fe; background:#f5f3ff; color:#3b0764; border-radius:8px; padding:4px 8px; font-size:12px; font-weight:800; cursor:grab; touch-action:none; user-select:none; font-family:inherit; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+                        #purchase-section-sourcing .src-ochip.done { background:#ede9fe; border-color:#a78bfa; }
+                        #purchase-section-sourcing .src-ochip small { color:#7c3aed; font-weight:700; margin-left:4px; }
                         #src-drag-ghost { position:fixed; z-index:2147483600; pointer-events:none; background:#0f766e; color:#fff; font-size:12px; font-weight:900; padding:6px 10px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.25); transform:translate(-50%, -130%); white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis; font-family:inherit; }
                         #purchase-section-sourcing .src-link { font-size:11.5px; color:var(--src-acc); font-weight:800; text-decoration:none; }
                         #purchase-section-sourcing .src-empty { border:1px dashed var(--src-line); border-radius:12px; height:100%; box-sizing:border-box; padding:10px; font-size:12px; color:var(--src-sub); }
@@ -3623,7 +3634,7 @@
                 };
                 const gSrc = {
                     tab: 'lineup', loaded: false, meta: null, lineup: {}, picks: {}, direct: {},
-                    band: null, kakao: null, week: '', calMonth: '', closed: [],
+                    band: null, kakao: null, week: '', calMonth: '', closed: [], onsite: {}, onsiteProducts: null, onsiteQ: { q: '', tab: '', open: true },
                     bandQ: { q: '', vendor: '', cat: '', sort: 's', dir: -1, soldOnly: false, limit: 100 },
                     kakaoQ: { q: '', vendor: '', sort: 'd', dir: -1, limit: 100 }
                 };
@@ -3651,9 +3662,11 @@
                     const up = document.getElementById('src-updated');
                     if (up) up.textContent = '불러오는 중…';
                     try {
-                        const [meta, lineup, picks, direct, closed] = await Promise.all([srcGet('meta'), srcGet('lineup'), srcGet('picks'), srcGet('direct'),
+                        const [meta, lineup, picks, direct, onsite, closed] = await Promise.all([srcGet('meta'), srcGet('lineup'), srcGet('picks'), srcGet('direct'), srcGet('onsite'),
                             fetch(`${FIREBASE_DB_URL}public_holidays.json?t=${Date.now()}`).then(r => r.ok ? r.json() : []).catch(() => [])]);   // 가게 임시 휴무일
                         gSrc.closed = Array.isArray(closed) ? closed : Object.values(closed || {});
+                        gSrc.onsite = onsite || {};
+                        if (force || !gSrc.onsiteProducts) gSrc.onsiteProducts = await srcLoadOnsiteProducts();
                         gSrc.meta = meta || {}; gSrc.lineup = lineup || {}; gSrc.picks = picks || {}; gSrc.direct = direct || {};
                         if (force) { gSrc.band = null; gSrc.kakao = null; }
                         gSrc.loaded = true;
@@ -3688,6 +3701,8 @@
                     const put = (vendor, name, date) => { const k = vendor + '|' + name; if (!m[k] || date > m[k]) m[k] = date; };
                     Object.entries(gSrc.picks).forEach(([wk, items]) => Object.values(items || {}).forEach(p => p && put(p.vendor, p.name, p.date || wk)));
                     Object.values(gSrc.direct).forEach(p => p && put(p.vendor, p.name, p.date));
+                    // 상시판매는 업체가 없어 검색어로 맞춘다: '#검색어' 열쇠
+                    Object.values(gSrc.onsite).forEach(p => { if (p && p.kw) { const k = '#' + p.kw; if (!m[k] || p.date > m[k]) m[k] = p.date; } });
                     return m;
                 }
 
@@ -3713,7 +3728,7 @@
                         (w.weatherNote ? '<span><span class="k">날씨</span> <b>' + srcEsc(w.weatherNote) + '</b></span>' : '') +
                         '<span class="k">단추를 누르면 그 요일 날짜로, 달력 날짜에 끌어다 놓으면 그 날짜로 저장돼요. 고른 상품은 4주 동안 다시 추천하지 않아요.</span></div>';
 
-                    html += srcCalendar();
+                    html += srcCalendar() + srcOnsitePanel();
                     const rows = Math.max(1, ...SRC_DAYS.map(d => items.filter(it => it.day === d).length));
                     html += '<div class="src-board">';
                     SRC_DAYS.forEach((d, c) => {
@@ -3803,10 +3818,14 @@
                         if (!p) return;
                         (byDate[p.date] = byDate[p.date] || []).push({ kind: 'direct', name: p.name, del: "srcUndirect('" + no + "')" });
                     });
+                    Object.entries(gSrc.onsite).forEach(([code, p]) => {
+                        if (!p) return;
+                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'onsite', name: p.name, del: "srcOnsiteDel('" + code + "')" });
+                    });
                     let html = '<div class="src-cal"><div class="src-cal-head">' +
                         '<button type="button" class="src-btn" onclick="srcCalMove(-1)">◀</button><b>' + y + '년 ' + m + '월</b>' +
                         '<button type="button" class="src-btn" onclick="srcCalMove(1)">▶</button>' +
-                        '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 회색 = 목록에서 직접 판매 표시 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span></div><div class="src-cal-grid">' +
+                        '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 보라 = 상시판매 · 회색 = 목록에서 직접 판매 표시 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span></div><div class="src-cal-grid">' +
                         SRC_DAYS.map(d => '<div class="src-cal-dow">' + d + '</div>').join('');
                     for (let d = new Date(start); d <= last; d.setDate(d.getDate() + 7)) {
                         for (let i = 0; i < 5; i++) {
@@ -3846,24 +3865,85 @@
                     srcRender();
                 }
 
+                // ── 상시판매 ──
+                // 검색어: 상품명 끝 두 낱말(숫자·괄호 뺀 것)을 붙여 대문자로. PC(지표채우기.ps1 Get-Words)와 같은 규칙이라 밴드 상품의 검색어와 맞춰 볼 수 있다.
+                function srcKw(name) {
+                    const t = String(name || '').replace(/\([^)]*\)/g, ' ').replace(/\[[^\]]*\]/g, ' ');
+                    let w = t.split(/\s+/).filter(x => x && !/\d/.test(x) && !x.includes('/')).map(x => x.replace(/[^가-힣A-Za-z]/g, '')).filter(Boolean);
+                    if (w.length > 2) w = w.slice(-2);
+                    return w.join('').toUpperCase();
+                }
+                async function srcLoadOnsiteProducts() {
+                    try {
+                        const r = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
+                        if (!r.ok) return [];
+                        const all = await r.json() || {};
+                        return Object.values(all).filter(p => p && String(p.displayTab || '').startsWith('onsite') && !p.hide && p.name)
+                            .map(p => ({ code: String(p.productCode || p.sid || ''), name: p.name, price: p.price, tab: p.displayTab, stock: p.stock }))
+                            .filter(p => p.code).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+                    } catch (e) { return []; }
+                }
+                function srcOnsitePanel() {
+                    const Q = gSrc.onsiteQ, list0 = gSrc.onsiteProducts || [];
+                    const cats = (typeof ONSITE_CATS !== 'undefined' && Array.isArray(ONSITE_CATS)) ? ONSITE_CATS : [];
+                    const label = k => (cats.find(c => c.key === k) || {}).label || k.replace('onsite-', '');
+                    const tabs = [...new Set(list0.map(p => p.tab))];
+                    const q = Q.q.trim().replace(/\s/g, '').toLowerCase();
+                    const list = list0.filter(p => (!Q.tab || p.tab === Q.tab) && (!q || p.name.replace(/\s/g, '').toLowerCase().includes(q)));
+                    return '<details class="src-onsite"' + (Q.open ? ' open' : '') + ' ontoggle="gSrc.onsiteQ.open=this.open"><summary>🏪 상시판매 상품 ' + list0.length + '개 — 이름표를 달력 날짜에 끌어다 놓아요</summary>' +
+                        '<div class="bar"><input type="search" id="src-onsite-q" placeholder="상시판매 상품 찾기" value="' + srcEsc(Q.q) + '" oninput="gSrc.onsiteQ.q=this.value; srcKeepFocus(\'src-onsite-q\')">' +
+                        '<span class="cats"><button type="button"' + (Q.tab ? '' : ' class="on"') + ' onclick="gSrc.onsiteQ.tab=\'\'; srcRender()">전체</button>' +
+                        tabs.map(k => '<button type="button"' + (Q.tab === k ? ' class="on"' : '') + ' onclick="gSrc.onsiteQ.tab=\'' + k + '\'; srcRender()">' + srcEsc(label(k)) + '</button>').join('') + '</span></div>' +
+                        '<div class="chips">' + (list.length ? list.map(p => {
+                            const done = gSrc.onsite[p.code];
+                            return '<span class="src-ochip' + (done ? ' done' : '') + '" data-code="' + srcEsc(p.code) + '" title="' + srcEsc(p.name) + (done ? ' — ' + done.date + ' 판매로 저장됨' : '') + '">' + srcEsc(p.name) +
+                                (done ? '<small>' + done.date.slice(5).replace('-', '/') + '</small>' : '') + '</span>';
+                        }).join('') : '<span class="k">찾는 상품이 없어요</span>') + '</div></details>';
+                }
+                function srcKeepFocus(id) {
+                    const el = document.getElementById(id); const pos = el ? el.selectionStart : 0;
+                    srcRender();
+                    const n = document.getElementById(id); if (n) { n.focus(); n.setSelectionRange(pos, pos); }
+                }
+                async function srcOnsiteSave(code, date) {
+                    const p = (gSrc.onsiteProducts || []).find(x => x.code === code); if (!p) return;
+                    const val = { date, code, name: p.name, price: p.price || '', tab: p.tab, kw: srcKw(p.name), at: new Date().toISOString() };
+                    try { await srcPut('onsite/' + code, val); gSrc.onsite[code] = val; showToast(date.slice(5).replace('-', '/') + ' 상시판매로 저장: ' + p.name); }
+                    catch (e) { showToast('저장 못 했어요: ' + e.message); }
+                    srcRender();
+                }
+                async function srcOnsiteDel(code) {
+                    const p = gSrc.onsite[code]; if (!p) return;
+                    if (!confirm(p.name + '\n상시판매 기록(' + p.date + ')을 지울까요?')) return;
+                    try { await srcPut('onsite/' + code, null); delete gSrc.onsite[code]; showToast('상시판매 기록을 지웠어요'); }
+                    catch (e) { showToast('저장 못 했어요: ' + e.message); }
+                    srcRender();
+                }
+
                 // ── 끌어다 놓기 ── 마우스·손가락 모두 된다 (포인터 이벤트). 6px 넘게 움직이면 끌기, 아니면 누르기.
                 (function srcDrag() {
                     let st = null;
                     const cellAt = (x, y) => { const el = document.elementFromPoint(x, y); return el ? el.closest('#purchase-section-sourcing [data-date]') : null; };
                     const clearOver = () => document.querySelectorAll('#purchase-section-sourcing .src-cal-day.over').forEach(e => e.classList.remove('over'));
                     document.addEventListener('pointerdown', e => {
-                        const b = e.target.closest && e.target.closest('#purchase-section-sourcing .src-picks button[data-key]');
+                        // 식단표 카드 단추 또는 상시판매 이름표
+                        const b = e.target.closest && e.target.closest('#purchase-section-sourcing .src-picks button[data-key], #purchase-section-sourcing .src-ochip[data-code]');
                         if (!b || b.disabled || e.button > 0) return;
-                        st = { b, key: b.dataset.key, lab: b.dataset.lab, x: e.clientX, y: e.clientY, drag: false, ghost: null, id: e.pointerId };
+                        st = { b, key: b.dataset.key, lab: b.dataset.lab, code: b.dataset.code, x: e.clientX, y: e.clientY, drag: false, ghost: null, id: e.pointerId };
                         try { b.setPointerCapture(e.pointerId); } catch (x) {}
                     });
                     document.addEventListener('pointermove', e => {
                         if (!st || e.pointerId !== st.id) return;
                         if (!st.drag && Math.hypot(e.clientX - st.x, e.clientY - st.y) > 6) {
                             st.drag = true;
-                            const it = ((gSrc.lineup[gSrc.week] || {}).items || {})[st.key] || {};
-                            const name = st.lab === '이 상품' ? it.name : String((it.alts || [])[+st.lab[0] - 1] || '').split(' / ')[0];
-                            st.ghost = document.createElement('div'); st.ghost.id = 'src-drag-ghost'; st.ghost.textContent = (st.lab === '이 상품' ? '' : st.lab + ' · ') + (name || '');
+                            let text;
+                            if (st.code) text = '상시 · ' + (((gSrc.onsiteProducts || []).find(x => x.code === st.code) || {}).name || '');
+                            else {
+                                const it = ((gSrc.lineup[gSrc.week] || {}).items || {})[st.key] || {};
+                                const name = st.lab === '이 상품' ? it.name : String((it.alts || [])[+st.lab[0] - 1] || '').split(' / ')[0];
+                                text = (st.lab === '이 상품' ? '' : st.lab + ' · ') + (name || '');
+                            }
+                            st.ghost = document.createElement('div'); st.ghost.id = 'src-drag-ghost'; st.ghost.textContent = text;
                             document.body.appendChild(st.ghost);
                         }
                         if (st.drag) {
@@ -3877,8 +3957,12 @@
                         const s = st; st = null;
                         clearOver(); if (s.ghost) s.ghost.remove();
                         if (e.type === 'pointercancel') return;
+                        const c = s.drag ? cellAt(e.clientX, e.clientY) : null;
+                        if (s.code) {   // 상시판매 이름표는 끌어다 놓아야만 저장한다
+                            if (c) srcOnsiteSave(s.code, c.dataset.date); else if (!s.drag) showToast('달력 날짜 칸에 끌어다 놓으면 저장돼요');
+                            return;
+                        }
                         if (!s.drag) { srcPick(s.key, s.lab); return; }
-                        const c = cellAt(e.clientX, e.clientY);
                         if (c) srcPick(s.key, s.lab, c.dataset.date);
                     };
                     document.addEventListener('pointerup', end);
@@ -3900,7 +3984,7 @@
                     const cutIso = cut.toISOString().slice(0, 10);
                     let list = rows.filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().includes(q) || String(r.kw || '').toLowerCase().includes(q))
                         && (!Q.vendor || r.v === Q.vendor) && (!Q.cat || r.c === Q.cat));
-                    list.forEach(r => { r.sold = sold[r.v + '|' + r.n] || ''; });
+                    list.forEach(r => { r.sold = sold[r.v + '|' + r.n] || (r.kw && sold['#' + r.kw]) || ''; });
                     if (Q.soldOnly) list = list.filter(r => r.sold);
                     const numCols = { s: 1, sp: 1, rp: 1, m: 1, pc: 1, q: 1, ctr: 1 };
                     list.sort((a, b) => {
