@@ -3536,6 +3536,8 @@
                         #purchase-section-sourcing .up { color:var(--src-up); font-weight:800; }
                         #purchase-section-sourcing .down { color:var(--src-down); font-weight:800; }
                         #purchase-section-sourcing .src-why { font-size:12px; border-top:1px dashed var(--src-line); padding-top:6px; color:#334155; overflow-wrap:anywhere; }
+                        #purchase-section-sourcing details.src-why summary { cursor:pointer; color:var(--src-sub); font-weight:800; font-size:11.5px; }
+                        #purchase-section-sourcing details.src-why[open] summary { margin-bottom:3px; }
                         #purchase-section-sourcing .src-alts { margin:0; padding-left:16px; font-size:12px; display:flex; flex-direction:column; gap:2px; }
                         #purchase-section-sourcing .src-alts li.chosen { background:var(--src-pick); color:var(--src-pick-ink); font-weight:800; border-radius:4px; padding:0 3px; }
                         #purchase-section-sourcing .src-picks { margin-top:auto; display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:4px; }
@@ -3796,7 +3798,7 @@
                         '<div class="src-mx"><div><span>검색량</span> ' + srcEsc(it.search || '–') + '</div><div><span>클릭률</span> ' + (it.ctr ? srcEsc(it.ctr) + '%' : '–') + '</div>' +
                             '<div><span>추세</span> ' + srcTrend(it.trend) + '</div><div><span>계절</span> ' + srcTrend(it.season) + '</div>' +
                             '<div><span>경쟁</span> ' + srcEsc(it.comp || '–') + '</div><div><span>카톡</span> ' + srcEsc(it.kakao || '–') + '</div></div>' +
-                        (it.why ? '<div class="src-why">' + srcEsc(it.why) + '</div>' : '') +
+                        (it.why ? '<details class="src-why"><summary>고른 이유</summary>' + srcEsc(it.why) + '</details>' : '') +
                         (alts.length ? '<ol class="src-alts">' + alts.map((a, i) => dn((i + 1) + '순위', srcEsc(a), 'li')).join('') + '</ol>' : '') +
                         (it.link ? '<a class="src-link" href="' + srcEsc(it.link) + '" target="_blank" rel="noopener">밴드 글 보기 ↗</a>' : '') +
                         '</div>';
@@ -3812,6 +3814,7 @@
                     const m = document.createElement('div'); m.id = 'src-menu';
                     m.innerHTML = '<div class="t">' + srcEsc(tg.name) + '<small>' + srcEsc(tg.vendor) + (tg.supply ? ' · ' + srcWon(tg.supply) : '') + '</small></div>' +
                         '<button type="button" class="ord" data-act="purchase">🚚 발주 등록 (발주관리로)</button>' +
+                        '<button type="button" data-act="band">🔗 밴드로 이동</button>' +
                         (ordered ? '<button type="button" class="undo" data-act="unorder">판매일 빼기 (' + String(p.date).slice(5).replace('-', '/') + ')</button>'
                                  : '<button type="button" data-act="order">📅 판매일로 넣기 — ' + day.slice(5).replace('-', '/') + ' ' + it.day + '요일</button>') +
                         (gSrc.skip[k] ? '<button type="button" class="skip undo" data-act="unskip">건너뜀 취소</button>' : '<button type="button" class="skip" data-act="skip">건너뜀 (4주 동안 추천 안 함)</button>') +
@@ -3825,6 +3828,7 @@
                         const act = e.target.dataset && e.target.dataset.act; if (!act) return;
                         srcMenuClose();
                         if (act === 'purchase') return srcToPurchase(tg, lab === '이 상품' ? it.rec : '');
+                        if (act === 'band') return srcOpenBand(lab === '이 상품' ? it.link : '', tg);
                         if (act === 'order') return srcPick(key, lab, day);
                         if (act === 'unorder') return srcPick(key, lab);
                         const now = new Date().toISOString();
@@ -3853,6 +3857,18 @@
                         const q = document.getElementById('purchase-qty'); if (q) setTimeout(() => q.focus(), 300);
                         showToast('발주 등록에 채워 뒀어요 — 수량만 넣고 저장하세요');
                     } catch (e) { showToast('발주 등록을 못 열었어요: ' + e.message); }
+                }
+                // 밴드 글 열기. 비슷한 상품은 링크가 카드에 없어 밴드 목록(업체·상품명)에서 찾는다.
+                async function srcOpenBand(link, tg) {
+                    if (link) { window.open(link, '_blank', 'noopener'); return; }
+                    const w = window.open('', '_blank');   // 먼저 창을 열어 두어야 막히지 않는다
+                    try {
+                        if (!gSrc.band) gSrc.band = (await srcGet('band')) || {};
+                        const r = Object.values(gSrc.band).find(x => x && x.v === tg.vendor && x.n === tg.name)
+                               || Object.values(gSrc.band).find(x => x && x.v === tg.vendor && String(x.n).replace(/\s/g, '') === String(tg.name).replace(/\s/g, ''));
+                        if (r && r.u) { if (w) w.location = r.u; else window.open(r.u, '_blank'); return; }
+                        if (w) w.close(); showToast('이 상품의 밴드 글을 못 찾았어요');
+                    } catch (e) { if (w) w.close(); showToast('밴드 글을 못 열었어요: ' + e.message); }
                 }
                 function srcMenuOutside(e) { const m = document.getElementById('src-menu'); if (m && !m.contains(e.target)) srcMenuClose(); }
                 function srcMenuClose() { const m = document.getElementById('src-menu'); if (m) m.remove(); document.removeEventListener('pointerdown', srcMenuOutside, true); }                // date 없이 부르면(단추 누르기) 같은 것을 다시 누를 때 취소, 아니면 그 요일 날짜로 저장.
