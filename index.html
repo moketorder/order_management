@@ -3565,6 +3565,7 @@
                         #purchase-section-sourcing .src-tag.direct { background:#e2e8f0; color:#334155; }
                         #purchase-section-sourcing .src-tag button { border:none; background:transparent; cursor:pointer; font-weight:900; color:inherit; padding:0 2px; font-size:11px; line-height:1; }
                         #purchase-section-sourcing .src-tag.onsite { background:#ede9fe; color:#5b21b6; }
+                        #purchase-section-sourcing .src-tag.sada { background:#ffedd5; color:#c2410c; }
                         #purchase-section-sourcing .src-onsite { background:#fff; border:1px solid var(--src-line); border-radius:12px; padding:8px 10px; margin-bottom:10px; }
                         #purchase-section-sourcing .src-onsite summary { cursor:pointer; font-weight:900; font-size:13px; color:#5b21b6; }
                         #purchase-section-sourcing .src-onsite .bar { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:8px 0 6px; }
@@ -3634,7 +3635,7 @@
                 };
                 const gSrc = {
                     tab: 'lineup', loaded: false, meta: null, lineup: {}, picks: {}, direct: {},
-                    band: null, kakao: null, week: '', calMonth: '', closed: [], onsite: {}, onsiteProducts: null, onsiteQ: { q: '', tab: '', open: true },
+                    band: null, kakao: null, week: '', calMonth: '', closed: [], onsite: {}, onsiteProducts: null, sada: [], onsiteQ: { q: '', tab: '', open: true },
                     bandQ: { q: '', vendor: '', cat: '', sort: 's', dir: -1, soldOnly: false, limit: 100 },
                     kakaoQ: { q: '', vendor: '', sort: 'd', dir: -1, limit: 100 }
                 };
@@ -3818,6 +3819,9 @@
                         if (!p) return;
                         (byDate[p.date] = byDate[p.date] || []).push({ kind: 'direct', name: p.name, del: "srcUndirect('" + no + "')" });
                     });
+                    (gSrc.sada || []).forEach(p => {   // 사다드림은 상품등록에서 고친다 (지우기 단추 없음)
+                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'sada', name: '사다 · ' + p.name, del: '' });
+                    });
                     Object.entries(gSrc.onsite).forEach(([code, p]) => {
                         if (!p) return;
                         (byDate[p.date] = byDate[p.date] || []).push({ kind: 'onsite', name: p.name, del: "srcOnsiteDel('" + code + "')" });
@@ -3825,7 +3829,7 @@
                     let html = '<div class="src-cal"><div class="src-cal-head">' +
                         '<button type="button" class="src-btn" onclick="srcCalMove(-1)">◀</button><b>' + y + '년 ' + m + '월</b>' +
                         '<button type="button" class="src-btn" onclick="srcCalMove(1)">▶</button>' +
-                        '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 보라 = 상시판매 · 회색 = 목록에서 직접 판매 표시 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span></div><div class="src-cal-grid">' +
+                        '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 보라 = 상시판매 · 주황 = 사다드림 · 회색 = 목록에서 직접 판매 표시 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span></div><div class="src-cal-grid">' +
                         SRC_DAYS.map(d => '<div class="src-cal-dow">' + d + '</div>').join('');
                     for (let d = new Date(start); d <= last; d.setDate(d.getDate() + 7)) {
                         for (let i = 0; i < 5; i++) {
@@ -3839,7 +3843,7 @@
                             if (hol) cls.push('hol');
                             html += '<div class="' + cls.join(' ') + '" data-date="' + k + '"><div class="top"><span class="n">' + x.getDate() + '</span>' +
                                 (hol ? '<span class="hn">' + hol + '</span>' : '') + (off ? '<span class="off" title="주문관리에 설정된 가게 휴무일">휴무</span>' : '') + '</div>' +
-                                (byDate[k] || []).map(t => '<div class="src-tag ' + t.kind + '" title="' + srcEsc(t.name) + '"><span>' + srcEsc(t.name) + '</span><button type="button" onclick="' + t.del + '" aria-label="지우기">×</button></div>').join('') + '</div>';
+                                (byDate[k] || []).map(t => '<div class="src-tag ' + t.kind + '" title="' + srcEsc(t.name) + '"><span>' + srcEsc(t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>').join('') + '</div>';
                         }
                     }
                     return html + '</div></div>';
@@ -3878,6 +3882,9 @@
                         const r = await fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`);
                         if (!r.ok) return [];
                         const all = await r.json() || {};
+                        // 사다드림: 상품등록에서 사다드림으로 고르고 픽업 날짜(date)를 넣은 상품. 지난 것도 달력에 남긴다
+                        gSrc.sada = Object.values(all).filter(p => p && (p.isSada === true || p.isSada === 'true') && /^\d{4}-\d{2}-\d{2}$/.test(String(p.date || '')))
+                            .map(p => ({ date: p.date, code: String(p.productCode || p.sid || ''), name: String(p.name || '').replace(/^\s*\[사다드림\]\s*/, ''), hide: !!p.hide }));
                         return Object.values(all).filter(p => p && String(p.displayTab || '').startsWith('onsite') && !p.hide && p.name)
                             .map(p => ({ code: String(p.productCode || p.sid || ''), name: p.name, price: p.price, tab: p.displayTab, stock: p.stock }))
                             .filter(p => p.code).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
