@@ -3495,6 +3495,8 @@
                      사장님이 고른 것은 여기서 바로 DB에 저장한다.
                        sourcing/picks/<주시작일>/<요일순서>  식단표에서 고른 상품 (이 상품 / 1~3순위)
                        sourcing/direct/<번호>               밴드 상품 목록에서 직접 판매 표시한 상품
+                       sourcing/skip/<업체|상품명>          건너뜀: 이번엔 안 하고 4주 동안 추천에서 뺀다
+                       sourcing/block/<업체|상품명>         추천제외: 앞으로 추천하지 않는다
                        sourcing/onsite/<상품코드>           상시판매 상품을 달력에 끌어다 놓은 것 (밴드 상품과 검색어가 같으면 그것도 4주 동안 추천에서 뺀다)
                      금요일 구성을 짤 때 최근 4주 안에 고른 상품은 다시 추천하지 않는다. -->
                 <div id="purchase-section-sourcing" class="purchase-sub-section" style="display: none;">
@@ -3575,6 +3577,23 @@
                         #purchase-section-sourcing .src-ochip { border:1.5px solid #ddd6fe; background:#f5f3ff; color:#3b0764; border-radius:8px; padding:4px 8px; font-size:12px; font-weight:800; cursor:grab; touch-action:none; user-select:none; font-family:inherit; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
                         #purchase-section-sourcing .src-ochip.done { background:#ede9fe; border-color:#a78bfa; }
                         #purchase-section-sourcing .src-ochip small { color:#7c3aed; font-weight:700; margin-left:4px; }
+                        #purchase-section-sourcing .src-dn { cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; border-radius:5px; }
+                        #purchase-section-sourcing .src-name.src-dn { padding:2px 4px; margin:-2px -4px; }
+                        #purchase-section-sourcing .src-dn:hover { background:var(--src-acc-soft); }
+                        #purchase-section-sourcing .src-alts li.src-dn { padding:1px 3px; }
+                        #purchase-section-sourcing .src-mk { display:inline-block; font-size:10px; font-weight:900; border-radius:4px; padding:0 4px; margin-left:4px; vertical-align:1px; white-space:nowrap; }
+                        #purchase-section-sourcing .src-mk.ord { background:var(--src-acc); color:#fff; }
+                        #purchase-section-sourcing .src-mk.skip { background:#e2e8f0; color:#475569; }
+                        #purchase-section-sourcing .src-mk.block { background:#fee2e2; color:#b91c1c; }
+                        #purchase-section-sourcing .src-dn.is-block { text-decoration:line-through; opacity:.6; }
+                        #src-menu { position:fixed; z-index:2147483500; background:#fff; border:1px solid #cbd5e1; border-radius:12px; box-shadow:0 12px 30px rgba(15,23,42,.18); padding:8px; display:flex; flex-direction:column; gap:5px; width:220px; font-family:inherit; }
+                        #src-menu .t { font-size:12px; font-weight:900; color:#0f172a; padding:2px 4px 4px; line-height:1.35; overflow-wrap:anywhere; }
+                        #src-menu .t small { display:block; color:#64748b; font-weight:700; }
+                        #src-menu button { height:36px; border-radius:9px; border:1.5px solid #cbd5e1; background:#fff; font-size:13px; font-weight:900; cursor:pointer; font-family:inherit; color:#334155; text-align:left; padding:0 10px; }
+                        #src-menu button.ord { border-color:#0f766e; color:#0f766e; }
+                        #src-menu button.skip { border-color:#94a3b8; }
+                        #src-menu button.block { border-color:#fca5a5; color:#b91c1c; }
+                        #src-menu button.undo { background:#f8fafc; }
                         #src-drag-ghost { position:fixed; z-index:2147483600; pointer-events:none; background:#0f766e; color:#fff; font-size:12px; font-weight:900; padding:6px 10px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.25); transform:translate(-50%, -130%); white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis; font-family:inherit; }
                         #purchase-section-sourcing .src-link { font-size:11.5px; color:var(--src-acc); font-weight:800; text-decoration:none; }
                         #purchase-section-sourcing .src-empty { border:1px dashed var(--src-line); border-radius:12px; height:100%; box-sizing:border-box; padding:10px; font-size:12px; color:var(--src-sub); }
@@ -3635,7 +3654,7 @@
                 };
                 const gSrc = {
                     tab: 'lineup', loaded: false, meta: null, lineup: {}, picks: {}, direct: {},
-                    band: null, kakao: null, week: '', calMonth: '', closed: [], onsite: {}, onsiteProducts: null, sada: [], onsiteQ: { q: '', tab: '', open: true },
+                    band: null, kakao: null, week: '', calMonth: '', closed: [], skip: {}, block: {}, onsite: {}, onsiteProducts: null, sada: [], onsiteQ: { q: '', tab: '', open: true },
                     bandQ: { q: '', vendor: '', cat: '', sort: 's', dir: -1, soldOnly: false, limit: 100 },
                     kakaoQ: { q: '', vendor: '', sort: 'd', dir: -1, limit: 100 }
                 };
@@ -3663,10 +3682,10 @@
                     const up = document.getElementById('src-updated');
                     if (up) up.textContent = '불러오는 중…';
                     try {
-                        const [meta, lineup, picks, direct, onsite, closed] = await Promise.all([srcGet('meta'), srcGet('lineup'), srcGet('picks'), srcGet('direct'), srcGet('onsite'),
+                        const [meta, lineup, picks, direct, onsite, skip, block, closed] = await Promise.all([srcGet('meta'), srcGet('lineup'), srcGet('picks'), srcGet('direct'), srcGet('onsite'), srcGet('skip'), srcGet('block'),
                             fetch(`${FIREBASE_DB_URL}public_holidays.json?t=${Date.now()}`).then(r => r.ok ? r.json() : []).catch(() => [])]);   // 가게 임시 휴무일
                         gSrc.closed = Array.isArray(closed) ? closed : Object.values(closed || {});
-                        gSrc.onsite = onsite || {};
+                        gSrc.onsite = onsite || {}; gSrc.skip = skip || {}; gSrc.block = block || {};
                         if (force || !gSrc.onsiteProducts) gSrc.onsiteProducts = await srcLoadOnsiteProducts();
                         gSrc.meta = meta || {}; gSrc.lineup = lineup || {}; gSrc.picks = picks || {}; gSrc.direct = direct || {};
                         if (force) { gSrc.band = null; gSrc.kakao = null; }
@@ -3727,7 +3746,7 @@
                         '<span><span class="k">고른 상품</span> <b>' + pickedN + '개</b></span>' +
                         '<span><span class="k">평균 마진</span> <b>' + avgM + '</b></span>' +
                         (w.weatherNote ? '<span><span class="k">날씨</span> <b>' + srcEsc(w.weatherNote) + '</b></span>' : '') +
-                        '<span class="k">단추를 누르면 그 요일 날짜로, 달력 날짜에 끌어다 놓으면 그 날짜로 저장돼요. 고른 상품은 4주 동안 다시 추천하지 않아요.</span></div>';
+                        '<span class="k">상품명을 누르면 발주·건너뜀·추천제외를 고르고, 상품명을 달력 날짜에 끌어다 놓으면 그 날짜로 발주돼요. 발주·건너뜀한 상품은 4주 동안 다시 추천하지 않아요.</span></div>';
 
                     html += srcCalendar() + srcOnsitePanel();
                     const rows = Math.max(1, ...SRC_DAYS.map(d => items.filter(it => it.day === d).length));
@@ -3744,32 +3763,81 @@
                     });
                     v.innerHTML = html + '</div>';
                 }
+                // 업체|상품명 → DB 열쇠 (열쇠에 못 쓰는 글자 . # $ [ ] / 는 바꾼다)
+                const srcNameKey = (vendor, name) => (String(vendor || '') + '|' + String(name || '')).replace(/[.#$\[\]\/]/g, '_').slice(0, 300);
+                // 카드의 한 이름(추천 상품 또는 비슷한 상품 n순위) → { name, vendor, supply }
+                function srcPickTarget(it, lab) {
+                    if (lab === '이 상품') return { name: it.name, vendor: it.vendor, supply: it.supply || '' };
+                    const a = String((it.alts || [])[+lab[0] - 1] || '').split(' / ');
+                    return a.length < 2 ? null : { name: a[0], vendor: a[1], supply: (a[2] || '').replace(/[^\d]/g, '') };
+                }
+                // 이름 옆 표시: 발주(날짜) · 건너뜀 · 추천제외
+                function srcMarks(it, lab, p) {
+                    const tg = srcPickTarget(it, lab); if (!tg) return '';
+                    const k = srcNameKey(tg.vendor, tg.name);
+                    let s = '';
+                    if (p && p.pick === lab) s += '<span class="src-mk ord">발주 ' + String(p.date || '').slice(5).replace('-', '/') + '</span>';
+                    if (gSrc.skip[k]) s += '<span class="src-mk skip">건너뜀</span>';
+                    if (gSrc.block[k]) s += '<span class="src-mk block">추천제외</span>';
+                    return s;
+                }
                 function srcCard(it, p) {
                     const pick = p ? p.pick : '';
-                    const altIdx = /^(\d)순위$/.test(pick) ? +pick[0] - 1 : -1;
                     const alts = (it.alts || []).filter(Boolean);
-                    const label = pick === '이 상품' ? '판매 결정' : altIdx >= 0 ? (altIdx + 1) + '순위로 판매' : '';
+                    const blocked = lab => { const tg = srcPickTarget(it, lab); return tg && gSrc.block[srcNameKey(tg.vendor, tg.name)] ? ' is-block' : ''; };
+                    // 상품명과 비슷한 상품 이름이 단추다: 누르면 발주·건너뜀·추천제외 창, 끌어다 달력에 놓으면 그 날짜로 발주
+                    const dn = (lab, inner, cls) => '<' + (cls === 'li' ? 'li' : 'div') + ' class="src-dn' + (cls === 'li' ? '' : ' src-name') + blocked(lab) + (pick === lab && cls === 'li' ? ' chosen' : '') + '" data-key="' + it.key + '" data-lab="' + lab + '" title="누르면 발주·건너뜀·추천제외, 달력 날짜에 끌어다 놓으면 그 날짜로 발주">' + inner + srcMarks(it, lab, p) + '</' + (cls === 'li' ? 'li' : 'div') + '>';
                     return '<div class="src-card' + (pick ? ' picked' : '') + '">' +
                         '<div class="src-row"><span class="src-no">' + it.order + '</span><span class="src-chip">' + srcEsc(it.cat) + '</span>' +
-                            (label ? '<span class="src-chip pick">' + label + '</span>' : '') +
                             (it.score ? '<span class="src-score">' + srcEsc(it.score) + '점</span>' : '') + '</div>' +
-                        '<div><div class="src-name">' + srcEsc(it.name) + '</div><div class="src-vendor">' + srcEsc(it.vendor) + '</div></div>' +
+                        '<div>' + dn('이 상품', srcEsc(it.name), 'div') + '<div class="src-vendor">' + srcEsc(it.vendor) + '</div></div>' +
                         '<div class="src-price">' + (it.supply ? '<span>공급 <b>' + srcWon(it.supply) + '</b></span>' : '<span>공급가 문의</span>') +
                             (it.rec ? '<span>권장 ' + srcWon(it.rec) + '</span>' : '') + (it.margin ? '<span class="m">마진 ' + srcEsc(it.margin) + '%</span>' : '') + '</div>' +
                         '<div class="src-mx"><div><span>검색량</span> ' + srcEsc(it.search || '–') + '</div><div><span>클릭률</span> ' + (it.ctr ? srcEsc(it.ctr) + '%' : '–') + '</div>' +
                             '<div><span>추세</span> ' + srcTrend(it.trend) + '</div><div><span>계절</span> ' + srcTrend(it.season) + '</div>' +
                             '<div><span>경쟁</span> ' + srcEsc(it.comp || '–') + '</div><div><span>카톡</span> ' + srcEsc(it.kakao || '–') + '</div></div>' +
                         (it.why ? '<div class="src-why">' + srcEsc(it.why) + '</div>' : '') +
-                        (alts.length ? '<ol class="src-alts">' + alts.map((a, i) => '<li' + (i === altIdx ? ' class="chosen"' : '') + '>' + srcEsc(a) + '</li>').join('') + '</ol>' : '') +
+                        (alts.length ? '<ol class="src-alts">' + alts.map((a, i) => dn((i + 1) + '순위', srcEsc(a), 'li')).join('') + '</ol>' : '') +
                         (it.link ? '<a class="src-link" href="' + srcEsc(it.link) + '" target="_blank" rel="noopener">밴드 글 보기 ↗</a>' : '') +
-                        '<div class="src-picks">' + SRC_PICKS.map((lab, i) => {
-                            const dis = i > 0 && !alts[i - 1];
-                            // 누르기·끌기는 아래 srcDrag 가 한 곳에서 처리한다 (data-key, data-lab)
-                            return '<button type="button" data-key="' + it.key + '" data-lab="' + lab + '"' + (pick === lab ? ' class="on"' : '') + (dis ? ' disabled' : '') +
-                                ' title="누르면 ' + it.day + '요일로 저장, 달력 날짜에 끌어다 놓으면 그 날짜로 저장">' + (i ? i + '순위' : '이 상품') + '</button>';
-                        }).join('') + '</div></div>';
+                        '</div>';
                 }
-                // date 없이 부르면(단추 누르기) 같은 것을 다시 누를 때 취소, 아니면 그 요일 날짜로 저장.
+                // 상품명을 눌렀을 때 뜨는 창
+                function srcMenu(key, lab, el) {
+                    srcMenuClose();
+                    const wk = gSrc.week, it = ((gSrc.lineup[wk] || {}).items || {})[key]; if (!it) return;
+                    const tg = srcPickTarget(it, lab); if (!tg) return;
+                    const p = (gSrc.picks[wk] || {})[key], k = srcNameKey(tg.vendor, tg.name);
+                    const ordered = p && p.pick === lab;
+                    const day = srcAddDays(wk, SRC_DAYS.indexOf(it.day));
+                    const m = document.createElement('div'); m.id = 'src-menu';
+                    m.innerHTML = '<div class="t">' + srcEsc(tg.name) + '<small>' + srcEsc(tg.vendor) + (tg.supply ? ' · ' + srcWon(tg.supply) : '') + '</small></div>' +
+                        (ordered ? '<button type="button" class="ord undo" data-act="unorder">발주 취소 (' + String(p.date).slice(5).replace('-', '/') + ')</button>'
+                                 : '<button type="button" class="ord" data-act="order">발주 — ' + day.slice(5).replace('-', '/') + ' ' + it.day + '요일</button>') +
+                        (gSrc.skip[k] ? '<button type="button" class="skip undo" data-act="unskip">건너뜀 취소</button>' : '<button type="button" class="skip" data-act="skip">건너뜀 (4주 동안 추천 안 함)</button>') +
+                        (gSrc.block[k] ? '<button type="button" class="block undo" data-act="unblock">추천제외 취소</button>' : '<button type="button" class="block" data-act="block">추천제외 (앞으로 추천 안 함)</button>') +
+                        '<button type="button" data-act="close">닫기</button>';
+                    document.body.appendChild(m);
+                    const r = el.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight;
+                    m.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r.left)) + 'px';
+                    m.style.top = (r.bottom + mh + 8 < window.innerHeight ? r.bottom + 4 : Math.max(8, r.top - mh - 4)) + 'px';
+                    m.onclick = async e => {
+                        const act = e.target.dataset && e.target.dataset.act; if (!act) return;
+                        srcMenuClose();
+                        if (act === 'order') return srcPick(key, lab, day);
+                        if (act === 'unorder') return srcPick(key, lab);
+                        const now = new Date().toISOString();
+                        try {
+                            if (act === 'skip') { const v = { name: tg.name, vendor: tg.vendor, date: srcToday(), at: now }; await srcPut('skip/' + k, v); gSrc.skip[k] = v; showToast('건너뜀: 4주 동안 추천 안 해요 — ' + tg.name); }
+                            if (act === 'unskip') { await srcPut('skip/' + k, null); delete gSrc.skip[k]; showToast('건너뜀을 취소했어요'); }
+                            if (act === 'block') { const v = { name: tg.name, vendor: tg.vendor, at: now }; await srcPut('block/' + k, v); gSrc.block[k] = v; showToast('추천제외: 앞으로 추천 안 해요 — ' + tg.name); }
+                            if (act === 'unblock') { await srcPut('block/' + k, null); delete gSrc.block[k]; showToast('추천제외를 취소했어요'); }
+                        } catch (err) { showToast('저장 못 했어요: ' + err.message); }
+                        srcRender();
+                    };
+                    setTimeout(() => document.addEventListener('pointerdown', srcMenuOutside, true), 0);
+                }
+                function srcMenuOutside(e) { const m = document.getElementById('src-menu'); if (m && !m.contains(e.target)) srcMenuClose(); }
+                function srcMenuClose() { const m = document.getElementById('src-menu'); if (m) m.remove(); document.removeEventListener('pointerdown', srcMenuOutside, true); }                // date 없이 부르면(단추 누르기) 같은 것을 다시 누를 때 취소, 아니면 그 요일 날짜로 저장.
                 // date 를 주면(달력에 끌어다 놓기) 늘 그 날짜로 저장한다.
                 async function srcPick(key, lab, date) {
                     const wk = gSrc.week, w = gSrc.lineup[wk] || {}, it = (w.items || {})[key];
@@ -3904,23 +3972,26 @@
                             .filter(p => p.code).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
                     } catch (e) { return []; }
                 }
+                // 검색창만 둔다. 찾기 전에는 이름표를 안 보여 준다 (162개를 다 깔면 달력이 아래로 밀린다).
+                // 글을 칠 때마다 화면 전체를 다시 그리면 한글이 'ㅂㅗㅇ'처럼 쪼개진다. 이름표 칸만 바꾼다.
                 function srcOnsitePanel() {
-                    const Q = gSrc.onsiteQ, list0 = gSrc.onsiteProducts || [];
-                    const cats = (typeof ONSITE_CATS !== 'undefined' && Array.isArray(ONSITE_CATS)) ? ONSITE_CATS : [];
-                    const label = k => (cats.find(c => c.key === k) || {}).label || k.replace('onsite-', '');
-                    const tabs = [...new Set(list0.map(p => p.tab))];
-                    const q = Q.q.trim().replace(/\s/g, '').toLowerCase();
-                    const list = list0.filter(p => (!Q.tab || p.tab === Q.tab) && (!q || p.name.replace(/\s/g, '').toLowerCase().includes(q)));
-                    return '<details class="src-onsite"' + (Q.open ? ' open' : '') + ' ontoggle="gSrc.onsiteQ.open=this.open"><summary>🏪 상시판매 상품 ' + list0.length + '개 — 이름표를 달력 날짜에 끌어다 놓아요</summary>' +
-                        '<div class="bar"><input type="search" id="src-onsite-q" placeholder="상시판매 상품 찾기" value="' + srcEsc(Q.q) + '" oninput="gSrc.onsiteQ.q=this.value; srcKeepFocus(\'src-onsite-q\')">' +
-                        '<span class="cats"><button type="button"' + (Q.tab ? '' : ' class="on"') + ' onclick="gSrc.onsiteQ.tab=\'\'; srcRender()">전체</button>' +
-                        tabs.map(k => '<button type="button"' + (Q.tab === k ? ' class="on"' : '') + ' onclick="gSrc.onsiteQ.tab=\'' + k + '\'; srcRender()">' + srcEsc(label(k)) + '</button>').join('') + '</span></div>' +
-                        '<div class="chips">' + (list.length ? list.map(p => {
-                            const done = gSrc.onsite[p.code];
-                            return '<span class="src-ochip' + (done ? ' done' : '') + '" data-code="' + srcEsc(p.code) + '" title="' + srcEsc(p.name) + (done ? ' — ' + done.date + ' 판매로 저장됨' : '') + '">' + srcEsc(p.name) +
-                                (done ? '<small>' + done.date.slice(5).replace('-', '/') + '</small>' : '') + '</span>';
-                        }).join('') : '<span class="k">찾는 상품이 없어요</span>') + '</div></details>';
+                    const Q = gSrc.onsiteQ, n = (gSrc.onsiteProducts || []).length;
+                    return '<details class="src-onsite"' + (Q.open ? ' open' : '') + ' ontoggle="gSrc.onsiteQ.open=this.open"><summary>🏪 상시판매 상품 ' + n + '개 — 찾아서 이름표를 달력 날짜에 끌어다 놓아요</summary>' +
+                        '<div class="bar"><input type="search" id="src-onsite-q" placeholder="상시판매 상품 이름으로 찾기" value="' + srcEsc(Q.q) + '" oninput="gSrc.onsiteQ.q=this.value; srcOnsiteChips()"></div>' +
+                        '<div class="chips" id="src-onsite-chips">' + srcOnsiteChipsHtml() + '</div></details>';
                 }
+                function srcOnsiteChipsHtml() {
+                    const q = gSrc.onsiteQ.q.trim().replace(/\s/g, '').toLowerCase();
+                    if (!q) return '<span class="k">상품 이름을 치면 여기에 나와요</span>';
+                    const list = (gSrc.onsiteProducts || []).filter(p => p.name.replace(/\s/g, '').toLowerCase().includes(q));
+                    if (!list.length) return '<span class="k">찾는 상품이 없어요</span>';
+                    return list.map(p => {
+                        const done = gSrc.onsite[p.code];
+                        return '<span class="src-ochip' + (done ? ' done' : '') + '" data-code="' + srcEsc(p.code) + '" title="' + srcEsc(p.name) + (done ? ' — ' + done.date + ' 판매로 저장됨' : '') + '">' + srcEsc(p.name) +
+                            (done ? '<small>' + done.date.slice(5).replace('-', '/') + '</small>' : '') + '</span>';
+                    }).join('');
+                }
+                function srcOnsiteChips() { const el = document.getElementById('src-onsite-chips'); if (el) el.innerHTML = srcOnsiteChipsHtml(); }
                 function srcKeepFocus(id) {
                     const el = document.getElementById(id); const pos = el ? el.selectionStart : 0;
                     srcRender();
@@ -3948,7 +4019,7 @@
                     const clearOver = () => document.querySelectorAll('#purchase-section-sourcing .src-cal-day.over').forEach(e => e.classList.remove('over'));
                     document.addEventListener('pointerdown', e => {
                         // 식단표 카드 단추 또는 상시판매 이름표
-                        const b = e.target.closest && e.target.closest('#purchase-section-sourcing .src-picks button[data-key], #purchase-section-sourcing .src-ochip[data-code]');
+                        const b = e.target.closest && e.target.closest('#purchase-section-sourcing .src-dn[data-key], #purchase-section-sourcing .src-ochip[data-code]');
                         if (!b || b.disabled || e.button > 0) return;
                         st = { b, key: b.dataset.key, lab: b.dataset.lab, code: b.dataset.code, x: e.clientX, y: e.clientY, drag: false, ghost: null, id: e.pointerId };
                         try { b.setPointerCapture(e.pointerId); } catch (x) {}
@@ -3983,7 +4054,7 @@
                             if (c) srcOnsiteSave(s.code, c.dataset.date); else if (!s.drag) showToast('달력 날짜 칸에 끌어다 놓으면 저장돼요');
                             return;
                         }
-                        if (!s.drag) { srcPick(s.key, s.lab); return; }
+                        if (!s.drag) { srcMenu(s.key, s.lab, s.b); return; }   // 누르면 발주·건너뜀·추천제외 창
                         if (c) srcPick(s.key, s.lab, c.dataset.date);
                     };
                     document.addEventListener('pointerup', end);
@@ -3995,7 +4066,8 @@
                     ['sold', '판매'], ['d', '게시일'], ['v', '업체'], ['g', '구분'], ['n', '상품명'], ['c', '카테고리'], ['s', '점수', 1], ['sp', '공급가', 1], ['rp', '권장', 1],
                     ['m', '마진%', 1], ['pc', '게시', 1], ['k', '카톡'], ['q', '검색량', 1], ['ctr', '클릭률', 1], ['comp', '경쟁'], ['tr', '추세'], ['ss', '계절']
                 ];
-                function srcRenderBand(v) {
+                // onlyRes: 찾기 칸에 글을 칠 때. 찾기 칸은 그대로 두고 표와 개수만 바꾼다 (그래야 한글이 쪼개지지 않는다)
+                function srcRenderBand(v, onlyRes) {
                     const Q = gSrc.bandQ, sold = srcSoldMap();
                     const rows = Object.entries(gSrc.band).map(([no, r]) => Object.assign({ no }, r));
                     const vendors = [...new Set(rows.map(r => r.v))].sort();
@@ -4015,14 +4087,14 @@
                     });
                     const recent = list.filter(r => r.sold && r.sold >= cutIso).length;
                     let html = '<div class="src-bar">' +
-                        '<input type="search" id="src-band-q" placeholder="상품명·검색어 찾기" value="' + srcEsc(Q.q) + '" oninput="gSrc.bandQ.q=this.value; gSrc.bandQ.limit=100; srcRenderBandKeep()">' +
+                        '<input type="search" id="src-band-q" placeholder="상품명·검색어 찾기" value="' + srcEsc(Q.q) + '" oninput="gSrc.bandQ.q=this.value; gSrc.bandQ.limit=100; srcRenderBand(null, true)">' +
                         '<select onchange="gSrc.bandQ.vendor=this.value; gSrc.bandQ.limit=100; srcRender()"><option value="">업체 전체</option>' + vendors.map(x => '<option' + (x === Q.vendor ? ' selected' : '') + '>' + srcEsc(x) + '</option>').join('') + '</select>' +
                         '<select onchange="gSrc.bandQ.cat=this.value; gSrc.bandQ.limit=100; srcRender()"><option value="">카테고리 전체</option>' + cats.map(x => '<option' + (x === Q.cat ? ' selected' : '') + '>' + srcEsc(x) + '</option>').join('') + '</select>' +
                         '<label style="display:flex;gap:4px;align-items:center;font-weight:800;font-size:12.5px;"><input type="checkbox"' + (Q.soldOnly ? ' checked' : '') + ' onchange="gSrc.bandQ.soldOnly=this.checked; srcRender()"> 판매한 것만</label>' +
-                        '<span><span class="k">찾은 상품</span> <b>' + list.length.toLocaleString() + '개</b></span><span><span class="k">최근 4주 판매</span> <b>' + recent + '개</b></span>' +
+                        '<span><span class="k">찾은 상품</span> <b id="src-band-n">' + list.length.toLocaleString() + '개</b></span><span><span class="k">최근 4주 판매</span> <b id="src-band-recent">' + recent + '개</b></span>' +
                         '<span class="k">"판매"를 누르면 오늘 날짜로 저장되고, 그 상품은 4주 동안 추천에서 빠져요.</span></div>';
-                    html += '<div class="src-tablewrap"><table><thead><tr>' + SRC_BAND_COLS.map(([k, lab, num]) => '<th' + (num ? ' class="r"' : '') + ' onclick="srcSortBand(\'' + k + '\')">' + lab + (Q.sort === k ? (Q.dir < 0 ? ' ▼' : ' ▲') : '') + '</th>').join('') + '</tr></thead><tbody>';
-                    html += list.slice(0, Q.limit).map(r => {
+                    let res = '<div class="src-tablewrap"><table><thead><tr>' + SRC_BAND_COLS.map(([k, lab, num]) => '<th' + (num ? ' class="r"' : '') + ' onclick="srcSortBand(\'' + k + '\')">' + lab + (Q.sort === k ? (Q.dir < 0 ? ' ▼' : ' ▲') : '') + '</th>').join('') + '</tr></thead><tbody>';
+                    res += list.slice(0, Q.limit).map(r => {
                         const direct = gSrc.direct[r.no];
                         const btn = r.sold
                             ? '<button type="button" class="src-sold on" title="' + (direct ? '눌러서 판매 표시 지우기' : '식단표에서 고른 상품이에요') + '" onclick="srcSold(\'' + r.no + '\')">' + r.sold.slice(5).replace('-', '/') + '</button>'
@@ -4033,14 +4105,15 @@
                             '<td class="r">' + srcEsc(r.m) + '</td><td class="r">' + srcEsc(r.pc) + '</td><td>' + srcEsc(r.k) + '</td><td class="r">' + srcEsc(r.q) + '</td><td class="r">' + srcEsc(r.ctr) + '</td>' +
                             '<td>' + srcEsc(r.comp) + '</td><td>' + srcTrend(r.tr) + '</td><td>' + srcTrend(r.ss) + '</td></tr>';
                     }).join('') + '</tbody></table></div>';
-                    if (list.length > Q.limit) html += '<button type="button" class="src-btn src-more" onclick="gSrc.bandQ.limit+=200; srcRender()">더 보기 (' + (list.length - Q.limit).toLocaleString() + '개 남음)</button>';
-                    v.innerHTML = html;
-                }
-                // 찾기 칸에 글을 칠 때마다 다시 그리면 커서가 사라진다. 다시 그린 뒤 커서를 돌려 둔다.
-                function srcRenderBandKeep() {
-                    const el = document.getElementById('src-band-q'); const pos = el ? el.selectionStart : 0;
-                    srcRender();
-                    const n = document.getElementById('src-band-q'); if (n) { n.focus(); n.setSelectionRange(pos, pos); }
+                    if (list.length > Q.limit) res += '<button type="button" class="src-btn src-more" onclick="gSrc.bandQ.limit+=200; srcRender()">더 보기 (' + (list.length - Q.limit).toLocaleString() + '개 남음)</button>';
+                    const box = document.getElementById('src-band-res');
+                    if (onlyRes && box) {
+                        box.innerHTML = res;
+                        document.getElementById('src-band-n').textContent = list.length.toLocaleString() + '개';
+                        document.getElementById('src-band-recent').textContent = recent + '개';
+                        return;
+                    }
+                    (v || document.getElementById('src-view')).innerHTML = html + '<div id="src-band-res">' + res + '</div>';
                 }
                 function srcSortBand(k) {
                     if (k === 'sold') return;
@@ -4063,7 +4136,7 @@
                 }
 
                 // ── 카톡 취합 ──
-                function srcRenderKakao(v) {
+                function srcRenderKakao(v, onlyRes) {
                     const Q = gSrc.kakaoQ;
                     const rows = Object.entries(gSrc.kakao).map(([no, r]) => Object.assign({ no }, r));
                     const vendors = [...new Set(rows.map(r => r.v))].sort();
@@ -4077,21 +4150,18 @@
                     });
                     const cols = [['d', '올린 일자'], ['v', '업체'], ['g', '구분'], ['n', '상품명'], ['p', '가격', 1], ['set', '구성'], ['cnt', '올린 횟수', 1], ['first', '처음 올린 날'], ['raw', '원문']];
                     let html = '<div class="src-bar">' +
-                        '<input type="search" id="src-kakao-q" placeholder="상품명·원문 찾기" value="' + srcEsc(Q.q) + '" oninput="gSrc.kakaoQ.q=this.value; gSrc.kakaoQ.limit=100; srcRenderKakaoKeep()">' +
+                        '<input type="search" id="src-kakao-q" placeholder="상품명·원문 찾기" value="' + srcEsc(Q.q) + '" oninput="gSrc.kakaoQ.q=this.value; gSrc.kakaoQ.limit=100; srcRenderKakao(null, true)">' +
                         '<select onchange="gSrc.kakaoQ.vendor=this.value; gSrc.kakaoQ.limit=100; srcRender()"><option value="">업체 전체</option>' + vendors.map(x => '<option' + (x === Q.vendor ? ' selected' : '') + '>' + srcEsc(x) + '</option>').join('') + '</select>' +
-                        '<span><span class="k">찾은 상품</span> <b>' + list.length.toLocaleString() + '개</b></span>' +
+                        '<span><span class="k">찾은 상품</span> <b id="src-kakao-n">' + list.length.toLocaleString() + '개</b></span>' +
                         '<span class="k">카톡방 대화를 내보내 PC에 넣어 줄 때 새로 정리돼요.</span></div>';
-                    html += '<div class="src-tablewrap"><table><thead><tr>' + cols.map(([k, lab, n]) => '<th' + (n ? ' class="r"' : '') + ' onclick="srcSortKakao(\'' + k + '\')">' + lab + (Q.sort === k ? (Q.dir < 0 ? ' ▼' : ' ▲') : '') + '</th>').join('') + '</tr></thead><tbody>';
-                    html += list.slice(0, Q.limit).map(r => '<tr><td>' + srcEsc(String(r.d || '').slice(2)) + '</td><td>' + srcEsc(r.v) + '</td><td>' + srcEsc(r.g) + '</td><td class="nm">' + srcEsc(r.n) + '</td>' +
+                    let res = '<div class="src-tablewrap"><table><thead><tr>' + cols.map(([k, lab, n]) => '<th' + (n ? ' class="r"' : '') + ' onclick="srcSortKakao(\'' + k + '\')">' + lab + (Q.sort === k ? (Q.dir < 0 ? ' ▼' : ' ▲') : '') + '</th>').join('') + '</tr></thead><tbody>';
+                    res += list.slice(0, Q.limit).map(r => '<tr><td>' + srcEsc(String(r.d || '').slice(2)) + '</td><td>' + srcEsc(r.v) + '</td><td>' + srcEsc(r.g) + '</td><td class="nm">' + srcEsc(r.n) + '</td>' +
                         '<td class="r">' + (r.p ? Number(r.p).toLocaleString() : '') + '</td><td>' + srcEsc(r.set) + '</td><td class="r">' + srcEsc(r.cnt) + '</td><td>' + srcEsc(String(r.first || '').slice(2, 10)) + '</td>' +
                         '<td class="raw">' + srcEsc(r.raw) + '</td></tr>').join('') + '</tbody></table></div>';
-                    if (list.length > Q.limit) html += '<button type="button" class="src-btn src-more" onclick="gSrc.kakaoQ.limit+=200; srcRender()">더 보기 (' + (list.length - Q.limit).toLocaleString() + '개 남음)</button>';
-                    v.innerHTML = html;
-                }
-                function srcRenderKakaoKeep() {
-                    const el = document.getElementById('src-kakao-q'); const pos = el ? el.selectionStart : 0;
-                    srcRender();
-                    const n = document.getElementById('src-kakao-q'); if (n) { n.focus(); n.setSelectionRange(pos, pos); }
+                    if (list.length > Q.limit) res += '<button type="button" class="src-btn src-more" onclick="gSrc.kakaoQ.limit+=200; srcRender()">더 보기 (' + (list.length - Q.limit).toLocaleString() + '개 남음)</button>';
+                    const box = document.getElementById('src-kakao-res');
+                    if (onlyRes && box) { box.innerHTML = res; document.getElementById('src-kakao-n').textContent = list.length.toLocaleString() + '개'; return; }
+                    (v || document.getElementById('src-view')).innerHTML = html + '<div id="src-kakao-res">' + res + '</div>';
                 }
                 function srcSortKakao(k) {
                     const Q = gSrc.kakaoQ; if (Q.sort === k) Q.dir = -Q.dir; else { Q.sort = k; Q.dir = (k === 'v' || k === 'n' || k === 'g') ? 1 : -1; }
