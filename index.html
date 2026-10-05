@@ -3883,8 +3883,22 @@
                         if (!r.ok) return [];
                         const all = await r.json() || {};
                         // 사다드림: 상품등록에서 사다드림으로 고르고 픽업 날짜(date)를 넣은 상품. 지난 것도 달력에 남긴다
-                        gSrc.sada = Object.values(all).filter(p => p && (p.isSada === true || p.isSada === 'true') && /^\d{4}-\d{2}-\d{2}$/.test(String(p.date || '')))
-                            .map(p => ({ date: p.date, code: String(p.productCode || p.sid || ''), name: String(p.name || '').replace(/^\s*\[사다드림\]\s*/, ''), hide: !!p.hide }));
+                        //   노출일정(schedules)에 여러 차례 픽업일을 걸어 둔 것도 같이 보여 준다. 같은 상품·같은 날은 한 번만.
+                        const prods = Object.values(all).filter(p => p && (p.isSada === true || p.isSada === 'true'));
+                        const bySid = {}; prods.forEach(p => { bySid[String(p.sid || p.productCode || '')] = p; });
+                        const seen = new Set(); gSrc.sada = [];
+                        const addSada = (p, date) => {
+                            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return;
+                            const code = String(p.productCode || p.sid || ''), k = code + '|' + date;
+                            if (seen.has(k)) return; seen.add(k);
+                            gSrc.sada.push({ date, code, name: String(p.name || '').replace(/^\s*\[사다드림\]\s*/, ''), hide: !!p.hide });
+                        };
+                        prods.forEach(p => addSada(p, p.date));
+                        try {
+                            const sr = await fetch(`${FIREBASE_DB_URL}schedules.json?t=${Date.now()}`);
+                            const sched = sr.ok ? (await sr.json()) || {} : {};
+                            Object.entries(sched).forEach(([sid, rounds]) => { const p = bySid[sid]; if (p) Object.values(rounds || {}).forEach(round => round && addSada(p, round.pickup)); });
+                        } catch (e) { }
                         return Object.values(all).filter(p => p && String(p.displayTab || '').startsWith('onsite') && !p.hide && p.name)
                             .map(p => ({ code: String(p.productCode || p.sid || ''), name: p.name, price: p.price, tab: p.displayTab, stock: p.stock }))
                             .filter(p => p.code).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
