@@ -3038,6 +3038,9 @@
                                 <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
                                         <button type="button" onclick="openCodePicker()" title="쓰던 번호에서 고르기"
                                             style="flex:0 0 auto; height:30px; padding:0 10px; box-sizing:border-box; background:#eff6ff; color:#2563eb; border:1.5px solid #bfdbfe; border-radius: 8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">🔍 번호 찾기</button>
+                                        <!-- [신규 2026-10-05] 새 번호 바로 등록 (사장님 요청 — 발주등록과 같은 [+]) -->
+                                        <button type="button" onclick="openCodeNew('product')" title="새 번호 등록"
+                                            style="flex:0 0 auto; width:30px; height:30px; padding:0; box-sizing:border-box; background:#f0fdf4; color:#15803d; border:1.5px solid #86efac; border-radius:8px; font-size:16px; font-weight:900; line-height:1; cursor:pointer;">+</button>
                                         <input type="text" id="productCodeLabel" class="form-control" placeholder="식별번호 이름"
                                             style="flex:1 1 auto; min-width:0; height:30px; padding:5px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#fff; color:#334155;">
                                         <button type="button" id="btn-code-label-save" onclick="applyCodeLabel('productCodeView','productCodeLabel')"
@@ -15841,7 +15844,19 @@
            '📅 일정'을 눌러 노출일(카톡 알림 시각)·마감·픽업을 정해 두면, 상품을 저장한 뒤 그 상품에 일정을 하나 담는다
            (노출일정 '일정에 담기'와 같은 psItemAdd). 그래서 노출일정 달력에도 그대로 보인다.
            저장 전까지는 화면에만 들고 있다 — 취소하면 사라진다. 수정 화면에서 정하면 그 상품에 일정이 하나 더 생긴다 */
-        let uploadFormSched = null;   // { releaseAt, expireAt, pickup } | null
+        let uploadFormSched = null;   // { releaseAt, expireAt, pickup, key?, orig? } | null — key 가 있으면 이미 걸린 일정(고치기), 없으면 새 일정
+        /* [신규 2026-10-05] 수정 화면을 열 때 그 상품에 걸린 일정을 불러온다 (사장님 요청 — 일정이 있는데 단추에 불이 안 들어왔다).
+           지금 판매 중인 차례가 있으면 그것, 없으면 앞으로 올라갈 가장 가까운 차례. 지난 차례만 있으면 없는 것으로 본다 */
+        function gFormSchedFromProduct(prod) {
+            if (!prod || !prod.sid || typeof psItemsOfSid !== 'function') return null;
+            const now = Date.now();
+            const items = psItemsOfSid(prod.sid);
+            const it = items.find(psIsActive)
+                || items.filter(x => Number(x.releaseAt) && psOpenAt(x.releaseAt) > now).sort((a, b) => Number(a.releaseAt) - Number(b.releaseAt))[0];
+            if (!it || !Number(it.releaseAt)) return null;
+            const s = { releaseAt: Number(it.releaseAt), expireAt: Number(it.expireAt) || null, pickup: psItemPickup(it) || null };
+            return { ...s, key: it.key, orig: { ...s } };
+        }
         function paintFormSchedBtn() {
             const b = document.getElementById('btnFormSched');
             if (!b) return;
@@ -15866,8 +15881,8 @@
             box.style.cssText = 'position:fixed; inset:0; z-index:10060; background:rgba(15,23,42,0.45); display:flex; align-items:center; justify-content:center; padding:16px;';
             box.onclick = e => { if (e.target === box) box.remove(); };
             box.innerHTML = `<div style="background:#fff; border-radius:14px; width:min(420px,100%); padding:16px; box-sizing:border-box;">
-                <div style="font-size:14px; font-weight:900; margin-bottom:4px;">📅 노출일정</div>
-                <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:10px;">상품을 저장하면 이 일정이 노출일정 달력에 담겨요. 노출일 0시에 손님 화면에 올라가요</div>
+                <div style="font-size:14px; font-weight:900; margin-bottom:4px;">📅 노출일정${s && s.key ? ' <span style="font-size:11px; font-weight:800; color:#2563eb;">· 지금 걸린 일정</span>' : ''}</div>
+                <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:10px;">${s && s.key ? '고치고 상품을 저장하면 이 일정이 바뀌어요 (노출일정 달력에도 그대로)' : '상품을 저장하면 이 일정이 노출일정 달력에 담겨요'}. 노출일 0시에 손님 화면에 올라가요</div>
                 <div style="display:flex; flex-direction:column; gap:6px;">
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span style="${LAB}" title="그 날짜 0시에 손님 화면에 올라가요. 시각은 카톡 알림용이에요">📣 노출일</span>
@@ -15887,7 +15902,7 @@
                     </div>
                 </div>
                 <div style="display:flex; gap:6px; margin-top:12px;">
-                    ${s ? `<button type="button" onclick="fspClear()" style="flex:0 0 auto; height:38px; padding:0 12px; border:1.5px solid #fecaca; background:#fff; color:#dc2626; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">지우기</button>` : ''}
+                    ${(s && !s.key) ? `<button type="button" onclick="fspClear()" style="flex:0 0 auto; height:38px; padding:0 12px; border:1.5px solid #fecaca; background:#fff; color:#dc2626; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">지우기</button>` : ''}
                     <button type="button" onclick="document.getElementById('form-sched-pick').remove()" style="flex:1; height:38px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">닫기</button>
                     <button type="button" onclick="fspApply()" style="flex:1; height:38px; border:none; background:#2563eb; color:#fff; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">정하기</button>
                 </div>
@@ -15929,10 +15944,11 @@
             const pickup = (document.getElementById('fsp-pickup') || {}).value || null;
             if (exp && exp <= rel) { showToast('⚠️ 마감 시각은 노출 시각보다 뒤여야 해요'); return; }
             if (exp && pickup && pickup < fMsToDateKey(exp)) { showToast('⚠️ 픽업일은 마감일과 같거나 뒤여야 해요'); return; }
-            uploadFormSched = { releaseAt: rel, expireAt: exp, pickup };
+            const old = uploadFormSched;
+            uploadFormSched = (old && old.key) ? { ...old, releaseAt: rel, expireAt: exp, pickup } : { releaseAt: rel, expireAt: exp, pickup };
             paintFormSchedBtn();
             document.getElementById('form-sched-pick').remove();
-            showToast('📅 일정을 정했어요 — 상품을 저장하면 노출일정에 담겨요');
+            showToast((old && old.key) ? '📅 일정을 고쳤어요 — 상품을 저장하면 바뀌어요' : '📅 일정을 정했어요 — 상품을 저장하면 노출일정에 담겨요');
         }
         function fspClear() {
             uploadFormSched = null;
@@ -27831,6 +27847,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                                 ${gIsClosedAdmin(prod)
                                     ? `<button type="button" onclick="event.stopPropagation(); toggleProductClosed(${index})" style="flex:1; min-width:0; padding:6px 2px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">마감 풀기</button>`
                                     : `<button type="button" onclick="event.stopPropagation(); toggleProductClosed(${index})" style="flex:1; min-width:0; padding:6px 4px; border:1.5px solid #ef4444; background:#fef2f2; color:#ef4444; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">마감</button>`}
+                                ${/* [신규 2026-10-05] 품절 단추 — 수량을 0으로 (사장님 요청). 이미 0개면 흐리게 둔다 */''}
+                                <button type="button" onclick="event.stopPropagation(); gSoldOutProduct(${index})" ${stockInputVal === '품절' ? 'disabled' : ''} title="수량을 0으로 — 손님 화면에 품절로 보여요" style="flex:1; min-width:0; padding:6px 4px; border:1.5px solid #f59e0b; background:#fffbeb; color:#b45309; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;${stockInputVal === '품절' ? ' opacity:0.45; cursor:default;' : ''}">품절</button>
                             </div>
                         </div>`;
                     }
@@ -29054,7 +29072,23 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 exitEditMode();
                 await loadProductsFromServer(); // [수정] 서버에서 최신 재고 조정값(global_stock) 다시 불러오기
                 /* [신규 2026-10-05] 등록·수정 화면에서 정한 노출일정을 이 상품에 담는다 → 노출일정 달력에도 보인다 */
-                if (_formSched) {
+                if (_formSched && _formSched.key) {
+                    /* [신규 2026-10-05] 이미 걸린 일정을 고쳤으면 그 일정을 바꾼다 — 노출일정 카드에서 고치는 것과 같은 길 (판매 중이면 한 번 묻는다) */
+                    const o = _formSched.orig || {}, k = _formSched.key;
+                    const chRel = Number(_formSched.releaseAt) !== Number(o.releaseAt);
+                    const chExp = Number(_formSched.expireAt || 0) !== Number(o.expireAt || 0);
+                    const chPick = String(_formSched.pickup || '') !== String(o.pickup || '');
+                    if ((chRel || chExp || chPick) && psItem(k)) {
+                        if (await psConfirmLive([k], '노출일정을 바꿔요.')) {
+                            psUndoMark('상품 수정 — 노출일정');
+                            if (chRel) await psItemSave(k, { releaseAt: _formSched.releaseAt });
+                            if (chExp) await psItemSave(k, _formSched.expireAt ? psExpireChanges(psItem(k), _formSched.expireAt) : { expireAt: null });
+                            if (chPick && _formSched.pickup) await psItemSetPickup(k, _formSched.pickup);
+                            showToast('📅 노출일정을 바꿨어요');
+                            if (typeof renderProductScheduleCalendar === 'function') renderProductScheduleCalendar();
+                        }
+                    }
+                } else if (_formSched) {
                     let _i = _savedSid ? uploadProducts.findIndex(x => x && x.sid === _savedSid) : -1;
                     if (_i < 0) _i = uploadProducts.findIndex(x => x && x.name === name && String(x.matchKey || '') === String(matchKey || ''));
                     if (_i < 0) showToast('⚠️ 저장한 상품을 못 찾아 일정을 못 담았어요 — 노출일정에서 담아 주세요');
@@ -29548,6 +29582,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // [신규] 재고관리 — 상품 재고 수량 직접 변경 (절대값 설정: 기본재고=입력값, 조정값 0으로 리셋)
         /* [신규 2026-10-05] 상품 카드 '변경' 단추를 뺐다 (사장님 요청) — 수량 칸에서 엔터를 누르거나 다른 곳을 누르면(칸을 떠나면) 바뀐다.
            아이폰 숫자판에는 엔터가 없어서 칸을 떠날 때도 저장한다. 비웠거나 그대로면 원래 수량으로 되돌리고 아무것도 안 한다 */
+        // [신규 2026-10-05] 상품 카드 [품절] — 한 번 물어보고 수량을 0으로 (수량 칸에 0을 적는 것과 같다)
+        async function gSoldOutProduct(index) {
+            const p = uploadProducts[index];
+            if (!p) return;
+            if (!(await psConfirm(`${p.name || '이 상품'}\n\n품절로 바꿀까요? 수량이 0이 돼요.\n다시 팔려면 수량 칸에 숫자를 적으면 돼요.`, '품절로', true))) return;
+            updateProductStock(index, '0');
+        }
         function gStockInputCommit(index, el) {
             const v = String(el.value || '').trim(), orig = String(el.dataset.orig || '');
             if (!v || v === orig) { el.value = orig; return; }
@@ -29647,7 +29688,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const prod = uploadProducts[index];
             uploadIsEditMode = true;
             uploadEditProductKey = index;
-            uploadFormSched = null; paintFormSchedBtn();   // [신규 2026-10-05] 다른 상품에서 정하다 만 노출일정이 따라오지 않게
+            uploadFormSched = gFormSchedFromProduct(prod); paintFormSchedBtn();   // [수정 2026-10-05] 이미 걸린 일정이 있으면 불러와 보여 준다 (없으면 비움)
             // [하드닝] 순번은 목록 재정렬/새로고침에 취약하므로, 이름+분류+날짜로 실제 대상을 기억해 둠
             uploadEditProductRef = { name: prod.name, matchKey: String(prod.matchKey || ''), date: String(prod.date || '') };
 
@@ -35376,9 +35417,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             renderCodePicker();
             const pre = document.getElementById('code-new-prefix');
             if (pre && target === 'purchase') pre.value = (typeof purchaseCodePrefix === 'string' && /^[PFS]$/.test(purchaseCodePrefix)) ? purchaseCodePrefix : 'P';
+            // [신규 2026-10-05] 상품등록 [+] — 갈래는 상품등록 '자동' 칸이 붙일 갈래(P·S·F), 이름은 상품명
+            if (pre && target === 'product') pre.value = (typeof gAutoCodePrefix === 'function' && /^[PFS]$/.test(gAutoCodePrefix())) ? gAutoCodePrefix() : 'P';
             const lab = document.getElementById('code-new-label');
             if (lab) {
-                const nm = target === 'purchase' ? String(document.getElementById('purchase-item-name')?.value || '') : '';
+                const nm = target === 'purchase' ? String(document.getElementById('purchase-item-name')?.value || '')
+                    : target === 'product' ? String(document.getElementById('productName')?.value || '') : '';
                 lab.value = nm.replace(/^\s*(\[[^\]]*\]\s*)+/, '').trim();
                 setTimeout(() => { lab.focus(); lab.select(); }, 80);   // openCodePicker 가 찾기 칸에 두는 커서보다 뒤에
             }
