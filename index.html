@@ -3519,6 +3519,8 @@
                                             <span>📦 발주 상품명</span>
                                             <!-- [신규] 등록 상품을 검색해서 고르는 창. 고르면 상품명·판매가·식별번호가 한 번에 채워진다. -->
                                             <button type="button" onclick="openCodePicker('purchase')" style="padding:4px 10px; background:#eff6ff; color:#2563eb; border:1.5px solid #bfdbfe; border-radius:7px; font-size:12px; font-weight:800; cursor:pointer;">🔍 번호 찾기</button>
+                                            <!-- [신규 2026-10-05] 새 번호를 바로 등록 (사장님 요청) — 번호 창을 '새 번호 만들기' 칸에 맞춰 연다 -->
+                                            <button type="button" onclick="openCodeNew('purchase')" title="새 번호 등록" style="width:28px; height:28px; padding:0; background:#f0fdf4; color:#15803d; border:1.5px solid #86efac; border-radius:7px; font-size:16px; font-weight:900; line-height:1; cursor:pointer;">+</button>
                                         </span>
                                         <!-- [신규] 식별번호 — 이름이 달라도 이 번호가 같으면 같은 상품으로 본다.
                                              손으로 못 고치게 읽기전용. '🔍 번호 찾기'로 고르면 채워지고, 비어 있으면 저장할 때 자동으로 붙는다. -->
@@ -35183,6 +35185,23 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            자동으로 붙는 번호는 언제나 P 라, 과일(F)·사다드림(S)은 여기서 손수 튼다.
            만든 번호는 이름표(product_code_labels)에 적어 둔다. 상품이나 발주가 아직 없어도
            목록에 떠서 고를 수 있어야 하기 때문이다. */
+        /* [신규 2026-10-05] 발주등록 '번호 찾기' 옆 [+] — 번호 창을 열고 '새 번호 만들기' 칸을 바로 채워 둔다 (사장님 요청).
+           갈래는 발주 화면에서 고른 P·S·F, 이름은 발주 상품명(앞의 [과일] 같은 대괄호는 뗀다). [만들기]를 누르면 만든 번호가 발주 칸에 들어간다 */
+        function openCodeNew(target) {
+            openCodePicker(target);
+            const sIn = document.getElementById('code-picker-search');
+            if (sIn) sIn.value = '';
+            gCodePickerQuery = '';
+            renderCodePicker();
+            const pre = document.getElementById('code-new-prefix');
+            if (pre && target === 'purchase') pre.value = (typeof purchaseCodePrefix === 'string' && /^[PFS]$/.test(purchaseCodePrefix)) ? purchaseCodePrefix : 'P';
+            const lab = document.getElementById('code-new-label');
+            if (lab) {
+                const nm = target === 'purchase' ? String(document.getElementById('purchase-item-name')?.value || '') : '';
+                lab.value = nm.replace(/^\s*(\[[^\]]*\]\s*)+/, '').trim();
+                setTimeout(() => { lab.focus(); lab.select(); }, 80);   // openCodePicker 가 찾기 칸에 두는 커서보다 뒤에
+            }
+        }
         async function createNewCode() {
             const pre = String(document.getElementById('code-new-prefix')?.value || 'F').trim().toUpperCase();
             const label = String(document.getElementById('code-new-label')?.value || '').trim();
@@ -35981,7 +36000,7 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                         <option value="S">🛒 사다드림 S</option>
                         <option value="P">📦 일반 P</option>
                     </select>
-                    <input type="text" id="code-new-label" placeholder="새 번호에 걸 이름 (예: 샤인머스켓)"
+                    <input type="text" id="code-new-label" placeholder="새 번호에 걸 이름 (예: 샤인머스켓)" onkeydown="if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); createNewCode(); }"
                         style="flex:1 1 150px; min-width:120px; box-sizing:border-box; height:32px; padding:0 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:700;">
                     <button type="button" onclick="createNewCode()"
                         style="flex:0 0 auto; height:32px; padding:0 12px; border:1.5px solid #86efac; background:#f0fdf4; color:#15803d; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">＋ 번호 만들기</button>
