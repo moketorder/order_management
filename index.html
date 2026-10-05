@@ -27441,7 +27441,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         let gListRoundCount = {};   // [신규 2026-10-02] 목록에서 같은 노출번호로 묶인 줄 수 (gSiblingKey → 수)
         /* [신규 2026-10-05] 상품목록 — 마지막 공구일과 공구 횟수 (사장님 요청).
-           주문 기록(지금 주문 + 보관함)에서 그 상품이 팔린 픽업일을 모아, 가장 늦은 날과 날 수를 보여 준다.
+           주문 기록(지금 주문 + 보관함)에서 그 상품이 공동구매·사다드림으로 팔린 픽업일을 모아, 가장 늦은 날과 횟수를 보여 준다.
            식별번호로 묶는다(주문 줄에 번호가 없으면 이름으로 번호를 찾는다). 과일(F)·사다드림(S)처럼 번호를 함께 쓰는 상품은 합쳐서 센다 */
         let _gGbHist = { n: -1, m: null };
         function gGbHistMap() {
@@ -27463,6 +27463,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const k = c ? 'c:' + c : 'n:' + fTightName(nm);
                 const d = getOrderDateInfo(o).dateStr;
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+                /* [수정 2026-10-05] 공동구매·사다드림 주문만 센다 — 상시판매로 팔린 날까지 '공구일'로 떴다 (사장님: 봉봉쭈꾸미 10/6).
+                   주문서가 붙이는 종류(category)로 가른다. 표시 없는 옛 주문(2026-08-15 전)은 픽업일 이틀 이상 전에 주문한 것만 공구로 본다
+                   (당일·다음날 주문은 상시판매 — '공동구매 회차 기록' psRound… 와 같은 짐작) */
+                if (o.category) { if (o.category !== 'group' && o.category !== 'sada') return; }
+                else {
+                    const t = parseTimestampToDate(o.timestamp);
+                    if (!t || isNaN(t.getTime()) || (new Date(d + 'T12:00:00') - new Date(fMsToDateKey(t.getTime()) + 'T12:00:00')) < 2 * 86400000) return;
+                }
                 if (!m.has(k)) m.set(k, new Set());
                 m.get(k).add(d);
             });
