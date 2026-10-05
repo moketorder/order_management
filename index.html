@@ -3281,6 +3281,7 @@
                         <div class="ps-seg" role="tablist">
                             <button type="button" id="ps-view-cal" class="on" onclick="psSetView('cal')">📅 달력</button>
                             <button type="button" id="ps-view-list" onclick="psSetView('list')">📋 목록</button>
+                            <button type="button" id="ps-view-hist" onclick="psSetView('hist')">📊 판매기록</button>
                         </div>
                         <div class="ps-tools">
                             <!-- [수정 2026-10-03] 차례: ❔ · 오늘 · (폰만 Ctrl) · 되돌리기 (사장님 요청) -->
@@ -4294,6 +4295,39 @@
         }
         .ms-cal-cell.empty { background:transparent; border-color:transparent; cursor:default; }
         /* [신규] 노출일정 막대 — 올라가는 날~마감 날을 잇는다 (칸 안 여백·칸 사이 틈을 건너 이어 보이게) */
+        /* [신규 2026-10-05] 노출일정 📊 상품별 기록 */
+        .ps-h-wrap { display: flex; flex-direction: column; gap: 8px; }
+        .ps-h-top { font-size: 13px; color: var(--text-main); }
+        .ps-h-dim { color: #94a3b8; font-weight: 700; font-size: 11.5px; }
+        .ps-h-ctl { display: flex; gap: 6px; }
+        .ps-h-ctl input { flex: 1 1 0; min-width: 0; height: 36px; padding: 0 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 13px; font-weight: 700; box-sizing: border-box; }
+        .ps-h-ctl select { flex: 0 0 auto; height: 36px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 12.5px; font-weight: 800; background: #fff; }
+        .ps-h-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-color); cursor: pointer; }
+        .ps-h-row.open { border-color: #93c5fd; background: #f8fbff; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+        .ps-h-main { flex: 1 1 auto; min-width: 0; }
+        .ps-h-date { flex: 0 0 44px; display: flex; flex-direction: column; align-items: center; line-height: 1.15; padding-right: 8px; border-right: 1px solid #e2e8f0; }   /* [신규 2026-10-05] 최근 회차 날짜를 앞에 */
+        .ps-h-date b { font-size: 15px; font-weight: 900; color: var(--text-main); font-variant-numeric: tabular-nums; }
+        .ps-h-date span { font-size: 11px; font-weight: 800; color: #94a3b8; }
+        .ps-h-name { font-size: 13.5px; font-weight: 900; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ps-h-code { font-size: 11px; font-weight: 800; color: #94a3b8; }
+        .ps-h-sub { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 3px; font-size: 12px; font-weight: 700; color: #475569; }
+        .ps-h-sub b { color: var(--text-main); }
+        .ps-h-up { color: #16a34a; font-weight: 900; } .ps-h-down { color: #dc2626; font-weight: 900; } .ps-h-flat { color: #94a3b8; }
+        .ps-h-chip { flex: 0 0 auto; font-size: 11.5px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: #f1f5f9; color: #64748b; white-space: nowrap; }
+        .ps-h-chip.on { background: #dcfce7; color: #15803d; }
+        .ps-h-card { margin-top: -9px; border: 1px solid #93c5fd; border-top: none; border-radius: 0 0 10px 10px; background: #fff; padding: 8px 10px 10px; }
+        .ps-h-tbl { overflow-x: auto; }
+        .ps-h-tbl table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+        .ps-h-tbl th { text-align: left; font-size: 11px; font-weight: 800; color: #94a3b8; padding: 4px 6px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+        .ps-h-tbl td { padding: 6px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; color: #334155; font-weight: 700; }
+        .ps-h-tbl .num { text-align: right; }
+        .ps-h-pk { font-weight: 900 !important; color: var(--text-main) !important; }
+        .ps-h-live { color: #16a34a; }   /* [신규 2026-10-05] 회차 기록 — 접수 중 */
+        .ps-h-on { margin: 10px 0 4px; font-size: 12.5px; color: var(--text-main); }   /* 상시판매 달별 참고 머리 */
+        .ps-h-tbl .ps-h-logrow td { padding: 0 6px 6px; font-size: 11px; font-weight: 700; color: #64748b; white-space: normal; border-bottom: 1px solid #f1f5f9; }
+        .ps-h-more { width: 100%; height: 34px; margin-top: 6px; border: 1.5px dashed #cbd5e1; background: #fff; border-radius: 8px; font-size: 12.5px; font-weight: 800; color: #475569; cursor: pointer; }
+        .ps-h-note { margin-top: 6px; font-size: 11px; font-weight: 700; color: #94a3b8; }
+        .ps-h-empty { padding: 24px; text-align: center; color: #94a3b8; font-weight: 800; font-size: 13px; }
         #ps-cal-box .ms-cal-cell { overflow: visible; min-height: 92px; }   /* 날마다 세로로 길게 — 막대 3~4줄이 여유 있게 */
         #ps-cal-box .ms-cal-cell.has { background: #fff; border-color: #eef2f6; }
         .ps-bars { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
@@ -5682,6 +5716,8 @@
 
             // 10일 지난 완료 주문 백그라운드 자동 이관
             autoArchiveOldOrdersSilent();
+            // [신규 2026-10-05] 공동구매 회차 기록 — 주문이 바뀌면 확정·취소 맞추기
+            try { psRoundTick(); } catch (e) { }
         }
 
         // [신규] REST 폴링 대신 Firebase 실시간 리스너(웹소켓)로 orders/메모 데이터를 구독.
@@ -13676,7 +13712,7 @@
         async function psLoadSchedules() {
             try {
                 const r = await fetch(`${FIREBASE_DB_URL}schedules.json?t=${Date.now()}`);
-                if (r.ok) psSched = (await r.json()) || {};
+                if (r.ok) { psSched = (await r.json()) || {}; psSchedLoaded = true; try { psRoundTick(); } catch (e) { } }
             } catch (e) { console.warn('일정 목록을 못 읽었어요:', e); }
         }
         async function psSchedPatch(patch) {
@@ -14512,13 +14548,27 @@
         }
 
         function initProductScheduleTab() {
-            if (!psCalMonths || psCalMonths.length === 0) {
+            const first = !psCalMonths || psCalMonths.length === 0;
+            if (first) {
                 const base = psTodayMonthKey();
                 // [수정] 페이지를 넘기지 않고 쭉 이어서 스크롤하는 방식으로 바꿨다 — 처음엔 전달~다다음달까지 넉넉히 걸어 둔다
                 psCalMonths = [psShiftMonthKey(base, -1), base, psShiftMonthKey(base, 1), psShiftMonthKey(base, 2)];
             }
             renderProductScheduleCalendar();
-            requestAnimationFrame(() => psCalScrollToMonth(psTodayMonthKey(), 'auto'));
+            // [수정 2026-10-05] 처음 열 때만 오늘이 한가운데 오게 옮긴다. 그 뒤로는 보던 자리를 그대로 둔다 (사장님 요청 — 탭을 누를 때마다 움직이지 않게)
+            if (first) {
+                const center = () => { psCalEnsureMonth(psTodayMonthKey()); psCalSuppressFor(400); psCalCenterOn(fMsToDateKey(Date.now()), 'auto'); };
+                requestAnimationFrame(center);
+                setTimeout(center, 350);   // 높이·글꼴이 뒤늦게 잡혀도 가운데 오게 한 번 더
+            }
+        }
+        // [신규 2026-10-05] 그 달이 달력에 걸려 있게만 한다 (안 걸려 있으면 이어붙여 다시 그린다) — 옮기지는 않는다
+        function psCalEnsureMonth(monthKey) {
+            if (!psCalMonths.length) return;
+            let grew = false;
+            while (monthKey < psCalMonths[0]) { psCalMonths.unshift(psShiftMonthKey(psCalMonths[0], -1)); grew = true; }
+            while (monthKey > psCalMonths[psCalMonths.length - 1]) { psCalMonths.push(psShiftMonthKey(psCalMonths[psCalMonths.length - 1], 1)); grew = true; }
+            if (grew) renderProductScheduleCalendar();
         }
 
         // [신규] 위/아래 끝까지 스크롤하면(또는 막대를 끝까지 끌고 가면) 자동으로 그 방향의 달을 하나 더 이어붙인다
@@ -14628,7 +14678,11 @@
         function psCalGoToday() {
             psCalOpenDay = '';
             psAddSearchOpenFor = '';
-            psCalScrollToMonth(psTodayMonthKey(), 'smooth');
+            // [수정 2026-10-05] 이번 달 1일이 아니라 오늘이 한가운데 오게 (사장님 요청)
+            psCalEnsureMonth(psTodayMonthKey());
+            renderProductScheduleCalendar();   // 열어 둔 날짜 표시를 지운 모습으로
+            psCalSuppressFor(1200);            // 부드럽게 옮기는 동안 위·아래 끝에 닿았다고 달을 덧붙이지 않게
+            psCalCenterOn(fMsToDateKey(Date.now()), 'smooth');
         }
 
         function togglePsDay(key) {
@@ -14639,13 +14693,13 @@
             if (psCalOpenDay) psCalCenterOn(key);
         }
         // [신규] 누른 날짜가 달력 칸 한가운데로 오게 부드럽게 옮긴다
-        function psCalCenterOn(key) {
+        function psCalCenterOn(key, behavior) {
             const box = document.getElementById('ps-cal-box');
             const cell = box && box.querySelector(`[data-day="${key}"]`);
             if (!cell) return;
             const top = cell.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
             psCalSuppressFor(700);   // 옮기는 동안 위·아래 끝에 닿았다고 달을 덧붙이지 않게
-            box.scrollTo({ top: Math.max(0, top - (box.clientHeight - cell.offsetHeight) / 2), behavior: 'smooth' });
+            box.scrollTo({ top: Math.max(0, top - (box.clientHeight - cell.offsetHeight) / 2), behavior: behavior || 'smooth' });
         }
 
 
@@ -14844,19 +14898,25 @@
                     + `</div>`;
             });
             html += `</div>`;   // ms-cal-grid 닫기
+            // [수정 2026-10-05] 다시 그리는 순간 내용이 비어 scrollTop이 0으로 튀고, 그 스크롤 이벤트가 위에 달을 덧붙여 자리가 밀렸다 → 자리를 지키고 잠깐 무시
+            const keepTop = box.scrollTop;
+            psCalSuppressFor(250);
             box.innerHTML = html;
+            if (keepTop) box.scrollTop = keepTop;
             psCalFitHeight(box);   // [신규 2026-10-03] 4주는 늘 보이게
             psCalSyncThumb();
             psTouchInit();
             // [신규 2026-10-02] 달력 ↔ 일정 목록
-            { const wrap = box.closest('.ps-cal-wrap'); if (wrap) wrap.style.display = (psViewMode === 'list') ? 'none' : ''; }
-            { const a = document.getElementById('ps-view-cal'), b2 = document.getElementById('ps-view-list');
-              if (a) a.classList.toggle('on', psViewMode !== 'list'); if (b2) b2.classList.toggle('on', psViewMode === 'list'); }
+            { const wrap = box.closest('.ps-cal-wrap'); if (wrap) wrap.style.display = (psViewMode === 'list' || psViewMode === 'hist') ? 'none' : ''; }
+            { const a = document.getElementById('ps-view-cal'), b2 = document.getElementById('ps-view-list'), b3 = document.getElementById('ps-view-hist');
+              if (a) a.classList.toggle('on', psViewMode !== 'list' && psViewMode !== 'hist'); if (b2) b2.classList.toggle('on', psViewMode === 'list'); if (b3) b3.classList.toggle('on', psViewMode === 'hist');
+              const lg = document.querySelector('#tab-admin-product-schedule .ps-legend'); if (lg) lg.style.display = (psViewMode === 'hist') ? 'none' : ''; }
             psUndoPaint();
 
             // 날짜를 골랐으면 그 날의 일정, 막대를 골랐으면 고른 막대의 일정 카드 (둘은 따로 고른다) · 목록으로 보기면 일정 목록
             const detailBox = document.getElementById('ps-day-detail-box');
             if (detailBox && psViewMode === 'list') { detailBox.innerHTML = psListHtml(); return; }
+            if (detailBox && psViewMode === 'hist') { detailBox.innerHTML = psHistHtml(); return; }   // [신규 2026-10-05] 상품별 기록
             if (detailBox) {
                 detailBox.innerHTML = psCalOpenDay
                     ? `<div style="border:1.5px solid #fde68a; border-radius:10px; background:#fffdf5; padding:12px;">${psDayDetailHtml(psCalOpenDay)}</div>`
@@ -14895,6 +14955,525 @@
             if (force === undefined) { try { localStorage.setItem('ps_help_open', open ? '1' : '0'); } catch (e) { } }
         }
         try { if (localStorage.getItem('ps_help_open') === '1') document.addEventListener('DOMContentLoaded', () => psToggleHelp(true)); } catch (e) { }
+        /* ===== [신규 2026-10-05] 공동구매 회차 기록 (사장님 요청) =====
+           회차 = 공동구매 상품 하나가 노출되어 접수를 시작한 때부터 마감·숨김까지 받은 주문. 배달·픽업일이 언제든 그 기간에 받았으면 한 회차.
+           · 공동구매만 센다 — 주문서가 주문 때 붙이는 종류(category)로 가른다. 공동구매(group)·사다드림(sada)만.
+             상시판매('other')·과일('fruit')·F 코드는 뺀다. 이 표시는 2026-08-15 주문부터 붙었다 — 표시 없는 옛 주문은 세지 않는다
+           · 서버 sched_history/<상품코드>/<회차번호> 에 회차마다 한 줄:
+               { name, sid, openAt(접수 시작), closeAt(접수 끝), pickups{배달·픽업일:true}, schedRid, est(짐작), log{시각:글},
+                 done(확정), doneAt, stats{ days{배달일:개수}, qty, orders, who, amt } }
+           · 시작·끝·바뀐 것은 상품 목록이 바뀔 때마다 '노출 중인 공동구매 ↔ 열린 회차'를 맞춰 보며 적는다(psRoundWatch).
+             저장하는 길이 여럿이라 저장마다 끼우지 않고, 목록 상태로 맞춘다. 시작 시각은 상품의 노출 시각(shownAt)을 쓴다
+             - 노출됐는데 열린 회차가 없으면 새 회차 (단, 앞 회차 배달·픽업일 전에 다시 노출하면 그 회차를 다시 연다 — 사장님 정함)
+             - 노출 중에 배달·픽업일·마감이 바뀌면 같은 회차에 '바뀜' 기록. 노출일정의 다음 차례로 넘어가면 앞 회차를 닫고 새 회차
+             - 숨겨지면 회차를 닫는다
+           · 숫자는 마지막 배달·픽업일 다음 날 확정하고 그 뒤로는 고치지 않는다 (배달·픽업일이 지나면 손님은 취소를 못 한다 — 사장님).
+             취소된 주문은 세지 않는다. 취소 개수·확정 뒤 취소 맞추기는 빼기로 함 (사장님: 별로 중요하지 않다)
+           · [신규 2026-10-05] 상시판매는 참고로 달마다 묶는다 (사장님 요청 — 공구로 올렸다 남은 것을 상시로 판 수요도 보이게).
+             표시가 '상시판매(other)'인 주문 + 옛 주문 중 상시판매로 짐작한 것. sched_history/<상품코드>/m<YYYY-MM> 에
+             { kind:'onsite', month, name, days, qty, orders, who, amt, done } 로 지난 달을 한 번 남긴다
+           · 과일(F 코드·과일 표시)은 넣지 않는다 (사장님 2026-10-05: 과일은 필요 없다)
+           · 준비 수량(일정 재고)은 남기지 않는다 (사장님: 필요 없다)
+           · 기록이 없는 옛 회차(이 기능 전)는 짐작한다: 주문 순서대로 보며, 앞 회차의 마지막 배달일 당일이나 그 뒤에
+             더 늦은 배달일 주문이 들어오면 새 회차로 본다 (est:true) */
+        let psHistQ = '', psHistSort = 'recent', psHistLimit = 60;   // 기본은 최근 일정 순
+        const psHistOpen = new Set(), psHistAll = new Set();
+        let psRoundLog = null;        // 서버의 회차 기록 { <상품코드>: { <회차번호>: 기록 } } — 못 읽었으면 null (그때는 쓰지 않는다)
+        let psSchedLoaded = false;    // 노출일정을 받았는지
+        function psHistISO(v) {
+            const m = String(v || '').match(/(\d{2,4})\s*[년.\-\/]\s*(\d{1,2})\s*[월.\-\/]\s*(\d{1,2})/);
+            if (!m) return '';
+            const y = m[1].length === 2 ? '20' + m[1] : m[1];
+            return `${y}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+        }
+        // 공동구매 상품인가 (날짜 상품 또는 사다드림, 과일 F 코드는 뺀다)
+        function psRoundIsGb(p) {
+            if (!p) return false;
+            const code = String(p.productCode || '').trim();
+            if (!code || /^F/i.test(code)) return false;
+            return psIsGroupProd(p) || isSadaListProduct(p);
+        }
+        function psRoundPickupOf(p) { return psIsGroupProd(p) ? psPickupKey(p) : (psHistISO(p.date) || ''); }
+        function psRoundLastPk(r) {
+            let m = '';
+            Object.keys(r.pickups || {}).forEach(k => { if (k > m) m = k; });
+            (r.o || []).forEach(x => { if (x.pk > m) m = x.pk; });
+            return m;
+        }
+        // 공동구매 주문을 상품코드별로 모은다 (시각 순)
+        const PS_ROUND_FROM = '2026-07-01';   // 회차 기록에 쓰는 주문의 시작일 (사장님 요청 — 7월부터)
+        function psRoundOrders() {
+            try { if (typeof salesArchiveLoaded !== 'undefined' && !salesArchiveLoaded && typeof loadSalesArchiveFromCache === 'function') loadSalesArchiveFromCache(); } catch (e) { }
+            const src = (typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : rawOrders) || [];
+            const by = new Map(), names = new Map();
+            /* [수정 2026-10-05] 표시 없는 옛 주문(7/1~8/14)은 주문 하나하나를 모양으로 가른다 (사장님: 지금 상품 상태로는 못 가른다 — 조건이 필요)
+               표시 있는 8/15 뒤 주문으로 시험한 결과: 상시판매는 거의 다 당일·다음날 받고(143건 중 135건), 공구는 72%가 2일 이상 먼저 받는다.
+               그래서 ① 배달·픽업일이 주문일보다 2일 이상 뒤 → 공구 (상시 8건 vs 공구 599건)
+                      ② 같은 상품·같은 배달일에 ①인 주문이 있다 → 공구 (그 날짜로 공구를 받고 있었다)
+                      ③ 같은 상품·같은 배달일에 손님이 2명 이상 → 공구 (상시판매는 각자 다른 날 받는다)
+                      나머지(당일·다음날 주문이고 그 배달일에 혼자) → 상시판매로 보고 뺀다. 시험 93.9% (지금 상품 상태는 안 본다) */
+            const pkInfo = new Map();   // 코드|배달일 → { early: ①인 주문 있음, who: 손님 }
+            const rows = [], onsite = new Map(), fruit = new Map();   // onsite: 코드 → 상시판매 주문 · fruit: 코드 → 과일 주문 (둘 다 달마다 묶는다)
+            // [신규 2026-10-05] 상품 코드가 안 붙은 주문(2026-09-10 하루 38건)은 상품 이름으로 코드를 찾는다 — 지금 상품 목록 먼저, 없으면 코드 있는 다른 주문
+            const normNm = v => String(v || '').replace(/\[취소\]/g, '').replace(/\s+/g, ' ').trim();
+            const nameCode = new Map();
+            src.forEach(o => { if (o && o.productCode && o.item) { const k = normNm(o.item); if (!nameCode.has(k)) nameCode.set(k, String(o.productCode).trim()); } });
+            (uploadProducts || []).forEach(p => { if (p && p.name && p.productCode) nameCode.set(normNm(p.name), String(p.productCode).trim()); });
+            src.forEach(o => {
+                if (!o || gIsFeeRow(o) || String(o.item || '') === '포인트 사용') return;
+                const raw = String(o.productCode || '').trim() || nameCode.get(normNm(o.item)) || '';
+                if (!raw) return;
+                // 표시가 있으면 공동구매·사다드림은 회차로, 상시판매(other)는 참고 자료로. 표시 없는 옛 주문(2026-08-15 전)은 일단 담고 아래에서 가른다
+                const isFruit = /^F/i.test(raw) || o.category === 'fruit';
+                const old = !o.category, onsiteTag = o.category === 'other';
+                const code = psSafeId(raw);
+                const pk = psHistISO(o.pickupDate);
+                const t = parseTimestampToDate(o.timestamp);
+                const ms = t && !isNaN(t.getTime()) && t.getFullYear() > 2000 ? t.getTime() : 0;
+                if (!pk || !ms) return;
+                if (fMsToDateKey(ms) < PS_ROUND_FROM) return;   // [신규 2026-10-05] 7월 주문부터만 (사장님 요청)
+                if (isSalesCanceled(o)) return;   // 취소된 주문은 세지 않는다
+                const od = fMsToDateKey(ms);
+                const who = (typeof gCustKey === 'function' ? gCustKey(o) : '') || String(o.phone || o.name || '');
+                const early = (new Date(pk + 'T12:00:00') - new Date(od + 'T12:00:00')) >= 2 * 86400000;
+                const k = code + '|' + pk, info = pkInfo.get(k) || { early: false, who: new Set() };
+                if (early) info.early = true; if (who) info.who.add(who); pkInfo.set(k, info);
+                if (isFruit) return;   // 과일은 넣지 않는다 (사장님)
+                rows.push({ code, nm: String(o.item || '').replace(/\[취소\]/g, '').trim(), ms, od, pk, old, onsiteTag, isFruit, early, q: parseInt(o.qty, 10) || 1, amt: parseInt(o.total, 10) || 0, who });
+            });
+            rows.forEach(x => {
+                if (x.isFruit) {   // 과일 — 달마다 묶는 자료로만
+                    if (x.nm) { const m = names.get(x.code) || new Map(); m.set(x.nm, (m.get(x.nm) || 0) + 1); names.set(x.code, m); }
+                    if (!fruit.has(x.code)) fruit.set(x.code, []);
+                    fruit.get(x.code).push(x);
+                    return;
+                }
+                let on = x.onsiteTag;
+                if (x.old) { const info = pkInfo.get(x.code + '|' + x.pk); if (!(x.early || (info && (info.early || info.who.size >= 2)))) on = true; }   // 옛 주문 — 상시판매로 짐작
+                if (x.nm) { const m = names.get(x.code) || new Map(); m.set(x.nm, (m.get(x.nm) || 0) + 1); names.set(x.code, m); }
+                const tgt = on ? onsite : by;
+                if (!tgt.has(x.code)) tgt.set(x.code, []);
+                tgt.get(x.code).push(x);
+            });
+            by.forEach(a => a.sort((x, y) => x.ms - y.ms));
+            return { by, names, onsite, fruit };
+        }
+        function psRoundStats(r) {
+            const days = {}, who = new Set(); let qty = 0, orders = 0, amt = 0;
+            (r.o || []).forEach(x => { days[x.pk] = (days[x.pk] || 0) + x.q; qty += x.q; orders += 1; amt += x.amt; if (x.who) who.add(x.who); });
+            return { days, qty, orders, who: who.size, amt };
+        }
+        /* 회차 계산: 서버 기록(진짜 회차) + 기록 밖 주문으로 짐작한 회차 → { code: { code, rounds[], names } }
+           주문 하나는 '그 시각 전에 시작한 가장 늦은 회차'에 넣는다. 기록된 회차(접수 중이거나 접수 끝 30분 안)면 그대로 넣고,
+           짐작 회차는 1주일 기준 하나로 나눈다 (사장님: 회차는 1주일) — 배달일이 회차 첫 배달일에서 7일 안이면 같은 회차, 7일 이상 뒤면 새 회차
+           옛 주문(7/1~8/14)이 공동구매인지는 psRoundOrders 에서 주문마다 가른다. 옛 주문만으로 된 회차는 old 로 표시한다 */
+        function psRoundCompute() {
+            const { by, names, onsite, fruit } = psRoundOrders();
+            const log = psRoundLog || {};
+            const schedPast = new Map();   // 코드 → 지난 노출일정 [{ rid, openAt, closeAt, pk }]
+            try {
+                const now = Date.now(), today = fMsToDateKey(now);
+                (typeof psAllItems === 'function' ? psAllItems() : []).forEach(it => {
+                    const p = uploadProducts[it.idx];
+                    const code = psSafeId(String(it.code || (p && p.productCode) || '').trim());
+                    const pk = psHistISO(typeof psItemPickup === 'function' ? psItemPickup(it) : it.pickup) || psHistISO(it.pickup);
+                    if (!code || !pk || !Number(it.releaseAt) || /^F/i.test(code)) return;
+                    const openAt = psOpenAt(it.releaseAt);
+                    if (openAt > now || pk >= today) return;   // 아직 안 올라갔거나 배달일이 안 지났다
+                    if (!schedPast.has(code)) schedPast.set(code, []);
+                    schedPast.get(code).push({ rid: it.rid, openAt, closeAt: Number(it.expireAt) || new Date(pk + 'T23:59:59').getTime(), pk });
+                });
+            } catch (e) { }
+            const codes = new Set([...by.keys(), ...Object.keys(log), ...schedPast.keys(), ...onsite.keys(), ...fruit.keys()]);
+            const out = {};
+            codes.forEach(code => {
+                const rs = Object.keys(log[code] || {}).map(rid => Object.assign({ rid, saved: true }, log[code][rid], { o: [] }))
+                    .filter(r => Number(r.openAt) > 0 && !r.kind).sort((a, b) => a.openAt - b.openAt);   // 달별 기록(kind 있음)은 회차가 아니다
+                (by.get(code) || []).forEach(x => {
+                    let i = rs.length - 1;
+                    while (i >= 0 && rs[i].openAt > x.ms) i--;
+                    const R = i >= 0 ? rs[i] : null;
+                    if (R) {
+                        const last = psRoundLastPk(R);
+                        const inWindow = (!R.est && !R.closeAt) || x.ms <= (Number(R.closeAt) || 0) + 30 * 60000;
+                        // [수정 2026-10-05] 짐작 회차는 1주일 기준 하나로 (사장님): 배달일이 회차 첫 배달일에서 7일 안이면 같은 회차, 7일 이상 뒤면 새 회차
+                        const firstPk = R.o.length ? R.o.reduce((m, y) => (y.pk < m ? y.pk : m), R.o[0].pk) : (Object.keys(R.pickups || {}).sort()[0] || last);
+                        const inWeek = !!firstPk && (new Date(x.pk + 'T12:00:00') - new Date(firstPk + 'T12:00:00')) < 7 * 86400000;
+                        if (inWindow || inWeek) { R.o.push(x); return; }
+                    }
+                    rs.splice(i + 1, 0, { rid: 'e' + x.ms, est: true, openAt: x.ms, pickups: {}, log: {}, o: [x] });
+                });
+                // [신규 2026-10-05] 지난 노출일정인데 주문이 하나도 없었으면 0개 팔린 회차로 둔다 (사장님: 판매가 없어도 공구 1회차)
+                //  앞으로는 psRoundWatch 가 노출될 때 바로 회차를 열어 두므로, 이 기능 전(10/2~) 일정만 여기서 채운다
+                (schedPast.get(code) || []).forEach(it => {
+                    const covered = rs.some(r => (r.pickups && r.pickups[it.pk]) || r.o.some(x => x.pk === it.pk) || (r.openAt <= it.openAt && (Number(r.closeAt) || Infinity) >= it.openAt));
+                    if (covered) return;
+                    rs.push({ rid: 's' + it.rid, est: true, sched: true, schedRid: it.rid, openAt: it.openAt, closeAt: it.closeAt, pickups: { [it.pk]: true }, log: {}, o: [] });
+                });
+                rs.sort((a, b) => a.openAt - b.openAt);
+                rs.forEach(r => {
+                    if (r.est && !r.saved && r.o.length && r.o.every(x => x.old)) r.old = true;
+                    r.lastPk = psRoundLastPk(r);
+                    const live = psRoundStats(r);
+                    // 확정한 회차는 남긴 숫자를 쓴다 (확정 뒤로는 고치지 않는다 · 보관함으로 간 주문이 안 보여도 그대로)
+                    r.stats = (r.done && r.stats) ? r.stats : live;
+                    r.live = live;
+                    if (r.est && r.o.length) { r.closeAt = r.closeAt || r.o[r.o.length - 1].ms; }
+                });
+                // 상시판매·과일 — 달마다 묶는다 (남긴 달은 남긴 숫자, 아니면 지금 주문으로). kind: 'onsite' 상시 · 'fruit' 과일
+                const mon = new Map();
+                [['onsite', onsite.get(code) || []], ['fruit', fruit.get(code) || []]].forEach(([kind, arr]) => arr.forEach(x => {
+                    const m = x.od.slice(0, 7), key = kind + '|' + m;
+                    const v = mon.get(key) || { kind, m, days: {}, qty: 0, orders: 0, amt: 0, whoSet: new Set(), old: true };
+                    v.days[x.od] = (v.days[x.od] || 0) + x.q; v.qty += x.q; v.orders += 1; v.amt += x.amt; if (x.who) v.whoSet.add(x.who); if (!x.old) v.old = false;
+                    mon.set(key, v);
+                }));
+                const months = [...mon.values()].map(v => ({ kind: v.kind, m: v.m, days: v.days, qty: v.qty, orders: v.orders, amt: v.amt, who: v.whoSet.size, old: v.old }));
+                Object.keys(log[code] || {}).forEach(k => {
+                    const v = log[code][k];
+                    if (!v || (v.kind !== 'onsite' && v.kind !== 'fruit') || !v.month) return;
+                    const i = months.findIndex(x => x.m === v.month && x.kind === v.kind);
+                    const rec = { kind: v.kind, m: v.month, days: v.days || {}, qty: Number(v.qty) || 0, orders: Number(v.orders) || 0, amt: Number(v.amt) || 0, who: Number(v.who) || 0, old: !!v.old, saved: true };
+                    if (i >= 0) months[i] = rec; else months.push(rec);
+                });
+                months.sort((a, b) => b.m.localeCompare(a.m) || a.kind.localeCompare(b.kind));
+                out[code] = { code, rounds: rs.filter(r => (r.stats && r.stats.qty > 0) || !r.est || r.sched), names: names.get(code) || new Map(), months };
+            });
+            return out;
+        }
+        async function psRoundLogLoad() {
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}sched_history.json?t=${Date.now()}`);
+                if (!r.ok) return false;
+                psRoundLog = (await r.json()) || {};
+                return true;
+            } catch (e) { console.warn('회차 기록을 못 읽었어요:', e); return false; }
+        }
+        async function psRoundPatch(patch) {
+            if (!Object.keys(patch).length) return true;
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}sched_history.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
+                if (!res.ok) { console.warn('회차 기록 저장 실패:', res.status); return false; }
+                // 내 사본에도 반영 ('코드/회차' 통째 또는 '코드/회차/칸')
+                Object.keys(patch).forEach(k => {
+                    const parts = k.split('/'), code = parts[0], rid = parts[1];
+                    const rec = ((psRoundLog[code] = psRoundLog[code] || {})[rid] = psRoundLog[code][rid] || {});
+                    if (parts.length === 2) psRoundLog[code][rid] = patch[k];
+                    else { let o = rec; for (let i = 2; i < parts.length - 1; i++) o = (o[parts[i]] = o[parts[i]] || {}); o[parts[parts.length - 1]] = patch[k]; }
+                });
+                return true;
+            } catch (e) { console.warn('회차 기록 저장 실패:', e); return false; }
+        }
+        function psRoundLogKey(ms) { let t = ms; while (psRoundLogKey._used.has(t)) t++; psRoundLogKey._used.add(t); return String(t); }
+        psRoundLogKey._used = new Set();
+        function psRoundHM(ms) { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
+        /* 노출 중인 공동구매 ↔ 열린 회차 맞추기 — 회차를 열고·닫고·바뀐 것을 적는다 */
+        async function psRoundWatch() {
+            if (psRoundLog === null || !psSchedLoaded || !(uploadProducts || []).length) return;
+            const now = Date.now(), today = fMsToDateKey(now), patch = {};
+            const vis = new Map();   // 코드 → 노출 중인 공동구매 상품들
+            (uploadProducts || []).forEach(p => {
+                if (!psRoundIsGb(p) || !gProdVisibleNow(p)) return;
+                { const k = psRoundPickupOf(p); if (k && k < today) return; }   // 배달일이 지났는데 아직 안 숨겨진 상품 — 접수 중이 아니다
+                const code = psSafeId(String(p.productCode).trim());
+                if (!vis.has(code)) vis.set(code, []);
+                vis.get(code).push(p);
+            });
+            let calc = null;
+            // 달별 상시 기록(m…, kind:'onsite')은 회차가 아니다 — 시작 시각이 있는 것만 회차로 본다
+            const isRound = r => !!r && Number(r.openAt) > 0 && !r.kind;
+            const openOf = code => Object.keys(psRoundLog[code] || {}).map(rid => Object.assign({ rid }, psRoundLog[code][rid])).filter(r => isRound(r) && !r.est && !r.closeAt);
+            // 1) 노출 중인 상품
+            vis.forEach((ps, code) => {
+                const pickups = {}; ps.forEach(p => { const k = psRoundPickupOf(p); if (k) pickups[k] = true; });
+                const schedRid = String(ps.map(p => p.schedRid || '').filter(Boolean)[0] || '');
+                const exp = Math.max(0, ...ps.map(p => Number(p.expireAt) || 0));
+                const shownAt = Math.max(0, ...ps.map(p => Number(p.shownAt) || 0));
+                const name = String(ps[0].name || '');
+                let open = openOf(code).sort((a, b) => b.openAt - a.openAt)[0];
+                let switchAt = 0;   // 노출일정의 다음 차례로 넘어간 시각
+                if (open && schedRid && open.schedRid && open.schedRid !== schedRid) {   // 노출일정의 다음 차례로 넘어갔다 → 앞 회차를 닫는다
+                    // [수정 2026-10-05] 닫는 시각 = 새 차례가 올라간 시각(그날 0시). 다른 기기가 먼저 올렸어도 그 사이 주문이 새 회차에 들어가게
+                    const nit = (typeof psItem === 'function') ? psItem(psKey(String(ps[0].sid || ''), schedRid)) : null;
+                    const at = nit && Number(nit.releaseAt) ? psOpenAt(nit.releaseAt) : 0;
+                    switchAt = (at > Number(open.openAt) && at <= now) ? at : now;
+                    patch[`${code}/${open.rid}/closeAt`] = switchAt;
+                    patch[`${code}/${open.rid}/log/${psRoundLogKey(switchAt)}`] = '다음 일정으로 넘어가 접수 끝';
+                    open = null;
+                }
+                if (open) {   // 같은 회차 — 바뀐 것만 적는다
+                    const a = Object.keys(open.pickups || {}).sort().join(','), b = Object.keys(pickups).sort().join(',');
+                    if (b && a !== b) {
+                        patch[`${code}/${open.rid}/pickups`] = pickups;
+                        patch[`${code}/${open.rid}/log/${psRoundLogKey(now)}`] = `배달·픽업일 ${a ? a.replace(/\d{4}-/g, '') : '없음'} → ${b.replace(/\d{4}-/g, '')}`;
+                    }
+                    if (exp && Number(open.closeSet || 0) !== exp) {
+                        if (open.closeSet) patch[`${code}/${open.rid}/log/${psRoundLogKey(now)}`] = `마감 ${psRoundHM(open.closeSet)} → ${psRoundHM(exp)}`;
+                        patch[`${code}/${open.rid}/closeSet`] = exp;
+                    }
+                    return;
+                }
+                // 열린 회차가 없다 — 배달·픽업일 전에 다시 노출한 것이면 앞 회차를 다시 연다
+                const recs = Object.keys(psRoundLog[code] || {}).map(rid => Object.assign({ rid }, psRoundLog[code][rid])).filter(r => isRound(r) && !r.est).sort((x, y) => y.openAt - x.openAt);
+                const prev = recs[0];
+                const prevLast = prev ? Object.keys(prev.pickups || {}).sort().pop() || '' : '';
+                if (!switchAt && prev && prev.closeAt && prevLast && prevLast >= today && (!schedRid || !prev.schedRid || prev.schedRid === schedRid) && !prev.done) {
+                    patch[`${code}/${prev.rid}/closeAt`] = null;
+                    patch[`${code}/${prev.rid}/log/${psRoundLogKey(now)}`] = '다시 노출 (배달·픽업일 전이라 같은 회차)';
+                    return;
+                }
+                // 새 회차 — 시작은 노출 시각. 노출 시각이 없거나 앞 회차보다 이르면, 지금 접수 중인 짐작 회차의 첫 주문 또는 지금
+                // [수정 2026-10-05] 앞 회차가 끝난 시각보다 뒤의 노출 시각만 쓴다 (잠깐 숨겼다 다시 켠 시각이 앞 회차 안에 있으면 안 쓴다)
+                const prevEnd = prev ? (Number(prev.closeAt) || switchAt || Number(prev.openAt) || 0) : 0;
+                let openAt = switchAt || ((shownAt && shownAt > prevEnd) ? shownAt : 0), note = switchAt ? '노출 (다음 일정 차례)' : '노출';
+                if (!openAt) {
+                    calc = calc || psRoundCompute();
+                    const c = calc[code], ongoing = c && c.rounds.filter(r => r.est && r.lastPk >= today).pop();
+                    if (ongoing) { openAt = ongoing.openAt; note = '노출 (시작 시각은 첫 주문으로 짐작)'; }
+                    else { openAt = now; note = '노출 (이 기록을 시작할 때 이미 노출 중)'; }
+                }
+                const rid = 'r' + openAt;
+                patch[`${code}/${rid}`] = { name, sid: String(ps[0].sid || ''), openAt, closeAt: null, closeSet: exp || null, pickups, schedRid: schedRid || null, log: { [psRoundLogKey(openAt)]: note } };
+            });
+            // 2) 열린 회차인데 상품이 숨겨졌다 → 닫는다
+            Object.keys(psRoundLog).forEach(code => {
+                if (vis.has(code)) return;
+                openOf(code).forEach(r => {
+                    patch[`${code}/${r.rid}/closeAt`] = now;
+                    patch[`${code}/${r.rid}/log/${psRoundLogKey(now)}`] = '숨김·마감으로 접수 끝';
+                });
+            });
+            if (Object.keys(patch).length) await psRoundPatch(patch);
+        }
+        /* 끝난 회차 숫자 확정 · 옛 회차(짐작) 남기기 — 한 번 확정한 회차는 다시 쓰지 않는다 */
+        async function psRoundSettle() {
+            if (psRoundLog === null) return;
+            try { if (typeof hydrateArchiveFromCache === 'function' && !(typeof salesArchiveLoaded !== 'undefined' && salesArchiveLoaded)) await hydrateArchiveFromCache(); } catch (e) { }
+            const archOk = typeof salesArchiveLoaded !== 'undefined' && salesArchiveLoaded;
+            const now = Date.now(), today = fMsToDateKey(now), lim9 = psAddDays(today, -9), patch = {};
+            const calc = psRoundCompute();
+            const curName = new Map();
+            (uploadProducts || []).forEach(p => { const c = psSafeId(String((p && p.productCode) || '').trim()); if (c && p.name && !curName.has(c)) curName.set(c, String(p.name)); });
+            Object.values(calc).forEach(c => {
+                const code = psSafeId(c.code);
+                const top = [...c.names.entries()].sort((a, b) => b[1] - a[1])[0];
+                const name = curName.get(code) || (top ? top[0] : '');
+                (c.months || []).forEach(mo => {
+                    if (mo.saved || mo.qty <= 0) return;
+                    if (mo.m >= today.slice(0, 7)) return;                 // 아직 이 달
+                    const [y, m] = mo.m.split('-').map(Number);
+                    const monthEnd = fMsToDateKey(new Date(y, m, 0, 12).getTime());
+                    if (!archOk && monthEnd < lim9) return;                 // 보관함으로 간 주문이 빠졌을 수 있다
+                    patch[`${code}/${mo.kind === 'fruit' ? 'f' : 'm'}${mo.m}`] = { kind: mo.kind, month: mo.m, name, days: mo.days, qty: mo.qty, orders: mo.orders, who: mo.who, amt: mo.amt, old: mo.old || null, done: true, doneAt: now };
+                });
+                c.rounds.forEach(r => {
+                    if (!r.lastPk || r.lastPk >= today) return;            // 배달·픽업일이 아직 안 지났다
+                    if (!r.est && !r.closeAt) return;                       // 아직 접수 중
+                    if (!archOk && r.lastPk < lim9) return;                 // 보관함으로 간 주문이 빠졌을 수 있다
+                    if (r.done) return;   // 이미 확정했다
+                    {
+                        if (r.live.qty <= 0 && !r.saved && !r.sched) return;   // 짐작 회차는 팔린 게 있어야 남긴다 (일정 회차·기록 회차는 0개여도 남긴다)
+                        if (r.saved) {
+                            patch[`${code}/${r.rid}/stats`] = r.live; patch[`${code}/${r.rid}/done`] = true; patch[`${code}/${r.rid}/doneAt`] = now;
+                        } else {
+                            const pickups = {}; Object.keys(r.live.days).forEach(k => { pickups[k] = true; });
+                            if (r.sched) Object.keys(r.pickups || {}).forEach(k => { pickups[k] = true; });
+                            patch[`${code}/${r.rid}`] = { name, openAt: r.openAt, closeAt: r.closeAt || null, pickups, est: true, old: r.old || null, sched: r.sched || null, schedRid: r.schedRid || null, log: {}, stats: r.live, done: true, doneAt: now };
+                        }
+                    }
+                });
+            });
+            if (Object.keys(patch).length) {
+                if (await psRoundPatch(patch)) console.log(`📊 회차 기록 ${Object.keys(patch).length}곳을 적었어요`);
+            }
+        }
+        // 주문·상품이 바뀔 때마다 부른다 (모아서 한 번). 처음엔 기록을 읽고, 못 읽으면 아무것도 쓰지 않는다
+        let psRoundTimer = null, psRoundBusy = false, psRoundLoadTried = 0;
+        function psRoundTick() {
+            clearTimeout(psRoundTimer);
+            psRoundTimer = setTimeout(async () => {
+                if (psRoundBusy) return psRoundTick();
+                if (!psSchedLoaded || !Array.isArray(rawOrders) || !rawOrders.length || !(uploadProducts || []).length) return;
+                psRoundBusy = true;
+                try {
+                    if (psRoundLog === null) {
+                        if (psRoundLoadTried >= 3) return;
+                        psRoundLoadTried++;
+                        if (!(await psRoundLogLoad())) return;
+                    }
+                    await psRoundWatch();
+                    await psRoundSettle();
+                    if (psViewMode === 'hist' && document.getElementById('ps-hist-list')) { window.__psHist = psHistBuild(); psHistPaintList(); }
+                } catch (e) { console.warn('회차 기록 처리 실패:', e); }
+                finally { psRoundBusy = false; }
+            }, 3000);
+        }
+        // 📊 상품별 기록 목록
+        function psHistBuild() {
+            const calc = psRoundCompute();
+            const upcoming = new Map();   // 코드 → 가장 가까운 앞으로의 배달일 (노출일정)
+            const today = fMsToDateKey(Date.now());
+            (typeof psAllItems === 'function' ? psAllItems() : []).forEach(it => {
+                const p = uploadProducts[it.idx];
+                const code = psSafeId(String(it.code || (p && p.productCode) || '').trim());
+                const pk = psHistISO(typeof psItemPickup === 'function' ? psItemPickup(it) : it.pickup) || psHistISO(it.pickup);
+                if (!code || !pk) return;
+                if (pk >= today && (!upcoming.has(code) || pk < upcoming.get(code))) upcoming.set(code, pk);
+            });
+            const curName = new Map();
+            (uploadProducts || []).forEach(p => { const c = psSafeId(String((p && p.productCode) || '').trim()); if (c && p.name && !curName.has(c)) curName.set(c, String(p.name)); });
+            const dayMs = 86400000, nowMs = Date.now();
+            const list = [];
+            Object.values(calc).forEach(c => {
+                const code = psSafeId(c.code);
+                const rounds = c.rounds.filter(r => r.stats.qty > 0 || !r.est || r.sched);   // [수정 2026-10-05] 기록된 회차·일정 회차는 0개 팔렸어도 1회차 (사장님 요청)
+                const months = c.months || [];
+                if (!rounds.length && !months.length) return;
+                rounds.forEach(r => {
+                    const days = Object.keys(r.stats.days).sort().map(pk => ({ pk, qty: r.stats.days[pk] }));
+                    const plan = Object.keys(r.pickups || {}).sort();
+                    r.days = days;
+                    // 회차 날짜: 올린 배달·픽업일, 없으면(짐작) 가장 많이 판 날
+                    r.pk = plan[0] || (days.slice().sort((a, b) => b.qty - a.qty || a.pk.localeCompare(b.pk))[0] || {}).pk || fMsToDateKey(r.openAt);
+                });
+                /* [신규 2026-10-05] 회차 뒤 상시판매 (사장님 요청 — 공구 끝나고 남은 것을 상시로 판 개수를 앞 회차에 붙여 본다)
+                   이 회차 마지막 배달일부터 다음 회차 마지막 배달일 전까지 상시판매로 판 개수. 달별 기록의 날짜별 개수에서 센다 (보관함으로 가도 남아 있게).
+                   공구 개수에는 더하지 않는다 */
+                const dayQ = {};
+                months.filter(mo => mo.kind !== 'fruit').forEach(mo => Object.keys(mo.days || {}).forEach(d => { dayQ[d] = (dayQ[d] || 0) + (Number(mo.days[d]) || 0); }));
+                const asc = rounds.slice().sort((a, b) => (a.lastPk || fMsToDateKey(a.openAt)).localeCompare(b.lastPk || fMsToDateKey(b.openAt)));
+                asc.forEach((r, i) => {
+                    const from = r.lastPk || fMsToDateKey(r.openAt);
+                    const to = asc[i + 1] ? (asc[i + 1].lastPk || fMsToDateKey(asc[i + 1].openAt)) : '9999-12-31';
+                    r.after = Object.keys(dayQ).filter(d => d >= from && d < to).reduce((a, d) => a + dayQ[d], 0);
+                });
+                rounds.sort((a, b) => b.openAt - a.openAt);
+                const lastPosted = rounds.length ? rounds[0].openAt : 0;
+                const pks = rounds.slice(0, 7).map(r => r.openAt);
+                const gaps = []; for (let i = 0; i + 1 < pks.length; i++) gaps.push(Math.round((pks[i] - pks[i + 1]) / dayMs));
+                gaps.sort((a, b) => a - b);
+                const gap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : null;
+                const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+                const done = rounds.filter(r => r.est || r.closeAt);
+                const recent = done.slice(0, 3).map(r => r.stats.qty), before = done.slice(3, 6).map(r => r.stats.qty);
+                const avgQty = Math.round(avg(recent));
+                const trend = (recent.length && before.length) ? (avg(recent) >= avg(before) * 1.15 ? 'up' : (avg(recent) <= avg(before) * 0.85 ? 'down' : 'flat')) : '';
+                const top = [...c.names.entries()].sort((a, b) => b[1] - a[1])[0];
+                const savedName = rounds.map(r => r.name).find(Boolean);
+                list.push({
+                    code, cur: curName.has(code), name: curName.get(code) || (top ? top[0] : '') || savedName || code, rounds,
+                    lastPosted, idleDays: lastPosted ? Math.floor((nowMs - lastPosted) / dayMs) : null,
+                    gap, avgQty, trend, total: rounds.reduce((x, r) => x + r.stats.qty, 0), next: upcoming.get(code) || '',
+                    months, onsiteTotal: months.reduce((x, mo) => x + mo.qty, 0)
+                });
+            });
+            // [신규 2026-10-05] 7월 뒤 판매 기록이 없는 지금 상품도 '기록 없음'으로 넣는다 (사장님: 그래야 자료가 맞다). 과일은 그대로 뺀다
+            const have = new Set(list.map(x => x.code));
+            curName.forEach((name, code) => {
+                if (have.has(code) || /^F/i.test(code)) return;   // 과일은 목록에도 넣지 않는다
+                have.add(code);
+                list.push({ code, cur: true, name, rounds: [], months: [], lastPosted: 0, idleDays: null, gap: null, avgQty: 0, trend: '', total: 0, next: upcoming.get(code) || '', onsiteTotal: 0, empty: true });
+            });
+            return list;
+        }
+        function dayOfKey(k) { return new Date(k + 'T12:00:00').getTime(); }
+        function psHistMD(ms) { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()}`; }
+        function psHistMDH(ms) { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}시`; }
+        function psHistPkLabel(pk) { const d = new Date(pk + 'T12:00:00'); return `${d.getMonth() + 1}/${d.getDate()} (${'일월화수목금토'[d.getDay()]})`; }
+        function psHistRowsHtml() {
+            const E = gEscapeHtml;
+            let list = window.__psHist || [];
+            const q = psHistQ.trim().toLowerCase();
+            if (q) list = list.filter(x => x.name.toLowerCase().includes(q) || x.code.toLowerCase().includes(q));
+            else list = list.filter(x => x.cur);   // [신규 2026-10-05] 평소엔 지금 상품 목록에 있는 것만 — 옛 상품은 찾기로
+            const by = {
+                idle: (a, b) => (!!a.next - !!b.next) || ((b.idleDays ?? -1) - (a.idleDays ?? -1)),   // 앞으로 일정이 없는 것 먼저, 오래 안 올린 순
+                sold: (a, b) => b.total - a.total,
+                recent: (a, b) => ((b.rounds[0] && b.rounds[0].pk) || (b.months[0] && b.months[0].m) || '').localeCompare((a.rounds[0] && a.rounds[0].pk) || (a.months[0] && a.months[0].m) || ''),
+                name: (a, b) => a.name.localeCompare(b.name, 'ko')
+            }[psHistSort] || ((a, b) => 0);
+            list = list.slice().sort(by);
+            if (!list.length) return `<div class="ps-h-empty">${q ? '찾는 상품이 없어요.' : '공동구매 기록이 없어요.'}</div>`;
+            const shown = list.slice(0, psHistLimit);
+            const tr = { up: '<span class="ps-h-up">▲ 늘어남</span>', down: '<span class="ps-h-down">▼ 줄어듦</span>', flat: '<span class="ps-h-flat">비슷</span>' };
+            return shown.map(x => {
+                const open = psHistOpen.has(x.code);
+                const idle = x.idleDays === null ? '' : (x.idleDays <= 0 ? '오늘' : `${x.idleDays}일 전`);
+                const r0 = x.rounds[0], m0 = x.months[0];
+                const d0 = r0 ? new Date(r0.pk + 'T12:00:00') : null;
+                const dateBox = d0 ? `<div class="ps-h-date"><b>${d0.getMonth() + 1}/${d0.getDate()}</b><span>${'일월화수목금토'[d0.getDay()]}${r0.pk.slice(0, 4) !== String(new Date().getFullYear()) ? ` ${r0.pk.slice(2, 4)}년` : ''}</span></div>`
+                    : (m0 ? `<div class="ps-h-date"><b>${parseInt(m0.m.slice(5), 10)}월</b><span>상시</span></div>` : '');   // 공구 기록이 없으면 상시판매 마지막 달
+                const head = `<div class="ps-h-row${open ? ' open' : ''}" onclick="psHistToggle('${E(x.code)}')">
+                    ${dateBox}
+                    <div class="ps-h-main">
+                        <div class="ps-h-name">${E(x.name)} <span class="ps-h-code">${E(x.code)}</span>${x.cur ? '' : ' <span class="ps-h-dim">· 지금 목록에 없음</span>'}</div>
+                        <div class="ps-h-sub">
+                            ${x.rounds.length ? `<span>마지막으로 올린 날 <b>${x.lastPosted ? psHistMD(x.lastPosted) : '—'}</b>${idle ? ` (${idle})` : ''}</span>
+                            <span>${x.rounds.length}회</span>` : (x.empty ? '<span class="ps-h-dim">7월 뒤 판매 기록 없음</span>' : '<span class="ps-h-dim">공구 기록 없음</span>')}
+                            ${x.onsiteTotal ? `<span class="ps-h-dim">${x.months.every(mo => mo.kind === 'fruit') ? '과일' : '상시'} ${x.onsiteTotal}개</span>` : ''}
+                            ${x.avgQty ? `<span>최근 평균 <b>${x.avgQty}개</b></span>` : ''}
+                            ${x.gap ? `<span>보통 <b>${x.gap}일</b>마다</span>` : ''}
+                            ${x.trend ? tr[x.trend] : ''}
+                        </div>
+                    </div>
+                    <span class="ps-h-chip${x.next ? ' on' : ''}">${x.next ? `일정 ${psHistPkLabel(x.next)}` : '일정 없음'}</span>
+                </div>`;
+                if (!open) return head;
+                const all = psHistAll.has(x.code);
+                const rs = all ? x.rounds : x.rounds.slice(0, 10);
+                const rows = rs.map(r => {
+                    const S = r.stats;
+                    // 접수 기간: 기록된 회차는 노출 ~ 접수 끝, 짐작 회차는 첫 주문 ~ 마지막 주문
+                    const when = r.sched ? `<span class="ps-h-dim">일정 · ${psHistMDH(r.openAt)} ~ ${psHistMDH(r.closeAt || r.openAt)}</span>`
+                        : r.est ? `<span class="ps-h-dim">${r.old ? '짐작(옛 주문)' : '짐작'} · 주문 ${psHistMDH(r.openAt)} ~ ${psHistMDH(r.closeAt || r.openAt)}</span>`
+                        : `${psHistMDH(r.openAt)} ~ ${r.closeAt ? psHistMDH(r.closeAt) : '<b class="ps-h-live">접수 중</b>'}`;
+                    const days = r.days || [];
+                    const dayTxt = days.length > 1 || (days[0] && days[0].pk !== r.pk) ? `<div class="ps-h-dim">${days.map(d => `${psHistMD(dayOfKey(d.pk))} ${d.qty}개`).join(' · ')}</div>` : '';
+                    const logs = Object.keys(r.log || {}).sort().map(k => `${psHistMDH(Number(k))} ${E(String(r.log[k]))}`);
+                    const logTxt = logs.length ? `<tr class="ps-h-logrow"><td colspan="5">${logs.join(' · ')}</td></tr>` : '';
+                    return `<tr><td class="ps-h-pk">${psHistPkLabel(r.pk)}${r.pk.slice(0, 4) !== String(new Date().getFullYear()) ? ` <span class="ps-h-dim">${r.pk.slice(2, 4)}년</span>` : ''}${dayTxt}</td>
+                        <td>${when}</td><td class="num"><b>${S.qty}개</b>${r.after ? `<div class="ps-h-dim" title="이 회차 배달일부터 다음 회차 배달일 전까지 상시판매로 판 개수">그 뒤 상시 ${r.after}</div>` : ''}</td><td class="num">${S.who}명</td><td class="num">${S.amt.toLocaleString()}원</td></tr>${logTxt}`;
+                }).join('');
+                const curY = String(new Date().getFullYear());
+                // [수정 2026-10-05] 공구 기록 없는 상품은 달마다 판매량만 한 줄로 (사장님 요청)
+                const monLineOf = kind => x.months.filter(mo => mo.kind === kind).map(mo => `${mo.m.slice(0, 4) !== curY ? mo.m.slice(2, 4) + '년 ' : ''}${parseInt(mo.m.slice(5), 10)}월 <b>${mo.qty}개</b>${mo.old ? '<span class="ps-h-dim">(짐작)</span>' : ''}`).join(' · ');
+                const monBlocks = [['onsite', '상시판매'], ['fruit', '과일']].map(([k, label]) => { const line = monLineOf(k); return line ? `<div class="ps-h-on"><b>${label}</b> <span class="ps-h-dim">달마다 판매량</span></div><div style="font-size:12.5px; font-weight:700; color:#334155; line-height:1.7;">${line}</div>` : ''; }).join('');
+                return head + `<div class="ps-h-card">
+                    ${x.rounds.length ? `<div class="ps-h-tbl"><table>
+                        <thead><tr><th>회차 (배달·픽업일)</th><th>접수 기간</th><th class="num">팔림</th><th class="num">손님</th><th class="num">금액</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table></div>` : ''}
+                    ${!all && x.rounds.length > 10 ? `<button type="button" class="ps-h-more" onclick="event.stopPropagation(); psHistShowAll('${E(x.code)}')">지난 회차 ${x.rounds.length - 10}개 더 보기</button>` : ''}
+                    ${x.months.length && !x.rounds.length ? monBlocks : ''}
+                    ${x.empty ? '<div class="ps-h-dim" style="padding:4px 2px;">2026년 7월 1일 뒤로 판 기록이 없어요.</div>' : ''}
+                    <div class="ps-h-note">회차 = 노출해서 접수를 받은 기간의 공동구매·사다드림 주문 (배달일은 달라도 한 회차). 과일은 뺐고, 상시판매는 회차로 안 묶고 달마다 세요. '짐작'은 기록을 시작하기 전 회차라 주문 시각으로 나눈 거예요. '짐작(옛 주문)'은 공동구매 표시가 없던 7/1~8/14 주문이라 공동구매인지도 주문 모양(2일 이상 먼저 받음 · 같은 배달일에 여럿)으로 짐작이에요 (약 94% 맞음). 회차의 '그 뒤 상시'는 그 회차 배달일부터 다음 회차 배달일 전까지 상시판매로 판 개수예요 (공구 개수에는 안 더함). 공구 기록이 없는 상품만 상시판매를 달마다 참고로 보여요. 7/1~8/14 상시판매는 짐작이에요.</div>
+                </div>`;
+            }).join('') + (list.length > shown.length ? `<button type="button" class="ps-h-more" onclick="psHistMore()">상품 ${list.length - shown.length}개 더 보기</button>` : '');
+        }
+        function psHistHtml() {
+            if (psRoundLog === null) psRoundTick();   // 회차 기록을 아직 못 읽었으면 읽어 와서 다시 그린다
+            window.__psHist = psHistBuild();
+            const n = window.__psHist.filter(x => x.cur && x.rounds.length).length, nOn = window.__psHist.filter(x => x.cur && !x.rounds.length && !x.empty).length, nEmpty = window.__psHist.filter(x => x.cur && x.empty).length;
+            const sortOpt = [['recent', '최근 일정 순'], ['idle', '오래 안 올린 순'], ['sold', '많이 팔린 순'], ['name', '이름 순']]
+                .map(([v, l]) => `<option value="${v}"${psHistSort === v ? ' selected' : ''}>${l}</option>`).join('');
+            return `<div class="ps-h-wrap">
+                <div class="ps-h-top">
+                    <b>📊 판매기록</b> <span class="ps-h-dim">지금 목록의 공동구매 상품 ${n}개${nOn ? ` · 상시판매만 ${nOn}개` : ''}${nEmpty ? ` · 기록 없음 ${nEmpty}개` : ''} · 누르면 회차별 판매 · 옛 상품은 찾기로</span>
+                </div>
+                <div class="ps-h-ctl">
+                    <input type="text" id="ps-hist-q" value="${gEscapeHtml(psHistQ)}" placeholder="🔍 상품 이름·코드" oninput="psHistSearch(this.value)">
+                    <select id="ps-hist-sort" onchange="psHistSetSort(this.value)">${sortOpt}</select>
+                </div>
+                <div id="ps-hist-list">${psHistRowsHtml()}</div>
+            </div>`;
+        }
+        function psHistPaintList() { const el = document.getElementById('ps-hist-list'); if (el) el.innerHTML = psHistRowsHtml(); }
+        function psHistSearch(v) { psHistQ = String(v || ''); psHistLimit = 60; psHistPaintList(); }
+        function psHistSetSort(v) { psHistSort = v; psHistPaintList(); }
+        function psHistToggle(code) { if (psHistOpen.has(code)) psHistOpen.delete(code); else psHistOpen.add(code); psHistPaintList(); }
+        function psHistShowAll(code) { psHistAll.add(code); psHistPaintList(); }
+        function psHistMore() { psHistLimit += 60; psHistPaintList(); }
+
         function psListHtml() {
             const now = Date.now();
             const keys = psAllItems().filter(it => !(Number(it.expireAt) && now >= Number(it.expireAt) && !psIsActive(it)) && !(Number(it.expireAt) && now >= Number(it.expireAt) + 3 * 86400000))
@@ -28001,6 +28580,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             el.after(box);
         }
         function renderProductsList() {
+            try { psRoundTick(); } catch (e) { }   // [신규 2026-10-05] 상품 목록이 바뀌면 공동구매 회차(노출·숨김·바뀜)를 맞춘다
             const container = document.getElementById('products-list-container');
             container.innerHTML = '';
 
