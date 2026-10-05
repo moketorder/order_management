@@ -3474,14 +3474,371 @@
                 
                 <!-- 하위 카테고리 탭 (발주 등록 / 발주 목록) -->
                 <div class="sub-tabs-container no-print" style="margin-bottom: 3px; padding: 0;">
-                    <div class="segment-control four-cols" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
+                    <div class="segment-control five-cols" style="display: grid; grid-template-columns: repeat(5, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
                         <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-link" onclick="switchPurchaseSubTab('link')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🔗 코드 관리</div>
                         <!-- [신규] 품목 분석 — 재고 점검과 잘 나가는 품목을 한 자리에 둔다 -->
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-check" onclick="switchPurchaseSubTab('check')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 품목 분석</div>
+                        <!-- [신규] 소싱 — 공급 밴드 상품·카톡 취합·주간 식단표 -->
+                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-sourcing" onclick="switchPurchaseSubTab('sourcing')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🛒 소싱</div>
                     </div>
                 </div>
+
+                <!-- [신규] 하위 섹션 5: 🛒 소싱 — 공급 밴드 상품·카톡 업체 취합·주간 식단표
+                     자료는 PC(밴드정리 폴더)가 매일 DB의 sourcing/ 아래에 올린다.
+                       sourcing/meta            올린 시각
+                       sourcing/band/<번호>      밴드 상품 (짧은 칸 이름: d 게시일, v 업체, n 상품명, s 점수 …)
+                       sourcing/kakao/<순번>     카톡 업체 상품
+                       sourcing/lineup/<주시작일> 금요일마다 짜는 다음 주 요일별 구성
+                     사장님이 고른 것은 여기서 바로 DB에 저장한다.
+                       sourcing/picks/<주시작일>/<요일순서>  식단표에서 고른 상품 (이 상품 / 1~3순위)
+                       sourcing/direct/<번호>               밴드 상품 목록에서 직접 판매 표시한 상품
+                     금요일 구성을 짤 때 최근 4주 안에 고른 상품은 다시 추천하지 않는다. -->
+                <div id="purchase-section-sourcing" class="purchase-sub-section" style="display: none;">
+                    <style>
+                        #purchase-section-sourcing { --src-line:#e2e8f0; --src-sub:#64748b; --src-acc:#0f766e; --src-acc-soft:#e6f4f1; --src-pick:#fef3c7; --src-pick-ink:#92400e; --src-up:#15803d; --src-down:#b91c1c; }
+                        #purchase-section-sourcing .src-top { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin:6px 0 10px; }
+                        #purchase-section-sourcing .src-seg { display:inline-flex; background:#e2e8f0; padding:3px; border-radius:10px; gap:3px; }
+                        #purchase-section-sourcing .src-seg button { border:none; background:transparent; padding:8px 14px; border-radius:8px; font-weight:800; font-size:13px; color:#475569; cursor:pointer; font-family:inherit; }
+                        #purchase-section-sourcing .src-seg button.on { background:#fff; color:var(--src-acc); box-shadow:0 1px 3px rgba(0,0,0,.1); }
+                        #purchase-section-sourcing .src-meta { font-size:12px; color:var(--src-sub); font-weight:700; display:flex; gap:8px; align-items:center; }
+                        #purchase-section-sourcing .src-btn { border:1.5px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; padding:5px 10px; font-size:12px; font-weight:800; cursor:pointer; font-family:inherit; }
+                        #purchase-section-sourcing .src-bar { display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; background:#fff; border:1px solid var(--src-line); border-radius:12px; padding:10px 12px; margin-bottom:10px; font-size:13px; }
+                        #purchase-section-sourcing .src-bar b { font-variant-numeric:tabular-nums; }
+                        #purchase-section-sourcing .src-bar .k { color:var(--src-sub); font-size:12px; font-weight:700; }
+                        #purchase-section-sourcing select, #purchase-section-sourcing input[type=search], #purchase-section-sourcing input[type=date] { height:34px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 8px; font-size:13px; font-weight:700; font-family:inherit; background:#fff; color:#0f172a; }
+                        #purchase-section-sourcing input[type=search] { min-width:180px; flex:1 1 180px; }
+                        /* 식단표: 같은 순번 카드끼리 한 줄에 서서 높이가 같다 */
+                        #purchase-section-sourcing .src-board { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px 10px; align-items:stretch; }
+                        #purchase-section-sourcing .src-cell { grid-row:var(--r); grid-column:var(--c); min-width:0; }
+                        #purchase-section-sourcing .src-dayhead { border-bottom:2px solid #0f172a; padding-bottom:5px; }
+                        #purchase-section-sourcing .src-dayhead .d { font-size:18px; font-weight:900; display:flex; gap:6px; align-items:baseline; }
+                        #purchase-section-sourcing .src-dayhead .d span { font-size:12px; color:var(--src-sub); font-weight:700; font-variant-numeric:tabular-nums; }
+                        #purchase-section-sourcing .src-dayhead .t, #purchase-section-sourcing .src-dayhead .w { font-size:11.5px; color:var(--src-sub); font-weight:700; }
+                        #purchase-section-sourcing .src-card { height:100%; box-sizing:border-box; background:#fff; border:1px solid var(--src-line); border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:6px; min-width:0; }
+                        #purchase-section-sourcing .src-card.picked { border-color:var(--src-acc); box-shadow:inset 0 0 0 1px var(--src-acc); }
+                        #purchase-section-sourcing .src-row { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+                        #purchase-section-sourcing .src-no { font-weight:900; color:var(--src-acc); font-size:12px; }
+                        #purchase-section-sourcing .src-chip { font-size:10.5px; padding:1px 7px; border-radius:999px; background:var(--src-acc-soft); color:var(--src-acc); font-weight:800; white-space:nowrap; }
+                        #purchase-section-sourcing .src-chip.pick { background:var(--src-pick); color:var(--src-pick-ink); }
+                        #purchase-section-sourcing .src-score { margin-left:auto; font-weight:900; font-size:12.5px; font-variant-numeric:tabular-nums; }
+                        #purchase-section-sourcing .src-name { font-weight:900; font-size:14px; line-height:1.35; overflow-wrap:anywhere; color:#0f172a; }
+                        #purchase-section-sourcing .src-vendor { font-size:11.5px; color:var(--src-sub); font-weight:700; }
+                        #purchase-section-sourcing .src-price { font-size:12.5px; font-variant-numeric:tabular-nums; display:flex; flex-wrap:wrap; gap:2px 8px; }
+                        #purchase-section-sourcing .src-price .m { color:var(--src-acc); font-weight:800; }
+                        #purchase-section-sourcing .src-mx { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px 8px; font-size:11.5px; font-variant-numeric:tabular-nums; }
+                        #purchase-section-sourcing .src-mx span { color:var(--src-sub); }
+                        #purchase-section-sourcing .up { color:var(--src-up); font-weight:800; }
+                        #purchase-section-sourcing .down { color:var(--src-down); font-weight:800; }
+                        #purchase-section-sourcing .src-why { font-size:12px; border-top:1px dashed var(--src-line); padding-top:6px; color:#334155; overflow-wrap:anywhere; }
+                        #purchase-section-sourcing .src-alts { margin:0; padding-left:16px; font-size:12px; display:flex; flex-direction:column; gap:2px; }
+                        #purchase-section-sourcing .src-alts li.chosen { background:var(--src-pick); color:var(--src-pick-ink); font-weight:800; border-radius:4px; padding:0 3px; }
+                        #purchase-section-sourcing .src-picks { margin-top:auto; display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:4px; }
+                        #purchase-section-sourcing .src-picks button { height:30px; border:1.5px solid #cbd5e1; background:#fff; border-radius:7px; font-size:11.5px; font-weight:900; color:#475569; cursor:pointer; font-family:inherit; padding:0 2px; }
+                        #purchase-section-sourcing .src-picks button.on { background:var(--src-acc); border-color:var(--src-acc); color:#fff; }
+                        #purchase-section-sourcing .src-picks button:disabled { opacity:.35; cursor:default; }
+                        #purchase-section-sourcing .src-link { font-size:11.5px; color:var(--src-acc); font-weight:800; text-decoration:none; }
+                        #purchase-section-sourcing .src-empty { border:1px dashed var(--src-line); border-radius:12px; height:100%; box-sizing:border-box; padding:10px; font-size:12px; color:var(--src-sub); }
+                        #purchase-section-sourcing .src-none { padding:30px 10px; text-align:center; color:var(--src-sub); font-weight:700; background:#fff; border-radius:12px; border:1px solid var(--src-line); }
+                        /* 목록 표 */
+                        #purchase-section-sourcing .src-tablewrap { overflow-x:auto; background:#fff; border:1px solid var(--src-line); border-radius:12px; }
+                        #purchase-section-sourcing table { border-collapse:collapse; width:100%; font-size:12.5px; }
+                        #purchase-section-sourcing th { position:sticky; top:0; background:#f8fafc; color:#475569; font-weight:800; text-align:left; padding:8px 6px; white-space:nowrap; border-bottom:1px solid var(--src-line); cursor:pointer; }
+                        #purchase-section-sourcing td { padding:7px 6px; border-bottom:1px solid #f1f5f9; vertical-align:top; font-variant-numeric:tabular-nums; }
+                        #purchase-section-sourcing td.nm { min-width:180px; max-width:320px; font-weight:800; color:#0f172a; }
+                        #purchase-section-sourcing td.nm a { color:inherit; text-decoration:none; }
+                        #purchase-section-sourcing td.nm a:hover { text-decoration:underline; }
+                        #purchase-section-sourcing td.raw { min-width:220px; max-width:420px; color:#475569; font-size:11.5px; }
+                        #purchase-section-sourcing td.r, #purchase-section-sourcing th.r { text-align:right; }
+                        #purchase-section-sourcing tr.sold td { background:#fffbeb; }
+                        #purchase-section-sourcing .src-sold { border:1.5px solid #cbd5e1; background:#fff; border-radius:7px; font-size:11.5px; font-weight:900; padding:3px 8px; cursor:pointer; white-space:nowrap; font-family:inherit; color:#475569; }
+                        #purchase-section-sourcing .src-sold.on { background:var(--src-pick); border-color:#f59e0b; color:var(--src-pick-ink); }
+                        #purchase-section-sourcing .src-more { display:block; margin:10px auto; }
+                        @media (max-width: 900px) {
+                            #purchase-section-sourcing .src-board { grid-template-columns:minmax(0,1fr); }
+                            #purchase-section-sourcing .src-cell { grid-row:auto; grid-column:auto; order:var(--o); }
+                            #purchase-section-sourcing .src-dayhead { margin-top:8px; }
+                            #purchase-section-sourcing .src-empty.fill { display:none; }
+                        }
+                    </style>
+
+                    <div class="src-top">
+                        <div class="src-seg" role="tablist">
+                            <button type="button" data-src-tab="lineup" class="on" onclick="srcTab('lineup')">🗓 식단표</button>
+                            <button type="button" data-src-tab="band" onclick="srcTab('band')">📦 밴드 상품</button>
+                            <button type="button" data-src-tab="kakao" onclick="srcTab('kakao')">💬 카톡 취합</button>
+                        </div>
+                        <div class="src-meta"><span id="src-updated">불러오는 중…</span><button type="button" class="src-btn" onclick="srcLoad(true)">↻ 새로고침</button></div>
+                    </div>
+                    <div id="src-view"></div>
+                </div>
+
+                <script>
+                /* ================= [신규] 🛒 소싱 (발주관리 하위) =================
+                   밴드 상품·카톡 취합·주간 식단표를 DB(sourcing/)에서 읽어 보여 주고,
+                   식단표에서 고른 상품과 밴드 목록에서 판매 표시한 상품을 DB에 바로 저장한다. */
+                const SRC_DAYS = ['월', '화', '수', '목', '금'];
+                const SRC_THEME = { '월': '국·탕·찌개 · 밥 · 면', '화': '생고기 · 수산물 · 채소', '수': '분식 · 간식 · 과자', '목': '반찬·김치 · 유제품 · 양념', '금': '양념고기 · 해물 · 야식' };
+                const SRC_PICKS = ['이 상품', '1순위', '2순위', '3순위'];
+                const gSrc = {
+                    tab: 'lineup', loaded: false, meta: null, lineup: {}, picks: {}, direct: {},
+                    band: null, kakao: null, week: '',
+                    bandQ: { q: '', vendor: '', cat: '', sort: 's', dir: -1, soldOnly: false, limit: 100 },
+                    kakaoQ: { q: '', vendor: '', sort: 'd', dir: -1, limit: 100 }
+                };
+                const srcEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+                const srcWon = v => v ? Number(v).toLocaleString('ko-KR') + '원' : '';
+                const srcNum = v => { const m = String(v == null ? '' : v).replace(/,/g, '').match(/-?\d+(\.\d+)?/); if (!m) return null; let n = +m[0]; if (/만/.test(String(v))) n *= 10000; return n; };
+                const srcTrend = v => !v ? '–' : String(v).indexOf('↑') >= 0 ? '<b class="up">' + srcEsc(v) + '</b>' : String(v).indexOf('↓') >= 0 ? '<b class="down">' + srcEsc(v) + '</b>' : srcEsc(v);
+                const srcToday = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+                function srcMonday(iso) {
+                    const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+                    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                }
+                async function srcGet(path) {
+                    const r = await fetch(`${FIREBASE_DB_URL}sourcing/${path}.json?t=${Date.now()}`);
+                    if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                    return r.json();
+                }
+                async function srcPut(path, val) {
+                    const r = await fetch(`${FIREBASE_DB_URL}sourcing/${path}.json`, val === null ? { method: 'DELETE' } : { method: 'PUT', body: JSON.stringify(val) });
+                    if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                }
+
+                async function srcLoad(force) {
+                    if (gSrc.loaded && !force) { srcRender(); return; }
+                    const up = document.getElementById('src-updated');
+                    if (up) up.textContent = '불러오는 중…';
+                    try {
+                        const [meta, lineup, picks, direct] = await Promise.all([srcGet('meta'), srcGet('lineup'), srcGet('picks'), srcGet('direct')]);
+                        gSrc.meta = meta || {}; gSrc.lineup = lineup || {}; gSrc.picks = picks || {}; gSrc.direct = direct || {};
+                        if (force) { gSrc.band = null; gSrc.kakao = null; }
+                        gSrc.loaded = true;
+                        const weeks = Object.keys(gSrc.lineup).sort().reverse();
+                        if (!gSrc.week || !gSrc.lineup[gSrc.week]) gSrc.week = weeks[0] || '';
+                        if (up) up.textContent = gSrc.meta.updated ? '자료 ' + gSrc.meta.updated + ' 기준' : '아직 올라온 자료가 없어요';
+                    } catch (e) {
+                        if (up) up.textContent = '못 불러왔어요 (' + e.message + ')';
+                    }
+                    srcRender();
+                }
+                function srcTab(t) {
+                    gSrc.tab = t;
+                    document.querySelectorAll('#purchase-section-sourcing [data-src-tab]').forEach(b => b.classList.toggle('on', b.dataset.srcTab === t));
+                    srcRender();
+                }
+                async function srcRender() {
+                    const v = document.getElementById('src-view');
+                    if (!v) return;
+                    if (gSrc.tab === 'lineup') return srcRenderLineup(v);
+                    if (gSrc.tab === 'band') {
+                        if (!gSrc.band) { v.innerHTML = '<div class="src-none">밴드 상품을 불러오는 중…</div>'; try { gSrc.band = (await srcGet('band')) || {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
+                        return srcRenderBand(v);
+                    }
+                    if (!gSrc.kakao) { v.innerHTML = '<div class="src-none">카톡 취합을 불러오는 중…</div>'; try { gSrc.kakao = (await srcGet('kakao')) || {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
+                    srcRenderKakao(v);
+                }
+
+                // ── 팔았다고 표시한 상품 모음: 업체|상품명 → 가장 최근 날짜 ──
+                function srcSoldMap() {
+                    const m = {};
+                    const put = (vendor, name, date) => { const k = vendor + '|' + name; if (!m[k] || date > m[k]) m[k] = date; };
+                    Object.entries(gSrc.picks).forEach(([wk, items]) => Object.values(items || {}).forEach(p => p && put(p.vendor, p.name, wk)));
+                    Object.values(gSrc.direct).forEach(p => p && put(p.vendor, p.name, p.date));
+                    return m;
+                }
+
+                // ── 식단표 ──
+                function srcRenderLineup(v) {
+                    const weeks = Object.keys(gSrc.lineup).sort().reverse();
+                    if (!weeks.length) { v.innerHTML = '<div class="src-none">아직 짜 둔 주간 구성이 없어요. 매주 금요일 저녁에 다음 주 구성이 올라와요.</div>'; return; }
+                    const w = gSrc.lineup[gSrc.week] || {};
+                    const items = Object.entries(w.items || {}).map(([key, it]) => Object.assign({ key }, it));
+                    const picks = gSrc.picks[gSrc.week] || {};
+                    const pickedN = Object.keys(picks).length;
+                    const margins = items.map(it => parseFloat(it.margin)).filter(n => !isNaN(n));
+                    const avgM = margins.length ? (margins.reduce((a, b) => a + b, 0) / margins.length).toFixed(1) + '%' : '–';
+                    const mon = new Date(gSrc.week + 'T00:00:00');
+                    const dates = {}; SRC_DAYS.forEach((d, i) => { const x = new Date(mon); x.setDate(x.getDate() + i); dates[d] = (x.getMonth() + 1) + '/' + x.getDate(); });
+                    const wx = {}; (w.weather || []).forEach(x => wx[x.day] = x);
+
+                    let html = '<div class="src-bar">' +
+                        '<select onchange="gSrc.week=this.value; srcRender()">' + weeks.map(k => '<option value="' + k + '"' + (k === gSrc.week ? ' selected' : '') + '>' + srcEsc((gSrc.lineup[k] || {}).label || k) + (k === weeks[0] ? ' (최신)' : '') + '</option>').join('') + '</select>' +
+                        '<span><span class="k">상품</span> <b>' + items.length + '개</b></span>' +
+                        '<span><span class="k">고른 상품</span> <b>' + pickedN + '개</b></span>' +
+                        '<span><span class="k">평균 마진</span> <b>' + avgM + '</b></span>' +
+                        (w.weatherNote ? '<span><span class="k">날씨</span> <b>' + srcEsc(w.weatherNote) + '</b></span>' : '') +
+                        '<span class="k">고르면 바로 저장돼요. 고른 상품은 4주 동안 다시 추천하지 않아요.</span></div>';
+
+                    const rows = Math.max(1, ...SRC_DAYS.map(d => items.filter(it => it.day === d).length));
+                    html += '<div class="src-board">';
+                    SRC_DAYS.forEach((d, c) => {
+                        const list = items.filter(it => it.day === d).sort((a, b) => a.order - b.order);
+                        const x = wx[d];
+                        html += '<div class="src-cell src-dayhead" style="--r:1;--c:' + (c + 1) + ';--o:' + (c * 100) + '"><div class="d">' + d + '<span>' + dates[d] + '</span></div><div class="t">' + SRC_THEME[d] + '</div>' +
+                            (x ? '<div class="w">' + x.max + '° / ' + x.min + '° · ' + srcEsc(x.feel) + '</div>' : '') + '</div>';
+                        for (let i = 0; i < rows; i++) {
+                            const st = ' style="--r:' + (i + 2) + ';--c:' + (c + 1) + ';--o:' + (c * 100 + i + 1) + '"';
+                            html += '<div class="src-cell"' + st + '>' + (list[i] ? srcCard(list[i], picks[list[i].key]) : '<div class="src-empty' + (i ? ' fill' : '') + '">' + (i ? '' : '상품이 없어요') + '</div>') + '</div>';
+                        }
+                    });
+                    v.innerHTML = html + '</div>';
+                }
+                function srcCard(it, p) {
+                    const pick = p ? p.pick : '';
+                    const altIdx = /^(\d)순위$/.test(pick) ? +pick[0] - 1 : -1;
+                    const alts = (it.alts || []).filter(Boolean);
+                    const label = pick === '이 상품' ? '판매 결정' : altIdx >= 0 ? (altIdx + 1) + '순위로 판매' : '';
+                    return '<div class="src-card' + (pick ? ' picked' : '') + '">' +
+                        '<div class="src-row"><span class="src-no">' + it.order + '</span><span class="src-chip">' + srcEsc(it.cat) + '</span>' +
+                            (label ? '<span class="src-chip pick">' + label + '</span>' : '') +
+                            (it.score ? '<span class="src-score">' + srcEsc(it.score) + '점</span>' : '') + '</div>' +
+                        '<div><div class="src-name">' + srcEsc(it.name) + '</div><div class="src-vendor">' + srcEsc(it.vendor) + '</div></div>' +
+                        '<div class="src-price">' + (it.supply ? '<span>공급 <b>' + srcWon(it.supply) + '</b></span>' : '<span>공급가 문의</span>') +
+                            (it.rec ? '<span>권장 ' + srcWon(it.rec) + '</span>' : '') + (it.margin ? '<span class="m">마진 ' + srcEsc(it.margin) + '%</span>' : '') + '</div>' +
+                        '<div class="src-mx"><div><span>검색량</span> ' + srcEsc(it.search || '–') + '</div><div><span>클릭률</span> ' + (it.ctr ? srcEsc(it.ctr) + '%' : '–') + '</div>' +
+                            '<div><span>추세</span> ' + srcTrend(it.trend) + '</div><div><span>계절</span> ' + srcTrend(it.season) + '</div>' +
+                            '<div><span>경쟁</span> ' + srcEsc(it.comp || '–') + '</div><div><span>카톡</span> ' + srcEsc(it.kakao || '–') + '</div></div>' +
+                        (it.why ? '<div class="src-why">' + srcEsc(it.why) + '</div>' : '') +
+                        (alts.length ? '<ol class="src-alts">' + alts.map((a, i) => '<li' + (i === altIdx ? ' class="chosen"' : '') + '>' + srcEsc(a) + '</li>').join('') + '</ol>' : '') +
+                        (it.link ? '<a class="src-link" href="' + srcEsc(it.link) + '" target="_blank" rel="noopener">밴드 글 보기 ↗</a>' : '') +
+                        '<div class="src-picks">' + SRC_PICKS.map((lab, i) => {
+                            const dis = i > 0 && !alts[i - 1];
+                            return '<button type="button"' + (pick === lab ? ' class="on"' : '') + (dis ? ' disabled' : '') + ' onclick="srcPick(\'' + it.key + '\',\'' + lab + '\')">' + (i ? i + '순위' : '이 상품') + '</button>';
+                        }).join('') + '</div></div>';
+                }
+                async function srcPick(key, lab) {
+                    const wk = gSrc.week, w = gSrc.lineup[wk] || {}, it = (w.items || {})[key];
+                    if (!it) return;
+                    const cur = (gSrc.picks[wk] || {})[key];
+                    let val = null;
+                    if (!cur || cur.pick !== lab) {
+                        let name = it.name, vendor = it.vendor, supply = it.supply || '';
+                        if (lab !== '이 상품') {
+                            const a = String((it.alts || [])[+lab[0] - 1] || '').split(' / ');
+                            if (a.length < 2) return;
+                            name = a[0]; vendor = a[1]; supply = (a[2] || '').replace(/[^\d]/g, '');
+                        }
+                        val = { pick: lab, name, vendor, supply, day: it.day, order: it.order, at: new Date().toISOString() };
+                    }
+                    try {
+                        await srcPut('picks/' + wk + '/' + key, val);
+                        gSrc.picks[wk] = gSrc.picks[wk] || {};
+                        if (val) gSrc.picks[wk][key] = val; else delete gSrc.picks[wk][key];
+                        showToast(val ? '고른 상품 저장: ' + val.name : '고른 것을 취소했어요');
+                    } catch (e) { showToast('저장 못 했어요: ' + e.message); }
+                    srcRender();
+                }
+
+                // ── 밴드 상품 ──
+                const SRC_BAND_COLS = [
+                    ['sold', '판매'], ['d', '게시일'], ['v', '업체'], ['g', '구분'], ['n', '상품명'], ['c', '카테고리'], ['s', '점수', 1], ['sp', '공급가', 1], ['rp', '권장', 1],
+                    ['m', '마진%', 1], ['pc', '게시', 1], ['k', '카톡'], ['q', '검색량', 1], ['ctr', '클릭률', 1], ['comp', '경쟁'], ['tr', '추세'], ['ss', '계절']
+                ];
+                function srcRenderBand(v) {
+                    const Q = gSrc.bandQ, sold = srcSoldMap();
+                    const rows = Object.entries(gSrc.band).map(([no, r]) => Object.assign({ no }, r));
+                    const vendors = [...new Set(rows.map(r => r.v))].sort();
+                    const cats = [...new Set(rows.map(r => r.c).filter(Boolean))].sort();
+                    const q = Q.q.trim().replace(/\s/g, '').toLowerCase();
+                    const cut = new Date(); cut.setDate(cut.getDate() - 28);
+                    const cutIso = cut.toISOString().slice(0, 10);
+                    let list = rows.filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().includes(q) || String(r.kw || '').toLowerCase().includes(q))
+                        && (!Q.vendor || r.v === Q.vendor) && (!Q.cat || r.c === Q.cat));
+                    list.forEach(r => { r.sold = sold[r.v + '|' + r.n] || ''; });
+                    if (Q.soldOnly) list = list.filter(r => r.sold);
+                    const numCols = { s: 1, sp: 1, rp: 1, m: 1, pc: 1, q: 1, ctr: 1 };
+                    list.sort((a, b) => {
+                        let x = a[Q.sort], y = b[Q.sort];
+                        if (numCols[Q.sort]) { x = srcNum(x); y = srcNum(y); if (x == null) return 1; if (y == null) return -1; return (x - y) * Q.dir; }
+                        x = String(x || ''); y = String(y || ''); if (!x) return 1; if (!y) return -1; return x.localeCompare(y, 'ko') * Q.dir;
+                    });
+                    const recent = list.filter(r => r.sold && r.sold >= cutIso).length;
+                    let html = '<div class="src-bar">' +
+                        '<input type="search" id="src-band-q" placeholder="상품명·검색어 찾기" value="' + srcEsc(Q.q) + '" oninput="gSrc.bandQ.q=this.value; gSrc.bandQ.limit=100; srcRenderBandKeep()">' +
+                        '<select onchange="gSrc.bandQ.vendor=this.value; gSrc.bandQ.limit=100; srcRender()"><option value="">업체 전체</option>' + vendors.map(x => '<option' + (x === Q.vendor ? ' selected' : '') + '>' + srcEsc(x) + '</option>').join('') + '</select>' +
+                        '<select onchange="gSrc.bandQ.cat=this.value; gSrc.bandQ.limit=100; srcRender()"><option value="">카테고리 전체</option>' + cats.map(x => '<option' + (x === Q.cat ? ' selected' : '') + '>' + srcEsc(x) + '</option>').join('') + '</select>' +
+                        '<label style="display:flex;gap:4px;align-items:center;font-weight:800;font-size:12.5px;"><input type="checkbox"' + (Q.soldOnly ? ' checked' : '') + ' onchange="gSrc.bandQ.soldOnly=this.checked; srcRender()"> 판매한 것만</label>' +
+                        '<span><span class="k">찾은 상품</span> <b>' + list.length.toLocaleString() + '개</b></span><span><span class="k">최근 4주 판매</span> <b>' + recent + '개</b></span>' +
+                        '<span class="k">"판매"를 누르면 오늘 날짜로 저장되고, 그 상품은 4주 동안 추천에서 빠져요.</span></div>';
+                    html += '<div class="src-tablewrap"><table><thead><tr>' + SRC_BAND_COLS.map(([k, lab, num]) => '<th' + (num ? ' class="r"' : '') + ' onclick="srcSortBand(\'' + k + '\')">' + lab + (Q.sort === k ? (Q.dir < 0 ? ' ▼' : ' ▲') : '') + '</th>').join('') + '</tr></thead><tbody>';
+                    html += list.slice(0, Q.limit).map(r => {
+                        const direct = gSrc.direct[r.no];
+                        const btn = r.sold
+                            ? '<button type="button" class="src-sold on" title="' + (direct ? '눌러서 판매 표시 지우기' : '식단표에서 고른 상품이에요') + '" onclick="srcSold(\'' + r.no + '\')">' + r.sold.slice(5).replace('-', '/') + '</button>'
+                            : '<button type="button" class="src-sold" onclick="srcSold(\'' + r.no + '\')">판매</button>';
+                        return '<tr' + (r.sold ? ' class="sold"' : '') + '><td>' + btn + '</td><td>' + srcEsc(String(r.d || '').slice(2, 10)) + '</td><td>' + srcEsc(r.v) + '</td><td>' + srcEsc(r.g) + '</td>' +
+                            '<td class="nm">' + (r.u ? '<a href="' + srcEsc(r.u) + '" target="_blank" rel="noopener">' + srcEsc(r.n) + '</a>' : srcEsc(r.n)) + '</td><td>' + srcEsc(r.c) + '</td>' +
+                            '<td class="r"><b>' + srcEsc(r.s) + '</b></td><td class="r">' + srcEsc(r.sp ? Number(r.sp).toLocaleString() : '') + '</td><td class="r">' + srcEsc(r.rp ? Number(r.rp).toLocaleString() : '') + '</td>' +
+                            '<td class="r">' + srcEsc(r.m) + '</td><td class="r">' + srcEsc(r.pc) + '</td><td>' + srcEsc(r.k) + '</td><td class="r">' + srcEsc(r.q) + '</td><td class="r">' + srcEsc(r.ctr) + '</td>' +
+                            '<td>' + srcEsc(r.comp) + '</td><td>' + srcTrend(r.tr) + '</td><td>' + srcTrend(r.ss) + '</td></tr>';
+                    }).join('') + '</tbody></table></div>';
+                    if (list.length > Q.limit) html += '<button type="button" class="src-btn src-more" onclick="gSrc.bandQ.limit+=200; srcRender()">더 보기 (' + (list.length - Q.limit).toLocaleString() + '개 남음)</button>';
+                    v.innerHTML = html;
+                }
+                // 찾기 칸에 글을 칠 때마다 다시 그리면 커서가 사라진다. 다시 그린 뒤 커서를 돌려 둔다.
+                function srcRenderBandKeep() {
+                    const el = document.getElementById('src-band-q'); const pos = el ? el.selectionStart : 0;
+                    srcRender();
+                    const n = document.getElementById('src-band-q'); if (n) { n.focus(); n.setSelectionRange(pos, pos); }
+                }
+                function srcSortBand(k) {
+                    if (k === 'sold') return;
+                    const Q = gSrc.bandQ; if (Q.sort === k) Q.dir = -Q.dir; else { Q.sort = k; Q.dir = (k === 'v' || k === 'n' || k === 'c' || k === 'g') ? 1 : -1; }
+                    srcRender();
+                }
+                async function srcSold(no) {
+                    const r = gSrc.band[no]; if (!r) return;
+                    const cur = gSrc.direct[no];
+                    const sold = srcSoldMap()[r.v + '|' + r.n];
+                    if (sold && !cur) { showToast('식단표에서 고른 상품이에요. 취소는 식단표에서 해 주세요.'); return; }
+                    const val = cur ? null : { date: srcToday(), no, name: r.n, vendor: r.v, kw: r.kw || '', at: new Date().toISOString() };
+                    if (cur && !confirm(r.n + '\n판매 표시(' + cur.date + ')를 지울까요?')) return;
+                    try {
+                        await srcPut('direct/' + no, val);
+                        if (val) gSrc.direct[no] = val; else delete gSrc.direct[no];
+                        showToast(val ? '판매 표시: ' + r.n : '판매 표시를 지웠어요');
+                    } catch (e) { showToast('저장 못 했어요: ' + e.message); }
+                    srcRender();
+                }
+
+                // ── 카톡 취합 ──
+                function srcRenderKakao(v) {
+                    const Q = gSrc.kakaoQ;
+                    const rows = Object.entries(gSrc.kakao).map(([no, r]) => Object.assign({ no }, r));
+                    const vendors = [...new Set(rows.map(r => r.v))].sort();
+                    const q = Q.q.trim().replace(/\s/g, '').toLowerCase();
+                    let list = rows.filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().includes(q) || String(r.raw || '').replace(/\s/g, '').toLowerCase().includes(q)) && (!Q.vendor || r.v === Q.vendor));
+                    const num = { cnt: 1, p: 1 };
+                    list.sort((a, b) => {
+                        let x = a[Q.sort], y = b[Q.sort];
+                        if (num[Q.sort]) return ((+x || 0) - (+y || 0)) * Q.dir;
+                        return String(x || '').localeCompare(String(y || ''), 'ko') * Q.dir;
+                    });
+                    const cols = [['d', '올린 일자'], ['v', '업체'], ['g', '구분'], ['n', '상품명'], ['p', '가격', 1], ['set', '구성'], ['cnt', '올린 횟수', 1], ['first', '처음 올린 날'], ['raw', '원문']];
+                    let html = '<div class="src-bar">' +
+                        '<input type="search" id="src-kakao-q" placeholder="상품명·원문 찾기" value="' + srcEsc(Q.q) + '" oninput="gSrc.kakaoQ.q=this.value; gSrc.kakaoQ.limit=100; srcRenderKakaoKeep()">' +
+                        '<select onchange="gSrc.kakaoQ.vendor=this.value; gSrc.kakaoQ.limit=100; srcRender()"><option value="">업체 전체</option>' + vendors.map(x => '<option' + (x === Q.vendor ? ' selected' : '') + '>' + srcEsc(x) + '</option>').join('') + '</select>' +
+                        '<span><span class="k">찾은 상품</span> <b>' + list.length.toLocaleString() + '개</b></span>' +
+                        '<span class="k">카톡방 대화를 내보내 PC에 넣어 줄 때 새로 정리돼요.</span></div>';
+                    html += '<div class="src-tablewrap"><table><thead><tr>' + cols.map(([k, lab, n]) => '<th' + (n ? ' class="r"' : '') + ' onclick="srcSortKakao(\'' + k + '\')">' + lab + (Q.sort === k ? (Q.dir < 0 ? ' ▼' : ' ▲') : '') + '</th>').join('') + '</tr></thead><tbody>';
+                    html += list.slice(0, Q.limit).map(r => '<tr><td>' + srcEsc(String(r.d || '').slice(2)) + '</td><td>' + srcEsc(r.v) + '</td><td>' + srcEsc(r.g) + '</td><td class="nm">' + srcEsc(r.n) + '</td>' +
+                        '<td class="r">' + (r.p ? Number(r.p).toLocaleString() : '') + '</td><td>' + srcEsc(r.set) + '</td><td class="r">' + srcEsc(r.cnt) + '</td><td>' + srcEsc(String(r.first || '').slice(2, 10)) + '</td>' +
+                        '<td class="raw">' + srcEsc(r.raw) + '</td></tr>').join('') + '</tbody></table></div>';
+                    if (list.length > Q.limit) html += '<button type="button" class="src-btn src-more" onclick="gSrc.kakaoQ.limit+=200; srcRender()">더 보기 (' + (list.length - Q.limit).toLocaleString() + '개 남음)</button>';
+                    v.innerHTML = html;
+                }
+                function srcRenderKakaoKeep() {
+                    const el = document.getElementById('src-kakao-q'); const pos = el ? el.selectionStart : 0;
+                    srcRender();
+                    const n = document.getElementById('src-kakao-q'); if (n) { n.focus(); n.setSelectionRange(pos, pos); }
+                }
+                function srcSortKakao(k) {
+                    const Q = gSrc.kakaoQ; if (Q.sort === k) Q.dir = -Q.dir; else { Q.sort = k; Q.dir = (k === 'v' || k === 'n' || k === 'g') ? 1 : -1; }
+                    srcRender();
+                }
+                </script>
 
                 <!-- 하위 섹션 1: 발주 내역 등록/수정 -->
                 <div id="purchase-section-register" class="purchase-sub-section" style="display: none;">
@@ -30598,11 +30955,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const listSec = document.getElementById('purchase-section-list');
             const linkSec = document.getElementById('purchase-section-link');
             const checkSec = document.getElementById('purchase-section-check');
+            const sourcingSec = document.getElementById('purchase-section-sourcing');   // [신규] 소싱
 
             if (registerSec) registerSec.style.display = subTabName === 'register' ? 'block' : 'none';
             if (listSec) listSec.style.display = subTabName === 'list' ? 'block' : 'none';
             if (linkSec) linkSec.style.display = subTabName === 'link' ? 'block' : 'none';
             if (checkSec) checkSec.style.display = subTabName === 'check' ? 'block' : 'none';
+            if (sourcingSec) sourcingSec.style.display = subTabName === 'sourcing' ? 'block' : 'none';
 
             if (subTabName === 'list') {
                 renderPurchaseOrdersList();
@@ -30611,6 +30970,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 gLoadCodeLabels().then(() => switchCodeSubTab(codeSubTab));
             } else if (subTabName === 'check') {
                 switchCheckSubTab(pchkSubTab);   // 지난번에 보던 쪽(재고 점검 / 잘 나가는 품목)으로 연다
+            } else if (subTabName === 'sourcing') {
+                srcLoad();   // [신규] 소싱: 처음 열 때 DB에서 받아 온다
             }
         }
 
