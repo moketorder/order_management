@@ -15551,7 +15551,8 @@
         }
         /* 회차 계산: 서버 기록(진짜 회차) + 기록 밖 주문으로 짐작한 회차 → { code: { code, rounds[], names } }
            주문 하나는 '그 시각 전에 시작한 가장 늦은 회차'에 넣는다. 기록된 회차(접수 중이거나 접수 끝 30분 안)면 그대로 넣고,
-           짐작 회차는 ① 앞 회차 배달일이 지난 뒤 더 늦은 배달일로 받은 주문, ② 첫 배달일에서 7일 이상 뒤 배달일 — 둘 중 하나면 새 회차
+           짐작 회차는 ① 앞 회차 배달일이 지난 뒤 더 늦은 배달일로 받은 주문, ② 첫 배달일에서 7일 이상 뒤 배달일 — 둘 중 하나면 새 회차.
+           단, 당일 배달이 빈 날 없이 이어지면(어제도 당일 배달, 오늘도 당일 배달) 한 회차로 이어 묶는다
            옛 주문(7/1~8/14)이 공동구매인지는 psRoundOrders 에서 주문마다 가른다. 옛 주문만으로 된 회차는 old 로 표시한다 */
         function psRoundCompute() {
             const { by, names, onsite, fruit } = psRoundOrders();
@@ -15575,7 +15576,13 @@
             codes.forEach(code => {
                 const rs = Object.keys(log[code] || {}).map(rid => Object.assign({ rid, saved: true }, log[code][rid], { o: [] }))
                     .filter(r => Number(r.openAt) > 0 && !r.kind).sort((a, b) => a.openAt - b.openAt);   // 달별 기록(kind 있음)은 회차가 아니다
+                // [신규 2026-10-05] 기록된 회차의 노출 시각보다 먼저 받은 주문이라도, 그 회차 배달일로 받았고 앞 기록 회차가 끝난 뒤면 그 회차에 넣는다
+                //  (노출 시각은 다시 저장하면 늦게 찍힐 수 있다 — 예: 알배추 겉절이 10/8 회차가 10/5 18시로 찍혀 앞 주문이 빠졌다)
+                const reals = rs.filter(r => !r.est);
+                reals.forEach((r, j) => { r.prevClose = j > 0 ? (Number(reals[j - 1].closeAt) || Number(reals[j - 1].openAt) || 0) : 0; });
                 (by.get(code) || []).forEach(x => {
+                    const early = reals.find(r => r.pickups && r.pickups[x.pk] && r.openAt > x.ms && x.ms > r.prevClose);
+                    if (early) { early.o.push(x); return; }
                     let i = rs.length - 1;
                     while (i >= 0 && rs[i].openAt > x.ms) i--;
                     const R = i >= 0 ? rs[i] : null;
@@ -15588,7 +15595,11 @@
                         const firstPk = R.o.length ? R.o.reduce((m, y) => (y.pk < m ? y.pk : m), R.o[0].pk) : (Object.keys(R.pickups || {}).sort()[0] || last);
                         const afterDone = !!last && x.pk > last && x.od >= last;
                         const pastWeek = !!firstPk && (new Date(x.pk + 'T12:00:00') - new Date(firstPk + 'T12:00:00')) >= 7 * 86400000;
-                        if (inWindow || !(afterDone || pastWeek)) { R.o.push(x); return; }
+                        // [신규 2026-10-05] 당일 배달이 빈 날 없이 이어지면 한 회차 (사장님 — 보물섬 떡꼬치 8/18·8/19):
+                        //  이 주문이 당일 배달이고, 앞 회차 마지막 배달일이 바로 전날이며 그날도 당일 배달 주문이 있었으면 이어서 같은 회차
+                        const dayBefore = fMsToDateKey(new Date(x.pk + 'T12:00:00').getTime() - 86400000);
+                        const sameDayChain = x.od === x.pk && last === dayBefore && R.o.some(y => y.pk === last && y.od === y.pk);
+                        if (inWindow || sameDayChain || !(afterDone || pastWeek)) { R.o.push(x); return; }
                     }
                     rs.splice(i + 1, 0, { rid: 'e' + x.ms, est: true, openAt: x.ms, pickups: {}, log: {}, o: [x] });
                 });
