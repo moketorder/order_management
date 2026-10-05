@@ -2799,7 +2799,7 @@
         <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:14px; padding:12px 14px;">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
                 <div style="font-size:13px; font-weight:900; color:#92400e;" id="announce-banner-title">🔔 카톡에 올릴 상품</div>
-                <!-- [신규] 지금 바쁘면 잠깐 접어 둔다. 끝난 게 아니라서 새로고침하면 다시 펼쳐진 채로 뜬다. -->
+                <!-- [신규] 지금 바쁘면 잠깐 접어 둔다. [수정 2026-10-05] 오늘 하루 동안 접힌 채로 (새로고침해도), 내일 다시 펼쳐진다 -->
                 <button type="button" onclick="toggleAnnounceBannerCollapsed()" id="announce-banner-toggle" style="flex:0 0 auto; height:26px; padding:0 10px; border:1px solid #fde68a; background:#fff; color:#92400e; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">숨기기</button>
             </div>
             <div id="announce-banner-list" style="display:flex; flex-direction:column;"></div>
@@ -15627,10 +15627,23 @@
 
         // [신규] 지금 바쁘면 잠깐 접어 둘 수 있게 — 이번 화면(세션)에서만 기억한다. 새로고침하면 다시 펼쳐진다.
         //  (끝낸 게 아니므로 서버엔 아무것도 안 적는다 — 다른 일 먼저 하고 나중에 또 봐야 하니까)
-        let announceBannerCollapsed = false;
+        /* [수정 2026-10-05] '숨기기'는 오늘 하루 동안 접어 둔다 (사장님 요청) — 새로고침해도 오늘은 접힌 채, 내일이 되면 다시 펼쳐진다.
+           이 기기(브라우저)에만 기억한다. 펼치기를 누르면 바로 다시 보인다 */
+        const ANNOUNCE_HIDE_DAY_KEY = 'moket_announce_hide_day';
+        function gAnnounceTodayKey() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+        let announceBannerCollapsed = (() => { try { return localStorage.getItem(ANNOUNCE_HIDE_DAY_KEY) === gAnnounceTodayKey(); } catch (e) { return false; } })();
         function toggleAnnounceBannerCollapsed() {
             announceBannerCollapsed = !announceBannerCollapsed;
+            try {
+                if (announceBannerCollapsed) localStorage.setItem(ANNOUNCE_HIDE_DAY_KEY, gAnnounceTodayKey());
+                else localStorage.removeItem(ANNOUNCE_HIDE_DAY_KEY);
+            } catch (e) { }
+            if (announceBannerCollapsed) showToast('🔔 오늘 하루 동안 접어 둘게요');
             checkPendingAnnouncements();
+        }
+        // [신규 2026-10-05] 배너에 쓸 픽업일 'YYYY-MM-DD' — 날짜 상품은 상품 날짜, 아니면 다음 차례 픽업일(nextDate). 없으면 ''
+        function gAnnouncePickupKey(p) {
+            return toISODate(p && p.matchKey) || toISODate(p && p.date) || toISODate(p && p.nextDate) || '';
         }
 
         function checkPendingAnnouncements() {
@@ -15646,7 +15659,9 @@
             //  그래야 예약을 새 날짜로 끌어다 놓아 다시 노출시켰을 때, 예전에 닫았던 사람한테도 새 알림이 다시 뜬다.
             const pending = (uploadProducts || [])
                 .map((p) => ({ p, key: gStableKeyOf(p) }))
-                .filter(({ p, key }) => p && Number(p.releaseAt) && now >= Number(p.releaseAt) && !myDismissedKeys.has(gDismissCycleKey(p, key)));
+                .filter(({ p, key }) => p && Number(p.releaseAt) && now >= Number(p.releaseAt) && !myDismissedKeys.has(gDismissCycleKey(p, key)))
+                // [신규 2026-10-05] 픽업일이 빠른 순 (사장님 요청). 픽업일이 없는 상품은 맨 뒤
+                .sort((a, b) => (gAnnouncePickupKey(a.p) || '9999').localeCompare(gAnnouncePickupKey(b.p) || '9999'));
             if (pending.length === 0) {
                 box.style.display = 'none';
                 list.innerHTML = '';
@@ -15654,7 +15669,7 @@
             }
             box.style.display = 'block';
             if (title) title.textContent = `🔔 카톡에 올릴 상품 ${pending.length}개`;
-            if (toggleBtn) toggleBtn.textContent = announceBannerCollapsed ? '▼ 펼치기' : '▲ 숨기기';
+            if (toggleBtn) toggleBtn.textContent = announceBannerCollapsed ? '▼ 펼치기' : '▲ 오늘 숨기기';
             // 접혀 있어도 내용은 미리 그려 둔다 — 펼칠 때 바로 보이라고
             list.innerHTML = pending.map(({ p, key }) => announceRowHtml(p, key)).join('');
             list.style.display = announceBannerCollapsed ? 'none' : 'flex';
@@ -15672,8 +15687,10 @@
             const act = gIsPhoneUI() ? `announceShare('${k}')` : `gOpenPcShareCopy(gFindProductIdxByKey('${k}'))`;
             const count = images.length > 1 ? `<small>${Math.min(images.length, 10)}장</small>` : '';
             // [신규 2026-10-01] 올라간 시각(노출일정 releaseAt) — 배너는 이 시각이 지난 상품만 띄운다 (사장님 요청)
-            const ra = Number(p.releaseAt) ? new Date(Number(p.releaseAt)) : null;
-            const when = ra ? `노출시각 ${ra.getMonth() + 1}/${ra.getDate()}(${'일월화수목금토'[ra.getDay()]}) ${String(ra.getHours()).padStart(2, '0')}:${String(ra.getMinutes()).padStart(2, '0')}` : '';
+            // [수정 2026-10-05] 노출시각 대신 픽업일을 보여 준다 (사장님 요청)
+            const pk = gAnnouncePickupKey(p);
+            const pd = pk ? new Date(`${pk}T00:00:00`) : null;
+            const when = pd ? `픽업 ${pd.getMonth() + 1}/${pd.getDate()}(${'일월화수목금토'[pd.getDay()]})` : '';
             return `<div class="ab-row">
                 <div class="ab-info">
                     <div class="ab-name"><b title="${gEscapeHtml(p.name || '')}">${gEscapeHtml(p.name || '')}</b>${p.price ? `<span>${Number(p.price).toLocaleString()}원</span>` : ''}</div>
