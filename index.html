@@ -3553,6 +3553,11 @@
                         #purchase-section-sourcing .src-cal-day.today .n { color:#fff; background:var(--src-acc); border-radius:999px; padding:0 6px; }
                         #purchase-section-sourcing .src-cal-day.over { outline:2px dashed var(--src-acc); outline-offset:-1px; background:var(--src-acc-soft); }
                         #purchase-section-sourcing .src-cal-day .n { font-size:11px; font-weight:900; font-variant-numeric:tabular-nums; align-self:flex-start; }
+                        #purchase-section-sourcing .src-cal-day .top { display:flex; gap:4px; align-items:center; flex-wrap:wrap; min-width:0; }
+                        #purchase-section-sourcing .src-cal-day.hol .n { color:#dc2626; }
+                        #purchase-section-sourcing .src-cal-day.hol { background:#fef2f2; }
+                        #purchase-section-sourcing .src-cal-day .hn { font-size:10px; font-weight:800; color:#dc2626; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+                        #purchase-section-sourcing .src-cal-day .off { font-size:10px; font-weight:900; color:#fff; background:#64748b; border-radius:4px; padding:0 4px; }
                         #purchase-section-sourcing .src-tag { font-size:10.5px; font-weight:800; border-radius:5px; padding:1px 4px; display:flex; gap:3px; align-items:center; background:var(--src-acc-soft); color:var(--src-acc); min-width:0; }
                         #purchase-section-sourcing .src-tag span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
                         #purchase-section-sourcing .src-tag.alt { background:var(--src-pick); color:var(--src-pick-ink); }
@@ -3605,9 +3610,20 @@
                 const SRC_DAYS = ['월', '화', '수', '목', '금'];
                 const SRC_THEME = { '월': '국·탕·찌개 · 밥 · 면', '화': '생고기 · 수산물 · 채소', '수': '분식 · 간식 · 과자', '목': '반찬·김치 · 유제품 · 양념', '금': '양념고기 · 해물 · 야식' };
                 const SRC_PICKS = ['이 상품', '1순위', '2순위', '3순위'];
+                // 나라 공휴일 (대체공휴일 포함). 2027년 뒤로는 해마다 더해 넣는다. 가게 임시 휴무는 DB public_holidays 를 따로 읽는다.
+                const SRC_HOLIDAYS = {
+                    '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴', '2026-03-01': '삼일절', '2026-03-02': '대체공휴일',
+                    '2026-05-05': '어린이날', '2026-05-24': '부처님오신날', '2026-05-25': '대체공휴일', '2026-06-03': '지방선거', '2026-06-06': '현충일',
+                    '2026-08-15': '광복절', '2026-08-17': '대체공휴일', '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴',
+                    '2026-10-03': '개천절', '2026-10-05': '대체공휴일', '2026-10-09': '한글날', '2026-12-25': '성탄절',
+                    '2027-01-01': '신정', '2027-02-06': '설날 연휴', '2027-02-07': '설날', '2027-02-08': '설날 연휴', '2027-02-09': '대체공휴일', '2027-03-01': '삼일절',
+                    '2027-05-05': '어린이날', '2027-05-13': '부처님오신날', '2027-06-06': '현충일', '2027-08-15': '광복절', '2027-08-16': '대체공휴일',
+                    '2027-09-14': '추석 연휴', '2027-09-15': '추석', '2027-09-16': '추석 연휴', '2027-10-03': '개천절', '2027-10-04': '대체공휴일',
+                    '2027-10-09': '한글날', '2027-10-11': '대체공휴일', '2027-12-25': '성탄절', '2027-12-27': '대체공휴일'
+                };
                 const gSrc = {
                     tab: 'lineup', loaded: false, meta: null, lineup: {}, picks: {}, direct: {},
-                    band: null, kakao: null, week: '', calMonth: '',
+                    band: null, kakao: null, week: '', calMonth: '', closed: [],
                     bandQ: { q: '', vendor: '', cat: '', sort: 's', dir: -1, soldOnly: false, limit: 100 },
                     kakaoQ: { q: '', vendor: '', sort: 'd', dir: -1, limit: 100 }
                 };
@@ -3635,7 +3651,9 @@
                     const up = document.getElementById('src-updated');
                     if (up) up.textContent = '불러오는 중…';
                     try {
-                        const [meta, lineup, picks, direct] = await Promise.all([srcGet('meta'), srcGet('lineup'), srcGet('picks'), srcGet('direct')]);
+                        const [meta, lineup, picks, direct, closed] = await Promise.all([srcGet('meta'), srcGet('lineup'), srcGet('picks'), srcGet('direct'),
+                            fetch(`${FIREBASE_DB_URL}public_holidays.json?t=${Date.now()}`).then(r => r.ok ? r.json() : []).catch(() => [])]);   // 가게 임시 휴무일
+                        gSrc.closed = Array.isArray(closed) ? closed : Object.values(closed || {});
                         gSrc.meta = meta || {}; gSrc.lineup = lineup || {}; gSrc.picks = picks || {}; gSrc.direct = direct || {};
                         if (force) { gSrc.band = null; gSrc.kakao = null; }
                         gSrc.loaded = true;
@@ -3788,7 +3806,7 @@
                     let html = '<div class="src-cal"><div class="src-cal-head">' +
                         '<button type="button" class="src-btn" onclick="srcCalMove(-1)">◀</button><b>' + y + '년 ' + m + '월</b>' +
                         '<button type="button" class="src-btn" onclick="srcCalMove(1)">▶</button>' +
-                        '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 회색 = 목록에서 직접 판매 표시 · × 로 지우기</span></div><div class="src-cal-grid">' +
+                        '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 회색 = 목록에서 직접 판매 표시 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span></div><div class="src-cal-grid">' +
                         SRC_DAYS.map(d => '<div class="src-cal-dow">' + d + '</div>').join('');
                     for (let d = new Date(start); d <= last; d.setDate(d.getDate() + 7)) {
                         for (let i = 0; i < 5; i++) {
@@ -3798,7 +3816,10 @@
                             if (x.getMonth() !== m - 1) cls.push('other');
                             if (gSrc.week && k >= gSrc.week && k <= weekEnd) cls.push('inweek');
                             if (k === today) cls.push('today');
-                            html += '<div class="' + cls.join(' ') + '" data-date="' + k + '"><span class="n">' + x.getDate() + '</span>' +
+                            const hol = SRC_HOLIDAYS[k], off = gSrc.closed.indexOf(k) >= 0;
+                            if (hol) cls.push('hol');
+                            html += '<div class="' + cls.join(' ') + '" data-date="' + k + '"><div class="top"><span class="n">' + x.getDate() + '</span>' +
+                                (hol ? '<span class="hn">' + hol + '</span>' : '') + (off ? '<span class="off" title="주문관리에 설정된 가게 휴무일">휴무</span>' : '') + '</div>' +
                                 (byDate[k] || []).map(t => '<div class="src-tag ' + t.kind + '" title="' + srcEsc(t.name) + '"><span>' + srcEsc(t.name) + '</span><button type="button" onclick="' + t.del + '" aria-label="지우기">×</button></div>').join('') + '</div>';
                         }
                     }
