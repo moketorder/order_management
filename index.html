@@ -4554,6 +4554,30 @@
         .ps-h-pk { font-weight: 900 !important; color: var(--text-main) !important; }
         .ps-h-live { color: #16a34a; }   /* [신규 2026-10-05] 회차 기록 — 접수 중 */
         .ps-h-on { margin: 10px 0 4px; font-size: 12.5px; color: var(--text-main); }   /* 상시판매 달별 참고 머리 */
+        /* [신규 2026-10-05] 판매기록 조건 거르기 */
+        .ps-hf-bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .ps-hf-btn, .ps-hf-pre { height: 30px; padding: 0 10px; border: 1.5px solid #cbd5e1; background: #fff; border-radius: 999px; font-size: 12px; font-weight: 800; color: #334155; cursor: pointer; white-space: nowrap; }
+        .ps-hf-btn.on { border-color: var(--primary); color: var(--primary); }
+        .ps-hf-btn b { display: inline-block; min-width: 16px; padding: 0 4px; border-radius: 999px; background: var(--primary); color: #fff; font-size: 11px; }
+        .ps-hf-pre { background: #f8fafc; }
+        .ps-hf-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+        .ps-hf-chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 10px; border-radius: 999px; background: #e0f2fe; color: #075985; font-size: 12px; font-weight: 800; }
+        .ps-hf-chip button { border: none; background: transparent; color: inherit; font-weight: 900; cursor: pointer; padding: 0 4px; }
+        .ps-hf-clr { border: none; background: transparent; color: #64748b; font-size: 12px; font-weight: 800; cursor: pointer; text-decoration: underline; }
+        .ps-hf-panel { margin-top: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: #f8fafc; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+        .ps-hf-panel > div { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; font-weight: 700; color: #334155; }
+        .ps-hf-panel > div > span:first-child { min-width: 70px; font-weight: 900; color: #0f172a; }
+        .ps-hf-panel select { height: 30px; border: 1.5px solid #cbd5e1; border-radius: 7px; font-size: 12.5px; font-weight: 700; background: #fff; }
+        .ps-hf-num { display: inline-flex; align-items: center; gap: 4px; }
+        .ps-hf-num input { width: 56px; height: 30px; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 0 6px; font-size: 13px; font-weight: 700; box-sizing: border-box; }
+        .ps-hf-chk { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+        .ps-hf-chk input[type="checkbox"] { position: static !important; opacity: 1 !important; width: 16px !important; height: 16px !important; margin: 0; display: inline-block !important; accent-color: var(--primary); }
+        @media (max-width: 600px) { .ps-hf-panel { grid-template-columns: 1fr; } }
+        /* [신규 2026-10-05] 재고 딱지 — 넉넉(초록) · 5개 이하(주황) */
+        .ps-h-stk { font-size: 11.5px; font-weight: 900; padding: 1px 7px; border-radius: 999px; }
+        .ps-h-stk.ok { background: #dcfce7; color: #15803d; }
+        .ps-h-stk.low { background: #ffedd5; color: #c2410c; }
+        .ps-h-stk.out { background: #fee2e2; color: #b91c1c; }
         .ps-h-tbl .ps-h-logrow td { padding: 0 6px 6px; font-size: 11px; font-weight: 700; color: #64748b; white-space: normal; border-bottom: 1px solid #f1f5f9; }
         .ps-h-more { width: 100%; height: 34px; margin-top: 6px; border: 1.5px dashed #cbd5e1; background: #fff; border-radius: 8px; font-size: 12.5px; font-weight: 800; color: #475569; cursor: pointer; }
         .ps-h-note { margin-top: 6px; font-size: 11px; font-weight: 700; color: #94a3b8; }
@@ -15140,7 +15164,11 @@
             { const wrap = box.closest('.ps-cal-wrap'); if (wrap) wrap.style.display = (psViewMode === 'list' || psViewMode === 'hist') ? 'none' : ''; }
             { const a = document.getElementById('ps-view-cal'), b2 = document.getElementById('ps-view-list'), b3 = document.getElementById('ps-view-hist');
               if (a) a.classList.toggle('on', psViewMode !== 'list' && psViewMode !== 'hist'); if (b2) b2.classList.toggle('on', psViewMode === 'list'); if (b3) b3.classList.toggle('on', psViewMode === 'hist');
-              const lg = document.querySelector('#tab-admin-product-schedule .ps-legend'); if (lg) lg.style.display = (psViewMode === 'hist') ? 'none' : ''; }
+              const lg = document.querySelector('#tab-admin-product-schedule .ps-legend'); if (lg) lg.style.display = (psViewMode === 'hist') ? 'none' : '';
+              // [신규 2026-10-05] 오른쪽 위 달력 단추(❔·오늘·Ctrl·되돌리기)와 쓰는 법은 달력일 때만 (사장님 요청)
+              const isCal = psViewMode !== 'list' && psViewMode !== 'hist';
+              const tools = document.querySelector('#tab-admin-product-schedule .ps-tools'); if (tools) tools.style.display = isCal ? '' : 'none';
+              const help = document.getElementById('ps-help'); if (help && !isCal) help.style.display = 'none'; }
             psUndoPaint();
 
             // 날짜를 골랐으면 그 날의 일정, 막대를 골랐으면 고른 막대의 일정 카드 (둘은 따로 고른다) · 목록으로 보기면 일정 목록
@@ -15552,6 +15580,23 @@
             });
             const curName = new Map();
             (uploadProducts || []).forEach(p => { const c = psSafeId(String((p && p.productCode) || '').trim()); if (c && p.name && !curName.has(c)) curName.set(c, String(p.name)); });
+            // [신규 2026-10-05] 코드별 진짜 재고 (사장님: 재고순) — 품절 판정(gIsProductSoldOut)과 같은 셈: 기본 재고 + 조정값. 같은 코드 여러 줄이면 더하고, 하나라도 무제한이면 무제한
+            //  지금 상시판매 중인 상품(상시판매 칸 + 손님 화면에 보임)의 재고만 센다 (사장님: 다른 것까지 생각하면 너무 많다).
+            //  공구 재고는 계획 수량이고, 일정 걸린 상품·끝난 공구 숫자도 진짜 재고가 아니라서 안 센다
+            const stockLeft = new Map();
+            (uploadProducts || []).forEach(p => {
+                const c = psSafeId(String((p && p.productCode) || '').trim());
+                if (!c) return;
+                let onsiteNow = false; try { onsiteNow = !!gOnsiteTabCatOfList(p) && gProdVisibleNow(p); } catch (e) { }
+                if (!onsiteNow) return;
+                const unl = (p.stock === '' || p.stock == null || String(p.stock).trim() === '무제한');
+                const a = (typeof uploadGlobalAdjustments === 'object' && uploadGlobalAdjustments) ? uploadGlobalAdjustments[fGetAdjKey(p.matchKey, p.name, p.sid)] : undefined;
+                const unlAdj = (a === 'unlimited' || (a != null && String(a).startsWith('unlimited')));
+                const left = (unl || unlAdj) ? Infinity : Math.max(0, (parseInt(p.stock || 0, 10) || 0) + (parseInt(a || 0, 10) || 0));
+                stockLeft.set(c, (stockLeft.has(c) ? stockLeft.get(c) : 0) + left);
+            });
+            // 재고 0은 '재고 없음'으로 (표시하지 않고 재고순에서 맨 아래)
+            stockLeft.forEach((v, c) => { if (v === 0) stockLeft.delete(c); });
             const dayMs = 86400000, nowMs = Date.now();
             const list = [];
             Object.values(calc).forEach(c => {
@@ -15594,7 +15639,11 @@
                     code, cur: curName.has(code), name: curName.get(code) || (top ? top[0] : '') || savedName || code, rounds,
                     lastPosted, idleDays: lastPosted ? Math.floor((nowMs - lastPosted) / dayMs) : null,
                     gap, avgQty, trend, total: rounds.reduce((x, r) => x + r.stats.qty, 0), next: upcoming.get(code) || '',
-                    months, onsiteTotal: months.reduce((x, mo) => x + mo.qty, 0)
+                    months, onsiteTotal: months.reduce((x, mo) => x + mo.qty, 0), stockLeft: stockLeft.has(code) ? stockLeft.get(code) : null,
+                    // [신규 2026-10-05] 보기 순서용 (사장님 요청)
+                    overdue: (gap && lastPosted) ? Math.floor((nowMs - lastPosted) / dayMs) - gap : null,   // 평소 간격보다 며칠 늦었나
+                    growth: (recent.length && before.length && avg(before) > 0) ? avg(recent) / avg(before) : null,   // 최근 3회차 ÷ 그 전 3회차
+                    afterTotal: rounds.reduce((x, r) => x + (r.after || 0), 0)   // 공구 뒤 상시로 판 개수 합
                 });
             });
             // [신규 2026-10-05] 7월 뒤 판매 기록이 없는 지금 상품도 '기록 없음'으로 넣는다 (사장님: 그래야 자료가 맞다). 과일은 그대로 뺀다
@@ -15602,7 +15651,7 @@
             curName.forEach((name, code) => {
                 if (have.has(code) || /^F/i.test(code)) return;   // 과일은 목록에도 넣지 않는다
                 have.add(code);
-                list.push({ code, cur: true, name, rounds: [], months: [], lastPosted: 0, idleDays: null, gap: null, avgQty: 0, trend: '', total: 0, next: upcoming.get(code) || '', onsiteTotal: 0, empty: true });
+                list.push({ code, cur: true, name, rounds: [], months: [], lastPosted: 0, idleDays: null, gap: null, avgQty: 0, trend: '', total: 0, next: upcoming.get(code) || '', onsiteTotal: 0, empty: true, stockLeft: stockLeft.has(code) ? stockLeft.get(code) : null });
             });
             return list;
         }
@@ -15610,6 +15659,98 @@
         function psHistMD(ms) { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()}`; }
         function psHistMDH(ms) { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}시`; }
         function psHistPkLabel(pk) { const d = new Date(pk + 'T12:00:00'); return `${d.getMonth() + 1}/${d.getDate()} (${'일월화수목금토'[d.getDay()]})`; }
+        // 평소 간격보다 늦은 날수 — 회차 3번 이상만 (2번이면 간격이 우연히 정해진다, 사장님 정함)
+        function psHistDue(x) { return (x.rounds.length >= 3 && x.overdue !== null) ? x.overdue : -9999; }
+        /* [신규 2026-10-05] 판매기록 조건 거르기 (사장님 요청 — 정렬이 너무 많아 엑셀처럼 조건을 겹쳐 건다)
+           조건은 이 기기에 기억한다 (ps_hist_filter). 묶음 단추는 자주 쓰는 조건을 한 번에 건다 */
+        const PS_HF0 = { kind: '', noSada: false, minAvg: '', minIdle: '', minRounds: '', late: false, next: '', trend: '', stock: '', minAfter: '' };
+        let psHistF = Object.assign({}, PS_HF0), psHistFOpen = false, psHistCount = { shown: 0, all: 0 };
+        try { const v = JSON.parse(localStorage.getItem('ps_hist_filter') || 'null'); if (v && typeof v === 'object') psHistF = Object.assign({}, PS_HF0, v); if (!['', 'has', 'none'].includes(psHistF.kind)) psHistF.kind = ''; if (psHistF.stock === 'out' || psHistF.stock === 'none') psHistF.stock = ''; } catch (e) { }
+        const PS_HF_PRESETS = {
+            popIdle: { label: '🔥 인기인데 오래 안 올림', f: { minAvg: 5, minIdle: 30, next: 'no', noSada: true }, sort: 'idle' },
+            due: { label: '⏰ 다시 올릴 때 됨', f: { minRounds: 3, late: true, next: 'no' }, sort: 'idle' },
+            growth: { label: '📈 늘어나는 상품', f: { trend: 'up' }, sort: 'sold' },
+            after: { label: '📦 공구 뒤 남은 상품', f: { minAfter: 5 }, sort: 'sold' }
+        };
+        function psHistNum(v) { const n = parseInt(v, 10); return isNaN(n) ? null : n; }
+        function psHistPass(x) {
+            const F = psHistF, n = psHistNum;
+            // 상시·공구 구분은 안 본다 — 회차가 있었는지만 (사장님)
+            if (F.kind === 'has' && !x.rounds.length) return false;
+            if (F.kind === 'none' && x.rounds.length) return false;
+            if (F.noSada && /^S/i.test(x.code)) return false;
+            if (n(F.minAvg) !== null && !((x.avgQty || 0) >= n(F.minAvg))) return false;
+            if (n(F.minIdle) !== null && !(x.idleDays !== null && x.idleDays >= n(F.minIdle))) return false;
+            if (n(F.minRounds) !== null && !(x.rounds.length >= n(F.minRounds))) return false;
+            if (F.late && !(psHistDue(x) > 0)) return false;
+            if (F.next === 'yes' && !x.next) return false;
+            if (F.next === 'no' && x.next) return false;
+            if (F.trend && x.trend !== F.trend) return false;
+            const sl = x.stockLeft;
+            if (F.stock === 'have' && !(sl > 0)) return false;
+            if (F.stock === 'low' && !(sl > 0 && sl !== Infinity && sl <= 5)) return false;
+            if (n(F.minAfter) !== null && !((x.afterTotal || 0) >= n(F.minAfter))) return false;
+            return true;
+        }
+        // 걸린 조건을 딱지 글로 [칸, 글]
+        function psHistActive() {
+            const F = psHistF, n = psHistNum, out = [];
+            const K = { has: '회차 있음', none: '회차 없음' }, T = { up: '늘어남', down: '줄어듦', flat: '비슷' };
+            const S = { have: '재고 있음', low: '재고 5개 이하' };
+            if (F.kind) out.push(['kind', K[F.kind]]);
+            if (F.noSada) out.push(['noSada', '사다드림 빼기']);
+            if (n(F.minAvg) !== null) out.push(['minAvg', `평균 ${n(F.minAvg)}개 이상`]);
+            if (n(F.minIdle) !== null) out.push(['minIdle', `안 올린 지 ${n(F.minIdle)}일 이상`]);
+            if (n(F.minRounds) !== null) out.push(['minRounds', `${n(F.minRounds)}회 이상`]);
+            if (F.late) out.push(['late', '평소보다 늦음']);
+            if (F.next) out.push(['next', F.next === 'yes' ? '일정 있음' : '일정 없음']);
+            if (F.trend) out.push(['trend', T[F.trend]]);
+            if (F.stock) out.push(['stock', S[F.stock]]);
+            if (n(F.minAfter) !== null) out.push(['minAfter', `공구 뒤 상시 ${n(F.minAfter)}개 이상`]);
+            return out;
+        }
+        function psHistActiveCount() { return psHistActive().length; }
+        function psHistFSave() { try { localStorage.setItem('ps_hist_filter', JSON.stringify(psHistF)); } catch (e) { } }
+        function psHistFSet(k, v) { psHistF[k] = v; psHistLimit = 60; psHistFSave(); psHistPaintFilter(); psHistPaintList(); }
+        function psHistFClear(k) { if (k) psHistF[k] = PS_HF0[k]; else psHistF = Object.assign({}, PS_HF0); psHistLimit = 60; psHistFSave(); psHistPaintFilter(); psHistPaintList(); }
+        function psHistPreset(key) {
+            const P = PS_HF_PRESETS[key]; if (!P) return;
+            psHistF = Object.assign({}, PS_HF0, P.f); if (P.sort) psHistSort = P.sort;
+            psHistLimit = 60; psHistFSave();
+            const sel = document.getElementById('ps-hist-sort'); if (sel) sel.value = psHistSort;
+            psHistPaintFilter(); psHistPaintList();
+        }
+        function psHistFToggle() { psHistFOpen = !psHistFOpen; psHistPaintFilter(); }
+        function psHistFilterHtml() {
+            const F = psHistF, act = psHistActive();
+            const sel = (k, opts) => `<select onchange="psHistFSet('${k}', this.value)">${opts.map(([v, l]) => `<option value="${v}"${String(F[k]) === v ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+            const num = (k, unit) => `<span class="ps-hf-num"><input type="number" min="0" inputmode="numeric" value="${F[k] === '' || F[k] === null ? '' : F[k]}" placeholder="-" onchange="psHistFSet('${k}', this.value)">${unit}</span>`;
+            const chk = (k, l) => `<label class="ps-hf-chk"><input type="checkbox"${F[k] ? ' checked' : ''} onchange="psHistFSet('${k}', this.checked)"> ${l}</label>`;
+            const presets = Object.keys(PS_HF_PRESETS).map(k => `<button type="button" class="ps-hf-pre" onclick="psHistPreset('${k}')">${PS_HF_PRESETS[k].label}</button>`).join('');
+            return `<div class="ps-hf-bar">
+                    <button type="button" class="ps-hf-btn${psHistFOpen ? ' on' : ''}" onclick="psHistFToggle()">🔎 조건${act.length ? ` <b>${act.length}</b>` : ''}</button>
+                    ${presets}
+                </div>
+                ${act.length ? `<div class="ps-hf-chips">${act.map(([k, l]) => `<span class="ps-hf-chip">${l}<button type="button" onclick="psHistFClear('${k}')" title="이 조건 풀기">✕</button></span>`).join('')}
+                    <button type="button" class="ps-hf-clr" onclick="psHistFClear()">모두 풀기</button> <span class="ps-h-dim" id="ps-hist-count"></span></div>` : ''}
+                ${psHistFOpen ? `<div class="ps-hf-panel">
+                    <div><span>회차</span>${sel('kind', [['', '전체'], ['has', '있음'], ['none', '없음']])} ${chk('noSada', '사다드림 빼기')}</div>
+                    <div><span>최근 평균</span>${num('minAvg', '개 이상')}</div>
+                    <div><span>안 올린 지</span>${num('minIdle', '일 이상')}</div>
+                    <div><span>회차 수</span>${num('minRounds', '회 이상')}</div>
+                    <div><span>간격</span>${chk('late', '평소 간격보다 늦음 (3회 이상)')}</div>
+                    <div><span>앞으로 일정</span>${sel('next', [['', '상관없음'], ['yes', '있음'], ['no', '없음']])}</div>
+                    <div><span>추세</span>${sel('trend', [['', '상관없음'], ['up', '늘어남'], ['down', '줄어듦'], ['flat', '비슷']])}</div>
+                    <div><span>재고</span>${sel('stock', [['', '상관없음'], ['have', '있음'], ['low', '5개 이하']])}</div>
+                    <div><span>공구 뒤 상시</span>${num('minAfter', '개 이상')}</div>
+                </div>` : ''}`;
+        }
+        function psHistPaintFilter() {
+            const el = document.getElementById('ps-hist-filter'); if (el) el.innerHTML = psHistFilterHtml();
+            const cnt = document.getElementById('ps-hist-count'); if (cnt) cnt.textContent = psHistActiveCount() ? `${psHistCount.all}개 중 ${psHistCount.shown}개` : '';
+        }
+        // 재고순 묶음: 0 = 상시판매 중 재고 있음(무제한 포함) · 1 = 재고 없음 (상시판매 중이 아님, 품절)
+        function psHistStockGroup(x) { const v = x.stockLeft; return (v === null || v === undefined) ? 1 : (v > 0 ? 0 : 2); }
         function psHistRowsHtml() {
             const E = gEscapeHtml;
             let list = window.__psHist || [];
@@ -15620,10 +15761,18 @@
                 idle: (a, b) => (!!a.next - !!b.next) || ((b.idleDays ?? -1) - (a.idleDays ?? -1)),   // 앞으로 일정이 없는 것 먼저, 오래 안 올린 순
                 sold: (a, b) => b.total - a.total,
                 recent: (a, b) => ((b.rounds[0] && b.rounds[0].pk) || (b.months[0] && b.months[0].m) || '').localeCompare((a.rounds[0] && a.rounds[0].pk) || (a.months[0] && a.months[0].m) || ''),
-                name: (a, b) => a.name.localeCompare(b.name, 'ko')
+                name: (a, b) => a.name.localeCompare(b.name, 'ko'),
+                // [신규 2026-10-05] 재고 많은 순 · 적은 순 — 상시판매 중 재고 있는 상품 → 재고 없음(상시판매 중이 아니거나 품절, 맨 아래)
+                stock: (a, b) => psHistStockGroup(a) - psHistStockGroup(b) || (b.stockLeft || 0) - (a.stockLeft || 0) || (b.total || 0) - (a.total || 0),
+                stockLow: (a, b) => psHistStockGroup(a) - psHistStockGroup(b) || (a.stockLeft || 0) - (b.stockLeft || 0) || (b.total || 0) - (a.total || 0)
             }[psHistSort] || ((a, b) => 0);
+            // [신규 2026-10-05] 조건 거르기 (엑셀처럼, 사장님 요청)
+            const before = list.length;
+            list = list.filter(psHistPass);
             list = list.slice().sort(by);
-            if (!list.length) return `<div class="ps-h-empty">${q ? '찾는 상품이 없어요.' : '공동구매 기록이 없어요.'}</div>`;
+            psHistCount = { shown: list.length, all: before };
+            const cnt = document.getElementById('ps-hist-count'); if (cnt) cnt.textContent = psHistActiveCount() ? `${before}개 중 ${list.length}개` : '';
+            if (!list.length) return `<div class="ps-h-empty">${q ? '찾는 상품이 없어요.' : (psHistActiveCount() ? '조건에 맞는 상품이 없어요.' : '공동구매 기록이 없어요.')}</div>`;
             const shown = list.slice(0, psHistLimit);
             const tr = { up: '<span class="ps-h-up">▲ 늘어남</span>', down: '<span class="ps-h-down">▼ 줄어듦</span>', flat: '<span class="ps-h-flat">비슷</span>' };
             return shown.map(x => {
@@ -15639,8 +15788,12 @@
                         <div class="ps-h-name">${E(x.name)} <span class="ps-h-code">${E(x.code)}</span>${x.cur ? '' : ' <span class="ps-h-dim">· 지금 목록에 없음</span>'}</div>
                         <div class="ps-h-sub">
                             ${x.rounds.length ? `<span>마지막으로 올린 날 <b>${x.lastPosted ? psHistMD(x.lastPosted) : '—'}</b>${idle ? ` (${idle})` : ''}</span>
-                            <span>${x.rounds.length}회</span>` : (x.empty ? '<span class="ps-h-dim">7월 뒤 판매 기록 없음</span>' : '<span class="ps-h-dim">공구 기록 없음</span>')}
+                            <span>${x.rounds.length}회</span>` : (x.empty ? '<span class="ps-h-dim">회차 없음 · 7월 뒤 판매 없음</span>' : '<span class="ps-h-dim">회차 없음</span>')}
                             ${x.onsiteTotal ? `<span class="ps-h-dim">${x.months.every(mo => mo.kind === 'fruit') ? '과일' : '상시'} ${x.onsiteTotal}개</span>` : ''}
+                            ${psHistF.late && psHistDue(x) > 0 ? `<span class="ps-h-stk low">${x.overdue}일 늦음</span>` : ''}
+                            ${psHistF.trend && x.growth ? `<span class="${x.growth >= 1 ? 'ps-h-up' : 'ps-h-down'}">최근 ${Math.round((x.growth - 1) * 100) >= 0 ? '+' : ''}${Math.round((x.growth - 1) * 100)}%</span>` : ''}
+                            ${psHistNum(psHistF.minAfter) !== null && x.afterTotal ? `<span class="ps-h-dim">공구 뒤 상시 <b>${x.afterTotal}개</b></span>` : ''}
+                            ${x.stockLeft === null || x.stockLeft === undefined ? '' : (x.stockLeft === Infinity ? '<span class="ps-h-stk ok">재고 무제한</span>' : `<span class="ps-h-stk${x.stockLeft <= 5 ? ' low' : ' ok'}">재고 ${x.stockLeft}개</span>`)}
                             ${x.avgQty ? `<span>최근 평균 <b>${x.avgQty}개</b></span>` : ''}
                             ${x.gap ? `<span>보통 <b>${x.gap}일</b>마다</span>` : ''}
                             ${x.trend ? tr[x.trend] : ''}
@@ -15683,21 +15836,26 @@
         function psHistHtml() {
             if (psRoundLog === null) psRoundTick();   // 회차 기록을 아직 못 읽었으면 읽어 와서 다시 그린다
             window.__psHist = psHistBuild();
-            const n = window.__psHist.filter(x => x.cur && x.rounds.length).length, nOn = window.__psHist.filter(x => x.cur && !x.rounds.length && !x.empty).length, nEmpty = window.__psHist.filter(x => x.cur && x.empty).length;
-            const sortOpt = [['recent', '최근 일정 순'], ['idle', '오래 안 올린 순'], ['sold', '많이 팔린 순'], ['name', '이름 순']]
+            const n = window.__psHist.filter(x => x.cur && x.rounds.length).length, nNo = window.__psHist.filter(x => x.cur && !x.rounds.length).length;
+            if (!['recent', 'sold', 'idle', 'stock', 'stockLow', 'name'].includes(psHistSort)) psHistSort = 'recent';   // 조건으로 옮긴 옛 정렬
+            const sortOpt = [['recent', '최근 일정 순'], ['sold', '많이 팔린 순'], ['idle', '오래 안 올린 순'], ['stock', '재고 많은 순'], ['stockLow', '재고 적은 순'], ['name', '이름 순']]
                 .map(([v, l]) => `<option value="${v}"${psHistSort === v ? ' selected' : ''}>${l}</option>`).join('');
             return `<div class="ps-h-wrap">
                 <div class="ps-h-top">
-                    <b>📊 판매기록</b> <span class="ps-h-dim">지금 목록의 공동구매 상품 ${n}개${nOn ? ` · 상시판매만 ${nOn}개` : ''}${nEmpty ? ` · 기록 없음 ${nEmpty}개` : ''} · 누르면 회차별 판매 · 옛 상품은 찾기로</span>
+                    <b>📊 판매기록</b> <span class="ps-h-dim">지금 상품 중 회차 있음 ${n}개 · 회차 없음 ${nNo}개 · 누르면 회차별 판매 · 옛 상품은 찾기로</span>
                 </div>
                 <div class="ps-h-ctl">
                     <input type="text" id="ps-hist-q" value="${gEscapeHtml(psHistQ)}" placeholder="🔍 상품 이름·코드" oninput="psHistSearch(this.value)">
                     <select id="ps-hist-sort" onchange="psHistSetSort(this.value)">${sortOpt}</select>
                 </div>
+                <div id="ps-hist-filter">${psHistFilterHtml()}</div>
                 <div id="ps-hist-list">${psHistRowsHtml()}</div>
             </div>`;
         }
-        function psHistPaintList() { const el = document.getElementById('ps-hist-list'); if (el) el.innerHTML = psHistRowsHtml(); }
+        function psHistPaintList() {
+            const el = document.getElementById('ps-hist-list'); if (el) el.innerHTML = psHistRowsHtml();
+            const cnt = document.getElementById('ps-hist-count'); if (cnt) cnt.textContent = psHistActiveCount() ? `${psHistCount.all}개 중 ${psHistCount.shown}개` : '';
+        }
         function psHistSearch(v) { psHistQ = String(v || ''); psHistLimit = 60; psHistPaintList(); }
         function psHistSetSort(v) { psHistSort = v; psHistPaintList(); }
         function psHistToggle(code) { if (psHistOpen.has(code)) psHistOpen.delete(code); else psHistOpen.add(code); psHistPaintList(); }
