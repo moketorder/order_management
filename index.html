@@ -15551,7 +15551,7 @@
         }
         /* 회차 계산: 서버 기록(진짜 회차) + 기록 밖 주문으로 짐작한 회차 → { code: { code, rounds[], names } }
            주문 하나는 '그 시각 전에 시작한 가장 늦은 회차'에 넣는다. 기록된 회차(접수 중이거나 접수 끝 30분 안)면 그대로 넣고,
-           짐작 회차는 1주일 기준 하나로 나눈다 (사장님: 회차는 1주일) — 배달일이 회차 첫 배달일에서 7일 안이면 같은 회차, 7일 이상 뒤면 새 회차
+           짐작 회차는 ① 앞 회차 배달일이 지난 뒤 더 늦은 배달일로 받은 주문, ② 첫 배달일에서 7일 이상 뒤 배달일 — 둘 중 하나면 새 회차
            옛 주문(7/1~8/14)이 공동구매인지는 psRoundOrders 에서 주문마다 가른다. 옛 주문만으로 된 회차는 old 로 표시한다 */
         function psRoundCompute() {
             const { by, names, onsite, fruit } = psRoundOrders();
@@ -15582,10 +15582,13 @@
                     if (R) {
                         const last = psRoundLastPk(R);
                         const inWindow = (!R.est && !R.closeAt) || x.ms <= (Number(R.closeAt) || 0) + 30 * 60000;
-                        // [수정 2026-10-05] 짐작 회차는 1주일 기준 하나로 (사장님): 배달일이 회차 첫 배달일에서 7일 안이면 같은 회차, 7일 이상 뒤면 새 회차
+                        /* [수정 2026-10-05] 짐작 회차 나누기 — 둘 중 하나라도 맞으면 새 회차 (사장님):
+                           ① 앞 회차 배달일이 지난 뒤(당일 포함)에 더 늦은 배달일로 들어온 주문 — 배달이 끝나고 다시 받은 것 (예: 한우 육회 9/18 뒤 9/23)
+                           ② 배달일이 회차 첫 배달일에서 7일 이상 뒤 — 미리 받아 둔 다음 주 주문 (예: 왕란 9/10에 받은 9/17) */
                         const firstPk = R.o.length ? R.o.reduce((m, y) => (y.pk < m ? y.pk : m), R.o[0].pk) : (Object.keys(R.pickups || {}).sort()[0] || last);
-                        const inWeek = !!firstPk && (new Date(x.pk + 'T12:00:00') - new Date(firstPk + 'T12:00:00')) < 7 * 86400000;
-                        if (inWindow || inWeek) { R.o.push(x); return; }
+                        const afterDone = !!last && x.pk > last && x.od >= last;
+                        const pastWeek = !!firstPk && (new Date(x.pk + 'T12:00:00') - new Date(firstPk + 'T12:00:00')) >= 7 * 86400000;
+                        if (inWindow || !(afterDone || pastWeek)) { R.o.push(x); return; }
                     }
                     rs.splice(i + 1, 0, { rid: 'e' + x.ms, est: true, openAt: x.ms, pickups: {}, log: {}, o: [x] });
                 });
