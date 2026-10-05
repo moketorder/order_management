@@ -2489,11 +2489,12 @@
             flex-shrink: 0;
             justify-content: center;
         }
-        /* [수정 2026-10-05] 폰 상품 카드 — 수량·변경·수정·마감을 두 개씩 두 줄 대신 한 개씩 네 줄로 (사장님 요청) */
-        @media (max-width: 768px) {
-            #tab-admin-products .product-actions.pa-stack > div { flex-direction: column; align-items: stretch !important; }
-            #tab-admin-products .product-actions.pa-stack > div > * { flex: 0 0 auto !important; width: 100%; }
-        }
+        /* [수정 2026-10-05] 상품 카드 단추 — 한 줄에 하나씩 (공동구매: 수량·수정·마감 / 상시판매: 수량·위치·수정) (사장님 요청).
+           PC·폰 모두. 단추 묶음 폭은 줄여서(104→72px) 상품 내용 칸을 넓힌다 */
+        #tab-admin-products .product-actions.pa-stack { width: 72px !important; }
+        #tab-admin-products .product-actions.pa-stack > div { flex-direction: column; align-items: stretch !important; }
+        #tab-admin-products .product-actions.pa-stack > div > * { flex: 0 0 auto !important; width: 100%; padding-left: 2px !important; padding-right: 2px !important; }
+        #tab-admin-products .product-actions.pa-stack select { font-size: 11px !important; text-overflow: ellipsis; }
         #tab-admin-products .btn-action {
             border: none;
             padding: 3px 6px;
@@ -25430,9 +25431,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 /* [수정 2026-10-05] 선반·냉장·냉동은 칸이 많아 단추가 너무 많았다 — 묶음 단추 하나씩만 두고,
                    누르면 그 밑 줄에 그 묶음의 칸들이 펼쳐진다 (사장님 요청). 묶음은 선반 이름으로 가른다(선반 관리에서 이름을 바꿔도 따라감).
                    지금 보고 있는 칸이 든 묶음은 진하게 칠하고 처음부터 펼쳐 둔다 */
-                const groupOf = ([k, l]) => /냉동/.test(l) ? 'freezer' : /냉장/.test(l) ? 'fridge' : /선반/.test(l) ? 'shelf' : '';
+                const groupOf = ([k, l]) => gShelfGroupOfLabel(l);
                 const GROUPS = [['shelf', '🗄️ 선반'], ['fridge', '❄️ 냉장'], ['freezer', '🧊 냉동']];
-                const curGroup = (subs.find(s => s[0] === uploadSubTab) && groupOf(subs.find(s => s[0] === uploadSubTab))) || '';
+                // [수정 2026-10-05] 묶음 단추를 누르면 그 묶음 전체('grp:묶음')를 먼저 보여 준다 (사장님 요청)
+                const curGroup = String(uploadSubTab).startsWith('grp:') ? String(uploadSubTab).slice(4)
+                    : ((subs.find(s => s[0] === uploadSubTab) && groupOf(subs.find(s => s[0] === uploadSubTab))) || '');
                 if (invShelfOpenGroup === null) invShelfOpenGroup = curGroup;
                 const btn = ([key, label]) => `<button type="button" class="sub-tab-btn ${uploadSubTab === key ? 'active' : ''}" data-sub-tab="${key}" onclick="invShelfPick('${key}')">${label}</button>`;
                 let top = '', placed = new Set();
@@ -25448,7 +25451,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 });
                 const openSubs = subs.filter(s => groupOf(s) && groupOf(s) === invShelfOpenGroup);
                 const lower = openSubs.length
-                    ? `<div style="flex:0 0 100%; display:flex; flex-wrap:wrap; gap:6px; padding:6px 8px; background:#f8fafc; border:1px solid var(--border); border-radius:12px;">${openSubs.map(btn).join('')}</div>`
+                    ? `<div style="flex:0 0 100%; display:flex; flex-wrap:wrap; gap:6px; padding:6px 8px; background:#f8fafc; border:1px solid var(--border); border-radius:12px;">${[[`grp:${invShelfOpenGroup}`, '전체']].concat(openSubs).map(btn).join('')}</div>`
                     : '';
 
                 subContainer.style.display = 'flex';
@@ -25472,8 +25475,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         // [신규 2026-10-05] 상시판매 선반 하위탭 — 펼쳐 둔 묶음('shelf'·'fridge'·'freezer', '' = 닫힘, null = 아직 안 정함)
         let invShelfOpenGroup = null;
+        // 칸 이름으로 묶음을 가른다 — '냉동'·'냉장'·'선반'이 들어간 이름 (선반 관리에서 이름을 바꿔도 따라감)
+        function gShelfGroupOfLabel(l) {
+            l = String(l || '');
+            return /냉동/.test(l) ? 'freezer' : /냉장/.test(l) ? 'fridge' : /선반/.test(l) ? 'shelf' : '';
+        }
+        // [수정 2026-10-05] 묶음 단추 — 처음 누르면 펼치면서 그 묶음 전체를 보여 주고, 펼쳐 둔 것을 다시 누르면 접기만 한다
         function invShelfToggleGroup(g) {
-            invShelfOpenGroup = (invShelfOpenGroup === g) ? '' : g;
+            if (invShelfOpenGroup === g) { invShelfOpenGroup = ''; buildSubTabs(); return; }
+            invShelfOpenGroup = g;
+            selectManageSubTab('grp:' + g);
             buildSubTabs();
         }
         function invShelfPick(key) {
@@ -27311,8 +27322,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const c = String(prod.productCode || '').trim();
             const s = gGbHistMap().get(c ? 'c:' + c : 'n:' + fTightName(prod.name || ''));
             if (!s || !s.size) return '';
-            const last = [...s].sort().pop();
-            return `<span title="마지막 공구일 (공구 횟수 = 팔린 픽업일 수)" style="font-size:10px; font-weight:800; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center;">🛒 ${Number(last.slice(5, 7))}/${Number(last.slice(8))} (${s.size}회)</span>`;
+            const days = [...s].sort();
+            const last = days[days.length - 1];
+            /* [수정 2026-10-05] 한 차례 공구는 픽업일이 며칠에 걸치기도 한다 — 그 차례 첫날부터 일주일(7일) 안의 날은 같은 차례로 보고 한 번만 센다 (사장님 요청).
+               매주 같은 요일에 여는 공구(딱 7일 뒤)는 다른 차례로 센다 */
+            let rounds = 0, start = null;
+            days.forEach(d => {
+                const t = new Date(`${d}T00:00:00`).getTime();
+                if (start === null || t - start >= 7 * 86400000) { rounds++; start = t; }
+            });
+            return `<span title="마지막 공구일 (공구 횟수 — 일주일 안에 붙은 픽업일은 한 번으로 셈)" style="font-size:10px; font-weight:800; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center;">🛒 ${Number(last.slice(5, 7))}/${Number(last.slice(8))} (${rounds}회)</span>`;
         }
         function renderProductsList() {
             const container = document.getElementById('products-list-container');
@@ -27349,6 +27368,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     if (uploadSubTab && uploadSubTab !== 'all') { // 선반 하위탭
                         const prodShelf = String(prod.shelf || "");
                         if (uploadSubTab === SHELF_NONE_SUB) return prodShelf === "";
+                        // [신규 2026-10-05] 묶음 전체(냉장·냉동·선반) — 그 묶음에 드는 칸이면 모두
+                        if (String(uploadSubTab).startsWith('grp:')) return !!prodShelf && gShelfGroupOfLabel(gShelfLabel(prodShelf)) === uploadSubTab.slice(4);
                         return prodShelf === uploadSubTab;
                     }
                     return true;
@@ -27630,7 +27651,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         if (!isUnlimited) {
                             stockInputVal = Math.max(0, parseInt(prod.stock || 0) + parseInt(adjValRaw || 0));
                         }
-                        actionsHtml = `<div class="product-actions" style="display:flex; flex-direction:column; gap:4px; width:104px; flex-shrink:0;">
+                        actionsHtml = `<div class="product-actions pa-stack" style="display:flex; flex-direction:column; gap:4px; width:104px; flex-shrink:0;">
                             <div style="display:flex; gap:3px; align-items:center; width:100%;">
                                 <input type="text" id="stock-input-${index}" value="${stockInputVal}" placeholder="${stockInputVal}" data-orig="${stockInputVal}" inputmode="numeric" enterkeyhint="done" onfocus="this.value='';" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="gStockInputCommit(${index}, this)" title="재고 수량 — 숫자를 쓰고 엔터(또는 다른 곳을 누르면) 바뀌어요. 999=무제한" style="flex:1; min-width:0; padding:5px 4px; border:1.5px solid var(--border); border-radius:6px; font-size:12px; font-weight:700; text-align:center; box-sizing:border-box;">                            </div>
                             <div style="display:flex; gap:3px; align-items:center; width:100%;">
