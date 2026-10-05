@@ -3538,6 +3538,26 @@
                         #purchase-section-sourcing .src-picks button { height:30px; border:1.5px solid #cbd5e1; background:#fff; border-radius:7px; font-size:11.5px; font-weight:900; color:#475569; cursor:pointer; font-family:inherit; padding:0 2px; }
                         #purchase-section-sourcing .src-picks button.on { background:var(--src-acc); border-color:var(--src-acc); color:#fff; }
                         #purchase-section-sourcing .src-picks button:disabled { opacity:.35; cursor:default; }
+                        #purchase-section-sourcing .src-picks button:not(:disabled) { cursor:grab; touch-action:none; }
+                        /* 달력: 아래 요일 칸과 같은 다섯 칸(월~금). 단추를 끌어다 날짜에 놓으면 그날 판 것으로 저장 */
+                        #purchase-section-sourcing .src-cal { background:#fff; border:1px solid var(--src-line); border-radius:12px; padding:8px 10px 10px; margin-bottom:10px; }
+                        #purchase-section-sourcing .src-cal-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+                        #purchase-section-sourcing .src-cal-head b { font-size:15px; font-weight:900; font-variant-numeric:tabular-nums; }
+                        #purchase-section-sourcing .src-cal-head .k { font-size:11.5px; color:var(--src-sub); font-weight:700; }
+                        #purchase-section-sourcing .src-cal-grid { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:4px 10px; }
+                        #purchase-section-sourcing .src-cal-dow { font-size:11px; color:var(--src-sub); font-weight:800; text-align:center; }
+                        #purchase-section-sourcing .src-cal-day { min-height:58px; border:1px solid var(--src-line); border-radius:8px; padding:4px; background:#f8fafc; display:flex; flex-direction:column; gap:3px; min-width:0; box-sizing:border-box; }
+                        #purchase-section-sourcing .src-cal-day.other { opacity:.45; }
+                        #purchase-section-sourcing .src-cal-day.inweek { background:#fff; border-color:#99d4c6; }
+                        #purchase-section-sourcing .src-cal-day.today .n { color:#fff; background:var(--src-acc); border-radius:999px; padding:0 6px; }
+                        #purchase-section-sourcing .src-cal-day.over { outline:2px dashed var(--src-acc); outline-offset:-1px; background:var(--src-acc-soft); }
+                        #purchase-section-sourcing .src-cal-day .n { font-size:11px; font-weight:900; font-variant-numeric:tabular-nums; align-self:flex-start; }
+                        #purchase-section-sourcing .src-tag { font-size:10.5px; font-weight:800; border-radius:5px; padding:1px 4px; display:flex; gap:3px; align-items:center; background:var(--src-acc-soft); color:var(--src-acc); min-width:0; }
+                        #purchase-section-sourcing .src-tag span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+                        #purchase-section-sourcing .src-tag.alt { background:var(--src-pick); color:var(--src-pick-ink); }
+                        #purchase-section-sourcing .src-tag.direct { background:#e2e8f0; color:#334155; }
+                        #purchase-section-sourcing .src-tag button { border:none; background:transparent; cursor:pointer; font-weight:900; color:inherit; padding:0 2px; font-size:11px; line-height:1; }
+                        #src-drag-ghost { position:fixed; z-index:2147483600; pointer-events:none; background:#0f766e; color:#fff; font-size:12px; font-weight:900; padding:6px 10px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.25); transform:translate(-50%, -130%); white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis; font-family:inherit; }
                         #purchase-section-sourcing .src-link { font-size:11.5px; color:var(--src-acc); font-weight:800; text-decoration:none; }
                         #purchase-section-sourcing .src-empty { border:1px dashed var(--src-line); border-radius:12px; height:100%; box-sizing:border-box; padding:10px; font-size:12px; color:var(--src-sub); }
                         #purchase-section-sourcing .src-none { padding:30px 10px; text-align:center; color:var(--src-sub); font-weight:700; background:#fff; border-radius:12px; border:1px solid var(--src-line); }
@@ -3560,6 +3580,9 @@
                             #purchase-section-sourcing .src-cell { grid-row:auto; grid-column:auto; order:var(--o); }
                             #purchase-section-sourcing .src-dayhead { margin-top:8px; }
                             #purchase-section-sourcing .src-empty.fill { display:none; }
+                            #purchase-section-sourcing .src-cal-grid { gap:3px; }
+                            #purchase-section-sourcing .src-cal-day { min-height:46px; padding:3px; }
+                            #purchase-section-sourcing .src-tag { font-size:9.5px; }
                         }
                     </style>
 
@@ -3583,7 +3606,7 @@
                 const SRC_PICKS = ['이 상품', '1순위', '2순위', '3순위'];
                 const gSrc = {
                     tab: 'lineup', loaded: false, meta: null, lineup: {}, picks: {}, direct: {},
-                    band: null, kakao: null, week: '',
+                    band: null, kakao: null, week: '', calMonth: '',
                     bandQ: { q: '', vendor: '', cat: '', sort: 's', dir: -1, soldOnly: false, limit: 100 },
                     kakaoQ: { q: '', vendor: '', sort: 'd', dir: -1, limit: 100 }
                 };
@@ -3644,7 +3667,7 @@
                 function srcSoldMap() {
                     const m = {};
                     const put = (vendor, name, date) => { const k = vendor + '|' + name; if (!m[k] || date > m[k]) m[k] = date; };
-                    Object.entries(gSrc.picks).forEach(([wk, items]) => Object.values(items || {}).forEach(p => p && put(p.vendor, p.name, wk)));
+                    Object.entries(gSrc.picks).forEach(([wk, items]) => Object.values(items || {}).forEach(p => p && put(p.vendor, p.name, p.date || wk)));
                     Object.values(gSrc.direct).forEach(p => p && put(p.vendor, p.name, p.date));
                     return m;
                 }
@@ -3664,13 +3687,14 @@
                     const wx = {}; (w.weather || []).forEach(x => wx[x.day] = x);
 
                     let html = '<div class="src-bar">' +
-                        '<select onchange="gSrc.week=this.value; srcRender()">' + weeks.map(k => '<option value="' + k + '"' + (k === gSrc.week ? ' selected' : '') + '>' + srcEsc((gSrc.lineup[k] || {}).label || k) + (k === weeks[0] ? ' (최신)' : '') + '</option>').join('') + '</select>' +
+                        '<select onchange="gSrc.week=this.value; gSrc.calMonth=this.value.slice(0, 7); srcRender()">' + weeks.map(k => '<option value="' + k + '"' + (k === gSrc.week ? ' selected' : '') + '>' + srcEsc((gSrc.lineup[k] || {}).label || k) + (k === weeks[0] ? ' (최신)' : '') + '</option>').join('') + '</select>' +
                         '<span><span class="k">상품</span> <b>' + items.length + '개</b></span>' +
                         '<span><span class="k">고른 상품</span> <b>' + pickedN + '개</b></span>' +
                         '<span><span class="k">평균 마진</span> <b>' + avgM + '</b></span>' +
                         (w.weatherNote ? '<span><span class="k">날씨</span> <b>' + srcEsc(w.weatherNote) + '</b></span>' : '') +
-                        '<span class="k">고르면 바로 저장돼요. 고른 상품은 4주 동안 다시 추천하지 않아요.</span></div>';
+                        '<span class="k">단추를 누르면 그 요일 날짜로, 달력 날짜에 끌어다 놓으면 그 날짜로 저장돼요. 고른 상품은 4주 동안 다시 추천하지 않아요.</span></div>';
 
+                    html += srcCalendar();
                     const rows = Math.max(1, ...SRC_DAYS.map(d => items.filter(it => it.day === d).length));
                     html += '<div class="src-board">';
                     SRC_DAYS.forEach((d, c) => {
@@ -3705,31 +3729,139 @@
                         (it.link ? '<a class="src-link" href="' + srcEsc(it.link) + '" target="_blank" rel="noopener">밴드 글 보기 ↗</a>' : '') +
                         '<div class="src-picks">' + SRC_PICKS.map((lab, i) => {
                             const dis = i > 0 && !alts[i - 1];
-                            return '<button type="button"' + (pick === lab ? ' class="on"' : '') + (dis ? ' disabled' : '') + ' onclick="srcPick(\'' + it.key + '\',\'' + lab + '\')">' + (i ? i + '순위' : '이 상품') + '</button>';
+                            // 누르기·끌기는 아래 srcDrag 가 한 곳에서 처리한다 (data-key, data-lab)
+                            return '<button type="button" data-key="' + it.key + '" data-lab="' + lab + '"' + (pick === lab ? ' class="on"' : '') + (dis ? ' disabled' : '') +
+                                ' title="누르면 ' + it.day + '요일로 저장, 달력 날짜에 끌어다 놓으면 그 날짜로 저장">' + (i ? i + '순위' : '이 상품') + '</button>';
                         }).join('') + '</div></div>';
                 }
-                async function srcPick(key, lab) {
+                // date 없이 부르면(단추 누르기) 같은 것을 다시 누를 때 취소, 아니면 그 요일 날짜로 저장.
+                // date 를 주면(달력에 끌어다 놓기) 늘 그 날짜로 저장한다.
+                async function srcPick(key, lab, date) {
                     const wk = gSrc.week, w = gSrc.lineup[wk] || {}, it = (w.items || {})[key];
                     if (!it) return;
                     const cur = (gSrc.picks[wk] || {})[key];
                     let val = null;
-                    if (!cur || cur.pick !== lab) {
+                    if (date || !cur || cur.pick !== lab) {
+                        if (!date) date = srcAddDays(wk, SRC_DAYS.indexOf(it.day));
                         let name = it.name, vendor = it.vendor, supply = it.supply || '';
                         if (lab !== '이 상품') {
                             const a = String((it.alts || [])[+lab[0] - 1] || '').split(' / ');
                             if (a.length < 2) return;
                             name = a[0]; vendor = a[1]; supply = (a[2] || '').replace(/[^\d]/g, '');
                         }
-                        val = { pick: lab, name, vendor, supply, day: it.day, order: it.order, at: new Date().toISOString() };
+                        val = { pick: lab, name, vendor, supply, day: it.day, order: it.order, date, at: new Date().toISOString() };
                     }
                     try {
                         await srcPut('picks/' + wk + '/' + key, val);
                         gSrc.picks[wk] = gSrc.picks[wk] || {};
                         if (val) gSrc.picks[wk][key] = val; else delete gSrc.picks[wk][key];
-                        showToast(val ? '고른 상품 저장: ' + val.name : '고른 것을 취소했어요');
+                        showToast(val ? val.date.slice(5).replace('-', '/') + ' 판매로 저장: ' + val.name : '고른 것을 취소했어요');
                     } catch (e) { showToast('저장 못 했어요: ' + e.message); }
                     srcRender();
                 }
+                function srcAddDays(iso, n) {
+                    const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n);
+                    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                }
+
+                // ── 달력 (월~금) ──
+                // 고른 상품(식단표)과 판매 표시(밴드 목록)를 판 날짜 칸에 보여 준다. 날짜 칸은 끌어다 놓는 자리다.
+                function srcCalendar() {
+                    const month = gSrc.calMonth || (gSrc.week || srcToday()).slice(0, 7);
+                    gSrc.calMonth = month;
+                    const [y, m] = month.split('-').map(Number);
+                    const first = new Date(y, m - 1, 1), last = new Date(y, m, 0);
+                    const start = new Date(first); start.setDate(start.getDate() - (start.getDay() + 6) % 7);
+                    const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    const today = srcToday(), weekEnd = gSrc.week ? srcAddDays(gSrc.week, 4) : '';
+                    const byDate = {};
+                    Object.entries(gSrc.picks).forEach(([wk, items]) => Object.entries(items || {}).forEach(([key, p]) => {
+                        if (!p) return;
+                        const d = p.date || srcAddDays(wk, Math.max(0, SRC_DAYS.indexOf(p.day)));
+                        (byDate[d] = byDate[d] || []).push({ kind: p.pick === '이 상품' ? '' : 'alt', name: p.name, del: "srcUnpick('" + wk + "','" + key + "')" });
+                    }));
+                    Object.entries(gSrc.direct).forEach(([no, p]) => {
+                        if (!p) return;
+                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'direct', name: p.name, del: "srcUndirect('" + no + "')" });
+                    });
+                    let html = '<div class="src-cal"><div class="src-cal-head">' +
+                        '<button type="button" class="src-btn" onclick="srcCalMove(-1)">◀</button><b>' + y + '년 ' + m + '월</b>' +
+                        '<button type="button" class="src-btn" onclick="srcCalMove(1)">▶</button>' +
+                        '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 회색 = 목록에서 직접 판매 표시 · × 로 지우기</span></div><div class="src-cal-grid">' +
+                        SRC_DAYS.map(d => '<div class="src-cal-dow">' + d + '</div>').join('');
+                    for (let d = new Date(start); d <= last; d.setDate(d.getDate() + 7)) {
+                        for (let i = 0; i < 5; i++) {
+                            const x = new Date(d); x.setDate(x.getDate() + i);
+                            const k = iso(x);
+                            const cls = ['src-cal-day'];
+                            if (x.getMonth() !== m - 1) cls.push('other');
+                            if (gSrc.week && k >= gSrc.week && k <= weekEnd) cls.push('inweek');
+                            if (k === today) cls.push('today');
+                            html += '<div class="' + cls.join(' ') + '" data-date="' + k + '"><span class="n">' + x.getDate() + '</span>' +
+                                (byDate[k] || []).map(t => '<div class="src-tag ' + t.kind + '" title="' + srcEsc(t.name) + '"><span>' + srcEsc(t.name) + '</span><button type="button" onclick="' + t.del + '" aria-label="지우기">×</button></div>').join('') + '</div>';
+                        }
+                    }
+                    return html + '</div></div>';
+                }
+                function srcCalMove(n) {
+                    const [y, m] = gSrc.calMonth.split('-').map(Number);
+                    const d = new Date(y, m - 1 + n, 1);
+                    gSrc.calMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+                    srcRender();
+                }
+                async function srcUndirect(no) {
+                    const p = gSrc.direct[no]; if (!p) return;
+                    if (!confirm(p.name + '\n판매 표시(' + p.date + ')를 지울까요?')) return;
+                    try { await srcPut('direct/' + no, null); delete gSrc.direct[no]; showToast('판매 표시를 지웠어요'); }
+                    catch (e) { showToast('저장 못 했어요: ' + e.message); }
+                    srcRender();
+                }
+                async function srcUnpick(wk, key) {
+                    const p = (gSrc.picks[wk] || {})[key]; if (!p) return;
+                    if (!confirm(p.name + '\n고른 것을 취소할까요?')) return;
+                    try { await srcPut('picks/' + wk + '/' + key, null); delete gSrc.picks[wk][key]; showToast('고른 것을 취소했어요'); }
+                    catch (e) { showToast('저장 못 했어요: ' + e.message); }
+                    srcRender();
+                }
+
+                // ── 끌어다 놓기 ── 마우스·손가락 모두 된다 (포인터 이벤트). 6px 넘게 움직이면 끌기, 아니면 누르기.
+                (function srcDrag() {
+                    let st = null;
+                    const cellAt = (x, y) => { const el = document.elementFromPoint(x, y); return el ? el.closest('#purchase-section-sourcing [data-date]') : null; };
+                    const clearOver = () => document.querySelectorAll('#purchase-section-sourcing .src-cal-day.over').forEach(e => e.classList.remove('over'));
+                    document.addEventListener('pointerdown', e => {
+                        const b = e.target.closest && e.target.closest('#purchase-section-sourcing .src-picks button[data-key]');
+                        if (!b || b.disabled || e.button > 0) return;
+                        st = { b, key: b.dataset.key, lab: b.dataset.lab, x: e.clientX, y: e.clientY, drag: false, ghost: null, id: e.pointerId };
+                        try { b.setPointerCapture(e.pointerId); } catch (x) {}
+                    });
+                    document.addEventListener('pointermove', e => {
+                        if (!st || e.pointerId !== st.id) return;
+                        if (!st.drag && Math.hypot(e.clientX - st.x, e.clientY - st.y) > 6) {
+                            st.drag = true;
+                            const it = ((gSrc.lineup[gSrc.week] || {}).items || {})[st.key] || {};
+                            const name = st.lab === '이 상품' ? it.name : String((it.alts || [])[+st.lab[0] - 1] || '').split(' / ')[0];
+                            st.ghost = document.createElement('div'); st.ghost.id = 'src-drag-ghost'; st.ghost.textContent = (st.lab === '이 상품' ? '' : st.lab + ' · ') + (name || '');
+                            document.body.appendChild(st.ghost);
+                        }
+                        if (st.drag) {
+                            e.preventDefault();
+                            st.ghost.style.left = e.clientX + 'px'; st.ghost.style.top = e.clientY + 'px';
+                            clearOver(); const c = cellAt(e.clientX, e.clientY); if (c) c.classList.add('over');
+                        }
+                    }, { passive: false });
+                    const end = e => {
+                        if (!st || e.pointerId !== st.id) return;
+                        const s = st; st = null;
+                        clearOver(); if (s.ghost) s.ghost.remove();
+                        if (e.type === 'pointercancel') return;
+                        if (!s.drag) { srcPick(s.key, s.lab); return; }
+                        const c = cellAt(e.clientX, e.clientY);
+                        if (c) srcPick(s.key, s.lab, c.dataset.date);
+                    };
+                    document.addEventListener('pointerup', end);
+                    document.addEventListener('pointercancel', end);
+                })();
 
                 // ── 밴드 상품 ──
                 const SRC_BAND_COLS = [
