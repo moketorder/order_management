@@ -16437,6 +16437,7 @@
                     .filter(it => String(it.name || "").trim() !== "")
                     .map(it => {
                         const row = { name: String(it.name).trim(), price: parseInt(it.price) || 0 };
+                        { const sub = String(it.sub || '').trim(); if (sub) row.sub = sub; }   // [신규 2026-10-05] 둘째 줄 (비우면 저장 안 함)
                         // [신규] 항목별 수량. 비워 두면 제한 없음이므로 아예 저장하지 않는다.
                         //  (0은 '품절'이라는 뜻이라 반드시 저장해야 한다)
                         const raw = String(it.stock === undefined || it.stock === null ? "" : it.stock).trim();
@@ -16533,6 +16534,8 @@
                     g.name = el.value;
                 } else if (el.dataset.optRole === 'item-name' && g.items[ii]) {
                     g.items[ii].name = el.value;
+                } else if (el.dataset.optRole === 'item-sub' && g.items[ii]) {
+                    g.items[ii].sub = el.value;   // [신규 2026-10-05] 둘째 줄
                 } else if (el.dataset.optRole === 'item-price' && g.items[ii]) {
                     g.items[ii].price = parseInt(el.value) || 0;
                 } else if (el.dataset.optRole === 'item-stock' && g.items[ii]) {
@@ -16841,6 +16844,9 @@
                             style="flex: 0 0 72px; width: 72px; padding: 9px 8px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
                         <button type="button" onclick="removeDetailOptionItem(${gi}, ${ii})" title="이 항목 삭제"
                             style="flex: 0 0 auto; width: 34px; height: 34px; border: 1.5px solid var(--border); background: #fff; border-radius: 8px; font-size: 15px; font-weight: 800; color: var(--text-sub); cursor: pointer;">&times;</button>
+                        ${/* [신규 2026-10-05] 둘째 줄 칸 — 손님 주문서에서 항목명 아래 회색 작은 글씨로 나온다 (사장님 요청 — 괄호로 가르던 것 대신) */''}
+                        <input class="opt-item-sub" type="text" data-opt-role="item-sub" data-gi="${gi}" data-ii="${ii}" value="${escapeAttrValue(it.sub || '')}" placeholder="둘째 줄 (예: 5kg 한 박스 · 비우면 한 줄)"
+                            style="flex: 1 1 100%; min-width: 0; box-sizing: border-box; padding: 7px 11px; border: 1.5px dashed var(--border); border-radius: 8px; font-size: 12px; font-weight: 600; color: #64748b; outline: none;">
                     </div>`;
                 });
 
