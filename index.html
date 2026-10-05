@@ -4011,6 +4011,7 @@
         .cc-cell span { display:block; font-size:8.5px; font-weight:800; color:inherit; white-space:nowrap; }
         .cc-cell.click { cursor:pointer; }
         .cc-cell.today { outline:1.5px solid var(--primary); }
+        .cc-cell.pick { outline:2.5px solid #0f172a !important; outline-offset:-1px; }   /* [신규 2026-10-04] 하루 고른 날 */
         .cc-cell.empty, .cc-cell.fut { background:transparent; border-color:transparent; }
         .cc-legend { font-size:9.5px; font-weight:700; color:#94a3b8; text-align:right; margin-top:4px; }
         /* [신규] 손님 관리 위쪽 '상품 조회' 달력은 PC에서 크게 본다 (폰에서는 화면 폭에 맞춘다) */
@@ -18573,6 +18574,7 @@
            이제 '상품 조회' 달력에서 보고 있는 달이 기간이다 — 요약·요일·시간대 표·손님 목록의 조회 숫자가 모두 그 달 기준.
            이번 달이면 1일부터 오늘까지. (caVisitPeriod·caVisitFrom 은 예전 단추용으로 남아 있지만 쓰지 않는다) */
         function caSelDays() {
+            if (caSumDay) return [caSumDay];   // [신규 2026-10-04] 달력에서 고른 하루
             const ym = caSumMonth || caMonthKeyOf(new Date());
             const [y, m] = ym.split('-').map(Number);
             const last = new Date(y, m, 0).getDate(), today = caLastDays(1)[0];
@@ -18580,8 +18582,8 @@
             for (let d = last; d >= 1; d--) { const k = `${ym}-${String(d).padStart(2, '0')}`; if (k <= today) out.push(k); }
             return out;   // [최근 날 → 1일]
         }
-        function caSelLabel() { const ym = caSumMonth || caMonthKeyOf(new Date()); return `${parseInt(ym.slice(5, 7), 10)}월`; }
-        function caIsOneDay() { return false; }
+        function caSelLabel() { if (caSumDay) return caMdLabel(caSumDay); const ym = caSumMonth || caMonthKeyOf(new Date()); return `${parseInt(ym.slice(5, 7), 10)}월`; }
+        function caIsOneDay() { return !!caSumDay; }
 
         function caAfterSelChange() {
             caRows = null;
@@ -18992,7 +18994,16 @@
         /* [신규] 손님 관리 '상품 조회' 카드의 달력 점도표.
            칸마다 그날 전체 조회 건수와 주문 건수를 적는다. ‹ › 로 달을 넘긴다. */
         let caSumMonth = '';
+        /* [신규 2026-10-04] 달력 날짜를 누르면 그날 하루 접속 기록 (사장님 요청 — 한 달로 바꾼 뒤 하루씩 볼 길이 없어졌다)
+           한 번 더 누르거나 '달 전체로'를 누르면 달 보기로 돌아간다. 달을 넘기면 하루 고른 것은 풀린다 */
+        let caSumDay = '';
+        function caSumPickDay(d) {
+            caSumDay = (caSumDay === d) ? '' : d;
+            caAfterSelChange();
+            if (caSumDay) caEnsureMonthVisits(caSumDay.slice(0, 7)).then(() => caAfterSelChange()).catch(() => { });
+        }
         function caSumMonthMove(step) {
+            caSumDay = '';
             const [y, m] = (caSumMonth || caMonthKeyOf(new Date())).split('-').map(Number);
             const d = new Date(y, m - 1 + step, 1), now = new Date();
             if (d > new Date(now.getFullYear(), now.getMonth(), 1)) return;
@@ -19035,12 +19046,12 @@
                 if (vv) Object.keys(vv).forEach(ph => { if (CA_STAFF_PHONES.has(ph)) return; look += caVisitCount(vv[ph]); lookWho++; });
                 const ord = ordCnt.get(d) || 0, ow = (ordWho.get(d) || new Set()).size;
                 const future = d > todayKey;
-                const cls = (future ? 'fut' : '') + (d === todayKey ? ' today' : '');
+                const cls = (future ? 'fut' : ' click') + (d === todayKey ? ' today' : '') + (d === caSumDay ? ' pick' : '');
                 const amt = ordAmt.get(d) || 0;
                 const tip = `${caMdLabel(d)} · 조회 ${lookWho}명 ${look}건${ord ? ` │ 주문 ${ow}명 ${ord}건 · ${amt.toLocaleString()}원` : ''}`;
                 const shade = (caHeatMode === 'ord') ? ccShade(ow, maxOrd, CC_ORANGE) : ccShade(lookWho, maxLook, CC_BLUE);
                 // [수정 2026-10-03] 칸에는 건수 대신 사람 수 — 몇 명이 봤고 몇 명이 샀나 (사장님 요청). 건수는 칸에 마우스를 두면 보인다
-                cells.push(ccCellHtml(day, lookWho, ow, { cls, shade, attr: ` title="${tip}"`, amt }));
+                cells.push(ccCellHtml(day, lookWho, ow, { cls, shade, attr: ` title="${tip} · 누르면 그날 접속 기록"${future ? '' : ` onclick="caSumPickDay('${d}')"`}`, amt }));
             });
             const canNext = new Date(y, m - 1, 1) < new Date(now.getFullYear(), now.getMonth(), 1);
             return `<div class="cc-cal cc-big">
@@ -19051,7 +19062,7 @@
                 </div>
                 <div class="cc-wd">${['월','화','수','목','금','토','일'].map(w => `<span>${w}</span>`).join('')}</div>
                 <div class="cc-grid">${cells.join('')}</div>
-                <div class="cc-legend">칸 위부터 👀 본 사람 · 🛒 산 사람 · 금액(만 원)</div>
+                <div class="cc-legend">칸 위부터 👀 본 사람 · 🛒 산 사람 · 금액(만 원) · 날짜를 누르면 그날 접속 기록</div>
             </div>`;
         }
 
@@ -19252,7 +19263,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const r = vs.rows[0];
                 if (!r) {
                     const near = [vs.nearBefore && `${caMdLabel(vs.nearBefore)}`, vs.nearAfter && `${caMdLabel(vs.nearAfter)}`].filter(Boolean).join(' · ');
-                    return wrap(top + `<div style="font-weight:700; color:#94a3b8;">${caVisitFrom ? `${SL}은 조회 없음` : '오늘은 아직 조회 없음'}</div>
+                    return wrap(top + `<div style="font-weight:700; color:#94a3b8;">${caSumDay ? `${SL}은 조회 없음` : '오늘은 아직 조회 없음'}</div>
                         ${near ? `<div style="margin-top:4px; font-weight:700; color:#94a3b8;">가까운 조회: ${B(near)}</div>` : ''}`);
                 }
                 const line = `<div class="cv-day${r.ord ? ' ord' : ''}" style="border-top:none;"${r.ord ? ` onclick="caShowDayOrdersByOrderTime('${r.d}')" title="이 날 주문 보기"` : ''}>
@@ -19433,11 +19444,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             const ctl = `<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                 <b style="font-size:14px; font-weight:900; color:#0f172a;">👀 상품 조회</b>
-                <span style="font-size:12px; font-weight:800; color:#64748b;">${caSelLabel()} · 아래 달력을 넘기면 함께 바뀌어요</span>
+                ${caSumDay
+                    ? `<span style="font-size:12px; font-weight:800; color:#0f172a;">${caSelLabel()} 하루</span><span style="font-size:11.5px; font-weight:700; color:#94a3b8;">· 같은 날을 한 번 더 누르면 달 전체</span>`
+                    : `<span style="font-size:12px; font-weight:800; color:#64748b;">${caSelLabel()} · 날짜를 누르면 그날 접속 기록</span>`}
             </div>`;
             const box = (text, body) => `<div>${ctl}
                 <details ${caVisitOpen ? 'open' : ''} ontoggle="caSetVisitOpen(this.open)" style="margin-top:6px;">
                     <summary style="cursor:pointer; font-size:12px; font-weight:800; color:#334155;">요약 <span style="font-size:11.5px; font-weight:700; color:#94a3b8;">· ${text}</span></summary>
+                    ${oneDay ? `<div style="margin-top:8px;">${caSumCalHtml()}</div>` : ''}${/* [신규 2026-10-04] 하루 보기에도 달력 — 다른 날을 바로 누를 수 있게 */''}
                     ${body}
                 </details></div>`;
             // 접속은 들어온 손님 기준, 주문은 그 기간의 전체 주문 기준 (칸 글과 같은 잣대)
@@ -19976,7 +19990,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     </div>
                     ${r.visit ? `<div class="ca-r2" style="color:#64748b;">
                         <span>👀 조회 ${caAgoLabel(r.visit.lastDays)}</span>
-                        ${r.visit.visitDays ? `<span>· ${caIsOneDay() ? `${caVisitFrom ? caMdLabel(caVisitFrom) : '오늘'} 조회 ${r.visit.count}건` : `${caSelLabel()} 중 ${r.visit.visitDays}일 · 조회 ${r.visit.count}건`}</span>` : ''}
+                        ${r.visit.visitDays ? `<span>· ${caIsOneDay() ? `${caSumDay ? caMdLabel(caSumDay) : '오늘'} 조회 ${r.visit.count}건` : `${caSelLabel()} 중 ${r.visit.visitDays}일 · 조회 ${r.visit.count}건`}</span>` : ''}
                         ${r.selOrders ? `<span>· 주문 ${r.selOrders}건</span>` : ''}
                         ${r.visit.browse && !caIsOneDay() ? `<span>· 구경만 ${r.visit.browse}일</span>` : ''}
                     </div>` : ''}
