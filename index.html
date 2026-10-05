@@ -2490,8 +2490,8 @@
             justify-content: center;
         }
         /* [수정 2026-10-05] 상품 카드 단추 — 한 줄에 하나씩 (공동구매: 수량·수정·마감 / 상시판매: 수량·위치·수정) (사장님 요청).
-           PC·폰 모두. 단추 묶음 폭은 줄여서(104→72px) 상품 내용 칸을 넓힌다 */
-        #tab-admin-products .product-actions.pa-stack { width: 72px !important; }
+           PC·폰 모두. 단추 묶음 폭은 줄여서(104→56px) 상품 내용 칸을 넓힌다 */
+        #tab-admin-products .product-actions.pa-stack { width: 56px !important; }
         #tab-admin-products .product-actions.pa-stack > div { flex-direction: column; align-items: stretch !important; }
         #tab-admin-products .product-actions.pa-stack > div > * { flex: 0 0 auto !important; width: 100%; padding-left: 2px !important; padding-right: 2px !important; }
         #tab-admin-products .product-actions.pa-stack select { font-size: 11px !important; text-overflow: ellipsis; }
@@ -15973,9 +15973,10 @@
             const code = String((prod && prod.productCode) || '').trim();
             if (!code) return '';
             const free = gIsTaxFreeCode(code);
-            return `<span onclick="gToggleTaxFree('${code}', event)" title="눌러서 과세·면세 바꾸기"`
+            // [수정 2026-10-05] 상품 카드에서는 보기만 한다 — 눌러서 바꾸던 것을 막았다 (사장님 요청). 바꾸려면 상품 수정 화면에서
+            return `<span title="과세·면세는 상품 수정 화면에서 바꿔요"`
                 + ` style="font-size:10px; font-weight:800; background:${free ? '#ecfdf5' : '#f1f5f9'}; color:${free ? '#047857' : '#64748b'};`
-                + ` padding:2px 6px; border-radius:4px; cursor:pointer; user-select:none;">${free ? '면세' : '과세'}</span>`;
+                + ` padding:2px 6px; border-radius:4px;">${free ? '면세' : '과세'}</span>`;
         }
         // [신규] 상품등록 칸의 과세·면세. 손대지 않았으면 저장 때 건드리지 않는다 (번호에 이미 정해 둔 값을 지키려고)
         let uploadFormTaxFree = false, uploadFormTaxTouched = false;
@@ -15989,20 +15990,7 @@
             b.style.borderColor = uploadFormTaxFree ? '#a7f3d0' : '#e2e8f0';
         }
         function toggleFormTaxFree() { uploadFormTaxFree = !uploadFormTaxFree; uploadFormTaxTouched = true; paintFormTaxFree(); }
-        async function gToggleTaxFree(code, ev) {
-            if (ev) ev.stopPropagation();
-            await gLoadTaxFree();
-            const free = !gIsTaxFreeCode(code);
-            try {
-                const r = await fetch(`${FIREBASE_DB_URL}settings/tax_free/${encodeURIComponent(code)}.json`, free
-                    ? { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true' }
-                    : { method: 'DELETE' });
-                if (!r.ok) throw new Error(r.status);
-                if (free) gTaxFree[code] = true; else delete gTaxFree[code];
-                showToast(`${code} → ${free ? '면세' : '과세'}`);
-                if (typeof renderProductsList === 'function') gKeepScroll(renderProductsList);
-            } catch (e) { showToast('바꾸지 못했습니다.'); }
-        }
+        // [삭제 2026-10-05] gToggleTaxFree(상품 카드 딱지를 눌러 과세·면세 바꾸기) — 카드에서는 못 바꾸게 했다 (사장님 요청)
 
         let uploadAgencyFeeTiers = [];   // 금액 구간별 대행료: [{ from: 기준금액(이상), fee: 대행료 }]
         let optionModalDraft = null;     // 모달에서 편집 중인 임시 사본 (저장 눌러야 폼에 반영)
@@ -27326,12 +27314,30 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const last = days[days.length - 1];
             /* [수정 2026-10-05] 한 차례 공구는 픽업일이 며칠에 걸치기도 한다 — 그 차례 첫날부터 일주일(7일) 안의 날은 같은 차례로 보고 한 번만 센다 (사장님 요청).
                매주 같은 요일에 여는 공구(딱 7일 뒤)는 다른 차례로 센다 */
-            let rounds = 0, start = null;
+            const list = [];   // 차례마다 [첫 픽업일, 마지막 픽업일]
+            let start = null;
             days.forEach(d => {
                 const t = new Date(`${d}T00:00:00`).getTime();
-                if (start === null || t - start >= 7 * 86400000) { rounds++; start = t; }
+                if (start === null || t - start >= 7 * 86400000) { list.push([d, d]); start = t; }
+                else list[list.length - 1][1] = d;
             });
-            return `<span title="마지막 공구일 (공구 횟수 — 일주일 안에 붙은 픽업일은 한 번으로 셈)" style="font-size:10px; font-weight:800; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center;">🛒 ${Number(last.slice(5, 7))}/${Number(last.slice(8))} (${rounds}회)</span>`;
+            const rounds = list.length;
+            // [신규 2026-10-05] 누르면 최근 공구일 5차례까지 펼쳐 보여 준다 (사장님 요청) — 한 차례가 며칠에 걸치면 '9/8~9/10'
+            const md = d => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
+            const recent = list.slice(-5).reverse().map(([a, b]) => a === b ? md(a) : `${md(a)}~${md(b)}`).join(' · ');
+            return `<span title="누르면 최근 공구일 5차례까지 보여요 (공구 횟수 — 일주일 안에 붙은 픽업일은 한 번으로 셈)" data-gb-recent="${gEscapeHtml(recent)}" onclick="gGbToggleRecent(event, this)" style="font-size:10px; font-weight:800; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; cursor:pointer; user-select:none;">🛒 ${md(last)} (${rounds}회)</span>`;
+        }
+        // 공구일 딱지를 누르면 그 밑에 최근 공구일 줄을 펴고, 다시 누르면 접는다
+        function gGbToggleRecent(ev, el) {
+            ev.stopPropagation();
+            const nx = el.nextElementSibling;
+            if (nx && nx.classList.contains('gb-recent')) { nx.remove(); return; }
+            const box = document.createElement('div');
+            box.className = 'gb-recent';
+            box.style.cssText = 'flex:0 0 100%; width:100%; margin-top:3px; padding:4px 8px; background:#f8fafc; border:1px solid var(--border); border-radius:6px; font-size:11px; font-weight:700; color:#475569; line-height:1.5;';
+            box.textContent = `최근 공구일 · ${el.dataset.gbRecent}`;
+            box.onclick = e => e.stopPropagation();
+            el.after(box);
         }
         function renderProductsList() {
             const container = document.getElementById('products-list-container');
@@ -27557,19 +27563,23 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     const hasImage = prod.images && prod.images.length > 0;
                     const imgUrl = hasImage ? ((String(prod.images[0]).startsWith("data:") || String(prod.images[0]).startsWith("http")) ? gCdnUrl(prod.images[0], 220) : `https://lh3.googleusercontent.com/d/${prod.images[0]}=s220`) : '';
 
+                    // [수정 2026-10-05] 상품 카드에서는 글자 없이 이모지만 (👁️ 노출중 · 🙈 숨김) — 사장님 요청. 손가락·마우스를 올리면 뜻이 떠요
                     const statusBadge = (!isVisible)
-                        ? `<span style="font-size: 10px; font-weight: 800; background: #fee2e2; color: #ef4444; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🙈 숨김</span>`
-                        : `<span style="font-size: 10px; font-weight: 800; background: #dcfce7; color: #22c55e; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">👁️ 노출중</span>`;
+                        ? `<span title="숨김 — 손님 화면에 안 보여요" style="font-size: 10px; font-weight: 800; background: #fee2e2; color: #ef4444; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🙈</span>`
+                        : `<span title="노출중 — 손님 화면에 보여요" style="font-size: 10px; font-weight: 800; background: #dcfce7; color: #22c55e; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">👁️</span>`;
 
                     // [신규] 예약 공개·종료 뱃지 — 아직 안 왔으면 올라갈 시각, 이미 지났으면(공개 중) 내려갈 시각을 보여준다
                     let scheduleBadge = '';
                     {
                         const _now = Date.now();
-                        if (prod.releaseAt && _now < psOpenAt(prod.releaseAt)) {   // [수정 2026-10-03] 그날 0시에 노출
-                            const _od = new Date(psOpenAt(prod.releaseAt));
-                            scheduleBadge = `<span title="이 날 0시에 자동으로 노출됩니다 (카톡 알림은 ${fFmtSchedTime(prod.releaseAt)})" style="font-size: 10px; font-weight: 800; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🕐 ${_od.getMonth() + 1}/${_od.getDate()} 0시 공개</span>`;
-                        } else if (prod.expireAt) {
-                            scheduleBadge = `<span title="이 시각에 자동으로 숨겨집니다" style="font-size: 10px; font-weight: 800; background: #fff7ed; color: #d97706; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🕕 ${fFmtSchedTime(prod.expireAt)} 종료</span>`;
+                        /* [수정 2026-10-05] 넷째 줄(노출 여부 · 노출일 · 마감일)에 노출일과 마감일을 둘 다 보여 준다 (사장님 요청).
+                           예전엔 올라가기 전이면 노출일만, 올라간 뒤면 마감만 보였다 */
+                        if (prod.releaseAt) {
+                            const _od = new Date(psOpenAt(prod.releaseAt)), _up = _now < psOpenAt(prod.releaseAt);
+                            scheduleBadge += `<span title="${_up ? '이 날 0시에 자동으로 노출됩니다' : '이 날 0시에 노출됐어요'} (카톡 알림은 ${fFmtSchedTime(prod.releaseAt)})" style="font-size: 10px; font-weight: 800; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">📣 ${_od.getMonth() + 1}/${_od.getDate()} 노출</span>`;
+                        }
+                        if (prod.expireAt) {
+                            scheduleBadge += `<span title="주문 마감 시각" style="font-size: 10px; font-weight: 800; background: #fff7ed; color: #d97706; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🕕 ${fFmtSchedTime(prod.expireAt)} 마감</span>`;
                         }
                     }
                     // [신규 2026-10-02] 같은 노출번호로 묶인 일정 수 (노출일정 복사본)
@@ -27647,7 +27657,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         const shelfOpts = gShelfOptsAll();   // [수정] 선반 관리에서 정한 목록 그대로
                         const cur = String(prod.shelf || '');
                         // 현재 실재고(또는 무제한)를 입력칸 기본값으로
-                        let stockInputVal = '무제한';
+                        let stockInputVal = '∞';   // [수정 2026-10-05] 무제한은 ∞ 로 (칸을 좁히려고)
                         if (!isUnlimited) {
                             stockInputVal = Math.max(0, parseInt(prod.stock || 0) + parseInt(adjValRaw || 0));
                         }
@@ -27661,7 +27671,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         </div>`;
                     } else {
                         // [신규] 당일/예약 탭도 재고관리와 동일하게 재고 입력칸, 수정 버튼 제공 (선반 드롭다운·기존 복제/품절 버튼 제외) · [수정 2026-10-05] 변경 단추 뺌 — 엔터나 칸을 떠나면 저장
-                        let stockInputVal = '무제한';
+                        let stockInputVal = '∞';   // [수정 2026-10-05] 무제한은 ∞ 로 (칸을 좁히려고)
                         if (!isUnlimited) {
                             stockInputVal = Math.max(0, parseInt(prod.stock || 0) + parseInt(adjValRaw || 0));
                         }
@@ -27683,16 +27693,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                             <span class="custom-checkbox" style="margin-right: 0; width: 18px; height: 18px;"></span>
                         </label>
                         ${hasImage ? `<img src="${imgUrl}" class="product-img">` : `<div class="product-img" style="display:flex; align-items:center; justify-content:center; font-size:16px;">📦</div>`}
+                        ${/* [수정 2026-10-05] 카드 글 순서 (사장님 요청): ① 노출 여부·상품 코드·코드명 ② 상품명·가격 ③ 딱지·최근 공구일 ④ 노출일·마감일 */''}
                         <div class="product-info" onclick="toggleSelectProduct(${index})" style="cursor: pointer; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
-                            <div class="product-name" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-all; line-height: 1.3; font-weight: 700;">
+                            ${/* [수정 2026-10-05] 노출 여부는 첫째 줄 코드 앞으로 (사장님 요청) */''}
+                            <div class="product-meta" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">${statusBadge}${prod.productCode ? `<span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${prod.productCode}</span>${gCodeLabelChip(prod.productCode)}` : ``}</div>
+                            <div style="display:flex; align-items:baseline; gap:6px; min-width:0;">
+                            <div class="product-name" style="flex:1 1 auto; min-width:0; margin-bottom:0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-all; line-height: 1.3; font-weight: 700;">
                                 ${gIsClosedAdmin(prod) ? `<span style="display:inline-block; background:#fef2f2; color:#dc2626; border:1px solid #fecaca; padding:0 6px; border-radius:5px; font-size:11px; font-weight:800; margin-right:4px; vertical-align:1px;">마감</span>` : ``}${isRecommendListProduct(prod) ? `<span style="color:#ff6d00; font-weight:800;">[오늘의추천]</span> ` : ``}${listDisplayName(prod)}
                             </div>
-                            <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                ${prod.productCode ? `<span style="background:#eef2ff; color:#4338ca; padding:2px 7px; border-radius:6px; font-size:11px; font-weight:800;">${prod.productCode}</span>${gCodeLabelChip(prod.productCode)}` : ``}
-                                ${priceHtml}
-                                ${stockText ? `<span style="color: var(--text-sub);">|</span><span>${stockText}</span>` : ``}
-                                ${gTaxBadge(prod)}${kindBadge}${storageBadge}${statusBadge}${scheduleBadge}${discountBadge}${optionBadge}${gGbHistBadge(prod)}
+                            <div class="product-meta" style="flex:0 0 auto; display:flex; gap:4px; white-space:nowrap; font-size:12px; font-weight:800;">${priceHtml}</div>
                             </div>
+                            <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                ${stockText ? `<span>${stockText}</span>` : ``}${gTaxBadge(prod)}${kindBadge}${storageBadge}${discountBadge}${optionBadge}${gGbHistBadge(prod)}
+                            </div>
+                            ${scheduleBadge ? `<div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">${scheduleBadge}</div>` : ``}
                             ${optionPanel}
                         </div>
                         ${actionsHtml}
@@ -29385,7 +29399,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!prod) { showToast("상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요."); renderProductsList(); return; }
             const raw = String(value == null ? '' : value).trim();
             if (raw === '') { renderProductsList(); return; } // 빈 값이면 변경 없음(원래 값으로 복원)
-            let wantUnlimited = (raw === '무제한' || raw.toLowerCase() === 'unlimited');
+            let wantUnlimited = (raw === '무제한' || raw === '∞' || raw.toLowerCase() === 'unlimited');   // [수정 2026-10-05] ∞ 도 무제한
             let newStock;
             if (wantUnlimited) {
                 newStock = '';
