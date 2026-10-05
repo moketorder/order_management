@@ -17550,6 +17550,7 @@
         let uploadManageTab = "today-fruit";
         let uploadEditReturnScroll = 0; // [신규] 수정 진입 전 상품목록 스크롤 위치 (수정 후 복원용)
         let uploadEditReturnSearch = ''; // [신규] 수정 진입 전 상품 검색어 (수정 후 복원용)
+        let uploadEditReturnTab = '';    // [신규 2026-10-05] 수정 진입 전 보던 화면 (취소하면 그리로)
         let uploadSubTab = "all"; 
         
         let uploadSelectedFiles = []; 
@@ -27339,9 +27340,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 else list[list.length - 1][1] = d;
             });
             const rounds = list.length;
-            // [신규 2026-10-05] 누르면 최근 공구일 5차례까지 펼쳐 보여 준다 (사장님 요청) — 한 차례가 며칠에 걸치면 '9/8~9/10'
+            // [신규 2026-10-05] 누르면 최근 공구일 5차례까지 펼쳐 보여 준다 (사장님 요청) — 차례마다 마지막 픽업일
             const md = d => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
-            const recent = list.slice(-5).reverse().map(([a, b]) => a === b ? md(a) : `${md(a)}~${md(b)}`).join(' · ');
+            const recent = list.slice(-5).reverse().map(([, b]) => md(b)).join(' · ');   // [수정 2026-10-05] 차례마다 마지막 픽업일만 (사장님 요청 — '9/8~9/10' 대신 '9/10')
             return `<span title="누르면 최근 공구일 5차례까지 보여요 (공구 횟수 — 일주일 안에 붙은 픽업일은 한 번으로 셈)" data-gb-recent="${gEscapeHtml(recent)}" onclick="gGbToggleRecent(event, this)" style="font-size:10px; font-weight:800; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; cursor:pointer; user-select:none;">🛒 ${md(last)} (${rounds}회)</span>`;
         }
         // 공구일 딱지를 누르면 그 밑에 최근 공구일 줄을 펴고, 다시 누르면 접는다
@@ -29500,6 +29501,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function editProduct(index) {
             uploadEditReturnScroll = window.scrollY || document.documentElement.scrollTop || 0; // [신규] 수정 전 스크롤 위치 기억
             uploadEditReturnSearch = productSearchKeyword || ''; // [신규] 수정 전 검색어 기억 (탭을 옮기면 지워지므로 여기서 담아 둔다)
+            // [신규 2026-10-05] 수정 전에 보던 화면(상품목록·노출일정 등)을 기억 — 취소하면 그 화면으로 돌아간다 (사장님 요청)
+            uploadEditReturnTab = (['product-list', 'product-schedule', 'orders', 'purchase-history', 'sales', 'product-review', 'product-suggest', 'thumbnail-generator']
+                .find(t => { const el = document.getElementById('tab-admin-' + t); return el && el.style.display !== 'none' && el.offsetParent !== null; })) || 'product-list';
             const prod = uploadProducts[index];
             uploadIsEditMode = true;
             uploadEditProductKey = index;
@@ -29771,10 +29775,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             updatePriceFieldForAmountLimit();
 
             if (wasEditMode) {
-                switchAdminTab('product-list');
+                // [수정 2026-10-05] 상품목록으로만 가던 것을, 수정 전에 보던 화면으로 돌아가게 했다 (노출일정에서 열었으면 노출일정으로)
+                const _back = uploadEditReturnTab || 'product-list';
+                uploadEditReturnTab = '';
+                switchAdminTab(_back);
                 // [신규] 수정 버튼 누르기 전 검색어로 복원 (탭 전환이 검색을 지우므로 그 다음에 되돌린다)
                 //  검색 중이었다면 찾던 결과가 그대로 보여야 한다. 처음부터 다시 검색하지 않도록.
-                restoreProductSearch(uploadEditReturnSearch);
+                if (_back === 'product-list') restoreProductSearch(uploadEditReturnSearch);
                 uploadEditReturnSearch = '';
                 // [신규] 수정 버튼 누르기 전 스크롤 위치로 복원
                 const _sc = uploadEditReturnScroll;
