@@ -3570,6 +3570,14 @@
                         #purchase-section-sourcing .src-tag.direct { background:#e2e8f0; color:#334155; }
                         #purchase-section-sourcing .src-tag button { border:none; background:transparent; cursor:pointer; font-weight:900; color:inherit; padding:0 2px; font-size:11px; line-height:1; }
                         #purchase-section-sourcing .src-tag.onsite { background:#ede9fe; color:#5b21b6; }
+                        /* [신규 2026-10-06] 달력 이름표 끌기 (노출일정처럼) — 끌면 옮기기, Ctrl+끌기 복사, Ctrl+누르기 여러 개 고르기 */
+                        #purchase-section-sourcing .src-tag[data-ref] { cursor:grab; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+                        #purchase-section-sourcing .src-tag.sel { outline:2px solid #0f172a; outline-offset:0; }
+                        #purchase-section-sourcing .src-tag.lift { opacity:.45; }
+                        #purchase-section-sourcing .src-ctrl-btn { display:none; }
+                        #purchase-section-sourcing .src-ctrl-btn.on, #purchase-section-sourcing .src-selbar .src-btn.del { background:#0f172a; border-color:#0f172a; color:#fff; }
+                        #purchase-section-sourcing .src-selbar { display:flex; gap:6px; align-items:center; font-size:12px; font-weight:800; color:#0f172a; }
+                        @media (pointer: coarse) { #purchase-section-sourcing .src-ctrl-btn { display:inline-block; } }
                         #purchase-section-sourcing .src-tag.sada { background:#ffedd5; color:#c2410c; }
                         #purchase-section-sourcing .src-onsite { background:#fff; border:1px solid var(--src-line); border-radius:12px; padding:8px 10px; margin-bottom:10px; }
                         #purchase-section-sourcing .src-onsite summary { cursor:pointer; font-weight:900; font-size:13px; color:#5b21b6; }
@@ -3773,7 +3781,7 @@
                     const w = gSrc.lineup[gSrc.week] || {};
                     const items = Object.entries(w.items || {}).map(([key, it]) => Object.assign({ key }, it));
                     const picks = gSrc.picks[gSrc.week] || {};
-                    const pickedN = Object.keys(picks).length;
+                    const pickedN = Object.keys(picks).filter(k => k.indexOf('~') < 0).length;   // [수정 2026-10-06] 달력 복사본(열쇠에 ~)은 빼고 센다
                     const margins = items.map(it => parseFloat(it.margin)).filter(n => !isNaN(n));
                     const avgM = margins.length ? (margins.reduce((a, b) => a + b, 0) / margins.length).toFixed(1) + '%' : '–';
                     const mon = new Date(gSrc.week + 'T00:00:00');
@@ -3968,27 +3976,32 @@
                     Object.entries(gSrc.picks).forEach(([wk, items]) => Object.entries(items || {}).forEach(([key, p]) => {
                         if (!p) return;
                         const d = p.date || srcAddDays(wk, Math.max(0, SRC_DAYS.indexOf(p.day)));
-                        (byDate[d] = byDate[d] || []).push({ kind: p.pick === '이 상품' ? '' : 'alt', name: p.name, del: "srcUnpick('" + wk + "','" + key + "')" });
+                        (byDate[d] = byDate[d] || []).push({ kind: p.pick === '이 상품' ? '' : 'alt', name: p.name, del: "srcUnpick('" + wk + "','" + key + "')", ref: JSON.stringify(['pick', wk, key]) });
                     }));
                     Object.entries(gSrc.direct).forEach(([no, p]) => {
                         if (!p) return;
-                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'direct', name: p.name, del: "srcUndirect('" + no + "')" });
+                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'direct', name: p.name, del: "srcUndirect('" + no + "')", ref: JSON.stringify(['direct', no]) });
                     });
                     (gSrc.sada || []).forEach(p => {   // 사다드림은 상품등록에서 고친다 (지우기 단추 없음)
                         (byDate[p.date] = byDate[p.date] || []).push({ kind: 'sada', name: '사다 · ' + p.name, del: '' });
                     });
                     Object.entries(gSrc.manual).forEach(([id, p]) => {
                         if (!p) return;
-                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'manual', name: '✍ ' + p.name + (p.memo ? ' (' + p.memo + ')' : ''), del: "srcManualDel('" + id + "')" });
+                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'manual', name: '✍ ' + p.name + (p.memo ? ' (' + p.memo + ')' : ''), del: "srcManualDel('" + id + "')", ref: JSON.stringify(['manual', id]) });
                     });
                     Object.entries(gSrc.onsite).forEach(([code, p]) => {
                         if (!p) return;
-                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'onsite', name: p.name, del: "srcOnsiteDel('" + code + "')" });
+                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'onsite', name: p.name, del: "srcOnsiteDel('" + code + "')", ref: JSON.stringify(['onsite', code]) });
                     });
                     let html = '<div class="src-cal"><div class="src-cal-head">' +
                         '<button type="button" class="src-btn" onclick="srcCalMove(-1)">◀</button><b>' + y + '년 ' + m + '월</b>' +
                         '<button type="button" class="src-btn" onclick="srcCalMove(1)">▶</button>' +
-                        '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 보라 = 상시판매 · 파랑 = 직접 쓴 것 · 주황 = 사다드림 · 회색 = 목록에서 직접 판매 표시 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span></div><div class="src-cal-grid">' +
+                        // [신규 2026-10-06] 되돌리기 · 폰용 Ctrl 단추 · 고른 것 지우기/풀기
+                        '<button type="button" class="src-btn" onclick="srcUndo()" title="' + (gSrcUndo.length ? '되돌리기: ' + srcEsc(gSrcUndo[gSrcUndo.length - 1].label) + ' (Ctrl+Z)' : '되돌릴 것이 없어요') + '"' + (gSrcUndo.length ? '' : ' disabled style="opacity:.4"') + '>↩</button>' +
+                        '<button type="button" class="src-btn src-ctrl-btn' + (gSrcCtrl ? ' on' : '') + '" onclick="srcCtrlToggle()" title="켜면 Ctrl 을 누른 것과 같아요 (여러 개 고르기·복사)">Ctrl</button>' +
+                        (gSrcSel.size ? '<span class="src-selbar">' + gSrcSel.size + '개 고름<button type="button" class="src-btn del" onclick="srcDelSelected()">지우기</button><button type="button" class="src-btn" onclick="srcSelClear()">풀기</button></span>' : '') +
+                        '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 보라 = 상시판매 · 파랑 = 직접 쓴 것 · 주황 = 사다드림 · 회색 = 목록에서 직접 판매 표시 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span>' +
+                        '<span class="k">끌기 = 옮기기 · Ctrl+끌기 = 복사 · Ctrl+누르기 = 여러 개 · Delete 지우기 · Ctrl+Z 되돌리기 · 폰은 길게 눌러 끌기</span></div><div class="src-cal-grid">' +
                         SRC_DAYS.map(d => '<div class="src-cal-dow">' + d + '</div>').join('');
                     for (let d = new Date(start); d <= last; d.setDate(d.getDate() + 7)) {
                         for (let i = 0; i < 5; i++) {
@@ -4003,7 +4016,7 @@
                             html += '<div class="' + cls.join(' ') + '" data-date="' + k + '"><div class="top"><span class="n">' + x.getDate() + '</span>' +
                                 (hol ? '<span class="hn">' + hol + '</span>' : '') + (off ? '<span class="off" title="주문관리에 설정된 가게 휴무일">휴무</span>' : '') +
                                 '<button type="button" class="src-cal-add" title="이 날짜에 상품 넣기" onclick="srcDayAdd(\'' + k + '\')">+</button></div>' +
-                                (byDate[k] || []).map(t => '<div class="src-tag ' + t.kind + '" title="' + srcEsc(t.name) + '"><span>' + srcEsc(t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>').join('') + '</div>';
+                                (byDate[k] || []).map(t => '<div class="src-tag ' + t.kind + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(t.name) + '"><span>' + srcEsc(t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>').join('') + '</div>';
                         }
                     }
                     return html + '</div></div>';
@@ -4156,6 +4169,190 @@
                     };
                     document.addEventListener('pointerup', end);
                     document.addEventListener('pointercancel', end);
+                })();
+
+                /* ── [신규 2026-10-06] 달력 이름표 끌기 (노출일정처럼, 사장님 요청) ──
+                   · 끌면 옮기기, Ctrl(맥 ⌘)+끌기 복사, Ctrl+누르기 여러 개 고르기, 빈 곳 누르기·Esc 풀기, Delete 지우기, Ctrl+Z·↩ 되돌리기
+                   · 폰은 길게 눌러(0.4초) 끌기, 머리줄 [Ctrl] 단추를 켜면 Ctrl 을 누른 것과 같다
+                   · 여러 개를 끌면 끈 것과 같은 '평일 수'만큼 다 같이 옮긴다 (달력이 월~금이라 주말에 떨어지지 않게)
+                   · 자리(ref) = ['pick', 주시작일, 열쇠] | ['direct'|'manual'|'onsite', 열쇠]. 복사본은 같은 묶음에 '열쇠~덧붙임'으로 둔다.
+                     PC(DB올리기.ps1)는 열쇠가 아니라 값(date·name·kw)만 읽으므로 복사본도 판매확정에 그대로 들어간다.
+                   · 한 번 옮기기·복사·지우기는 sourcing 에 PATCH 한 번 (여러 자리를 한꺼번에) — 되돌리기도 같은 방법으로 앞 값을 다시 쓴다 */
+                const gSrcSel = new Set();
+                const gSrcUndo = [];
+                let gSrcCtrl = false;
+                function srcCtrlOn(e) { return !!(e && (e.ctrlKey || e.metaKey)) || gSrcCtrl; }
+                function srcCtrlToggle() { gSrcCtrl = !gSrcCtrl; srcRender(); }
+                function srcRefPath(r) { return r[0] === 'pick' ? 'picks/' + r[1] + '/' + r[2] : r[0] + '/' + r[1]; }
+                function srcRefGet(r) { return (r[0] === 'pick' ? (gSrc.picks[r[1]] || {})[r[2]] : (gSrc[r[0]] || {})[r[1]]) || null; }
+                function srcRefSet(r, val) {
+                    let m;
+                    if (r[0] === 'pick') { m = gSrc.picks[r[1]] = gSrc.picks[r[1]] || {}; r = [0, r[2]]; }
+                    else m = gSrc[r[0]] = gSrc[r[0]] || {};
+                    if (val) m[r[1]] = val; else delete m[r[1]];
+                }
+                function srcRefDate(r, p) { return (p && p.date) || (r[0] === 'pick' && p ? srcAddDays(r[1], Math.max(0, SRC_DAYS.indexOf(p.day))) : ''); }
+                function srcRefCopy(r) {
+                    const sfx = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+                    if (r[0] === 'manual') return ['manual', 'm' + sfx];
+                    if (r[0] === 'pick') return ['pick', r[1], String(r[2]).split('~')[0] + '~' + sfx];
+                    return [r[0], String(r[1]).split('~')[0] + '~' + sfx];
+                }
+                // 평일 차례 (2024-01-01 월요일부터 월~금만 센다) — 여러 개를 같은 평일 수만큼 옮길 때 쓴다
+                function srcWdOrd(iso) {
+                    const n = Math.round((new Date(iso + 'T00:00:00') - new Date('2024-01-01T00:00:00')) / 864e5);
+                    const w = Math.floor(n / 7);
+                    return w * 5 + Math.min(n - w * 7, 4);
+                }
+                function srcWdIso(o) { const w = Math.floor(o / 5); return srcAddDays('2024-01-01', w * 7 + (o - w * 5)); }
+                async function srcPatch(changes) {
+                    const body = {};
+                    changes.forEach(c => { body[srcRefPath(c.r)] = c.after; });
+                    const r = await fetch(`${FIREBASE_DB_URL}sourcing.json`, { method: 'PATCH', body: JSON.stringify(body) });
+                    if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                    changes.forEach(c => srcRefSet(c.r, c.after));
+                }
+                async function srcDoChanges(changes, label) {
+                    if (!changes.length) return;
+                    try {
+                        await srcPatch(changes);
+                        gSrcUndo.push({ label, changes });
+                        if (gSrcUndo.length > 30) gSrcUndo.shift();
+                        showToast(label + ' · Ctrl+Z 되돌리기');
+                    } catch (e) { showToast('저장 못 했어요: ' + e.message); }
+                    srcRender();
+                }
+                async function srcUndo() {
+                    const op = gSrcUndo.pop();
+                    if (!op) { showToast('되돌릴 것이 없어요'); return; }
+                    try { await srcPatch(op.changes.map(c => ({ r: c.r, after: c.before }))); showToast('되돌렸어요: ' + op.label); }
+                    catch (e) { gSrcUndo.push(op); showToast('되돌리지 못했어요: ' + e.message); }
+                    gSrcSel.clear();
+                    srcRender();
+                }
+                // 끈 이름표(from 날짜)를 to 날짜에 놓았다 — 고른 것 모두를 같은 평일 수만큼 옮기거나 복사
+                function srcMoveTags(refs, from, to, copy) {
+                    const off = srcWdOrd(to) - srcWdOrd(from);
+                    if (!off && !copy) return;
+                    const now = new Date().toISOString(), changes = [], newSel = [];
+                    refs.forEach(rs => {
+                        const r = JSON.parse(rs), cur = srcRefGet(r);
+                        if (!cur) return;
+                        const d0 = srcRefDate(r, cur) || from;
+                        const val = Object.assign({}, cur, { date: srcWdIso(srcWdOrd(d0) + off), at: now });
+                        if (copy) { const nr = srcRefCopy(r); changes.push({ r: nr, before: null, after: val }); newSel.push(JSON.stringify(nr)); }
+                        else { changes.push({ r, before: cur, after: val }); newSel.push(rs); }
+                    });
+                    gSrcSel.clear(); newSel.forEach(x => gSrcSel.add(x));
+                    const md = to.slice(5).replace('-', '/');
+                    srcDoChanges(changes, (changes.length > 1 ? changes.length + '개 ' : '') + (copy ? '복사' : '옮김') + ' → ' + md + (off && changes.length > 1 ? ' (평일 ' + (off > 0 ? '+' : '') + off + '일)' : ''));
+                }
+                function srcDelSelected() {
+                    const changes = [...gSrcSel].map(rs => { const r = JSON.parse(rs); return { r, before: srcRefGet(r), after: null }; }).filter(c => c.before);
+                    gSrcSel.clear();
+                    if (!changes.length) { srcRender(); return; }
+                    srcDoChanges(changes, changes.length + '개 지움');
+                }
+                function srcSelClear() { gSrcSel.clear(); srcSelPaint(); srcRender(); }
+                function srcSelPaint() { document.querySelectorAll('#purchase-section-sourcing .src-tag[data-ref]').forEach(el => el.classList.toggle('sel', gSrcSel.has(el.dataset.ref))); }
+                // 누르기 = 고르기 (Ctrl 이면 더하고 빼기, 아니면 그것 하나만 — 하나만 고른 것을 다시 누르면 풀기)
+                function srcTagTap(ref, add) {
+                    if (add) { if (gSrcSel.has(ref)) gSrcSel.delete(ref); else gSrcSel.add(ref); }
+                    else if (gSrcSel.size === 1 && gSrcSel.has(ref)) gSrcSel.clear();
+                    else { gSrcSel.clear(); gSrcSel.add(ref); }
+                    srcRender();
+                }
+                (function srcTagDnd() {
+                    let st = null;
+                    const cellAt = (x, y) => { const el = document.elementFromPoint(x, y); return el ? el.closest('#purchase-section-sourcing .src-cal-day[data-date]') : null; };
+                    const clearOver = () => document.querySelectorAll('#purchase-section-sourcing .src-cal-day.over').forEach(e => e.classList.remove('over'));
+                    const tagOf = t => t && t.closest && !t.closest('button') ? t.closest('#purchase-section-sourcing .src-tag[data-ref]') : null;
+                    const begin = () => {   // 끌기 시작 — 끈 것이 고른 것 안에 있으면 고른 것 모두, 아니면 그것 하나
+                        st.drag = true;
+                        if (!gSrcSel.has(st.ref)) { gSrcSel.clear(); gSrcSel.add(st.ref); srcSelPaint(); }
+                        st.refs = [...gSrcSel];
+                        document.querySelectorAll('#purchase-section-sourcing .src-tag.sel').forEach(el => el.classList.add('lift'));
+                        st.ghost = document.createElement('div'); st.ghost.id = 'src-drag-ghost';
+                        document.body.appendChild(st.ghost);
+                    };
+                    const place = (x, y, copy) => {
+                        const n = st.refs.length, nm = (st.tag.textContent || '').replace(/×$/, '').trim();
+                        st.ghost.textContent = (copy ? '복사 · ' : '') + (n > 1 ? n + '개 · ' : '') + nm;
+                        st.ghost.style.left = (x + 12) + 'px'; st.ghost.style.top = (y - 28) + 'px';
+                        clearOver(); const c = cellAt(x, y); if (c) c.classList.add('over');
+                    };
+                    const finish = (x, y, copy, cancel) => {
+                        const s = st; st = null;
+                        if (!s) return;
+                        clearTimeout(s.timer);
+                        clearOver(); if (s.ghost) s.ghost.remove();
+                        document.querySelectorAll('#purchase-section-sourcing .src-tag.lift').forEach(el => el.classList.remove('lift'));
+                        if (cancel) return;
+                        if (!s.drag) { srcTagTap(s.ref, copy); return; }
+                        const c = cellAt(x, y);
+                        if (c) srcMoveTags(s.refs, s.from, c.dataset.date, copy);
+                    };
+                    // PC — 마우스. 6px 넘게 움직이면 끌기, 아니면 누르기
+                    document.addEventListener('pointerdown', e => {
+                        if (e.pointerType === 'touch' || e.button > 0) return;
+                        const tag = tagOf(e.target);
+                        if (!tag) {   // 달력 빈 곳을 누르면 고른 것을 푼다
+                            if (gSrcSel.size && e.target.closest && e.target.closest('#purchase-section-sourcing .src-cal-grid') && !e.target.closest('button')) srcSelClear();
+                            return;
+                        }
+                        const day = tag.closest('[data-date]');
+                        st = { tag, ref: tag.dataset.ref, from: day ? day.dataset.date : '', x: e.clientX, y: e.clientY, id: e.pointerId, drag: false, ghost: null, refs: [] };
+                        try { tag.setPointerCapture(e.pointerId); } catch (x) { }
+                    });
+                    document.addEventListener('pointermove', e => {
+                        if (!st || st.touch || e.pointerId !== st.id) return;
+                        if (!st.drag && Math.hypot(e.clientX - st.x, e.clientY - st.y) > 6) begin();
+                        if (st.drag) { e.preventDefault(); place(e.clientX, e.clientY, srcCtrlOn(e)); }
+                    }, { passive: false });
+                    document.addEventListener('pointerup', e => { if (st && !st.touch && e.pointerId === st.id) finish(e.clientX, e.clientY, srcCtrlOn(e), false); });
+                    document.addEventListener('pointercancel', e => { if (st && !st.touch && e.pointerId === st.id) finish(0, 0, false, true); });
+                    // 폰 — 길게 눌러(0.4초) 끌기. 그 전에 움직이면 화면 넘기기
+                    document.addEventListener('touchstart', e => {
+                        if (e.touches.length !== 1) return;
+                        const tag = tagOf(e.target);
+                        if (!tag) return;
+                        const t = e.touches[0], day = tag.closest('[data-date]');
+                        st = { touch: true, tag, ref: tag.dataset.ref, from: day ? day.dataset.date : '', x: t.clientX, y: t.clientY, lx: t.clientX, ly: t.clientY, drag: false, ready: false, ghost: null, refs: [] };
+                        st.timer = setTimeout(() => {
+                            if (!st || !st.touch) return;
+                            st.ready = true;
+                            try { navigator.vibrate && navigator.vibrate(15); } catch (x) { }
+                            begin(); place(st.lx, st.ly, srcCtrlOn(null));
+                        }, 400);
+                    }, { passive: true });
+                    document.addEventListener('touchmove', e => {
+                        if (!st || !st.touch) return;
+                        const t = e.touches[0];
+                        if (!st.ready) {
+                            if (Math.abs(t.clientX - st.x) > 10 || Math.abs(t.clientY - st.y) > 10) { clearTimeout(st.timer); st = null; }
+                            return;
+                        }
+                        e.preventDefault();
+                        st.lx = t.clientX; st.ly = t.clientY;
+                        place(t.clientX, t.clientY, srcCtrlOn(null));
+                    }, { passive: false });
+                    document.addEventListener('touchend', e => {
+                        if (!st || !st.touch) return;
+                        if (st.ready) e.preventDefault();   // 끈 뒤에 딸려 오는 누르기(click)를 막는다
+                        finish(st.lx, st.ly, srcCtrlOn(null), false);
+                    }, { passive: false });
+                    document.addEventListener('touchcancel', () => { if (st && st.touch) finish(0, 0, false, true); });
+                    document.addEventListener('contextmenu', e => { if (tagOf(e.target)) e.preventDefault(); });   // 길게 누를 때 메뉴 안 뜨게
+                    // 글쇠 — 소싱이 보일 때만 (노출일정 글쇠와 겹치지 않게)
+                    document.addEventListener('keydown', e => {
+                        const sec = document.getElementById('purchase-section-sourcing');
+                        if (!sec || !sec.offsetParent || !sec.querySelector('.src-cal')) return;
+                        const tg = (document.activeElement && document.activeElement.tagName) || '';
+                        if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT' || document.getElementById('src-day') || document.getElementById('src-edit')) return;
+                        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && String(e.key).toLowerCase() === 'z') { e.preventDefault(); srcUndo(); return; }
+                        if (e.key === 'Escape' && gSrcSel.size) { srcSelClear(); return; }
+                        if ((e.key === 'Delete' || e.key === 'Backspace') && gSrcSel.size) { e.preventDefault(); srcDelSelected(); }
+                    });
                 })();
 
                 // ── 고친 내용 (sourcing/edits/band|kakao/<원래 업체|상품명>) ──
