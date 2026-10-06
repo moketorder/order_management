@@ -3825,7 +3825,7 @@
                     const k = srcNameKey(tg.vendor, tg.name);
                     let s = '';
                     if (p && p.pick === lab) s += '<span class="src-mk ord">판매 ' + String(p.date || '').slice(5).replace('-', '/') + '</span>';
-                    if (gSrc.skip[k]) s += '<span class="src-mk skip">건너뜀</span>';
+                    if (gSrc.skip[k]) s += '<span class="src-mk skip">건너뜀' + srcSkipUntilText(gSrc.skip[k]) + '</span>';
                     if (gSrc.block[k]) s += '<span class="src-mk block">추천제외</span>';
                     return s;
                 }
@@ -3876,10 +3876,11 @@
                     const k = srcNameKey(tg.vendor, tg.name);
                     const m = document.createElement('div'); m.id = 'src-menu';
                     m.innerHTML = '<div class="t">' + srcEsc(tg.name) + '<small>' + srcEsc(tg.vendor) + (tg.supply ? ' · ' + srcWon(tg.supply) : '') + '</small></div>' +
-                        '<button type="button" class="ord" data-act="purchase">🚚 발주 등록 (발주관리로)</button>' +
+                        // [수정 2026-10-06] 차례: 밴드로 이동 · 발주 등록 · 건너뜀 · 추천제외 · 닫기 (사장님 요청)
                         '<button type="button" data-act="band">🔗 밴드로 이동</button>' +
+                        '<button type="button" class="ord" data-act="purchase">🚚 발주 등록 (발주관리로)</button>' +
                         // 판매일은 달력에 끌어다 놓기와 달력 이름표 × 로만 정한다 (창에는 안 둔다 — 사장님 요청)
-                        (gSrc.skip[k] ? '<button type="button" class="skip undo" data-act="unskip">건너뜀 취소</button>' : '<button type="button" class="skip" data-act="skip">건너뜀 (4주 동안 추천 안 함)</button>') +
+                        (gSrc.skip[k] ? '<button type="button" class="skip undo" data-act="unskip">건너뜀 취소' + srcSkipUntilText(gSrc.skip[k]) + '</button>' : '<button type="button" class="skip" data-act="skipask">건너뜀 (몇 주 고르기)</button>') +
                         (gSrc.block[k] ? '<button type="button" class="block undo" data-act="unblock">추천제외 취소</button>' : '<button type="button" class="block" data-act="block">추천제외 (앞으로 추천 안 함)</button>') +
                         '<button type="button" data-act="close">닫기</button>';
                     document.body.appendChild(m);
@@ -3892,9 +3893,9 @@
                         if (act === 'purchase') return srcToPurchase(tg, o.rec);
                         if (act === 'band') return srcOpenBand(o.link, tg);
                         if (act === 'sale') return o.sale.run();
+                        if (act === 'skipask') { srcSkipAsk(tg, k, el); return; }
                         const now = new Date().toISOString();
                         try {
-                            if (act === 'skip') { const v = { name: tg.name, vendor: tg.vendor, date: srcToday(), at: now }; await srcPut('skip/' + k, v); gSrc.skip[k] = v; showToast('건너뜀: 4주 동안 추천 안 해요 — ' + tg.name); }
                             if (act === 'unskip') { await srcPut('skip/' + k, null); delete gSrc.skip[k]; showToast('건너뜀을 취소했어요'); }
                             if (act === 'block') { const v = { name: tg.name, vendor: tg.vendor, at: now }; await srcPut('block/' + k, v); gSrc.block[k] = v; showToast('추천제외: 앞으로 추천 안 해요 — ' + tg.name); }
                             if (act === 'unblock') { await srcPut('block/' + k, null); delete gSrc.block[k]; showToast('추천제외를 취소했어요'); }
@@ -3903,6 +3904,52 @@
                     };
                     setTimeout(() => document.addEventListener('pointerdown', srcMenuOutside, true), 0);
                 }
+                /* [신규 2026-10-06] 건너뜀 — 몇 주 건너뛸지 고른다 (사장님 요청. 예전엔 4주로 고정)
+                   PC(DB올리기.ps1 → 판매확정.csv '건너뜀' 줄)는 date 가 든 주(월요일)부터 4주 동안 추천에서 뺀다.
+                   그래서 n주를 고르면 date 를 '이번 주 월요일 + (n-4)주'로 적어, PC 를 고치지 않고도 n주 뒤 월요일에 풀리게 한다.
+                   weeks·until(풀리는 월요일)·asked(누른 날)도 같이 적어 둔다. */
+                const SRC_SKIP_WEEKS = [1, 2, 3, 4, 6, 8, 12];
+                function srcSkipUntilText(v) { return v && v.until ? ' (~' + srcAddDays(v.until, -1).slice(5).replace('-', '/') + ')' : ''; }
+                function srcSkipAsk(tg, k, el) {
+                    srcMenuClose();
+                    const m = document.createElement('div'); m.id = 'src-menu';
+                    m.innerHTML = '<div class="t">몇 주 건너뛸까요?<small>' + srcEsc(tg.name) + '</small></div>' +
+                        '<div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:5px;">' +
+                        SRC_SKIP_WEEKS.map(n => '<button type="button" class="skip" data-weeks="' + n + '" style="white-space:nowrap; padding:0 2px;">' + n + '주</button>').join('') + '</div>' +
+                        '<button type="button" data-act="close">닫기</button>';
+                    document.body.appendChild(m);
+                    const r = el.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight;
+                    m.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, r.left)) + 'px';
+                    m.style.top = (r.bottom + mh + 8 < window.innerHeight ? r.bottom + 4 : Math.max(8, r.top - mh - 4)) + 'px';
+                    m.onclick = async e => {
+                        const b = e.target.closest('button'); if (!b) return;
+                        srcMenuClose();
+                        const n = +b.dataset.weeks; if (!n) return;
+                        const mon = srcMonday(srcToday());
+                        const v = { name: tg.name, vendor: tg.vendor, date: srcAddDays(mon, (n - 4) * 7), weeks: n, until: srcAddDays(mon, n * 7), asked: srcToday(), at: new Date().toISOString() };
+                        try { await srcPut('skip/' + k, v); gSrc.skip[k] = v; showToast('건너뜀: ' + n + '주 동안 추천 안 해요' + srcSkipUntilText(v) + ' — ' + tg.name); }
+                        catch (err) { showToast('저장 못 했어요: ' + err.message); }
+                        srcRender();
+                    };
+                    setTimeout(() => document.addEventListener('pointerdown', srcMenuOutside, true), 0);
+                }
+                // [신규 2026-10-06] 달력 이름표를 누르면(하나 고르기) 식단표와 같은 창 — 밴드로 이동 · 발주 등록 · 건너뜀 · 추천제외
+                function srcTagMenu(rs) {
+                    const r = JSON.parse(rs), p = srcRefGet(r); if (!p) return;
+                    const el = [...document.querySelectorAll('#purchase-section-sourcing .src-tag[data-ref]')].find(x => x.dataset.ref === rs); if (!el) return;
+                    let rec = '', link = '', supply = p.supply || '';
+                    if (r[0] === 'pick' && p.pick === '이 상품') {
+                        const it = Object.values(((gSrc.lineup[r[1]] || {}).items) || {}).find(x => x && x.name === p.name && x.vendor === p.vendor);
+                        if (it) { rec = it.rec || ''; link = it.link || ''; supply = supply || it.supply || ''; }
+                    }
+                    if (r[0] === 'direct' && p.no) {
+                        const b = srcBandRow(p.no);
+                        if (b) { rec = b.rp || ''; link = b.u || ''; supply = supply || b.sp || ''; }
+                    }
+                    const vendor = p.vendor || (r[0] === 'onsite' ? '상시판매' : r[0] === 'manual' ? (p.memo || '') : '');
+                    srcMenuShow({ name: p.name, vendor, supply }, el, { rec, link });
+                }
+
                 // 발주관리 → 발주 등록 화면을 열고 매입처·상품명·단가·판매가를 채워 둔다. 수량은 사장님이 넣는다.
                 function srcToPurchase(tg, rec) {
                     try {
@@ -3963,6 +4010,8 @@
                 }
 
                 // ── 달력 (월~금) ──
+                // [신규 2026-10-06] 한 날짜 칸 안 차례 — 사다드림 · 추천 · 비슷한 상품 · 밴드 상품 · 상시 · 직접 쓴 것 (사장님 요청)
+                const SRC_TAG_RANK = { sada: 0, '': 1, alt: 2, direct: 3, onsite: 4, manual: 5 };
                 // 고른 상품(식단표)과 판매 표시(밴드 목록)를 판 날짜 칸에 보여 준다. 날짜 칸은 끌어다 놓는 자리다.
                 function srcCalendar() {
                     const month = gSrc.calMonth || (gSrc.week || srcToday()).slice(0, 7);
@@ -4016,7 +4065,7 @@
                             html += '<div class="' + cls.join(' ') + '" data-date="' + k + '"><div class="top"><span class="n">' + x.getDate() + '</span>' +
                                 (hol ? '<span class="hn">' + hol + '</span>' : '') + (off ? '<span class="off" title="주문관리에 설정된 가게 휴무일">휴무</span>' : '') +
                                 '<button type="button" class="src-cal-add" title="이 날짜에 상품 넣기" onclick="srcDayAdd(\'' + k + '\')">+</button></div>' +
-                                (byDate[k] || []).map(t => '<div class="src-tag ' + t.kind + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(t.name) + '"><span>' + srcEsc(t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>').join('') + '</div>';
+                                (byDate[k] || []).slice().sort((a, b) => SRC_TAG_RANK[a.kind] - SRC_TAG_RANK[b.kind]).map(t => '<div class="src-tag ' + t.kind + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(t.name) + '"><span>' + srcEsc(t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>').join('') + '</div>';
                         }
                     }
                     return html + '</div></div>';
@@ -4261,6 +4310,7 @@
                     else if (gSrcSel.size === 1 && gSrcSel.has(ref)) gSrcSel.clear();
                     else { gSrcSel.clear(); gSrcSel.add(ref); }
                     srcRender();
+                    if (!add && gSrcSel.size === 1 && gSrcSel.has(ref)) srcTagMenu(ref);   // [신규 2026-10-06] 하나 고르면 창
                 }
                 (function srcTagDnd() {
                     let st = null;
@@ -7432,7 +7482,7 @@
         const gFlyerSlotLabel = (s) => (s.from == null) ? '전체' : (s.from === s.to ? `${s.from}호` : `${s.from}~${s.to}호`);
         const gFlyerDates = (apt, key) => ((flyerLogs[apt] || {})[key] || {}).dates || [];
 
-        /* [신규] 최근 석 달 안에 돌린 라인이 몇 곳인지 / 그 아파트에 라인이 모두 몇 곳인지.
+        /* [신규] 1년 안에 돌린 라인이 (2026-10-06 석 달 → 1년) 몇 곳인지 / 그 아파트에 라인이 모두 몇 곳인지.
            '오늘 몇 곳 돌렸나'보다, '아직 안 간 데가 얼마나 남았나'가 알고 싶은 것이라 이렇게 센다.
            지금 있는 칸만 센다 — 칸을 지웠는데 기록만 남아 있으면 숫자가 부풀기 때문이다. */
         /* 전단지 화면은 칸이 좁아 긴 이름이 잘린다. 배달기사 이름(짧은 이름)이 있으면 그것을 쓴다.
@@ -7443,7 +7493,9 @@
 
         function gFlyerAptLegend() {
             return `<div style="${_fLegend} padding:8px 2px 0;">
-                <span><b style="color:#64748b;">( )</b> 최근 석 달 안에 돌린 라인 / 그 아파트 라인 모두</span>
+                <span>차례 = 최근 석 달 주문 많은 순</span>
+                <span><b style="color:#64748b;">%</b> 1년 안에 돌린 라인</span>
+                <span><b style="color:#0f172a; background:rgba(15,23,42,.07); border-radius:5px; padding:0 4px;">10/6</b> 마지막으로 돌린 날</span>
                 <span><i style="${_fDot('#86efac', '#f0fdf4')}"></i>다 돎</span>
                 <span><i style="${_fDot('#fde68a', '#fffbeb')}"></i>반 이상</span>
                 <span><i style="${_fDot('#e2e8f0', '#fff')}"></i>그 밖</span>
@@ -7466,8 +7518,43 @@
             return (hit && hit.shortName) ? String(hit.shortName) : n;
         }
 
+        /* [신규 2026-10-06] 아파트별 최근 석 달 주문 수 — 아파트 관리 화면과 같은 규칙
+           (취소 뺌, 같은 사람이 같은 날 시킨 것은 한 건). 주문이 많으면 다시 세지 않게 잠깐 담아 둔다. */
+        let _flyerOrdCache = { n: -1, at: 0, map: {} };
+        function gFlyerAptOrderCounts() {
+            const list = rawOrders || [];
+            if (_flyerOrdCache.n === list.length && Date.now() - _flyerOrdCache.at < 60000) return _flyerOrdCache.map;
+            const from = new Date(); from.setMonth(from.getMonth() - 3);
+            const sets = {};
+            list.forEach(o => {
+                if (!o || isSalesCanceled(o)) return;
+                const d = parseTimestampToDate(o.timestamp);
+                if (!d || isNaN(d.getTime()) || d < from) return;
+                const full = `${o.address || ''} ${o.addressDetail || ''}`.trim();
+                if (!full) return;
+                const apt = gFindApartment(full);
+                if (!apt) return;
+                (sets[apt.name] = sets[apt.name] || new Set()).add(gOrderDayKey(o));
+            });
+            const map = {};
+            Object.keys(sets).forEach(k => { map[k] = sets[k].size; });
+            _flyerOrdCache = { n: list.length, at: Date.now(), map };
+            return map;
+        }
+        // 그 아파트에서 전단지를 마지막으로 돌린 날 (어느 라인이든)
+        function gFlyerAptLastDate(aptName) {
+            let last = '';
+            Object.values(flyerLogs[aptName] || {}).forEach(v => { const d = ((v && v.dates) || [])[0] || ''; if (d > last) last = d; });
+            return last;
+        }
+        function gFlyerMd(iso) {
+            const [y, m, d] = String(iso).split('-');
+            const md = parseInt(m) + '/' + parseInt(d);
+            return (y === String(new Date().getFullYear())) ? md : y.slice(2) + '.' + md;
+        }
+
         function gFlyerRecentStat(aptName) {
-            const d = new Date(); d.setMonth(d.getMonth() - 3);
+            const d = new Date(); d.setFullYear(d.getFullYear() - 1);   // [수정 2026-10-06] 석 달 → 1년 (사장님 요청)
             const 자른날 = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             const 칸들 = gFlyerSlotsOf(aptName).flatMap(g => g.slots);
             const 돌림 = 칸들.filter(s => {
@@ -8480,15 +8567,17 @@
 
             // ── 아파트 고르기 ──
             if (!_flyerApt) {
+                // [수정 2026-10-06] 최근 석 달 주문 많은 순으로 (같으면 이름 순) — 사장님 요청
+                const _ord = gFlyerAptOrderCounts();
                 const names = [...new Set(Object.keys(entrancePasswords || {}))]
-                    .sort((a, b) => a.localeCompare(b, 'ko'));
+                    .sort((a, b) => (_ord[b] || 0) - (_ord[a] || 0) || a.localeCompare(b, 'ko'));
                 const today = gTodayKey();
 
                 const chips = names.map(n => {
                     const dongCount = gFlyerSlotsOf(n).length;   // [수정] 칸(라인) 수보다 동 수가 한눈에 들어온다
                     /* [수정] 칸을 지웠는데 그 칸의 기록이 남아 있으면 '오늘 N'만 올라가고
                        눌러 봐도 해당하는 줄이 없어 헷갈린다. 지금 있는 칸만 센다. */
-                    /* 최근 석 달 안에 돌린 라인 / 그 아파트 라인 모두.
+                    /* 1년 안에 돌린 라인 / 그 아파트 라인 모두.
                        다 돌았으면 초록, 반 넘게 돌았으면 노랑, 아니면 그대로 둔다. */
                     const st = gFlyerRecentStat(n);
                     const 다돌음 = (st.total > 0 && st.done >= st.total);
@@ -8497,18 +8586,25 @@
                     const 바탕 = 다돌음 ? '#f0fdf4' : (반넘음 ? '#fffbeb' : '#fff');
                     // [수정] 돌린 개수가 옅은 회색이라 눈에 안 들어왔다. 진하게 한다.
                     const 숫자색 = 다돌음 ? '#15803d' : (반넘음 ? '#b45309' : '#334155');
+                    /* [수정 2026-10-06] 가로 네 칸 — 이름 / 최근 석 달 주문 수 · 돌린 라인 / 마지막으로 돌린 날 (사장님 요청) */
+                    const 주문 = _ord[n] || 0;
+                    const 마지막 = gFlyerAptLastDate(n);
                     return `<button type="button" onclick="pickFlyerApt('${encodeURIComponent(n)}')"
-                        title="${gEscapeHtml(n)} — 최근 석 달 안에 돌린 라인 ${st.done}곳 / 모두 ${st.total}곳"
-                        style="display:flex; align-items:center; gap:6px; width:100%; box-sizing:border-box; min-height:38px; padding:6px 11px;
+                        title="${gEscapeHtml(n)} (${dongCount}동) — 최근 석 달 주문 ${주문}건 · 1년 안에 돌린 라인 ${st.done}곳 / 모두 ${st.total}곳${마지막 ? ' · 마지막 ' + 마지막 : ''}"
+                        style="display:flex; flex-direction:column; align-items:stretch; gap:2px; width:100%; min-width:0; box-sizing:border-box; padding:6px 7px;
                                border:1.5px solid ${테두리}; background:${바탕};
-                               color:#334155; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer; text-align:left;">
-                        <span style="flex:1; min-width:0; line-height:1.35; word-break:keep-all; overflow-wrap:break-word;">${gEscapeHtml(gFlyerShortName(n))}
-                            <span style="font-weight:800; color:#64748b;">(${dongCount}동)</span></span>
-                        <span style="flex:0 0 auto; font-size:13px; font-weight:900; color:${숫자색}; font-variant-numeric:tabular-nums; white-space:nowrap;">${st.done}/${st.total}</span></button>`;
+                               color:#334155; border-radius:9px; font-weight:800; cursor:pointer; text-align:left;">
+                        <span style="font-size:12.5px; line-height:1.3; word-break:keep-all; overflow-wrap:anywhere;">${gEscapeHtml(gFlyerShortName(n))}</span>
+                        <!-- [수정 2026-10-06] 주문 수는 뺐다(차례만 주문 많은 순). 가운데는 1년 안에 돌린 라인 비율(%) — 사장님 요청 -->
+                        <span style="font-size:13px; font-weight:900; color:${st.total ? 숫자색 : '#cbd5e1'}; font-variant-numeric:tabular-nums; white-space:nowrap;">${st.total ? Math.round(st.done / st.total * 100) + '%' : '–'}</span>
+                        <!-- [수정 2026-10-06] 날짜 앞 🧾 는 뺐다 — 진한 글씨 + 옅은 바탕으로 눈에 띄게 (사장님 요청) -->
+                        ${마지막
+                            ? `<span style="align-self:flex-start; padding:1px 6px; border-radius:6px; background:rgba(15,23,42,.07); font-size:12px; font-weight:900; color:#0f172a; white-space:nowrap; font-variant-numeric:tabular-nums;">${gFlyerMd(마지막)}</span>`
+                            : `<span style="font-size:11px; font-weight:800; color:#cbd5e1; white-space:nowrap;">안 돌림</span>`}</button>`;
                 }).join('');
 
                 box.innerHTML =
-                    (names.length ? `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:6px;">${chips}</div>` + gFlyerAptLegend()
+                    (names.length ? `<div style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:5px;">${chips}</div>` + gFlyerAptLegend()
                         : `<div style="padding:12px 0; font-size:12.5px; font-weight:700; color:#cbd5e1;">아직 아파트가 없습니다. 아래에서 새로 만들어 주세요.</div>`)
                     ;
 
