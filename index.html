@@ -11806,7 +11806,7 @@
             const diff = needed - current;
             if (diff === 0) return;
 
-            const baseOrder = productRows[0];
+            const baseOrder = gLatestOrder(productRows) || productRows[0];   // [수정 2026-10-07] 그날 마지막 주문에 붙인다
             const ok = await gAppendFeeRowAdmin(cleanPhone, baseOrder, pDate, Math.abs(diff), diff < 0);
             if (ok) {
                 showToast(diff > 0
@@ -11838,6 +11838,29 @@
         }
 
         // 배달비/배달비 차감 줄을 새로 하나 기록한다 (기존 기록은 건드리지 않는다)
+        /* [신규 2026-10-07] 배달비·배달비 차감을 새로 붙일 때는 따로 주문을 만들지 않고 그날 '마지막 주문'에 붙인다 (사장님 요청).
+           예전에는 지금 시각으로 주문을 하나 더 만들어 '배달 0개 · 배달비 3,000원'짜리 카드가 따로 생겼다. */
+        function gOrderTimeNum(o) {
+            const r = Number(o && o.rawTimestamp);
+            if (r > 1e12) return r;
+            const m = String((o && o.timestamp) || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})\D+?(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)).getTime() : 0;
+        }
+        function gLatestOrder(rows) {
+            return (rows || []).reduce((best, o) => (!best || gOrderTimeNum(o) > gOrderTimeNum(best)) ? o : best, null);
+        }
+        // 같은 주문(같은 시각)에 이미 같은 이름 줄이 있으면 _2, _3 … — 비어 있는 자리를 서버에서 확인한다 (덮어쓰면 안 된다)
+        async function gFreeOrderKey(ph, base) {
+            for (let i = 1; i <= 9; i++) {
+                const k = i === 1 ? base : base + '_' + i;
+                try {
+                    const r = await fetch(`${FIREBASE_DB_URL}orders/${ph}/${k}.json?shallow=true&t=${Date.now()}`);
+                    if (r.ok && (await r.json()) === null) return k;
+                } catch (e) { return null; }
+            }
+            return null;
+        }
+
         async function gAppendFeeRowAdmin(cleanPhone, baseOrder, pDate, amount, isRefund) {
             const amt = Math.abs(parseInt(amount) || 0);
             if (amt <= 0) return false;
@@ -11850,9 +11873,11 @@
 
             const rowName = isRefund ? FEE_REFUND_NAME : "배달비";
             const signed = isRefund ? -amt : amt;
-            const tempTimestamp = Date.now();
-            const formattedTimestamp = formatTimestampToFullString(tempTimestamp);
-            const orderKey = fSafeKey(formattedTimestamp) + "_" + fSafeKey(rowName);
+            // [수정 2026-10-07] 마지막 주문(baseOrder)과 같은 시각으로 — 손님 주문내역·주문관리에서 그 주문에 같이 묶인다
+            const tempTimestamp = Number(baseOrder.rawTimestamp) > 1e12 ? Number(baseOrder.rawTimestamp) : (gOrderTimeNum(baseOrder) || Date.now());
+            const formattedTimestamp = baseOrder.timestamp || formatTimestampToFullString(tempTimestamp);
+            const orderKey = await gFreeOrderKey(cleanPhone, fSafeKey(formattedTimestamp) + "_" + fSafeKey(rowName));
+            if (!orderKey) return false;
 
             const payload = {
                 // [삭제] header:'order' — 구글 시트로 보내던 시절의 표시. 지금은 읽는 곳이 없다.
