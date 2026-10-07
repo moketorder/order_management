@@ -11800,20 +11800,37 @@
 
             // 무료배달 기준 금액 — 사다드림 금액은 빼고 센다 (주문서와 같은 규칙)
             const base = productRows.reduce((a, o) => a + (isSadaOrderRow(o) ? 0 : amountOf(o)), 0);
+            /* [수정 2026-10-07] 그날 배달비는 '있어야 할 배달비' 한 줄만 남기고 나머지(남는 배달비 줄·배달비 차감 줄)는 모두 취소한다 (사장님 요청).
+               예전에는 모자라면 배달비를, 넘치면 '배달비 차감'을 새 줄로 덧붙였다. 남길 줄은 금액이 맞는 배달비 중 가장 늦게 붙은 것,
+               없으면 그날 마지막 주문에 새로 붙인다. */
             const current = feeRows.reduce((a, o) => a + amountOf(o), 0)
                           - refundRows.reduce((a, o) => a + amountOf(o), 0);
             const needed = (base >= 15000) ? 0 : await gGetDeliveryFee();
-            const diff = needed - current;
-            if (diff === 0) return;
+            const tidy = refundRows.length === 0 && (needed === 0 ? feeRows.length === 0 : (feeRows.length === 1 && amountOf(feeRows[0]) === needed));
+            if (tidy) return;
 
-            const baseOrder = gLatestOrder(productRows) || productRows[0];   // [수정 2026-10-07] 그날 마지막 주문에 붙인다
-            const ok = await gAppendFeeRowAdmin(cleanPhone, baseOrder, pDate, Math.abs(diff), diff < 0);
-            if (ok) {
-                showToast(diff > 0
-                    ? `배달비 ${Math.abs(diff).toLocaleString()}원이 추가되었습니다.`
-                    : `배달비 ${Math.abs(diff).toLocaleString()}원을 빼드렸습니다.`);
-                renderFilteredOrders();
+            const keep = needed > 0
+                ? feeRows.filter(o => amountOf(o) === needed).sort((a, b) => gOrderTimeNum(b) - gOrderTimeNum(a))[0] || null
+                : null;
+            for (const r of refundRows.concat(feeRows.filter(o => o !== keep))) {
+                try {
+                    const res = await gPatchOrder(cleanPhone, r.orderKey, { canceled: true, received: "취소완료" }, [{
+                        phone: cleanPhone, name: r.name || "", item: r.item || "",
+                        what: "배달비", from: String(r.total || r.price || ""), to: "취소",
+                        note: needed > 0 ? "그날 배달비를 한 줄로 정리" : "무료배달 기준을 넘어 배달비 정리"
+                    }]);
+                    if (res.ok) { r.canceled = true; r.received = "취소완료"; }
+                } catch (e) { console.error("배달비 정리 실패:", e); }
             }
+            if (needed > 0 && !keep) {
+                const baseOrder = gLatestOrder(productRows) || productRows[0];   // 그날 마지막 주문에 붙인다
+                await gAppendFeeRowAdmin(cleanPhone, baseOrder, pDate, needed, false);
+            }
+            const diff = needed - current;
+            showToast(diff > 0 ? `배달비 ${diff.toLocaleString()}원이 추가되었습니다.`
+                : diff < 0 ? `배달비 ${(-diff).toLocaleString()}원이 취소되었습니다.`
+                : '배달비를 한 줄로 정리했습니다.');
+            renderFilteredOrders();
         }
 
         // 주문 기록이 사다드림인지 (저장된 isSada 우선, 없으면 예전 주문이라 이름으로 판단)
