@@ -20190,9 +20190,13 @@
             }
             const nameOf = ptaNameMap();
             const qRaw = String(_rva.q || '').trim(), qNum = qRaw.replace(/\D/g, '');
-            const rows = Object.keys(_rva.points || {}).map(ph => ({ ph, nm: nameOf[ph] || '', bal: Number((_rva.points[ph] || {}).bal) || 0 }))
+            /* [수정 2026-10-07] 찾을 때는 포인트가 없는 손님도 나오게 (사장님 요청 — 사람을 골라 직접 넣기).
+               평소에는 포인트가 있는 손님만, 검색하면 주문·가입한 손님 전부에서 찾는다 */
+            const keys = new Set(Object.keys(_rva.points || {}));
+            if (qRaw) Object.keys(nameOf).forEach(k => { if (/^\d{9,11}$/.test(k)) keys.add(k); });
+            const rows = [...keys].map(ph => ({ ph, nm: nameOf[ph] || '', bal: Number(((_rva.points || {})[ph] || {}).bal) || 0, has: !!(_rva.points || {})[ph] }))
                 .filter(r => !qRaw || (qNum && r.ph.includes(qNum)) || (r.nm && r.nm.includes(qRaw)))
-                .sort((a, b) => b.bal - a.bal);
+                .sort((a, b) => b.bal - a.bal || (a.nm || '').localeCompare(b.nm || '', 'ko'));
             const cardBtn = (ph, nm, big) => `<span onclick="event.stopPropagation(); showCustomerCardModal('${encodeURIComponent(ph)}','${encodeURIComponent(nm || '')}')" title="손님 카드 보기"
                 style="cursor:pointer; font-weight:900; color:#2563eb; ${big ? 'font-size:15px;' : ''} text-decoration:underline; text-underline-offset:3px;">${E(nm || '이름 없음')}</span>`;
             const pick = _rva.pick;
@@ -20200,6 +20204,7 @@
             const pickBal = pick ? (Number((_rva.points[pick] || {}).bal) || 0) : 0;
             box.innerHTML = `<div class="card" style="padding:12px 14px; margin-bottom:10px;">
                     <input id="pta-q" class="form-control" placeholder="전화번호(뒤 4자리도 됩니다) 또는 별명" value="${E(_rva.q)}" oninput="_rva.q=this.value; renderReviewsAdmin(false); setTimeout(()=>{const i=document.getElementById('pta-q'); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);}},0)" style="height:40px;">
+                    <div style="margin-top:6px; font-size:11.5px; font-weight:700; color:#94a3b8;">포인트가 없는 손님도 찾으면 나와요 · 누르면 포인트를 넣거나 쓸 수 있어요</div>
                 </div>`
                 + (pick ? `<div class="card" style="padding:14px; margin-bottom:10px; border:2px solid var(--primary);">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
@@ -20209,15 +20214,15 @@
                     </div>
                     <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
                         <input id="pta-amt" type="number" inputmode="numeric" class="form-control" placeholder="포인트" style="flex:1 1 100px; height:38px;">
-                        <input id="pta-memo" class="form-control" placeholder="메모 (예: 매장 픽업)" value="매장 픽업" style="flex:2 1 140px; height:38px;">
+                        <input id="pta-memo" class="form-control" placeholder="메모 (예: 이벤트 당첨, 매장 사용)" value="" style="flex:2 1 140px; height:38px;">
                         <button type="button" onclick="ptaAdjust(-1)" style="height:38px; padding:0 12px; border:none; border-radius:8px; background:#dc2626; color:#fff; font-weight:800; cursor:pointer;">사용</button>
-                        <button type="button" onclick="ptaAdjust(1)" style="height:38px; padding:0 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#334155; font-weight:800; cursor:pointer;">더하기</button>
+                        <button type="button" onclick="ptaAdjust(1)" style="height:38px; padding:0 12px; border:none; border-radius:8px; background:#16a34a; color:#fff; font-weight:800; cursor:pointer;">넣기</button>
                     </div>
                     <div style="margin-top:6px; font-size:11.5px; font-weight:700; color:#94a3b8;">${PT_MIN_USE.toLocaleString()}P부터 쓸 수 있습니다 · 1P = 1원</div>
                     <div style="margin-top:10px;">${logs.map(l => `<div style="display:flex; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px solid #f1f5f9; font-size:13px;"><span style="font-weight:700; color:#334155;">${PT_WHY[l.why] || l.why}<span style="color:#94a3b8; font-size:11.5px; margin-left:6px;">${when(l.at)}${l.memo ? ' · ' + E(l.memo) : ''}</span></span><b style="color:${(l.amt || 0) >= 0 ? '#16a34a' : '#dc2626'};">${(l.amt || 0) >= 0 ? '+' : ''}${(Number(l.amt) || 0).toLocaleString()}</b></div>`).join('') || '<div style="color:#94a3b8; font-size:13px;">기록이 없습니다.</div>'}</div>
                 </div>` : '')
-                + (rows.length ? rows.slice(0, 100).map(r => `<div class="card" onclick="_rva.pick='${E(r.ph)}'; renderReviewsAdmin(false);" style="padding:11px 14px; margin-bottom:6px; display:flex; justify-content:space-between; cursor:pointer; ${r.ph === pick ? 'background:#f0fdf4;' : ''}"><span style="font-weight:800; color:#334155; min-width:0;">${cardBtn(r.ph, r.nm)} <span style="color:#94a3b8; font-weight:700;">${E(phone(r.ph))}</span></span><b style="color:${r.bal >= PT_MIN_USE ? '#16a34a' : '#64748b'};">${r.bal.toLocaleString()}P</b></div>`).join('')
-                    : `<div class="card" style="padding:24px; text-align:center; color:var(--text-sub); font-weight:700;">포인트가 있는 손님이 없습니다.</div>`);
+                + (rows.length ? rows.slice(0, 100).map(r => `<div class="card" onclick="_rva.pick='${E(r.ph)}'; renderReviewsAdmin(false); setTimeout(()=>{const i=document.getElementById('pta-amt'); if(i) i.focus();},0)" style="padding:11px 14px; margin-bottom:6px; display:flex; justify-content:space-between; cursor:pointer; ${r.ph === pick ? 'background:#f0fdf4;' : ''}"><span style="font-weight:800; color:#334155; min-width:0;">${cardBtn(r.ph, r.nm)} <span style="color:#94a3b8; font-weight:700;">${E(phone(r.ph))}</span></span><b style="color:${r.bal >= PT_MIN_USE ? '#16a34a' : '#64748b'};">${r.has ? r.bal.toLocaleString() + 'P' : '<span style="color:#cbd5e1;">포인트 없음</span>'}</b></div>`).join('')
+                    : `<div class="card" style="padding:24px; text-align:center; color:var(--text-sub); font-weight:700;">${qRaw ? '찾는 손님이 없습니다.' : '포인트가 있는 손님이 없습니다 · 위에서 손님을 찾아 넣어 주세요.'}</div>`);
         }
         /* [신규 2026-10-03] 포인트 번호(카카오 번호) → 손님 별명. 주문 카드에 보이는 이름과 같게 —
            가장 최근 주문에 적힌 이름, 주문이 없으면 손님 정보(가입 때 이름 → 카톡 닉네임) */
@@ -20293,6 +20298,9 @@
             try {
                 await rvaFetch();
                 const bal = ptaSumBal(ph, 0);
+                if (sign > 0 && !await psConfirm(`${(ptaNameMap()[ph] || '')} ${phone_(ph)} 손님에게 포인트 ${amt.toLocaleString()}P를 넣습니다.${memo ? `
+메모: ${memo}` : ''}
+넣은 뒤: ${(bal + amt).toLocaleString()}P`)) return;   // [신규 2026-10-07] 넣기도 한 번 묻는다
                 if (sign < 0) {
                     if (bal < PT_MIN_USE) return showToast(`${PT_MIN_USE.toLocaleString()}P부터 쓸 수 있습니다 (지금 ${bal.toLocaleString()}P).`);
                     if (amt > bal) return showToast(`남은 포인트(${bal.toLocaleString()}P)보다 많이 쓸 수 없습니다.`);
@@ -20300,7 +20308,7 @@
                 }
                 const lid = `a_${Date.now().toString(36)}`, now = Date.now();
                 await rvaPatch({ [`point_logs/${ph}/${lid}`]: { amt: sign * amt, why: 'adjust', at: now, memo: memo || (sign < 0 ? '매장 사용' : '가게 조정') }, [`points/${ph}`]: { bal: bal + sign * amt, last: lid, at: now } });
-                showToast(sign < 0 ? `${amt.toLocaleString()}P를 썼습니다.` : `${amt.toLocaleString()}P를 더했습니다.`);
+                showToast(sign < 0 ? `${amt.toLocaleString()}P를 썼습니다.` : `${amt.toLocaleString()}P를 넣었습니다.`);
                 await renderReviewsAdmin(true);
             } catch (e) { showToast('저장하지 못했습니다: ' + gErrKo(e)); }
         }
@@ -31026,6 +31034,33 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         isStockChanged = true;
                     }
                 }
+
+                /* [신규 2026-10-07] 옵션 수량을 새로 넣거나 바꾸면 그 옵션에 쌓인 조정값(option_stock)을 비운다 (사장님 — 블루베리 품절)
+                   수량 제한이 없을 때도 주문서가 팔린 만큼 조정값을 깎아 둬서(예: 한팩 -6), 나중에 수량 5를 넣으면 5-6=0 으로 바로 품절이 됐다.
+                   상품 재고를 고칠 때 global_stock 을 0 으로 맞추는 것과 같다 — 사장님이 넣은 숫자가 그대로 남은 수량이 된다.
+                   수량을 비워(제한 없음) 바꾼 경우도 비운다. 수량을 그대로 두면 건드리지 않는다 (팔린 만큼 그대로 남아 있게) */
+                try {
+                    const saved = updatedProducts[_savedIdx];
+                    const sv = v => (v === undefined || v === null || String(v).trim() === '') ? '' : String(parseInt(v, 10) || 0);
+                    const oldStockOf = (gName, iName) => {
+                        if (!oldProd || !Array.isArray(oldProd.options)) return undefined;   // 새 상품 — 예전 값 없음
+                        const g = oldProd.options.find(x => x && x.name === gName);
+                        const it = g && (g.items || []).find(x => x && x.name === iName);
+                        return it ? sv(it.stock) : undefined;
+                    };
+                    const resets = [];
+                    (Array.isArray(saved && saved.options) ? saved.options : []).forEach(g => (g && g.items || []).forEach(it => {
+                        if (!it) return;
+                        const now = sv(it.stock), before = oldStockOf(g.name, it.name);
+                        const changed = (before === undefined) ? now !== '' : before !== now;
+                        if (!changed) return;
+                        resets.push(gOptStockKey(saved, g.name, it.name));   // 화면이 조정값을 아직 안 받았을 수 있어 바뀐 항목은 늘 비운다
+                    }));
+                    for (const k of resets) {
+                        await fetch(`${FIREBASE_DB_URL}option_stock/${encodeURIComponent(k)}.json`, { method: 'DELETE' }).catch(e => console.warn('옵션 조정값 비우기 실패:', k, e));
+                        delete optionAdjustments[k];
+                    }
+                } catch (e) { console.warn('옵션 조정값 비우기 실패:', e); }
 
                 // [신규] 상품 재고 정보가 수정되거나 식별자가 변경된 경우, 전역 재고 변동분(global_stock) 초기화 조치
                 if (isStockChanged) {
