@@ -2805,7 +2805,9 @@
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
                 <div style="font-size:13px; font-weight:900; color:#92400e;" id="announce-banner-title">🔔 카톡에 올릴 상품</div>
                 <!-- [신규] 지금 바쁘면 잠깐 접어 둔다. [수정 2026-10-05] 오늘 하루 동안 접힌 채로 (새로고침해도), 내일 다시 펼쳐진다 -->
-                <button type="button" onclick="toggleAnnounceBannerCollapsed()" id="announce-banner-toggle" style="flex:0 0 auto; height:26px; padding:0 10px; border:1px solid #fde68a; background:#fff; color:#92400e; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">숨기기</button>
+                <!-- [신규 2026-10-08] 지금 보이는 알림을 한꺼번에 '다 올렸어요' (사장님 요청) -->
+                <span style="display:inline-flex; gap:6px; margin-left:auto;"><button type="button" onclick="announceDismissAll()" id="announce-banner-all" style="flex:0 0 auto; height:26px; padding:0 10px; border:1px solid #bbf7d0; background:#f0fdf4; color:#15803d; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">✔ 전체 확인</button>
+                <button type="button" onclick="toggleAnnounceBannerCollapsed()" id="announce-banner-toggle" style="flex:0 0 auto; height:26px; padding:0 10px; border:1px solid #fde68a; background:#fff; color:#92400e; border-radius:7px; font-size:11px; font-weight:800; cursor:pointer;">숨기기</button></span>
             </div>
             <div id="announce-banner-list" style="display:flex; flex-direction:column;"></div>
         </div>
@@ -19271,6 +19273,7 @@
                 return;
             }
             box.style.display = 'block';
+            gAnnouncePending = pending;   // [신규 2026-10-08] 전체 확인용
             if (title) title.textContent = `🔔 카톡에 올릴 상품 ${pending.length}개`;
             if (toggleBtn) toggleBtn.textContent = announceBannerCollapsed ? '▼ 펼치기' : '▲ 오늘 숨기기';
             // 접혀 있어도 내용은 미리 그려 둔다 — 펼칠 때 바로 보이라고
@@ -19413,6 +19416,30 @@
         }
 
         // '다 올렸어요' — 이제 안내를 마친 것으로 저장한다 (다음에 다시 로그인해도 안 뜸)
+        /* [신규 2026-10-08] 🔔 배너 '전체 확인' — 지금 배너에 보이는 상품을 한꺼번에 '다 올렸어요'로 (한 번 묻는다, 나만 닫힘) */
+        let gAnnouncePending = [];
+        async function announceDismissAll() {
+            const list = (gAnnouncePending || []).filter(x => x && x.p);
+            if (!list.length) return;
+            if (!await psConfirm(`카톡에 올릴 상품 ${list.length}개를 모두 '다 올렸어요'로 할까요?\n\n${list.slice(0, 8).map(x => '· ' + (x.p.name || '')).join('\n')}${list.length > 8 ? `\n… 외 ${list.length - 8}개` : ''}`)) return;
+            const uid = (window.gStaffMe || {}).uid || '';
+            if (!uid) { showToast('로그인 확인 중이에요 — 잠시 후 다시 눌러 주세요.'); return; }
+            const dis = {}, prodPatch = {};
+            list.forEach(({ p, key }) => {
+                dis[gDismissCycleKey(p, key)] = true;
+                const idx = gFindProductIdxByKey(key); if (idx >= 0) prodPatch[`${idx}/announced`] = true;
+            });
+            const ok = await fetch(`${FIREBASE_DB_URL}announce_dismissed/${encodeURIComponent(uid)}.json`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dis)
+            }).then(r => r.ok).catch(() => false);
+            if (!ok) { showToast('닫지 못했어요 — 다시 눌러 주세요.'); return; }
+            Object.keys(dis).forEach(k => myDismissedKeys.add(k));
+            list.forEach(({ p, key }) => { p.announced = true; announceTextCopied.delete(key); });
+            try { if (Object.keys(prodPatch).length) await fbPatchProducts(prodPatch); } catch (e) { console.warn('상품 announced 기록 실패(닫기 자체는 잘 됐음):', e); }
+            showToast(`🔔 ${list.length}개를 모두 확인했어요`);
+            checkPendingAnnouncements();
+            if (typeof renderProductsList === 'function') renderProductsList();
+        }
         async function announceDismissRow(key) {
             const idx = gFindProductIdxByKey(key);
             const p = uploadProducts[idx];
