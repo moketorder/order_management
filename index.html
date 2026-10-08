@@ -903,6 +903,11 @@
         }
 
         .btn-batch {
+            /* [수정 2026-10-08] 한쪽으로 쏠리지 않게 줄 너비에 고르게 (사장님 요청) */
+            flex: 1 1 0;
+            min-width: 0;
+            white-space: nowrap;
+            text-align: center;
             padding: 7px 12px;
             font-size: 12px;
             border-radius: var(--radius-sub);
@@ -3072,6 +3077,11 @@
                                     <div class="name-rule-ex">사다드림·신선식품·오늘의추천·특가는 체크하면 저절로 붙어요</div>
                                     <div id="name-preview" class="name-preview" style="display:none;"></div>
                                 </div>
+                                <!-- [신규 2026-10-08] 소싱 카테고리 — 소싱 일정의 카테고리별 추천·2주 추천에서 이 상품(특히 상시판매)이 들어갈 칸 (사장님 요청). 비우면 이름으로 짐작 -->
+                                <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+                                    <label for="productSrcCat" style="margin:0; flex:0 0 auto; font-size:13px; font-weight:800; color:#475569;">카테고리</label>
+                                    <select id="productSrcCat" class="form-control" style="flex:1 1 auto; min-width:0; height:38px;" onfocus="gFillSrcCatSelect(this)" onpointerdown="gFillSrcCatSelect(this)"><option value="">(비우면 이름으로 짐작)</option></select>
+                                </div>
                                 <!-- [수정] 노출 버튼 두 개는 아래 '보관방법 / 노출여부' 줄로 옮겼다. -->
 
                             </div>
@@ -3702,6 +3712,7 @@
                         #purchase-section-sourcing .src-plan-cat.on > b { color:#5b21b6; }
                         #purchase-section-sourcing .src-plan-cat .src-ochip { display:block; font-size:11.5px; padding:3px 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
                         #purchase-section-sourcing .src-plan-cat .src-ochip small { display:block; font-size:10px; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
+                        #purchase-section-sourcing .src-plan-age { font-weight:900; background:rgba(15,23,42,.08); border-radius:4px; padding:0 3px; margin-right:2px; }
                         #purchase-section-sourcing .src-plan-day { background:#fff; border:1px solid var(--src-line); border-radius:10px; padding:6px; min-width:0; display:flex; flex-direction:column; gap:4px; }
                         #purchase-section-sourcing .src-plan-day .h .hol { font-size:10.5px; font-weight:800; color:#dc2626; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
                         #purchase-section-sourcing .src-plan-day .h { display:flex; align-items:center; gap:6px; font-size:12px; }
@@ -3737,6 +3748,7 @@
                         @media (max-width: 600px) { #purchase-section-sourcing .src-uni .bar { flex-wrap:wrap; } #purchase-section-sourcing .src-tg { padding:0 7px; font-size:11.5px; } }
                         #purchase-section-sourcing .src-hchip { background:#fffbeb; border-color:#fde68a; color:#78350f; cursor:default; }
                         #purchase-section-sourcing .src-hchip small { color:#b45309; }
+                        #purchase-section-sourcing .src-hchip[data-hist] { cursor:grab; touch-action:none; }   /* [신규 2026-10-08] 끌어다 놓는 공구 이름표 */
                         #purchase-section-sourcing .src-bchip.done { background:#ccfbf1; border-color:#2dd4bf; }
                         #src-edit { position:fixed; inset:0; z-index:2147483400; background:rgba(15,23,42,.35); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }
                         #src-edit .in { background:#fff; border-radius:14px; padding:14px; width:100%; max-width:380px; display:flex; flex-direction:column; gap:8px; font-family:inherit; box-shadow:0 18px 40px rgba(15,23,42,.25); }
@@ -4076,7 +4088,7 @@
                         const nk = String(p.name || '').replace(/\s/g, ''), c = psSafeId(String(p.code || '').trim());
                         const h = hist.find(x => x && ((c && x.code === c) || String(x.name || '').replace(/\s/g, '') === nk));
                         return { p, last: h ? srcHistLast(h) : '', total: h ? (+h.total || 0) : 0, kw: srcKw(p.name) };
-                    }).filter(x => x.p && x.p.code && x.p.name && (!x.last || x.last < since))
+                    }).filter(x => x.p && x.p.code && x.p.name && (!x.last || x.last < since))   // 4주 넘은 것 (칸에서 4주·8주로 나눈다)
                       .filter(x => !(sold['#' + x.kw] && sold['#' + x.kw] >= since) && !((gSrc.onsite[x.p.code] || {}).date >= since))
                       .sort((a, b) => (b.last ? 1 : 0) - (a.last ? 1 : 0) || b.total - a.total || String(a.last).localeCompare(String(b.last)));
                 }
@@ -4112,6 +4124,7 @@
                         const names = {}; rows.forEach(r => { names[String(r.n).replace(/\s/g, '')] = r.c; });
                         gSrcOnCat = { band: gSrc.band, def: gSrc.catdef, names, text: Object.keys(byCat).map(c => [c, '|' + byCat[c].join('|') + '|']), memo: {} };
                     }
+                    if (p && p.srcCat) return srcCatName(p.srcCat);   // [신규 2026-10-08] 상품 등록에서 고른 카테고리가 먼저
                     const C = gSrcOnCat, key = String(p.code || p.name);
                     if (key in C.memo) return C.memo[key];
                     const nk = String(p.name || '').replace(/\s/g, '');
@@ -4127,10 +4140,23 @@
                 }
                 /* [수정 2026-10-08] 요일별 칸 대신 한 주에 카테고리마다 하나씩 (사장님 요청)
                    다음 주·다다음 주 두 묶음. 카테고리 칸마다 밴드 상품 하나(첫 주 = 1순위, 둘째 주 = 2순위), 끝에 상시판매 칸 하나 */
+                /* [수정 2026-10-08] 다음 주만 (사장님 요청) · 카테고리마다 밴드 상품 + 상시판매 + 4주 지난 공구 상품 하나씩
+                   공구 상품 = 판매 기록(psHistBuild)에서 마지막 공구가 4주 넘었고 다음 차례가 안 잡힌 것 (상시판매로 이미 나온 것은 뺌), 많이 판 순 */
+                function srcPlanGb(onCodes) {
+                    const since = srcAddDays(srcToday(), -28), sold = srcSoldMap();
+                    const prodBy = {}; (uploadProducts || []).forEach(p => { if (p && p.productCode) prodBy[psSafeId(String(p.productCode).trim())] = p; });
+                    return (gSrc.hist || []).map(h => ({ h, last: srcHistLast(h) }))
+                        .filter(x => x.h && x.h.code && x.h.name && x.last && x.last < since && !x.h.next && !onCodes.has(x.h.code))
+                        .filter(x => { const kw = srcKw(x.h.name); return !(sold['#' + kw] && sold['#' + kw] >= since); })
+                        .map(x => ({ p: { code: x.h.code, name: x.h.name, srcCat: ((prodBy[x.h.code] || {}).srcCat) || '' }, last: x.last, total: +x.h.total || 0 }))
+                        .sort((a, b) => b.total - a.total || String(a.last).localeCompare(String(b.last)));
+                }
                 function srcPlanPanel() {
                     if (!gSrc.band) return '';   // 밴드 상품을 받은 뒤에 (카테고리 추천이 받아 온다)
                     srcHistEnsure();
-                    const mon = srcAddDays(srcMonday(srcToday()), 7), ons = srcPlanOnsite(), by = srcCatPool();
+                    const st = srcAddDays(srcMonday(srcToday()), 7), ons = srcPlanOnsite(), by = srcCatPool();
+                    const onCodes = new Set(ons.map(x => psSafeId(String(x.p.code || '').trim())));
+                    const gbs = srcPlanGb(onCodes);
                     const hide = new Set(srcCatDefs().filter(d => !d.show).map(d => d.name));
                     const cats = srcCatDefs().map(d => d.name).filter(c => by[c] && !hide.has(c)).concat(Object.keys(by).filter(c => !srcCatDefs().some(d => d.name === c)));
                     const won = v => v ? Number(String(v).replace(/[^\d]/g, '')).toLocaleString('ko-KR') + '원' : '';
@@ -4139,34 +4165,31 @@
                         '<small>' + srcEsc(r.v) + (r._grpN ? ' 외 ' + r._grpN + '곳' : '') + (r.sp ? ' · ' + won(r.sp) : '') + '</small></span>';
                     const onChip = x => '<span class="src-ochip" data-code="' + srcEsc(x.p.code) + '" title="' + srcEsc(x.p.name) + ' · 상시판매' + (x.last ? ' · 마지막 공구 ' + x.last : ' · 공구한 적 없음') + ' · 달력에 끌어다 놓으면 저장">' + srcEsc(x.p.name) +
                         '<small>' + (x.last ? '공구 ' + md(x.last) : '상시') + '</small></span>';
-                    // [수정 2026-10-08] 상시판매는 따로 칸을 두지 않고 카테고리마다 같이 (사장님 요청) — 그 카테고리 상시판매 후보의 첫 주 1번째, 둘째 주 2번째
-                    const onBy = {};
-                    ons.forEach(x => { const c = srcOnsiteCat(x.p); if (c) (onBy[c] = onBy[c] || []).push(x); });
-                    const allCats = cats.concat(Object.keys(onBy).filter(c => !cats.includes(c) && !hide.has(c)));
-                    const week = w => {
-                        const st = srcAddDays(mon, w * 7);
-                        const boxes = allCats.map(c => {
-                            // [신규 2026-10-08] 🔄 다른 상품 (사장님 요청) — 누를 때마다 그 카테고리 후보에서 두 칸씩 뒤로 (두 주가 안 겹치게). 이 기기에 주별로 기억
-                            const k = st + '|' + c, o = srcPlanRR()[k] || 0;
-                            // [수정 2026-10-08] 두 주가 겹치지 않게 (사장님 요청 — 리롤해도 다른 주 추천은 안 나오게): 두 주 몫을 함께 정하고 겹치면 다음 후보
-                            const st0 = srcAddDays(mon, 0), st1 = srcAddDays(mon, 7), RR = srcPlanRR();
-                            //  다다음 주 몫(b)을 먼저 정하고, 다음 주(a)는 b 를 뺀 후보에서 고른다 — 한 주를 바꿔도 다른 주는 그대로
-                            const pick = list => {
-                                if (!list || !list.length) return null;
-                                const b = list.length > 1 ? list[(1 + (RR[st1 + '|' + c] || 0)) % list.length] : null;
-                                if (w === 1) return b;
-                                const rest = list.filter(x => x !== b);
-                                return rest.length ? rest[(RR[st0 + '|' + c] || 0) % rest.length] : null;
-                            };
-                            const r = pick(by[c]), x = pick(onBy[c]);
-                            return (r || x) ? '<div class="src-plan-cat"><div class="ch"><b>' + srcEsc(c) + '</b><button type="button" class="src-plan-rr" onclick="srcPlanReroll(\'' + srcEsc(k) + '\')" title="다른 상품 보기' + (o ? ' (' + o + '번 바꿈 · 길게 누르면 처음으로)' : '') + '" oncontextmenu="event.preventDefault(); srcPlanReroll(\'' + srcEsc(k) + '\', true)">🔄</button></div>' + (r ? bandChip(r) : '') + (x ? onChip(x) : '') + '</div>' : '';
-                        }).join('');
-                        return '<div class="src-plan-week"><div class="wh">' + (w ? '다다음 주' : '다음 주') + ' <small>' + md(st) + '~' + md(srcAddDays(st, 4)) + '</small></div>' +
-                            '<div class="src-plan-grid">' + (boxes || '<span class="k">추천할 상품이 없어요</span>') + '</div></div>';
-                    };
-                    return '<div class="src-plan"><div class="src-cathead"><b>다음 2주 공구 추천</b></div>' +
-                        '<div class="k">카테고리마다 · 초록 = 밴드 상품 · 보라 = 상시판매(마지막 공구 4주 넘은 것) · 달력 날짜에 끌어다 놓으면 저장돼요</div>' +
-                        week(0) + week(1) + '</div>';
+                    const gbChip = x => '<span class="src-ochip src-hchip" data-hist="' + srcEsc(x.p.code) + '" title="' + srcEsc(x.p.name) + ' · 마지막 공구 ' + x.last + ' · 달력에 끌어다 놓으면 저장">' + srcEsc(x.p.name) +
+                        '<small>공구 ' + md(x.last) + (x.total ? ' · ' + x.total + '개 팜' : '') + '</small></span>';
+                    // [수정 2026-10-08] 카테고리마다 마지막 공구 4~7주 전 것 하나·8주 이상 것 하나 (사장님 요청) — 상시판매(보라)·공구 상품(노랑)을 섞어 많이 판 순
+                    const since8 = srcAddDays(srcToday(), -56);
+                    const by4 = {}, by8 = {};
+                    ons.map(x => Object.assign({ on: true }, x)).concat(gbs).forEach(x => {
+                        const c = srcOnsiteCat(x.p); if (!c) return;
+                        const m = (!x.last || x.last <= since8) ? by8 : by4;   // 8주 이상 / 4~7주
+                        (m[c] = m[c] || []).push(x);
+                    });
+                    [by4, by8].forEach(m => Object.values(m).forEach(l => l.sort((a, b) => (b.total || 0) - (a.total || 0))));
+                    const oldChip = (x, tag) => (x.on ? onChip(x) : gbChip(x)).replace('<small>', '<small><b class="src-plan-age">' + tag + '</b> ');
+                    const allCats = cats.concat([...new Set(Object.keys(by4).concat(Object.keys(by8)))].filter(c => !cats.includes(c) && !hide.has(c)));
+                    const RR = srcPlanRR();
+                    const boxes = allCats.map(c => {
+                        // 🔄 누를 때마다 그 카테고리 후보에서 한 칸씩 뒤로 (밴드·상시·공구 같이). 이 기기에 주별로 기억
+                        const k = st + '|' + c, o = RR[k] || 0;
+                        const pick = list => list && list.length ? list[o % list.length] : null;
+                        const r = pick(by[c]), x = pick(by4[c]), g = pick(by8[c]);
+                        return (r || x || g) ? '<div class="src-plan-cat"><div class="ch"><b>' + srcEsc(c) + '</b><button type="button" class="src-plan-rr" onclick="srcPlanReroll(\'' + srcEsc(k) + '\')" title="다른 상품 보기' + (o ? ' (' + o + '번 바꿈 · 오른쪽 클릭·길게 누르면 처음으로)' : '') + '" oncontextmenu="event.preventDefault(); srcPlanReroll(\'' + srcEsc(k) + '\', true)">🔄</button></div>' +
+                            (r ? bandChip(r) : '') + (x ? oldChip(x, '4~7주') : '') + (g ? oldChip(g, '8주+') : '') + '</div>' : '';
+                    }).join('');
+                    return '<div class="src-plan"><div class="src-cathead"><b>다음 주 공구 추천 <small>' + md(st) + '~' + md(srcAddDays(st, 4)) + '</small></b></div>' +
+                        '<div class="k">카테고리마다 · 초록 = 밴드 상품 · 보라 = 상시판매 · 노랑 = 공구 상품 (4~7주 · 8주+ = 마지막 공구 뒤 지난 주) · 달력 날짜에 끌어다 놓으면 저장돼요</div>' +
+                        '<div class="src-plan-grid">' + (boxes || '<span class="k">추천할 상품이 없어요</span>') + '</div></div>';
                 }
                 function srcCatToggle(no) { gSrcCat.open[no] = !gSrcCat.open[no]; srcRender(); }
                 function srcCatMore(c) { gSrcCat.show[c] = (gSrcCat.show[c] || 5) + 5; srcRender(); }
@@ -5155,7 +5178,7 @@
                             Object.entries(sched).forEach(([sid, rounds]) => { const p = bySid[sid]; if (p) Object.values(rounds || {}).forEach(round => round && addSada(p, round.pickup)); });
                         } catch (e) { }
                         return Object.values(all).filter(p => p && String(p.displayTab || '').startsWith('onsite') && !p.hide && p.name)
-                            .map(p => ({ code: String(p.productCode || p.sid || ''), name: p.name, price: p.price, tab: p.displayTab, stock: p.stock }))
+                            .map(p => ({ code: String(p.productCode || p.sid || ''), name: p.name, price: p.price, tab: p.displayTab, stock: p.stock, srcCat: p.srcCat || '' }))   // [수정 2026-10-08] 상품 등록에서 고른 카테고리
                             .filter(p => p.code).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
                     } catch (e) { return []; }
                 }
@@ -32441,6 +32464,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     // [신규] 이름 위 작은 줄 — 대괄호(nameTags)·수식어(nameLead). 상품명에는 넣지 않는다
                     nameTags: (() => { const t = gNameFieldsRead().tags; return t.length ? t : null; })(),
                     nameLead: gNameFieldsRead().lead || null,
+                    srcCat: (document.getElementById('productSrcCat') || {}).value || null,   // [신규 2026-10-08] 소싱 카테고리
                     // [신규] 냉동·냉장 옆 딱지 (두 개까지, 한 개 10자까지)
                     tags: (() => { const t = String((document.getElementById('productTags') || {}).value || '').split(',').map(x => x.trim().slice(0, 10)).filter(Boolean).slice(0, 2); return t.length ? t : null; })(),
                     // [신규] 사다드림 여부. 상품명 말머리 대신 이 값으로 판단한다.
@@ -33460,6 +33484,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             { const _b = document.getElementById('pnBracket'), _l = document.getElementById('pnLead');
               if (_b) _b.value = (Array.isArray(prod.nameTags) ? prod.nameTags : []).join(', ');
               if (_l) _l.value = prod.nameLead || ''; gPaintNamePreview(); }
+            { const _sc = document.getElementById('productSrcCat'); if (_sc) { gFillSrcCatSelect(_sc, prod.srcCat || ''); _sc.value = prod.srcCat || ''; } }   // [신규 2026-10-08]
             { const _tg = document.getElementById('productTags'); if (_tg) _tg.value = (Array.isArray(prod.tags) ? prod.tags : String(prod.tags || '').split(',')).map(x => String(x).trim()).filter(Boolean).join(', '); }
             // 이전 상품에서 잠겨 있었을 수 있으므로 가격칸을 먼저 깨끗한 숫자칸으로 되돌린 뒤 값을 넣는다
             resetPriceField();
@@ -33578,6 +33603,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             renderSelectedFilesList();
         }
 
+        // [신규 2026-10-08] 상품 등록 '카테고리' 목록 — 소싱 카테고리 관리의 이름들 (지금 값이 목록에 없으면 앞에 넣는다)
+        function gFillSrcCatSelect(sel, cur) {
+            if (!sel) return;
+            const names = (typeof srcCatDefs === 'function' ? srcCatDefs().map(d => d.name) : []);
+            const v = cur !== undefined ? cur : sel.value;
+            if (v && !names.includes(v)) names.unshift(v);
+            const want = '|' + names.join('|');
+            if (sel.dataset.list === want) return;
+            sel.innerHTML = '<option value="">(비우면 이름으로 짐작)</option>' + names.map(n => `<option value="${gEscapeHtml(n)}">${gEscapeHtml(n)}</option>`).join('');
+            sel.dataset.list = want; sel.value = v || '';
+        }
         function exitEditMode() {
             const wasEditMode = uploadIsEditMode;
             uploadIsEditMode = false;
