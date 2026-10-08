@@ -3852,7 +3852,7 @@
                     band: null, kakao: null, week: '', calMonth: '', closed: [], skip: {}, block: {}, onsite: {}, onsiteProducts: null, sada: [], manual: {}, dayQ: { days: 28 }, onsiteQ: { q: '', tab: '', open: true },
                     bandQ: { q: '', vendor: '', cat: '', sort: 's', dir: -1, soldOnly: false, limit: 100, from: '', to: '', days: 0 },
                     pickQ: { q: '', days: 28 }, edits: { band: {}, kakao: {} },
-                    kakaoQ: { q: '', vendor: '', sort: 'd', dir: -1, limit: 100 }
+                    kakaoQ: { q: '', vendor: '', cat: '', sort: 'd', dir: -1, limit: 100, from: '', to: '', days: 0 }   // [수정 2026-10-08] 카테고리·기간 (밴드 상품처럼)
                 };
                 const srcEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
                 const srcWon = v => v ? Number(v).toLocaleString('ko-KR') + '원' : '';
@@ -4107,17 +4107,20 @@
                 function srcOnsiteCat(p) {
                     if (!gSrcOnCat || gSrcOnCat.band !== gSrc.band || gSrcOnCat.def !== gSrc.catdef) {
                         const rows = srcBandRows().filter(r => r && r.n && r.c);
-                        gSrcOnCat = { band: gSrc.band, def: gSrc.catdef, rows: rows.map(r => ({ n: String(r.n).replace(/\s/g, ''), c: r.c })), memo: {} };
+                        // [수정 2026-10-08] 빠르게 — 카테고리마다 상품 이름을 한 줄로 이어 두고 낱말이 몇 번 나오나 센다 (카톡 1,300개도 금방)
+                        const byCat = {}; rows.forEach(r => { (byCat[r.c] = byCat[r.c] || []).push(String(r.n).replace(/\s/g, '')); });
+                        const names = {}; rows.forEach(r => { names[String(r.n).replace(/\s/g, '')] = r.c; });
+                        gSrcOnCat = { band: gSrc.band, def: gSrc.catdef, names, text: Object.keys(byCat).map(c => [c, '|' + byCat[c].join('|') + '|']), memo: {} };
                     }
                     const C = gSrcOnCat, key = String(p.code || p.name);
                     if (key in C.memo) return C.memo[key];
                     const nk = String(p.name || '').replace(/\s/g, '');
-                    let c = (C.rows.find(r => r.n === nk) || {}).c || '';
+                    let c = C.names[nk] || '';
                     if (!c) { const a = srcCatAuto(p.name, ''); if (a) c = a; }
                     if (!c) {
                         const words = String(p.name || '').replace(/\([^)]*\)|\[[^\]]*\]/g, ' ').split(/\s+/).map(w => w.replace(/[^가-힣A-Za-z]/g, '')).filter(w => w.length >= 2 && !/^(국내산|국산|수입|프리미엄|정품|특가|신선한?|맛있는|한봉지|한팩|한박스|개입)$/.test(w));
                         const score = {};
-                        C.rows.forEach(r => { words.forEach(w => { if (r.n.includes(w)) score[r.c] = (score[r.c] || 0) + w.length; }); });
+                        C.text.forEach(([cat, t]) => { words.forEach(w => { const k = t.split(w).length - 1; if (k) score[cat] = (score[cat] || 0) + k * w.length; }); });
                         c = Object.keys(score).sort((a, b) => score[b] - score[a])[0] || '';
                     }
                     return (C.memo[key] = srcCatName(c));
@@ -6024,23 +6027,32 @@
                     const Q = gSrc.kakaoQ;
                     const rows = srcKakaoRows();
                     const vendors = [...new Set(rows.map(r => r.v))].sort();
+                    /* [신규 2026-10-08] 밴드 상품처럼 카테고리·기간 (사장님 요청) — 카톡 자료엔 카테고리가 없어 PC가 넣어 주면(c) 그것, 없으면 밴드 상품 이름으로 짐작(srcOnsiteCat) */
+                    if (gSrc.band) rows.forEach(r => { r.c = r.c ? srcCatName(r.c) : srcOnsiteCat({ code: 'k:' + r.no, name: r.n }); });
+                    else if (!gSrcCat.loading) { gSrcCat.loading = true; srcGet('band').then(b => { gSrc.band = b || {}; gSrcCat.loading = false; if (gSrc.tab === 'kakao') srcRender(); }).catch(() => { gSrcCat.loading = false; }); }
+                    const cats = [...new Set(rows.map(r => r.c).filter(Boolean))].sort();
+                    const from = Q.days ? srcDaysAgo(Q.days) : Q.from, to = Q.days ? '' : Q.to;
                     const q = Q.q.trim().replace(/\s/g, '').toLowerCase();
-                    let list = rows.filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().includes(q) || String(r.raw || '').replace(/\s/g, '').toLowerCase().includes(q)) && (!Q.vendor || r.v === Q.vendor));
+                    let list = rows.filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().includes(q) || String(r.raw || '').replace(/\s/g, '').toLowerCase().includes(q)) && (!Q.vendor || r.v === Q.vendor)
+                        && (!Q.cat || r.c === Q.cat) && srcInPeriod(String(r.d || '').slice(0, 10), from, to));
                     const num = { cnt: 1, p: 1 };
                     list.sort((a, b) => {
                         let x = a[Q.sort], y = b[Q.sort];
                         if (num[Q.sort]) return ((+x || 0) - (+y || 0)) * Q.dir;
                         return String(x || '').localeCompare(String(y || ''), 'ko') * Q.dir;
                     });
-                    const cols = [['d', '올린 일자'], ['v', '업체'], ['g', '구분'], ['n', '상품명'], ['p', '가격', 1], ['set', '구성'], ['cnt', '올린 횟수', 1], ['first', '처음 올린 날'], ['raw', '원문']];
+                    const cols = [['d', '올린 일자'], ['v', '업체'], ['g', '구분'], ['n', '상품명'], ['c', '카테고리'], ['p', '가격', 1], ['set', '구성'], ['cnt', '올린 횟수', 1], ['first', '처음 올린 날'], ['raw', '원문']];
                     let html = '<div class="src-bar">' +
                         '<input type="search" id="src-kakao-q" placeholder="상품명·원문 찾기" value="' + srcEsc(Q.q) + '" oninput="gSrc.kakaoQ.q=this.value; gSrc.kakaoQ.limit=100; srcRenderKakao(null, true)">' +
                         '<select onchange="gSrc.kakaoQ.vendor=this.value; gSrc.kakaoQ.limit=100; srcRender()"><option value="">업체 전체</option>' + vendors.map(x => '<option' + (x === Q.vendor ? ' selected' : '') + '>' + srcEsc(x) + '</option>').join('') + '</select>' +
+                        '<select onchange="gSrc.kakaoQ.cat=this.value; gSrc.kakaoQ.limit=100; srcRender()"><option value="">카테고리 전체</option>' + cats.map(x => '<option' + (x === Q.cat ? ' selected' : '') + '>' + srcEsc(x) + '</option>').join('') + '</select>' +
+                        '<select onchange="gSrc.kakaoQ.days=+this.value; gSrc.kakaoQ.limit=100; srcRender()">' + [[0, '기간: 직접'], [7, '최근 1주'], [14, '최근 2주'], [28, '최근 4주'], [56, '최근 8주']].map(([d, l]) => '<option value="' + d + '"' + (Q.days === d ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>' +
+                        (Q.days ? '' : '<input type="date" value="' + srcEsc(Q.from) + '" onchange="gSrc.kakaoQ.from=this.value; gSrc.kakaoQ.limit=100; srcRender()" title="올린 날 시작"><span class="k">~</span><input type="date" value="' + srcEsc(Q.to) + '" onchange="gSrc.kakaoQ.to=this.value; gSrc.kakaoQ.limit=100; srcRender()" title="올린 날 끝">') +
                         '<span><span class="k">찾은 상품</span> <b id="src-kakao-n">' + list.length.toLocaleString() + '개</b></span>' +
                         '<span class="k">카톡방 대화를 내보내 PC에 넣어 줄 때 새로 정리돼요.</span></div>';
                     let res = '<div class="src-tablewrap"><table><thead><tr>' + cols.map(([k, lab, n]) => '<th' + (n ? ' class="r"' : '') + ' onclick="srcSortKakao(\'' + k + '\')">' + lab + (Q.sort === k ? (Q.dir < 0 ? ' ▼' : ' ▲') : '') + '</th>').join('') + '</tr></thead><tbody>';
                     res += list.slice(0, Q.limit).map(r => '<tr><td>' + srcEsc(String(r.d || '').slice(2)) + '</td><td>' + srcEsc(r.v) + '</td><td>' + srcEsc(r.g) + '</td><td class="nm">' + srcEsc(r.n) + (r._edited ? '<span class="src-mk skip">고침</span>' : '') + '<button type="button" class="src-ed" title="고치기" onclick="srcEdit(\'kakao\',\'' + r.no + '\')">✏️</button></td>' +
-                        '<td class="r">' + (r.p ? Number(r.p).toLocaleString() : '') + '</td><td>' + srcEsc(r.set) + '</td><td class="r">' + srcEsc(r.cnt) + '</td><td>' + srcEsc(String(r.first || '').slice(2, 10)) + '</td>' +
+                        '<td>' + srcEsc(r.c || '') + '</td><td class="r">' + (r.p ? Number(r.p).toLocaleString() : '') + '</td><td>' + srcEsc(r.set) + '</td><td class="r">' + srcEsc(r.cnt) + '</td><td>' + srcEsc(String(r.first || '').slice(2, 10)) + '</td>' +
                         '<td class="raw">' + srcEsc(r.raw) + '</td></tr>').join('') + '</tbody></table></div>';
                     if (list.length > Q.limit) res += '<button type="button" class="src-btn src-more" onclick="gSrc.kakaoQ.limit+=200; srcRender()">더 보기 (' + (list.length - Q.limit).toLocaleString() + '개 남음)</button>';
                     const box = document.getElementById('src-kakao-res');
