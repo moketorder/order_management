@@ -3785,6 +3785,10 @@
                         #purchase-section-sourcing .src-cal-add { margin-left:auto; width:22px; height:22px; border-radius:6px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; font-weight:900; font-size:14px; line-height:1; cursor:pointer; padding:0; flex:0 0 auto; font-family:inherit; }
                         #purchase-section-sourcing .src-cal-add:hover { border-color:var(--src-acc); color:var(--src-acc); }
                         #purchase-section-sourcing .src-tag.manual { background:#dbeafe; color:#1e40af; }
+                        /* [신규 2026-10-08] 이름표 색은 셋만 — 신규 초록 · 상시/예전 공구 보라 · 직접 쓴 것 파랑 */
+                        #purchase-section-sourcing .src-tag.c-new { background:var(--src-acc-soft); color:var(--src-acc); }
+                        #purchase-section-sourcing .src-tag.c-old { background:#ede9fe; color:#5b21b6; }
+                        #purchase-section-sourcing .src-tag.c-hand { background:#dbeafe; color:#1e40af; }
                         #src-day { position:fixed; inset:0; z-index:2147483400; background:rgba(15,23,42,.35); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }
                         #src-day .in { background:#fff; border-radius:14px; padding:14px; width:100%; max-width:440px; max-height:calc(100vh - 32px); overflow:auto; display:flex; flex-direction:column; gap:8px; font-family:inherit; box-shadow:0 18px 40px rgba(15,23,42,.25); box-sizing:border-box; }
                         #src-day .t { font-weight:900; font-size:14px; } #src-day .t small { display:block; font-size:11.5px; color:#64748b; font-weight:700; margin-top:2px; }
@@ -5101,7 +5105,7 @@
                         // [수정 2026-10-07] 'N개 고름 · 지우기 · 풀기' 줄은 뺐다 — Delete 키로 지운다 (사장님 요청)
                         '<span class="src-calf">' + SRC_CAL_F.map(([k, lab, tip]) => '<button type="button" class="src-btn' + ((gSrc.calF || {})[k] ? ' on' : '') + '" onclick="srcCalFToggle(\'' + k + '\')" title="' + tip + '">' + lab + '</button>').join('') + '</span>' +   // [신규 2026-10-07] 안 된 것만 보기
                         '<details class="src-calhelp"><summary>설명</summary>' +   // [수정 2026-10-07] 설명은 기본으로 접어 둔다 (사장님 요청)
-                        '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 보라 = 상시판매 · 파랑 = 직접 쓴 것 · 주황 = 사다드림 · 회색 = 목록에서 직접 판매 표시 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span>' +
+                        '<span class="k">초록 = 신규(밴드·추천) · 보라 = 상시판매·예전 공구(추천이라도 상시·예전 공구 상품에 이어지면 보라) · 파랑 = 직접 쓴 것 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span>' +
                         '<span class="k">초록 숫자 = 상품 등록됨(남은 재고, ∞ 무제한) · 오른쪽 위 발주등록X·상품등록X·일정등록X = 켜면 그것이 안 된 것만 보기</span><span class="k">끌기 = 옮기기 · Ctrl+끌기 = 복사 · Ctrl+누르기 = 여러 개 · Delete 지우기 · Ctrl+Z 되돌리기 · 폰은 길게 눌러 끌기</span></details></div><div class="src-cal-grid">' +
                         SRC_DAYS.map(d => '<div class="src-cal-dow">' + d + '</div>').join('');
                     for (let d = new Date(start); d <= calEnd; d.setDate(d.getDate() + 7)) {
@@ -5117,7 +5121,7 @@
                             html += '<div class="' + cls.join(' ') + '" data-date="' + k + '"><div class="top"><span class="n">' + x.getDate() + '</span>' +
                                 srcWxHtml(k) + (hol ? '<span class="hn">' + hol + '</span>' : '') + (off ? '<span class="off" title="주문관리에 설정된 가게 휴무일">휴무</span>' : '') +
                                 '<button type="button" class="src-cal-add" title="이 날짜에 상품 넣기" onclick="srcDayAdd(\'' + k + '\')">+</button></div>' +
-                                (byDate[k] || []).filter(t => srcCalPass(t.ref, k)).sort((a, b) => SRC_TAG_RANK[a.kind] - SRC_TAG_RANK[b.kind]).map(t => '<div class="src-tag ' + t.kind + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(t.name) + '">' + srcRegMark(t.ref, k) + '<span>' + srcEsc(t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>').join('') + '</div>';
+                                (byDate[k] || []).filter(t => srcCalPass(t.ref, k)).sort((a, b) => SRC_TAG_RANK[a.kind] - SRC_TAG_RANK[b.kind]).map(t => '<div class="src-tag ' + t.kind + ' ' + srcTagColor(t, k) + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(t.name) + '">' + srcRegMark(t.ref, k) + '<span>' + srcEsc(t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>').join('') + '</div>';
                         }
                     }
                     return html + '</div></div>';
@@ -5156,6 +5160,27 @@
                         w = { code: /비/.test(feel) ? 61 : 0, max: x.max, min: x.min }; tip = '최고 ' + x.max + '° 최저 ' + x.min + '° · ' + feel;
                     }
                     return '<span class="wx" title="' + srcEsc(tip) + '">' + srcWxIcon(w.code) + w.max + '°</span>';
+                }
+                /* [신규 2026-10-08] 달력 이름표 색은 셋만 (사장님 요청) — 초록 = 신규(밴드·추천·비슷한 상품·판매 표시),
+                   보라 = 상시판매·예전 공구(공구 기록을 끌어다 놓은 것·사다드림, 그리고 추천이라도 상시판매 상품이나 전에 공구한 상품에 이어진 것),
+                   파랑 = 직접 쓴 것(✍) */
+                function srcTagColor(t, date) {
+                    if (t.kind === 'onsite' || t.kind === 'sada') return 'c-old';
+                    let r = null, p = null; try { r = t.ref ? JSON.parse(t.ref) : null; p = r ? srcRefGet(r) : null; } catch (e) { }
+                    if (t.kind === 'manual') return (p && p.memo === '공구' && p.code) ? 'c-old' : 'c-hand';
+                    // 신규(밴드 쪽) — 이어진 상품이 상시판매이거나 이 날 전에 공구한 적이 있으면 보라
+                    if (t.ref) {
+                        const st = srcRegState(t.ref, date), prod = st.prod;
+                        if (prod) {
+                            if (String(prod.displayTab || '').startsWith('onsite')) return 'c-old';
+                            srcHistEnsure();
+                            const c = psSafeId(String(prod.productCode || '').trim()), nk = String(prod.name || '').replace(/\s/g, '');
+                            const h = (gSrc.hist || []).find(x => x && ((c && x.code === c) || String(x.name || '').replace(/\s/g, '') === nk));
+                            const cut = srcAddDays(date, -3);
+                            if (h && (h.rounds || []).some(x => x && x.pk && x.pk < cut)) return 'c-old';
+                        }
+                    }
+                    return 'c-new';
                 }
                 function srcCalMove(n) {
                     const [y, m] = gSrc.calMonth.split('-').map(Number);
