@@ -4368,10 +4368,10 @@
                         // [수정 2026-10-07] 차례: 수정(✍만) · 밴드 · 발주 등록 · 상품 등록 · 상품 연결 · 일정 추가 · 닫기 — 달력 이름표 창은 이모지·건너뜀·추천제외 뺌 (사장님 요청)
                         (o.manual ? '<button type="button" data-act="editManual">✏️ 수정</button>' : o.ref ? '<button type="button" data-act="editDisp">✏️ 수정</button>' : '') +   // [수정 2026-10-08] 달력 이름표는 모두 수정 (달력에만 보이는 이름)   // [신규 2026-10-07] 달력에 손으로 쓴 것 고치기
                         '<button type="button" data-act="band">🔗 밴드</button>' +
+                        (o.ref ? '<button type="button" class="ord" data-act="polink">🧾 발주 연결' + srcPoLinkNow(o.ref) + '</button>' : '') +   // [신규 2026-10-08] 이미 한 발주에 잇기 (사장님 요청)   // [ìì  2026-10-08] ì°¨ë¡: ë°ì£¼ ì°ê²° Â· ë°ì£¼ ë±ë¡ Â· ìí ì°ê²° Â· ìí ë±ë¡ (ì¬ì¥ë ìì²­)
                         '<button type="button" class="ord" data-act="purchase">🚚 발주 등록</button>' +
-                        '<button type="button" class="reg" data-act="product">🛒 ' + (srcRegIdxOfTg(tg, o) >= 0 ? '상품 수정' : '상품 등록') + '</button>' +   // [수정 2026-10-07] 등록돼 있으면 상품 수정 (사장님 요청)
-                        (o.ref ? '<button type="button" class="ord" data-act="polink">🧾 발주 연결' + srcPoLinkNow(o.ref) + '</button>' : '') +   // [신규 2026-10-08] 이미 한 발주에 잇기 (사장님 요청)
                         '<button type="button" class="reg" data-act="link">📎 상품 연결</button>' +   // [신규 2026-10-07] 이미 있는 상품에 잇기
+                        '<button type="button" class="reg" data-act="product">🛒 ' + (srcRegIdxOfTg(tg, o) >= 0 ? '상품 수정' : '상품 등록') + '</button>' +   // [수정 2026-10-07] 등록돼 있으면 상품 수정 (사장님 요청)
                         (o.ref ? '<button type="button" class="sch" data-act="sched">📅 일정 추가</button>' : '') +
                         // 판매일은 달력에 끌어다 놓기와 달력 이름표 × 로만 정한다 (창에는 안 둔다 — 사장님 요청)
                         (o.ref ? '' : gSrc.skip[k] ? '<button type="button" class="skip undo" data-act="unskip">⏭️ 건너뜀 취소' + srcSkipUntilText(gSrc.skip[k]) + '</button>' : '<button type="button" class="skip" data-act="skipask">⏭️ 건너뜀</button>') +
@@ -4384,7 +4384,7 @@
                     m.onclick = async e => {
                         const act = e.target.dataset && e.target.dataset.act; if (!act) return;
                         srcMenuClose();
-                        if (act === 'purchase') { srcLockBand(tg, 'purchase'); return srcToPurchase(tg, o.rec); }   // [신규 2026-10-07] 발주한 밴드 상품은 값 고정
+                        if (act === 'purchase') { srcLockBand(tg, 'purchase'); return srcToPurchase(tg, o.rec, o.ref); }   // [신규 2026-10-07] 발주한 밴드 상품은 값 고정
                         if (act === 'product') return srcToProduct(tg, o);
                         if (act === 'polink') return srcPoLinkDialog(tg, o.ref);
                         if (act === 'link') return srcLinkDialog(tg, null, o.ref);
@@ -4520,6 +4520,18 @@
                    · 일정 추가: 노출일정과 같은 길(psItemAdd)로 건다. 여럿이면 일정 이름(groupLabel)을 붙여 한 묶음(group)으로.
                      등록 안 된 상품이 하나라도 있으면 일정은 안 걸고, 그 상품마다 '상품 등록' 단추를 보여 준다. */
                 let gSrcPendingReg = null;
+                /* [신규 2026-10-08] 달력 이름표 → 🚚 발주 등록으로 연 발주 (사장님 요청 — 이름을 바꿔 저장해도 이어지게).
+                   발주를 새로 저장하면(savePurchaseOrder) 그 발주를 이름표에 잇고(sourcing/polink), 이름을 바꿨으면 달력에도 바뀐 이름(disp)으로 */
+                let gSrcPendingPo = null;
+                async function srcPoLinkAfterSave(pp, id, payload) {
+                    const r = JSON.parse(pp.ref);
+                    const v = { id, date: String(payload.date || '').slice(0, 10), item: payload.itemName || '', supplier: payload.supplier || '', qty: payload.totalUnits || payload.qty || 0, at: new Date().toISOString() };
+                    await srcPut('polink/' + srcRefPath(r), v); srcPoLinkSet(r, v);
+                    const p = srcRefGet(r), nm = String(payload.itemName || '').trim();
+                    if (p && nm && nm !== String(p.disp || p.name || '').trim() && nm !== String(p.name || '').trim()) {
+                        const val = Object.assign({}, p, { disp: nm }); await srcPut(srcRefPath(r), val); srcRefSet(r, val);
+                    }
+                }
                 function srcVendorOf(r, p) { return (p && p.vendor) || (r[0] === 'onsite' ? '상시판매' : r[0] === 'manual' ? ((p && p.memo) || '') : ''); }
                 const srcNormName = s => String(s || '').replace(/\[[^\]]*\]/g, '').replace(/\s/g, '').toLowerCase();
                 function srcProdIndex() {
@@ -4977,13 +4989,16 @@
                 }
 
                 // 발주관리 → 발주 등록 화면을 열고 매입처·상품명·단가·판매가를 채워 둔다. 수량은 사장님이 넣는다.
-                function srcToPurchase(tg, rec) {
+                function srcToPurchase(tg, rec, rs) {
                     try {
                         // [수정 2026-10-08] 소싱이 일정 탭으로 옮겨 가서 발주 탭으로 먼저 넘어가야 발주 등록 칸이 보인다 (사장님 지적)
+                        const _back = { tab: gVisibleAdminTab(), scroll: window.scrollY || 0 };   // 저장 뒤 돌아올 곳
                         switchAdminTab('purchase-history');
                         if (typeof resetPurchaseOrderForm === 'function') resetPurchaseOrderForm();
+                        gPurchaseReturn = _back;
                         switchPurchaseSubTab('register');
                         const set = (id, v) => { const el = document.getElementById(id); if (!el || v === undefined || v === null || v === '') return; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+                        gSrcPendingPo = rs ? { ref: rs, name: tg.name } : null;   // [신규 2026-10-08] 달력 이름표에서 연 발주 — 저장되면 그 이름표에 잇는다
                         set('purchase-supplier', tg.vendor);
                         set('purchase-item-name', tg.name);
                         // [신규 2026-10-07] 이미 등록된(이어진) 상품이 있으면 그 식별번호로 발주한다 — 발주와 상품이 같은 번호
@@ -5071,7 +5086,7 @@
                     });
                     Object.entries(gSrc.manual).forEach(([id, p]) => {
                         if (!p) return;
-                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'manual', name: '✍ ' + p.name + (p.memo ? ' (' + p.memo + ')' : ''), del: "srcManualDel('" + id + "')", ref: JSON.stringify(['manual', id]) });
+                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'manual', name: '✍ ' + (p.disp || p.name) + (p.memo ? ' (' + p.memo + ')' : ''), del: "srcManualDel('" + id + "')", ref: JSON.stringify(['manual', id]) });
                     });
                     Object.entries(gSrc.onsite).forEach(([code, p]) => {
                         if (!p) return;
@@ -32794,6 +32809,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const _returnSearch = uploadIsEditMode ? uploadEditReturnSearch : '';
                 const _formSched = uploadFormSched;   // [신규 2026-10-05] exitEditMode 가 지우기 전에 챙긴다
                 const _savedSid = (_savedIdx >= 0 && updatedProducts[_savedIdx]) ? updatedProducts[_savedIdx].sid : null;
+                /* [신규 2026-10-08] 저장 뒤 들어오기 전에 보던 화면으로 (사장님 요청 — 소싱 달력에서 열었으면 소싱 달력으로).
+                   수정은 uploadEditReturnTab, 새 상품은 uploadNewReturn(상품 등록으로 들어올 때 기억한 화면) */
+                const _ret = uploadIsEditMode ? { tab: uploadEditReturnTab || 'product-list', scroll: uploadEditReturnScroll }
+                    : ((typeof uploadNewReturn !== 'undefined' && uploadNewReturn && uploadNewReturn.tab && uploadNewReturn.tab !== 'product-upload') ? uploadNewReturn : { tab: 'product-list' });
+                if (typeof uploadNewReturn !== 'undefined') uploadNewReturn = null;
                 // [신규 2026-10-07] 소싱의 '🛒 상품 등록'으로 연 새 상품이면 어느 소싱 상품인지 이어 둔다 (소싱 달력 O 표시·일정 추가용)
                 if (!uploadIsEditMode && typeof srcLinkRegistered === 'function') {
                     try { await srcLinkRegistered(_savedSid, (_savedIdx >= 0 && updatedProducts[_savedIdx]) ? updatedProducts[_savedIdx].productCode : null, name); } catch (e) { }
@@ -32825,8 +32845,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 }
                 buildManageCategoryTabs();
                 buildSubTabs();
-                switchAdminTab('product-list');
-                restoreProductSearch(_returnSearch); // 찾던 검색 결과 그대로 복원
+                switchAdminTab(_ret.tab);   // [수정 2026-10-08] 상품 목록으로만 가던 것을 들어오기 전 화면으로
+                if (_ret.tab === 'purchase-history' && _ret.sub && typeof switchPurchaseSubTab === 'function') switchPurchaseSubTab(_ret.sub);
+                if (_ret.tab === 'product-list') restoreProductSearch(_returnSearch); // 찾던 검색 결과 그대로 복원
+                if (_ret.scroll != null) setTimeout(() => window.scrollTo(0, _ret.scroll || 0), 80);
             } catch (e) {
                 console.error("저장 에러:", e);
                 showToast("저장에 실패했습니다: " + gErrKo(e));
@@ -36482,6 +36504,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     await refreshPurchaseArchive(true);
                 }
 
+                // [신규 2026-10-08] 소싱 달력 이름표에서 연 새 발주면 그 이름표에 잇고 이름을 맞춘다
+                if (!editingId && typeof gSrcPendingPo !== 'undefined' && gSrcPendingPo) {
+                    const _pp = gSrcPendingPo; gSrcPendingPo = null;
+                    try { const _j = await res.json(); if (_j && _j.name) await srcPoLinkAfterSave(_pp, _j.name, payload); }
+                    catch (e) { console.warn('소싱 달력 발주 연결 실패(발주 저장에는 지장 없음):', e); }
+                }
                 // [신규] 상품관리에서 넘어온 발주라면, 방금 정해진 번호를 그 상품에도 붙여 준다.
                 //  이래야 다음부터 그 상품과 발주가 번호로 이어진다.
                 if (pendingProductCodeLink !== null) {
@@ -36498,9 +36526,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 }
 
                 showToast(editingId ? "발주 내역이 수정되었습니다." : "발주 내역이 저장되었습니다.");
+                const _pback = editingId ? null : gPurchaseReturn; gPurchaseReturn = null;   // [신규 2026-10-08]
                 resetPurchaseOrderForm();
                 await loadPurchaseOrders();
-                switchPurchaseSubTab('list');
+                if (_pback && _pback.tab && _pback.tab !== 'purchase-history') {
+                    switchAdminTab(_pback.tab);
+                    setTimeout(() => window.scrollTo(0, _pback.scroll || 0), 80);
+                } else switchPurchaseSubTab('list');
 
                 // [신규] '💾 저장 후 상품등록'으로 저장했으면 이어서 상품등록 폼으로 넘어간다.
                 if (goProductAfterPurchaseSave) {
@@ -36567,7 +36599,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        /* [신규 2026-10-08] 발주 등록을 다른 화면(소싱 달력·상품 목록)에서 열었으면 저장 뒤 그 화면으로 돌아간다 (사장님 요청) */
+        let gPurchaseReturn = null;
         function resetPurchaseOrderForm() {
+            if (typeof gSrcPendingPo !== 'undefined') gSrcPendingPo = null;   // [신규 2026-10-08] 소싱 달력에서 연 발주 대기도 푼다 (엉뚱한 발주에 잇지 않게)
             document.getElementById('purchase-order-form').reset();
             document.getElementById('purchase-editing-id').value = "";
             document.getElementById('purchase-supplier').value = "";
@@ -39497,7 +39532,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             calcPurchaseTotal();
             
             // 5. 발주 내역 -> 발주 등록 탭으로 전환
-            switchAdminTab('purchase-history');
+            { const _back = { tab: gVisibleAdminTab(), scroll: window.scrollY || 0 };   // [신규 2026-10-08] 저장 뒤 돌아올 곳
+              switchAdminTab('purchase-history'); gPurchaseReturn = _back; }
             switchPurchaseSubTab('register');
             
             // 6. 스무스 스크롤 및 수량 입력 필드 포커스
