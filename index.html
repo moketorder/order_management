@@ -31084,6 +31084,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    예전처럼 예약 공개·종료를 맞추고(autoApplyScheduledVisibility) → 반복 일정을 4주 앞까지 채운다 */
                 (async () => {
                     await psLoadSchedules();
+                    try { renderProductsList(); } catch (e) { }   // [신규 2026-10-08] 받은 일정으로 '다음 일정' 딱지를 다시 그린다
                     await gMaybeMigrateSids();   // 노출번호 없는 상품(예전 화면에서 저장한 것 등)에 먼저 번호를 붙인다 — 일정은 노출번호에 딸리므로
                     for (let w = 0; w < 50 && gSidMigrating; w++) await new Promise(r => setTimeout(r, 200));   // 다른 곳에서 붙이는 중이면 끝날 때까지 기다린다
                     const mig = await psMigrateToSchedules();
@@ -31419,9 +31420,19 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         : `<span title="노출중 — 손님 화면에 보여요" style="font-size: 10px; font-weight: 800; background: #dcfce7; color: #22c55e; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">👁️</span>`;
 
                     // [신규] 예약 공개·종료 뱃지 — 아직 안 왔으면 올라갈 시각, 이미 지났으면(공개 중) 내려갈 시각을 보여준다
-                    let scheduleBadge = '';
+                    let scheduleBadge = '', _nextSched = null;
                     {
                         const _now = Date.now();
+                        /* [신규 2026-10-08] 상품 줄에 지금 차례가 없어도(노출 여부와 상관없이) 노출일정에 걸린 다음 일정이 있으면 보여 준다 (사장님 요청) */
+                        if (!prod.releaseAt && !prod.expireAt && prod.sid && typeof psItemsOfSid === 'function') {
+                            _nextSched = psItemsOfSid(prod.sid).filter(it => (Number(it.releaseAt) || Number(it.expireAt)) && !(Number(it.expireAt) && Number(it.expireAt) <= _now))
+                                .sort((a, b) => (Number(a.releaseAt) || Number(a.expireAt)) - (Number(b.releaseAt) || Number(b.expireAt)))[0] || null;
+                            if (_nextSched) {
+                                const _md = ms => { const d = new Date(Number(ms)); return `${d.getMonth() + 1}/${d.getDate()}(${'일월화수목금토'[d.getDay()]})`; };
+                                const _r = Number(_nextSched.releaseAt), _e = Number(_nextSched.expireAt);
+                                scheduleBadge += `<span title="노출일정에 걸린 다음 일정${_r ? ' · ' + fFmtSchedTime(_r) + ' 알림(그날 0시 노출)' : ''}${_e ? ' · ' + fFmtSchedTime(_e) + ' 마감' : ''}" style="font-size: 10px; font-weight: 800; background: #eef2ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">📅 다음 일정 ${_r ? _md(_r) + ' 노출' : ''}${_r && _e ? ' · ' : ''}${_e ? _md(_e) + ' 마감' : ''}</span>`;
+                            }
+                        }
                         /* [수정 2026-10-05] 넷째 줄(노출 여부 · 노출일 · 마감일)에 노출일과 마감일을 둘 다 보여 준다 (사장님 요청).
                            예전엔 올라가기 전이면 노출일만, 올라간 뒤면 마감만 보였다 */
                         if (prod.releaseAt) {
@@ -31559,7 +31570,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                                 ${stockText ? `<span>${stockText}</span>` : ``}${kindBadge}${storageBadge}${discountBadge}${optionBadge}${gGbHistBadge(prod)}
                             </div>
                             ${/* [수정 2026-10-05] 노출일·마감이 없으면(노출일정에 안 걸린 상품) '📅 일정 없음' 회색 딱지 (사장님 요청) */''}
-                            <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">${(prod.releaseAt || prod.expireAt) ? scheduleBadge : `<span title="노출일정에 걸린 일정이 없어요 (손으로 노출·숨김)" style="font-size: 10px; font-weight: 800; background: #f1f5f9; color: #94a3b8; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">📅 일정 없음</span>${scheduleBadge}`}</div>
+                            <div class="product-meta" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">${(prod.releaseAt || prod.expireAt || _nextSched) ? scheduleBadge : `<span title="노출일정에 걸린 일정이 없어요 (손으로 노출·숨김)" style="font-size: 10px; font-weight: 800; background: #f1f5f9; color: #94a3b8; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">📅 일정 없음</span>${scheduleBadge}`}</div>
                             ${optionPanel}
                             ${/* [수정 2026-10-05] 수량·수정·마감(상시판매는 수량·위치·수정)을 카드 오른쪽 세로 칸에서 맨 밑 가로 한 줄로 옮겼다 (사장님 요청) */''}
                             ${actionsHtml}
