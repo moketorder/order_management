@@ -4612,15 +4612,25 @@
                     const sc = srcSchedState(prod, date); if (sc) { S.sched = !!sc.hit; S.hit = sc.hit; }
                     return S;
                 }
+                /* [수정 2026-10-08] 이름 앞 숫자 = 재고 대신 공구 진행한 횟수 (사장님 요청) — 이어진 상품(또는 공구 기록을 끌어다 놓은 것)의
+                   판매 기록(psHistBuild)에서 오늘까지 지난 차례 수. 한 번도 안 했으면 숫자 없음. 재고·발주·일정은 마우스를 올리면 */
                 function srcRegMark(rs, date, S) {
                     S = S || srcRegState(rs, date);
-                    if (!S.prod) return '';
-                    const st = (typeof salesRealStock === 'function') ? salesRealStock(S.prod) : null;
-                    if (st == null) return '';
-                    const tip = ['상품 등록됨 · 남은 재고 ' + (st === Infinity ? '무제한' : st + '개')];
+                    let p = null; try { p = srcRefGet(JSON.parse(rs)); } catch (e) { }
+                    const prod = S.prod;
+                    const code = prod ? psSafeId(String(prod.productCode || '').trim()) : (p && p.code ? String(p.code) : '');
+                    const nk = String((prod && prod.name) || (p && p.code ? p.name : '') || '').replace(/\s/g, '');
+                    if (!code && !nk) return '';
+                    srcHistEnsure();
+                    const h = (gSrc.hist || []).find(x => x && ((code && x.code === code) || (nk && String(x.name || '').replace(/\s/g, '') === nk)));
+                    const today = srcToday(), done = h ? (h.rounds || []).filter(x => x && x.pk && x.pk <= today).map(x => x.pk).sort() : [];
+                    if (!done.length) return '';
+                    const tip = ['공구 ' + done.length + '번 진행 · 마지막 ' + done[done.length - 1].slice(5).replace('-', '/')];
+                    const st = (prod && typeof salesRealStock === 'function') ? salesRealStock(prod) : null;
+                    if (st != null) tip.push('남은 재고 ' + (st === Infinity ? '무제한' : st + '개'));
                     if (S.po1) tip.push('발주 ' + String(S.po1.date).slice(5, 10).replace('-', '/') + ' · ' + (S.po1.supplier || ''));
                     if (S.hit) { const a = fMsToDateKey(S.hit.releaseAt), b = psItemPickup(S.hit) || fMsToDateKey(S.hit.expireAt); tip.push('노출일정 ' + a.slice(5).replace('-', '/') + (b ? ' ~ ' + b.slice(5).replace('-', '/') : '')); }
-                    return '<b class="src-rg o" title="' + srcEsc(tip.join('\n')) + '">' + (st === Infinity ? '∞' : st) + '</b>';
+                    return '<b class="src-rg o" title="' + srcEsc(tip.join('\n')) + '">' + done.length + '회</b>';
                 }
                 // 거르기: 켠 단추 중 하나라도 '안 된(false)' 이름표만 남긴다. 모르는 것(null)은 숨긴다
                 const SRC_CAL_F = [['po', '발주등록X', '발주 안 한 것만'], ['reg', '상품등록X', '상품 등록 안 한 것만'], ['sched', '일정등록X', '노출일정 없는 것만']];   // [수정 2026-10-08] 이름 뒤에 X (사장님 요청)
@@ -5027,7 +5037,8 @@
                         if (w) w.close(); showToast('이 상품의 밴드 글을 못 찾았어요');
                     } catch (e) { if (w) w.close(); showToast('밴드 글을 못 열었어요: ' + e.message); }
                 }
-                function srcMenuOutside(e) { const m = document.getElementById('src-menu'); if (m && !m.contains(e.target)) srcMenuClose(); }
+                let gSrcMenuOutAt = 0;   // [신규 2026-10-08] 바깥을 눌러 창을 닫은 때
+                function srcMenuOutside(e) { const m = document.getElementById('src-menu'); if (m && !m.contains(e.target)) { gSrcMenuOutAt = Date.now(); srcMenuClose(); } }
                 function srcMenuClose() { const m = document.getElementById('src-menu'); if (m) m.remove(); document.removeEventListener('pointerdown', srcMenuOutside, true); }                // date 없이 부르면(단추 누르기) 같은 것을 다시 누를 때 취소, 아니면 그 요일 날짜로 저장.
                 // date 를 주면(달력에 끌어다 놓기) 늘 그 날짜로 저장한다.
                 async function srcPick(key, lab, date) {
@@ -5106,7 +5117,7 @@
                         '<span class="src-calf">' + SRC_CAL_F.map(([k, lab, tip]) => '<button type="button" class="src-btn' + ((gSrc.calF || {})[k] ? ' on' : '') + '" onclick="srcCalFToggle(\'' + k + '\')" title="' + tip + '">' + lab + '</button>').join('') + '</span>' +   // [신규 2026-10-07] 안 된 것만 보기
                         '<details class="src-calhelp"><summary>설명</summary>' +   // [수정 2026-10-07] 설명은 기본으로 접어 둔다 (사장님 요청)
                         '<span class="k">초록 = 신규(밴드·추천) · 보라 = 상시판매·예전 공구(추천이라도 상시·예전 공구 상품에 이어지면 보라) · 파랑 = 직접 쓴 것 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span>' +
-                        '<span class="k">초록 숫자 = 상품 등록됨(남은 재고, ∞ 무제한) · 오른쪽 위 발주등록X·상품등록X·일정등록X = 켜면 그것이 안 된 것만 보기</span><span class="k">끌기 = 옮기기 · Ctrl+끌기 = 복사 · Ctrl+누르기 = 여러 개 · Delete 지우기 · Ctrl+Z 되돌리기 · 폰은 길게 눌러 끌기</span></details></div><div class="src-cal-grid">' +
+                        '<span class="k">초록 숫자 = 공구 진행한 횟수(마우스를 올리면 마지막 공구·재고) · 오른쪽 위 발주등록X·상품등록X·일정등록X = 켜면 그것이 안 된 것만 보기</span><span class="k">끌기 = 옮기기 · Ctrl+끌기 = 복사 · Ctrl+누르기 = 여러 개 · Delete 지우기 · Ctrl+Z 되돌리기 · 폰은 길게 눌러 끌기</span></details></div><div class="src-cal-grid">' +
                         SRC_DAYS.map(d => '<div class="src-cal-dow">' + d + '</div>').join('');
                     for (let d = new Date(start); d <= calEnd; d.setDate(d.getDate() + 7)) {
                         for (let i = 0; i < 5; i++) {
@@ -5464,7 +5475,9 @@
                 // 누르기 = 고르기 (Ctrl 이면 더하고 빼기, 아니면 그것 하나만 — 하나만 고른 것을 다시 누르면 풀기)
                 function srcTagTap(ref, add) {
                     if (add) { if (gSrcSel.has(ref)) gSrcSel.delete(ref); else gSrcSel.add(ref); }
-                    else if (gSrcSel.size === 1 && gSrcSel.has(ref)) gSrcSel.clear();
+                    // [수정 2026-10-08] 이미 고른 것을 다시 누르면 — 창이 막 열려 있었으면(그 누르기로 닫힘) 풀고, 창이 없으면 다시 연다
+                    //  (창 단추를 눌러 일을 하고 나면 고른 채로 남아, 예전엔 두 번 눌러야 창이 다시 떴다 — 사장님 지적)
+                    else if (gSrcSel.size === 1 && gSrcSel.has(ref)) { if (Date.now() - gSrcMenuOutAt < 600) gSrcSel.clear(); }
                     else { gSrcSel.clear(); gSrcSel.add(ref); }
                     srcRender();
                     // [신규 2026-10-06] 하나 고르면 창 · [신규 2026-10-07] 여럿 고르면 일정 추가·건너뜀·추천제외 창
