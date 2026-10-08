@@ -3687,7 +3687,15 @@
                         #purchase-section-sourcing .src-plan { margin-top:4px; }
                         #purchase-section-sourcing .src-plan .src-cathead small { font-size:12px; color:var(--src-sub); font-weight:800; margin-left:4px; }
                         #purchase-section-sourcing .src-plan > .k { font-size:11px; margin:-4px 0 6px; }
-                        #purchase-section-sourcing .src-plan-grid { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:6px; }
+                        #purchase-section-sourcing .src-plan-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:6px; }
+                        #purchase-section-sourcing .src-plan-week { margin-bottom:10px; }
+                        #purchase-section-sourcing .src-plan-week .wh { font-size:13px; font-weight:900; margin:2px 0 6px; }
+                        #purchase-section-sourcing .src-plan-week .wh small { font-size:11.5px; color:var(--src-sub); font-weight:800; margin-left:4px; }
+                        #purchase-section-sourcing .src-plan-cat { background:#fff; border:1px solid var(--src-line); border-radius:10px; padding:6px; min-width:0; display:flex; flex-direction:column; gap:4px; }
+                        #purchase-section-sourcing .src-plan-cat > b { font-size:11.5px; font-weight:900; color:#334155; }
+                        #purchase-section-sourcing .src-plan-cat.on > b { color:#5b21b6; }
+                        #purchase-section-sourcing .src-plan-cat .src-ochip { display:block; font-size:11.5px; padding:3px 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+                        #purchase-section-sourcing .src-plan-cat .src-ochip small { display:block; font-size:10px; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
                         #purchase-section-sourcing .src-plan-day { background:#fff; border:1px solid var(--src-line); border-radius:10px; padding:6px; min-width:0; display:flex; flex-direction:column; gap:4px; }
                         #purchase-section-sourcing .src-plan-day .h .hol { font-size:10.5px; font-weight:800; color:#dc2626; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
                         #purchase-section-sourcing .src-plan-day .h { display:flex; align-items:center; gap:6px; font-size:12px; }
@@ -3696,7 +3704,7 @@
                         #purchase-section-sourcing .src-plan-day .chips { display:flex; flex-direction:column; gap:4px; }
                         #purchase-section-sourcing .src-plan-day .src-ochip { display:block; font-size:11.5px; padding:3px 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
                         #purchase-section-sourcing .src-plan-day .src-ochip small { display:block; font-size:10px; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
-                        @media (max-width: 700px) { #purchase-section-sourcing .src-plan-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+                        @media (max-width: 700px) { #purchase-section-sourcing .src-plan-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }   /* 폰은 두 칸 */
                         #purchase-section-sourcing .src-grpn { flex:0 0 auto; border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:999px; font-size:10.5px; font-weight:800; padding:0 6px; height:18px; cursor:pointer; font-family:inherit; white-space:nowrap; }
                         #src-grppop { position:fixed; z-index:2147483300; background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 12px 30px rgba(15,23,42,.18); padding:8px; width:min(360px, calc(100vw - 16px)); max-height:60vh; overflow:auto; font-family:inherit; }
                         #src-grppop .t { font-size:13px; font-weight:900; color:#0f172a; padding:2px 4px 6px; } #src-grppop .t small { display:block; font-size:11px; color:#64748b; font-weight:700; }
@@ -4072,33 +4080,30 @@
                     for (let round = 0; round < 10 && out.length < 40; round++) cats.forEach(c => { const r = (by[c] || [])[round]; if (r) out.push(r); });
                     return out;
                 }
+                /* [수정 2026-10-08] 요일별 칸 대신 한 주에 카테고리마다 하나씩 (사장님 요청)
+                   다음 주·다다음 주 두 묶음. 카테고리 칸마다 밴드 상품 하나(첫 주 = 1순위, 둘째 주 = 2순위), 끝에 상시판매 칸 하나 */
                 function srcPlanPanel() {
                     if (!gSrc.band) return '';   // 밴드 상품을 받은 뒤에 (카테고리 추천이 받아 온다)
                     srcHistEnsure();
-                    const dates = srcPlanDates(), ons = srcPlanOnsite(), bands = srcPlanBand();
+                    const mon = srcAddDays(srcMonday(srcToday()), 7), ons = srcPlanOnsite(), by = srcCatPool();
+                    const hide = new Set(srcCatDefs().filter(d => !d.show).map(d => d.name));
+                    const cats = srcCatDefs().map(d => d.name).filter(c => by[c] && !hide.has(c)).concat(Object.keys(by).filter(c => !srcCatDefs().some(d => d.name === c)));
                     const won = v => v ? Number(String(v).replace(/[^\d]/g, '')).toLocaleString('ko-KR') + '원' : '';
-                    let oi = 0, bi = 0;
-                    const cell = d => {
-                        const dt = new Date(d + 'T00:00:00'), head = '<div class="h"><b>' + (dt.getMonth() + 1) + '/' + dt.getDate() + ' (' + '일월화수목금토'[dt.getDay()] + ')</b>' + srcWxHtml(d) +
-                            // [수정 2026-10-08] 공휴일·휴무일도 추천은 채운다 (사장님 요청 — 안 넣으면 그만) · 이름만 빨갛게 보여 준다
-                            (SRC_HOLIDAYS[d] || gSrc.closed.indexOf(d) >= 0 ? '<span class="hol">' + srcEsc(SRC_HOLIDAYS[d] || '휴무') + '</span>' : '') + '</div>';
-                        let chips = '';
-                        for (let i = 0; i < SRC_PLAN_PER.onsite && oi < ons.length; i++, oi++) {
-                            const x = ons[oi];
-                            chips += '<span class="src-ochip" data-code="' + srcEsc(x.p.code) + '" title="' + srcEsc(x.p.name) + ' · 상시판매' + (x.last ? ' · 마지막 공구 ' + x.last : ' · 공구한 적 없음') + ' · 달력에 끌어다 놓으면 저장">' + srcEsc(x.p.name) +
-                                '<small>' + (x.last ? '공구 ' + x.last.slice(5).replace('-', '/') : '상시') + '</small></span>';
-                        }
-                        for (let i = 0; i < SRC_PLAN_PER.band && bi < bands.length; i++, bi++) {
-                            const r = bands[bi];
-                            chips += '<span class="src-ochip src-bchip" data-no="' + srcEsc(r.no) + '" title="' + srcEsc(r.n + ' · ' + r.v + ' · ' + (r.c || '')) + ' · 누르면 창 · 달력에 끌어다 놓으면 판매 표시">' + srcEsc(r.n) +
-                                '<small>' + srcEsc(r.v) + (r.sp ? ' · ' + won(r.sp) : '') + '</small></span>';
-                        }
-                        return '<div class="src-plan-day">' + head + '<div class="chips">' + (chips || '<span class="k">추천할 상품이 없어요</span>') + '</div></div>';
-                    };
                     const md = d => d.slice(5).replace('-', '/');
-                    return '<div class="src-plan"><div class="src-cathead"><b>다음 2주 공구 추천 <small>' + md(dates[0]) + '~' + md(dates[dates.length - 1]) + '</small></b></div>' +
-                        '<div class="k">보라 = 상시판매(마지막 공구 4주 넘은 것) · 초록 = 밴드 상품 · 달력 날짜에 끌어다 놓으면 저장돼요</div>' +
-                        '<div class="src-plan-grid">' + dates.map(cell).join('') + '</div></div>';
+                    const bandChip = r => '<span class="src-ochip src-bchip" data-no="' + srcEsc(r.no) + '" title="' + srcEsc(r.n + ' · ' + r.v) + ' · 누르면 창 · 달력에 끌어다 놓으면 판매 표시">' + srcEsc(r.n) +
+                        '<small>' + srcEsc(r.v) + (r._grpN ? ' 외 ' + r._grpN + '곳' : '') + (r.sp ? ' · ' + won(r.sp) : '') + '</small></span>';
+                    const onChip = x => '<span class="src-ochip" data-code="' + srcEsc(x.p.code) + '" title="' + srcEsc(x.p.name) + ' · 상시판매' + (x.last ? ' · 마지막 공구 ' + x.last : ' · 공구한 적 없음') + ' · 달력에 끌어다 놓으면 저장">' + srcEsc(x.p.name) +
+                        '<small>' + (x.last ? '공구 ' + md(x.last) : '상시') + '</small></span>';
+                    const week = w => {
+                        const st = srcAddDays(mon, w * 7);
+                        const boxes = cats.map(c => { const r = (by[c] || [])[w]; return r ? '<div class="src-plan-cat"><b>' + srcEsc(c) + '</b>' + bandChip(r) + '</div>' : ''; }).join('') +
+                            (ons[w] ? '<div class="src-plan-cat on"><b>상시판매</b>' + onChip(ons[w]) + '</div>' : '');
+                        return '<div class="src-plan-week"><div class="wh">' + (w ? '다다음 주' : '다음 주') + ' <small>' + md(st) + '~' + md(srcAddDays(st, 4)) + '</small></div>' +
+                            '<div class="src-plan-grid">' + (boxes || '<span class="k">추천할 상품이 없어요</span>') + '</div></div>';
+                    };
+                    return '<div class="src-plan"><div class="src-cathead"><b>다음 2주 공구 추천</b></div>' +
+                        '<div class="k">카테고리마다 하나씩 · 초록 = 밴드 상품 · 보라 = 상시판매(마지막 공구 4주 넘은 것) · 달력 날짜에 끌어다 놓으면 저장돼요</div>' +
+                        week(0) + week(1) + '</div>';
                 }
                 function srcCatToggle(no) { gSrcCat.open[no] = !gSrcCat.open[no]; srcRender(); }
                 function srcCatMore(c) { gSrcCat.show[c] = (gSrcCat.show[c] || 5) + 5; srcRender(); }
