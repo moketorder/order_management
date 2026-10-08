@@ -11503,7 +11503,7 @@
                                         <span class="custom-checkbox"></span>
                                     </label>
                                 </td>
-                                <td class="item-name-cell">${gEscapeHtml(it.item)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</td>
+                                <td class="item-name-cell">${gEscapeHtml(it.item)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${gShopNoteAdm(it)}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</td>
                                 <td style="width:70px;"><strong class="${qtyClass}">${qtyNum}</strong>개</td>
                                 <td style="width:100px;">${parseInt(it.price || 0).toLocaleString()}원</td>
                                 <td style="width:100px;"><strong>${parseInt(it.total || 0).toLocaleString()}원</strong></td>
@@ -11521,7 +11521,7 @@
                                         <input type="checkbox" class="item-checkbox" data-phone="${customer.phone}" data-key="${it.orderKey}" ${selectedItems.has(customer.phone + "|" + it.orderKey) ? 'checked' : ''} onchange="handleItemSelect(this)">
                                         <span class="custom-checkbox"></span>
                                     </label>
-                                    <span class="mobile-item-name">${gEscapeHtml(it.item)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</span>
+                                    <span class="mobile-item-name">${gEscapeHtml(it.item)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${gShopNoteAdm(it)}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</span>
                                     <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${escapeArg(customer.phone)}', '${escapeArg(it.orderKey)}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
                                 </div>
                                 <div class="mobile-item-middle">
@@ -12894,6 +12894,8 @@
             const currentDate = matchingOrder ? (matchingOrder.pickupDate || matchingOrder.date || "") : "";
 
             showDatePickerModal(`${label} 변경`, currentDate, async (trimmedDate) => {
+                // [신규 2026-10-08] 날짜 변경도 이유를 묻는다 (적지 않아도 된다)
+                const _ask = await gAskShopNote('날짜 변경', `${label} → ${fToPickupLabel(trimmedDate)} · ${keysToChange.length}개 상품`, '바꾸기'); if (!_ask) return;
                 showLoader("📅 주문 날짜 변경 중...");
                 try {
                     const targetDateInfo = matchingOrder ? getOrderDateInfo(matchingOrder) : { dateStr: "" };
@@ -12928,6 +12930,7 @@
                         if (order.matchKey) {
                             updatePayload.matchKey = savedDate;
                         }
+                        if (_ask.note) { updatePayload.shopNote = _ask.note; order.shopNote = _ask.note; }   // [신규 2026-10-08]
 
                         const prevDate = order.pickupDate || order.date || "";   // [신규] 기록에 남길 이전 날짜
                         // 로컬 메모리 상태 즉시 업데이트
@@ -13390,9 +13393,46 @@
             document.body.appendChild(modal);
         }
 
-        function selectItemStatus(phone, orderKey, newStatus) {
+        /* [신규 2026-10-08] 취소·날짜 변경 이유 (사장님 요청) — 적지 않아도 되고, '손님에게 보이기'를 켜면 손님 주문서 주문 내역의 그 상품 밑에 나온다.
+           주문 줄에 shopNote = { text, show, kind('취소'·'날짜 변경'), at } 로 적는다. 안 적으면 손대지 않는다.
+           돌려주는 값: 진행 → { note: shopNote 또는 null }, 그만두기 → null */
+        // [신규 2026-10-08] 주문 카드의 상품 줄 밑 — 적어 둔 취소·날짜 변경 이유
+        function gShopNoteAdm(it) {
+            const n = it && it.shopNote; if (!n || !n.text) return '';
+            return `<div class="shop-note-adm" style="display:block; margin-top:2px; font-size:11.5px; font-weight:700; color:#92400e; text-decoration:none;">📝 ${gEscapeHtml(n.kind || '')} · ${gEscapeHtml(n.text)} <span style="color:${n.show ? '#16a34a' : '#94a3b8'};">(${n.show ? '손님에게 보임' : '손님에게 안 보임'})</span></div>`;
+        }
+        function gAskShopNote(kind, sub, okLabel) {
+            return new Promise(res => {
+                const m = document.createElement('div');
+                m.style.cssText = 'position:fixed; inset:0; z-index:2147483400; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;';
+                m.innerHTML = `<div style="background:#fff; border-radius:14px; padding:16px; width:100%; max-width:380px; display:flex; flex-direction:column; gap:10px; font-family:inherit;">
+                    <div style="font-size:15px; font-weight:900; color:#0f172a;">${gEscapeHtml(kind)} 이유<div style="font-size:12px; color:#64748b; font-weight:700; margin-top:3px; word-break:keep-all;">${gEscapeHtml(sub || '')}</div></div>
+                    <textarea id="shop-note-text" rows="3" placeholder="이유 (안 적어도 돼요 · 예: 입고가 늦어져서)" style="border:1.5px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:14px; font-family:inherit; resize:vertical;"></textarea>
+                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#334155; cursor:pointer;"><input type="checkbox" id="shop-note-show" style="width:18px; height:18px; position:static; opacity:1; appearance:auto; -webkit-appearance:checkbox;"> 손님에게 보이기</label>
+                    <div style="font-size:11.5px; color:#94a3b8; font-weight:700;">켜면 손님 주문서 주문 내역에 이유가 나와요.</div>
+                    <div style="display:flex; gap:8px;"><button type="button" data-a="ok" style="flex:1; height:40px; border:none; border-radius:9px; background:${kind === '취소' ? '#dc2626' : '#d97706'}; color:#fff; font-weight:900; font-size:14px; cursor:pointer;">${gEscapeHtml(okLabel || kind)}</button><button type="button" data-a="no" style="flex:1; height:40px; border:1.5px solid #cbd5e1; border-radius:9px; background:#fff; color:#334155; font-weight:900; font-size:14px; cursor:pointer;">그만두기</button></div>
+                </div>`;
+                document.body.appendChild(m);
+                const done = v => { m.remove(); res(v); };
+                m.onclick = e => {
+                    if (e.target === m) return done(null);
+                    const a = e.target.dataset && e.target.dataset.a; if (!a) return;
+                    if (a === 'no') return done(null);
+                    const text = String(m.querySelector('#shop-note-text').value || '').trim().slice(0, 200), show = m.querySelector('#shop-note-show').checked;
+                    if (show && !text) { showToast('손님에게 보이려면 이유를 적어 주세요'); return; }
+                    done({ note: text ? { text, show: !!show, kind, at: Date.now() } : null });
+                };
+                setTimeout(() => { const t = m.querySelector('#shop-note-text'); if (t) t.focus(); }, 50);
+            });
+        }
+        async function selectItemStatus(phone, orderKey, newStatus) {
             const modal = document.getElementById('item-status-select-modal');
             if (modal) modal.remove();
+            if (newStatus === '취소') {   // [신규 2026-10-08] 취소는 이유를 묻는다
+                const t = rawOrders.find(o => o.orderKey === orderKey);
+                const a = await gAskShopNote('취소', t ? t.item : '', '취소하기'); if (!a) return;
+                return updateSingleItemStatus(phone, orderKey, newStatus, a.note ? { shopNote: a.note } : undefined);
+            }
             updateSingleItemStatus(phone, orderKey, newStatus);
         }
 
@@ -13553,10 +13593,17 @@
                 return;
             }
 
+            // [신규 2026-10-08] 취소는 이유를 한 번 묻고 고른 줄 모두에 적는다
+            let _shopNote = null;
+            if (newStatus === '취소') {
+                const a = await gAskShopNote('취소', itemsToProcess.length + '개 상품', itemsToProcess.length + '개 취소하기'); if (!a) return;
+                _shopNote = a.note;
+            }
             showLoader(`선택 항목 [${newStatus}] 일괄 처리 중...`);
 
             try {
                 const patchBody = getStatusPatchBody(newStatus);
+                if (_shopNote) patchBody.shopNote = _shopNote;
                 // [신규] 바꾸기 전에 배달완료였던 줄 (배달 기록 맞추기용)
                 const _prevDelB = itemsToProcess.map(x => x.target).filter(gIsDeliveredRow).map(t => Object.assign({}, t));
                 const promises = [];
