@@ -12749,10 +12749,12 @@
             fetch(`${FIREBASE_DB_URL}customers/${key}.json?t=${Date.now()}`)
                 .then(r => r.ok ? r.json() : null).catch(() => null)
                 .then(s => {
+                    // [버그수정 2026-10-08] 손님 정보에서 지운 칸은 빈칸으로 연다 (지난 주문 값을 다시 채우지 않는다)
+                    const val = f => (s && (String(s[f] || '').trim() || Object.prototype.hasOwnProperty.call(s, f) || (s.fieldAt && s.fieldAt[f]))) ? String(s[f] || '').trim() : pick(f);
                     editCustomerAddress(key, list.map(o => o.orderKey).join('|@@|'),
-                        (s && s.address) || pick('address'),
-                        (s && s.addressDetail) || pick('addressDetail'),
-                        (s && s.entrance) || pick('entrance'),
+                        val('address'),
+                        val('addressDetail'),
+                        val('entrance'),
                         list.length, (s && s.refundAccount) || '');
                 });
         }
@@ -23518,9 +23520,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const recent = v.rows.slice().sort((a, b) => (parseTimestampToDate(b.timestamp) || 0) - (parseTimestampToDate(a.timestamp) || 0));   // [버그수정] 글자 순서가 아니라 날짜로
                 const pick = f => { const h = recent.find(o => String(o[f] || '').trim()); return h ? String(h[f]).trim() : ''; };
                 const has = f => !!String((s && s[f]) || '').trim();
+                /* [버그수정 2026-10-08] 손님 정보에서 일부러 비운 칸(가게·손님이 지움)은 빈칸 그대로 둔다.
+                   예전엔 빈칸이면 지난 주문 값을 빌려 와서, 현관 비번을 지워도 옛 비번이 다시 보였다.
+                   한 번도 적은 적 없는 칸(손님 정보에 그 칸이 아예 없음)만 주문에서 빌려 온다. */
+                const known = f => !!s && (Object.prototype.hasOwnProperty.call(s, f) || !!(s.fieldAt && s.fieldAt[f]));
                 const take = (f, orderField) => {
                     const mine = String((s && s[f]) || '').trim();
-                    return mine || pick(orderField || f);
+                    return (mine || known(f)) ? mine : pick(orderField || f);
                 };
 
                 const nameFromOrders = [...v.names.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -23571,7 +23577,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     refundAccount: String((s && s.refundAccount) || '').trim(),
                     saved: !!s,
                     /* 손님 정보에는 없고 주문에서 빌려 온 칸이 있나 — 카드에 알려 주려고 센다 */
-                    borrowed: !!s && ['name', 'address', 'entrance', 'realName'].some(f => !has(f) && !!pick(f === 'realName' ? 'kakaoRealName' : f)),
+                    borrowed: !!s && ['name', 'address', 'entrance', 'realName'].some(f => !has(f) && !known(f) && !!pick(f === 'realName' ? 'kakaoRealName' : f)),
                     savedAt: s && s.updatedAt ? s.updatedAt : 0,
                     /* 가입한 때 — 손님이 주문서에서 정보를 저장한 그때(createdAt)를 먼저 쓰고,
                        그게 없는 옛 손님은 첫 주문일을 가입일로 친다. */
