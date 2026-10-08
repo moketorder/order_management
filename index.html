@@ -3274,9 +3274,9 @@
                 <!-- [수정 2026-10-07] 머리 줄(달력·목록·판매기록 · 도구)은 흰 칸 밖으로 — 소싱 일정과 같은 모양 (사장님 요청) -->
                     <div class="ps-toolbar">
                         <div class="ps-seg" role="tablist">
-                            <button type="button" id="ps-view-cal" class="on" onclick="psSetView('cal')">📅 달력</button>
-                            <button type="button" id="ps-view-list" onclick="psSetView('list')">📋 목록</button>
-                            <button type="button" id="ps-view-hist" onclick="psSetView('hist')">📊 판매기록</button>
+                            <button type="button" id="ps-view-cal" class="on" onclick="psSetView('cal')">📅 판매 일정</button>   <!-- [수정 2026-10-08] 이름 (사장님 요청) -->
+                            <button type="button" id="ps-view-list" onclick="psSetView('list')">📋 상품 목록</button>
+                            <button type="button" id="ps-view-hist" onclick="psSetView('hist')">📊 판매 기록</button>
                         </div>
                         <div class="ps-tools">
                             <!-- [수정 2026-10-03] 차례: ❔ · 오늘 · (폰만 Ctrl) · 되돌리기 (사장님 요청) -->
@@ -3300,8 +3300,10 @@
                         <div><b>고르기</b> 막대 누르기 · 여러 개는 <b>Ctrl</b>+누르기 · 빈 곳을 끌어 한꺼번에 · 날짜 누르면 그 날 일정 · <b>Esc</b> 풀기</div>
                         <div><b>옮기기</b> 막대를 날짜·시간 줄로 끌기 · <b>Ctrl</b>+끌기 복사 · 양 끝·세로선을 끌면 시작·픽업·마감만 · 폰은 길게 눌러 끌기 (폰은 위 <b>Ctrl</b> 단추를 켜면 Ctrl 을 누른 것과 같아요)</div>
                         <div><b>고른 뒤</b> 🔗 합치기 · ✂️ 나누기 · <b>Delete</b> 지우기(상품은 그대로) · ↩ 되돌리기(<b>Ctrl+Z</b>)</div>
-                        <div><b>시간 줄</b> 날짜칸 안 여덟 줄 = 6·8·10·12·14·16·18·20시 · 위·아래 끝까지 굴리면 전달·다음달</div>
+                        <div><b>시간 줄</b> 날짜칸 안 여덟 줄 = 6·8·10·12·14·16·18·20시 · ◀ ▶ 로 전달·다음달</div>
                     </div>
+                    <!-- [신규 2026-10-08] 한 달씩 넘겨 본다 (사장님 요청 — 소싱 일정 달력처럼, 쭉 이어지게 말고) -->
+                    <div class="ps-monthbar"><button type="button" onclick="psCalPageMove(-1)">◀</button><b id="ps-month-label"></b><button type="button" onclick="psCalPageMove(1)">▶</button></div>
                     <div class="ps-cal-wrap">
                         <div id="ps-cal-box" class="ps-cal-scroll" onscroll="psCalOnScroll()" ondragover="psCalDragAutoScroll(event)" onmousedown="psMarqueeDown(event)"></div>
                         <!-- [신규] 폰에서는 달력 안 손가락 스크롤을 막고(바깥 화면이 대신 움직임) 이 막대로 위아래를 옮긴다 -->
@@ -3351,6 +3353,7 @@
                 <div style="display:flex; gap:6px; margin-bottom:10px;">
                     <button type="button" id="rva-tab-rv" class="sub-tab-btn active" onclick="rvaShow('rv')">후기</button>
                     <button type="button" id="rva-tab-pt" class="sub-tab-btn" onclick="rvaShow('pt')">손님 포인트</button>
+                    <button type="button" id="rva-tab-del" class="sub-tab-btn" onclick="rvaShow('del')">삭제함</button>   <!-- [신규 2026-10-08] 지운 후기 모음 (사장님 요청) -->
                 </div>
                 <div id="rva-body"></div>
             </div>
@@ -3692,7 +3695,10 @@
                         #purchase-section-sourcing .src-plan-week .wh { font-size:13px; font-weight:900; margin:2px 0 6px; }
                         #purchase-section-sourcing .src-plan-week .wh small { font-size:11.5px; color:var(--src-sub); font-weight:800; margin-left:4px; }
                         #purchase-section-sourcing .src-plan-cat { background:#fff; border:1px solid var(--src-line); border-radius:10px; padding:6px; min-width:0; display:flex; flex-direction:column; gap:4px; }
-                        #purchase-section-sourcing .src-plan-cat > b { font-size:11.5px; font-weight:900; color:#334155; }
+                        #purchase-section-sourcing .src-plan-cat > b, #purchase-section-sourcing .src-plan-cat .ch b { font-size:11.5px; font-weight:900; color:#334155; }
+                        #purchase-section-sourcing .src-plan-cat .ch { display:flex; align-items:center; justify-content:space-between; gap:4px; }
+                        #purchase-section-sourcing .src-plan-rr { flex:0 0 auto; width:24px; height:22px; border:1px solid #cbd5e1; background:#fff; border-radius:6px; font-size:12px; line-height:1; cursor:pointer; padding:0; }
+                        #purchase-section-sourcing .src-plan-rr:hover { background:#f1f5f9; }
                         #purchase-section-sourcing .src-plan-cat.on > b { color:#5b21b6; }
                         #purchase-section-sourcing .src-plan-cat .src-ochip { display:block; font-size:11.5px; padding:3px 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
                         #purchase-section-sourcing .src-plan-cat .src-ochip small { display:block; font-size:10px; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
@@ -3796,6 +3802,7 @@
                         #purchase-section-sourcing td.nm a:hover { text-decoration:underline; }
                         #purchase-section-sourcing td.raw { min-width:220px; max-width:420px; color:#475569; font-size:11.5px; }
                         #purchase-section-sourcing td.r, #purchase-section-sourcing th.r { text-align:right; }
+                        #purchase-section-sourcing td.dt { white-space:nowrap; }   /* [신규 2026-10-08] 게시일은 한 줄 (사장님 요청) */
                         #purchase-section-sourcing tr.sold td { background:#fffbeb; }
                         #purchase-section-sourcing .src-sold { border:1.5px solid #cbd5e1; background:#fff; border-radius:7px; font-size:11.5px; font-weight:900; padding:3px 8px; cursor:pointer; white-space:nowrap; font-family:inherit; color:#475569; }
                         #purchase-section-sourcing .src-sold.on { background:var(--src-pick); border-color:#f59e0b; color:var(--src-pick-ink); }
@@ -4080,6 +4087,41 @@
                     for (let round = 0; round < 10 && out.length < 40; round++) cats.forEach(c => { const r = (by[c] || [])[round]; if (r) out.push(r); });
                     return out;
                 }
+                /* [신규 2026-10-08] 상시판매 상품의 카테고리 — 상시판매엔 밴드 카테고리가 없어 밴드 상품 이름으로 짐작한다
+                   ① 밴드에 같은 이름이 있으면 그 카테고리 ② 카테고리 관리에 넣은 낱말 ③ 이름의 낱말(두 글자 이상)이 든 밴드 상품들 중 가장 많은 카테고리
+                   못 찾으면 '' (그 상품은 추천 칸에 안 나온다) */
+                // [신규 2026-10-08] 2주 추천 🔄 — { '주시작일|카테고리': 바꾼 횟수 } 를 이 기기에 기억 (지난 주 것은 버린다)
+                const SRC_PLAN_RR_KEY = 'moket_src_plan_rr';
+                function srcPlanRR() {
+                    if (!gSrc.planRR) { try { gSrc.planRR = JSON.parse(localStorage.getItem(SRC_PLAN_RR_KEY) || '{}') || {}; } catch (e) { gSrc.planRR = {}; } }
+                    return gSrc.planRR;
+                }
+                function srcPlanReroll(k, reset) {
+                    const m = srcPlanRR(), cut = srcAddDays(srcMonday(srcToday()), 7);
+                    Object.keys(m).forEach(x => { if (x.slice(0, 10) < cut) delete m[x]; });
+                    if (reset) delete m[k]; else m[k] = (m[k] || 0) + 1;
+                    try { localStorage.setItem(SRC_PLAN_RR_KEY, JSON.stringify(m)); } catch (e) { }
+                    srcRender();
+                }
+                let gSrcOnCat = null;
+                function srcOnsiteCat(p) {
+                    if (!gSrcOnCat || gSrcOnCat.band !== gSrc.band || gSrcOnCat.def !== gSrc.catdef) {
+                        const rows = srcBandRows().filter(r => r && r.n && r.c);
+                        gSrcOnCat = { band: gSrc.band, def: gSrc.catdef, rows: rows.map(r => ({ n: String(r.n).replace(/\s/g, ''), c: r.c })), memo: {} };
+                    }
+                    const C = gSrcOnCat, key = String(p.code || p.name);
+                    if (key in C.memo) return C.memo[key];
+                    const nk = String(p.name || '').replace(/\s/g, '');
+                    let c = (C.rows.find(r => r.n === nk) || {}).c || '';
+                    if (!c) { const a = srcCatAuto(p.name, ''); if (a) c = a; }
+                    if (!c) {
+                        const words = String(p.name || '').replace(/\([^)]*\)|\[[^\]]*\]/g, ' ').split(/\s+/).map(w => w.replace(/[^가-힣A-Za-z]/g, '')).filter(w => w.length >= 2 && !/^(국내산|국산|수입|프리미엄|정품|특가|신선한?|맛있는|한봉지|한팩|한박스|개입)$/.test(w));
+                        const score = {};
+                        C.rows.forEach(r => { words.forEach(w => { if (r.n.includes(w)) score[r.c] = (score[r.c] || 0) + w.length; }); });
+                        c = Object.keys(score).sort((a, b) => score[b] - score[a])[0] || '';
+                    }
+                    return (C.memo[key] = srcCatName(c));
+                }
                 /* [수정 2026-10-08] 요일별 칸 대신 한 주에 카테고리마다 하나씩 (사장님 요청)
                    다음 주·다다음 주 두 묶음. 카테고리 칸마다 밴드 상품 하나(첫 주 = 1순위, 둘째 주 = 2순위), 끝에 상시판매 칸 하나 */
                 function srcPlanPanel() {
@@ -4094,15 +4136,33 @@
                         '<small>' + srcEsc(r.v) + (r._grpN ? ' 외 ' + r._grpN + '곳' : '') + (r.sp ? ' · ' + won(r.sp) : '') + '</small></span>';
                     const onChip = x => '<span class="src-ochip" data-code="' + srcEsc(x.p.code) + '" title="' + srcEsc(x.p.name) + ' · 상시판매' + (x.last ? ' · 마지막 공구 ' + x.last : ' · 공구한 적 없음') + ' · 달력에 끌어다 놓으면 저장">' + srcEsc(x.p.name) +
                         '<small>' + (x.last ? '공구 ' + md(x.last) : '상시') + '</small></span>';
+                    // [수정 2026-10-08] 상시판매는 따로 칸을 두지 않고 카테고리마다 같이 (사장님 요청) — 그 카테고리 상시판매 후보의 첫 주 1번째, 둘째 주 2번째
+                    const onBy = {};
+                    ons.forEach(x => { const c = srcOnsiteCat(x.p); if (c) (onBy[c] = onBy[c] || []).push(x); });
+                    const allCats = cats.concat(Object.keys(onBy).filter(c => !cats.includes(c) && !hide.has(c)));
                     const week = w => {
                         const st = srcAddDays(mon, w * 7);
-                        const boxes = cats.map(c => { const r = (by[c] || [])[w]; return r ? '<div class="src-plan-cat"><b>' + srcEsc(c) + '</b>' + bandChip(r) + '</div>' : ''; }).join('') +
-                            (ons[w] ? '<div class="src-plan-cat on"><b>상시판매</b>' + onChip(ons[w]) + '</div>' : '');
+                        const boxes = allCats.map(c => {
+                            // [신규 2026-10-08] 🔄 다른 상품 (사장님 요청) — 누를 때마다 그 카테고리 후보에서 두 칸씩 뒤로 (두 주가 안 겹치게). 이 기기에 주별로 기억
+                            const k = st + '|' + c, o = srcPlanRR()[k] || 0;
+                            // [수정 2026-10-08] 두 주가 겹치지 않게 (사장님 요청 — 리롤해도 다른 주 추천은 안 나오게): 두 주 몫을 함께 정하고 겹치면 다음 후보
+                            const st0 = srcAddDays(mon, 0), st1 = srcAddDays(mon, 7), RR = srcPlanRR();
+                            //  다다음 주 몫(b)을 먼저 정하고, 다음 주(a)는 b 를 뺀 후보에서 고른다 — 한 주를 바꿔도 다른 주는 그대로
+                            const pick = list => {
+                                if (!list || !list.length) return null;
+                                const b = list.length > 1 ? list[(1 + (RR[st1 + '|' + c] || 0)) % list.length] : null;
+                                if (w === 1) return b;
+                                const rest = list.filter(x => x !== b);
+                                return rest.length ? rest[(RR[st0 + '|' + c] || 0) % rest.length] : null;
+                            };
+                            const r = pick(by[c]), x = pick(onBy[c]);
+                            return (r || x) ? '<div class="src-plan-cat"><div class="ch"><b>' + srcEsc(c) + '</b><button type="button" class="src-plan-rr" onclick="srcPlanReroll(\'' + srcEsc(k) + '\')" title="다른 상품 보기' + (o ? ' (' + o + '번 바꿈 · 길게 누르면 처음으로)' : '') + '" oncontextmenu="event.preventDefault(); srcPlanReroll(\'' + srcEsc(k) + '\', true)">🔄</button></div>' + (r ? bandChip(r) : '') + (x ? onChip(x) : '') + '</div>' : '';
+                        }).join('');
                         return '<div class="src-plan-week"><div class="wh">' + (w ? '다다음 주' : '다음 주') + ' <small>' + md(st) + '~' + md(srcAddDays(st, 4)) + '</small></div>' +
                             '<div class="src-plan-grid">' + (boxes || '<span class="k">추천할 상품이 없어요</span>') + '</div></div>';
                     };
                     return '<div class="src-plan"><div class="src-cathead"><b>다음 2주 공구 추천</b></div>' +
-                        '<div class="k">카테고리마다 하나씩 · 초록 = 밴드 상품 · 보라 = 상시판매(마지막 공구 4주 넘은 것) · 달력 날짜에 끌어다 놓으면 저장돼요</div>' +
+                        '<div class="k">카테고리마다 · 초록 = 밴드 상품 · 보라 = 상시판매(마지막 공구 4주 넘은 것) · 달력 날짜에 끌어다 놓으면 저장돼요</div>' +
                         week(0) + week(1) + '</div>';
                 }
                 function srcCatToggle(no) { gSrcCat.open[no] = !gSrcCat.open[no]; srcRender(); }
@@ -4264,7 +4324,7 @@
                         '<button type="button" data-act="close">✕ 닫기</button>';
                     else m.innerHTML = '<div class="t">' + srcEsc(tg.name) + '<small>' + srcEsc(tg.vendor) + (tg.supply ? ' · ' + srcWon(tg.supply) : '') + '</small></div>' +
                         // [수정 2026-10-07] 차례: 수정(✍만) · 밴드 · 발주 등록 · 상품 등록 · 상품 연결 · 일정 추가 · 닫기 — 달력 이름표 창은 이모지·건너뜀·추천제외 뺌 (사장님 요청)
-                        (o.manual ? '<button type="button" data-act="editManual">✏️ 수정</button>' : '') +   // [신규 2026-10-07] 달력에 손으로 쓴 것 고치기
+                        (o.manual ? '<button type="button" data-act="editManual">✏️ 수정</button>' : o.ref ? '<button type="button" data-act="editDisp">✏️ 수정</button>' : '') +   // [수정 2026-10-08] 달력 이름표는 모두 수정 (달력에만 보이는 이름)   // [신규 2026-10-07] 달력에 손으로 쓴 것 고치기
                         '<button type="button" data-act="band">🔗 밴드</button>' +
                         '<button type="button" class="ord" data-act="purchase">🚚 발주 등록</button>' +
                         '<button type="button" class="reg" data-act="product">🛒 ' + (srcRegIdxOfTg(tg, o) >= 0 ? '상품 수정' : '상품 등록') + '</button>' +   // [수정 2026-10-07] 등록돼 있으면 상품 수정 (사장님 요청)
@@ -4287,6 +4347,7 @@
                         if (act === 'polink') return srcPoLinkDialog(tg, o.ref);
                         if (act === 'link') return srcLinkDialog(tg, null, o.ref);
                         if (act === 'editManual') return srcManualEdit(o.manual);
+                        if (act === 'editDisp') return srcDispEdit(o.ref);
                         if (act === 'editBand') return srcEditFromTg(tg);
                         if (act === 'sched') return srcSchedDialog([o.ref]);
                         if (act === 'band') return srcOpenBand(o.link, tg);
@@ -4504,7 +4565,7 @@
                     return '<b class="src-rg o" title="' + srcEsc(tip.join('\n')) + '">' + (st === Infinity ? '∞' : st) + '</b>';
                 }
                 // 거르기: 켠 단추 중 하나라도 '안 된(false)' 이름표만 남긴다. 모르는 것(null)은 숨긴다
-                const SRC_CAL_F = [['po', '발주등록', '발주 안 한 것만'], ['reg', '상품등록', '상품 등록 안 한 것만'], ['sched', '일정등록', '노출일정 없는 것만']];   // [수정 2026-10-07] 이름 (사장님 요청)
+                const SRC_CAL_F = [['po', '발주등록X', '발주 안 한 것만'], ['reg', '상품등록X', '상품 등록 안 한 것만'], ['sched', '일정등록X', '노출일정 없는 것만']];   // [수정 2026-10-08] 이름 뒤에 X (사장님 요청)
                 function srcCalPass(rs, date) {
                     const F = gSrc.calF || {}, on = SRC_CAL_F.filter(([k]) => F[k]).map(([k]) => k);
                     if (!on.length) return true;
@@ -4656,6 +4717,32 @@
                         }
                     };
                     document.getElementById('src-link-q').focus();
+                }
+                /* [신규 2026-10-08] 달력 이름표 '수정' — 달력에만 보이는 이름(disp)을 그 자리에 적는다 (사장님 요청).
+                   원래 이름(name)은 그대로 둔다 — 상품 등록·발주 찾기·4주 추천 빼기·PC 판매확정은 원래 이름을 쓴다. 비우면 원래 이름으로 */
+                function srcDispEdit(rs) {
+                    const r = JSON.parse(rs), p = srcRefGet(r); if (!p) return;
+                    srcMenuClose();
+                    const box = document.createElement('div'); box.id = 'src-edit';
+                    box.innerHTML = '<div class="in"><div class="t">✏️ 달력에 보일 이름<small>원래 이름: ' + srcEsc(p.name || '') + '</small></div>' +
+                        '<label>이름<input type="text" data-f="disp" value="' + srcEsc(p.disp || p.name || '') + '"></label>' +
+                        '<div class="row"><button type="button" class="ok" data-act="save">저장</button>' + (p.disp ? '<button type="button" data-act="undo">원래 이름으로</button>' : '') + '<button type="button" data-act="close">닫기</button></div>' +
+                        '<div class="k">달력에서만 바뀌어요. 상품 찾기·발주·상품 등록은 원래 이름으로 해요.</div></div>';
+                    document.body.appendChild(box);
+                    box.onclick = async e => {
+                        if (e.target === box) return box.remove();
+                        const act = e.target.dataset && e.target.dataset.act; if (!act) return;
+                        if (act === 'close') return box.remove();
+                        let disp = act === 'undo' ? '' : box.querySelector('[data-f="disp"]').value.trim();
+                        if (disp === String(p.name || '').trim()) disp = '';
+                        const val = Object.assign({}, p, { at: p.at || new Date().toISOString() });
+                        if (disp) val.disp = disp; else delete val.disp;
+                        try { await srcPut(srcRefPath(r), val); srcRefSet(r, val); showToast(disp ? '달력 이름을 바꿨어요: ' + disp : '원래 이름으로 돌렸어요'); }
+                        catch (err) { showToast('저장 못 했어요: ' + err.message); return; }
+                        box.remove(); srcRender();
+                    };
+                    const inp = box.querySelector('[data-f="disp"]'); inp.focus(); inp.select();
+                    inp.onkeydown = e => { if (e.key === 'Enter') box.querySelector('[data-act="save"]').click(); };
                 }
                 /* [신규 2026-10-07] 달력에 손으로 쓴 것(✍) 고치기 — 이름·메모 */
                 function srcManualEdit(id) {
@@ -4920,17 +5007,22 @@
                     const [y, m] = month.split('-').map(Number);
                     const first = new Date(y, m - 1, 1), last = new Date(y, m, 0);
                     const start = new Date(first); start.setDate(start.getDate() - (start.getDay() + 6) % 7);
+                    // [신규 2026-10-08] 전달 마지막 주와 다음 달 첫 주도 보이게 (사장님 요청) — 1일이 월요일이면 한 주 앞부터,
+                    //  끝은 다음 달 첫 평일이 든 주까지
+                    if (first.getDay() === 1) start.setDate(start.getDate() - 7);
+                    const nf = new Date(y, m, 1); while (nf.getDay() === 0 || nf.getDay() === 6) nf.setDate(nf.getDate() + 1);
+                    const calEnd = new Date(nf); calEnd.setDate(calEnd.getDate() - (calEnd.getDay() + 6) % 7);
                     const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
                     const today = srcToday(), weekEnd = gSrc.week ? srcAddDays(gSrc.week, 4) : '';
                     const byDate = {};
                     Object.entries(gSrc.picks).forEach(([wk, items]) => Object.entries(items || {}).forEach(([key, p]) => {
                         if (!p) return;
                         const d = p.date || srcAddDays(wk, Math.max(0, SRC_DAYS.indexOf(p.day)));
-                        (byDate[d] = byDate[d] || []).push({ kind: p.pick === '이 상품' ? '' : 'alt', name: p.name, del: "srcUnpick('" + wk + "','" + key + "')", ref: JSON.stringify(['pick', wk, key]) });
+                        (byDate[d] = byDate[d] || []).push({ kind: p.pick === '이 상품' ? '' : 'alt', name: p.disp || p.name, del: "srcUnpick('" + wk + "','" + key + "')", ref: JSON.stringify(['pick', wk, key]) });
                     }));
                     Object.entries(gSrc.direct).forEach(([no, p]) => {
                         if (!p) return;
-                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'direct', name: p.name, del: "srcUndirect('" + no + "')", ref: JSON.stringify(['direct', no]) });
+                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'direct', name: p.disp || p.name, del: "srcUndirect('" + no + "')", ref: JSON.stringify(['direct', no]) });
                     });
                     (gSrc.sada || []).forEach(p => {   // 사다드림은 상품등록에서 고친다 (지우기 단추 없음)
                         (byDate[p.date] = byDate[p.date] || []).push({ kind: 'sada', name: '사다 · ' + p.name, del: '' });
@@ -4941,7 +5033,7 @@
                     });
                     Object.entries(gSrc.onsite).forEach(([code, p]) => {
                         if (!p) return;
-                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'onsite', name: p.name, del: "srcOnsiteDel('" + code + "')", ref: JSON.stringify(['onsite', code]) });
+                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'onsite', name: p.disp || p.name, del: "srcOnsiteDel('" + code + "')", ref: JSON.stringify(['onsite', code]) });
                     });
                     let html = '<div class="src-cal"><div class="src-cal-head">' +
                         '<button type="button" class="src-btn" onclick="srcCalMove(-1)">◀</button><b>' + y + '년 ' + m + '월</b>' +
@@ -4953,9 +5045,9 @@
                         '<span class="src-calf">' + SRC_CAL_F.map(([k, lab, tip]) => '<button type="button" class="src-btn' + ((gSrc.calF || {})[k] ? ' on' : '') + '" onclick="srcCalFToggle(\'' + k + '\')" title="' + tip + '">' + lab + '</button>').join('') + '</span>' +   // [신규 2026-10-07] 안 된 것만 보기
                         '<details class="src-calhelp"><summary>설명</summary>' +   // [수정 2026-10-07] 설명은 기본으로 접어 둔다 (사장님 요청)
                         '<span class="k">초록 = 추천 상품 · 노랑 = 비슷한 상품(대안) · 보라 = 상시판매 · 파랑 = 직접 쓴 것 · 주황 = 사다드림 · 회색 = 목록에서 직접 판매 표시 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span>' +
-                        '<span class="k">초록 숫자 = 상품 등록됨(남은 재고, ∞ 무제한) · 오른쪽 위 발주등록·상품등록·일정등록 = 켜면 그것이 안 된 것만 보기</span><span class="k">끌기 = 옮기기 · Ctrl+끌기 = 복사 · Ctrl+누르기 = 여러 개 · Delete 지우기 · Ctrl+Z 되돌리기 · 폰은 길게 눌러 끌기</span></details></div><div class="src-cal-grid">' +
+                        '<span class="k">초록 숫자 = 상품 등록됨(남은 재고, ∞ 무제한) · 오른쪽 위 발주등록X·상품등록X·일정등록X = 켜면 그것이 안 된 것만 보기</span><span class="k">끌기 = 옮기기 · Ctrl+끌기 = 복사 · Ctrl+누르기 = 여러 개 · Delete 지우기 · Ctrl+Z 되돌리기 · 폰은 길게 눌러 끌기</span></details></div><div class="src-cal-grid">' +
                         SRC_DAYS.map(d => '<div class="src-cal-dow">' + d + '</div>').join('');
-                    for (let d = new Date(start); d <= last; d.setDate(d.getDate() + 7)) {
+                    for (let d = new Date(start); d <= calEnd; d.setDate(d.getDate() + 7)) {
                         for (let i = 0; i < 5; i++) {
                             const x = new Date(d); x.setDate(x.getDate() + i);
                             const k = iso(x);
@@ -5793,7 +5885,7 @@
                             : '<button type="button" class="src-sold" onclick="srcSold(\'' + r.no + '\')">판매</button>';
                         const cls = (r.sold ? 'sold' : '') + (r._grpSub ? ' grpsub' : '');
                         const ck = '<td class="ck"><input type="checkbox" class="src-ck" onchange="srcBandCk(\'' + r.no + '\', this.checked)"' + ((gSrc.bandSel || {})[r.no] ? ' checked' : '') + '></td>';   // [신규 2026-10-07] 손으로 같은 상품 묶기
-                        return '<tr' + (cls ? ' class="' + cls.trim() + '"' : '') + '>' + ck + '<td>' + srcEsc(String(r.d || '').slice(2, 10)) + '</td><td>' + (r._grpSub ? '└ ' : '') + srcEsc(r.v) + '</td><td>' + srcEsc(r.g) + '</td>' +
+                        return '<tr' + (cls ? ' class="' + cls.trim() + '"' : '') + '>' + ck + '<td class="dt">' + srcEsc(String(r.d || '').slice(2, 10)) + '</td><td>' + (r._grpSub ? '└ ' : '') + srcEsc(r.v) + '</td><td>' + srcEsc(r.g) + '</td>' +
                             '<td class="nm">' + (r.u ? '<a href="' + srcEsc(r.u) + '" target="_blank" rel="noopener">' + srcEsc(r.n) + '</a>' : srcEsc(r.n)) + (r._edited ? '<span class="src-mk skip">고침</span>' : '') + '<button type="button" class="src-ed" title="고치기" onclick="srcEdit(\'band\',\'' + r.no + '\')">✏️</button>' +
                                 (r._grpRows ? '<button type="button" class="src-grp' + ((Q.openGrp || {})[r.grp] ? ' on' : '') + '" onclick="srcGrpToggle(\'' + srcEsc(r.grp) + '\')">' + (r._grpN ? '다른 업체 ' + r._grpN + '곳' : '같은 상품 ' + r._grpRows + '개') + ' ' + ((Q.openGrp || {})[r.grp] ? '▾' : '▸') + '</button>' : '') + '</td><td>' + srcEsc(r.c) + '</td>' +
                             '<td class="r"><b>' + srcEsc(r.s) + '</b></td><td class="r">' + srcEsc(r.sp ? Number(r.sp).toLocaleString() : '') + '</td><td class="r">' + srcEsc(r.rp ? Number(r.rp).toLocaleString() : '') + '</td>' +
@@ -6446,12 +6538,18 @@
         /* [수정 2026-10-05] 일요일 칸은 화면에서만 숨긴다 (날짜·자료는 그대로) — 월~토 6칸을 고르게 넓힌다 (사장님 요청) */
         #ps-cal-box .ms-cal-cell.ms-cal-sun, #ps-cal-box .ms-cal-cell.ps-sun-pad, .ps-cal-scroll .ps-cal-weekhead .ps-sun-head { display: none; }
         /* [수정 2026-10-05] 달력 보기일 때는 노출일정 화면을 PC 창 너비만큼 넓힌다 (목록·판매기록 보기는 그대로 760px) */
-        #tab-admin-product-schedule > .container:has(#ps-view-cal.on) { max-width: none !important; }
+        #tab-admin-product-schedule > .container { max-width: none !important; }   /* [수정 2026-10-08] 판매 일정·상품 목록·판매 기록 모두 넓게 (사장님 요청) */
         #ps-cal-box .ms-cal-cell.ps-gutter { background: transparent; border-color: transparent; cursor: default; padding-left: 0; padding-right: 0; outline: none; }
         .ps-gutter .ps-slot { border-top-color: transparent; }
         .ps-gutter .ps-bar-empty { margin: 0; }
         .ps-gutter-lbl { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font-size: 10.5px; font-weight: 800; color: #94a3b8; pointer-events: none; }
         .ps-cal-rail { display: none; }
+        /* [신규 2026-10-08] 한 달씩 — 달력 속 스크롤 없이 통째로, 위에 ◀ 달 ▶ */
+        .ps-cal-wrap .ps-cal-scroll { max-height: none !important; overflow-y: visible !important; }
+        .ps-monthbar { display: flex; align-items: center; gap: 8px; margin: 2px 0 8px; }
+        .ps-monthbar b { font-size: 15px; font-weight: 900; color: #0f172a; font-variant-numeric: tabular-nums; }
+        .ps-monthbar button { height: 30px; min-width: 34px; border: 1.5px solid #cbd5e1; background: #fff; border-radius: 8px; font-weight: 900; cursor: pointer; color: #334155; }
+        @media (pointer: coarse) { .ps-cal-wrap .ps-cal-scroll { padding-right: 0 !important; } .ps-cal-rail { display: none !important; } }
         @media (pointer: coarse) {
             .ps-cal-wrap .ps-cal-scroll { overflow-y: hidden; padding-right: 30px; }
             .ps-cal-rail { display: block; position: absolute; top: 2px; right: 2px; bottom: 2px; width: 26px; touch-action: none; z-index: 4; }
@@ -15685,6 +15783,7 @@
         }
 
         /* ===== [신규] 🗓️ 노출일정 탭 — 상품등록과 따로, 예약 공개·종료를 달력으로 관리한다 ===== */
+        let psCalPage = '';           // [신규 2026-10-08] 지금 보는 달 'YYYY-MM' (비면 이번 달)
         let psCalMonths = [];         // 지금 이어 붙여 보여주는 달들 'YYYY-MM' — 오래된→최신 차례
         // [신규 2026-10-01] 올라가는 시각은 이 다섯 칸 중에서만 고른다 (11·13·15·17·19시)
         // [수정 2026-10-03] 올라가는 시각 — 6시부터 2시간마다 20시까지 (사장님 요청. 예전 11·13·15·17·19시는 한 시간씩 당겼다). 달력의 시간 줄도 이것을 따른다
@@ -16669,7 +16768,16 @@
             }
         }
         // [신규 2026-10-05] 그 달이 달력에 걸려 있게만 한다 (안 걸려 있으면 이어붙여 다시 그린다) — 옮기지는 않는다
+        // [신규 2026-10-08] ◀ ▶ 달 넘기기
+        function psCalPageMove(n) {
+            psCalPage = psShiftMonthKey(psCalPage || psTodayMonthKey(), n);
+            psCalOpenDay = '';
+            renderProductScheduleCalendar();
+        }
         function psCalEnsureMonth(monthKey) {
+            // [수정 2026-10-08] 한 달씩 보므로 그 달로 넘긴다
+            if (monthKey && monthKey !== (psCalPage || psTodayMonthKey())) { psCalPage = monthKey; renderProductScheduleCalendar(); }
+            return;
             if (!psCalMonths.length) return;
             let grew = false;
             while (monthKey < psCalMonths[0]) { psCalMonths.unshift(psShiftMonthKey(psCalMonths[0], -1)); grew = true; }
@@ -16689,6 +16797,7 @@
             psCalSuppressTimer = setTimeout(() => { psCalSuppressScroll = false; }, ms);
         }
         function psCalExtendTop() {
+            return;   // [수정 2026-10-08] 이어붙이지 않는다 (달 넘기기)
             if (psCalExtending || !psCalMonths.length) return;
             psCalExtending = true;
             psCalSuppressFor(150);
@@ -16700,6 +16809,7 @@
             psCalExtending = false;
         }
         function psCalExtendBottom() {
+            return;   // [수정 2026-10-08] 이어붙이지 않는다 (달 넘기기)
             if (psCalExtending || !psCalMonths.length) return;
             psCalExtending = true;
             psCalMonths.push(psShiftMonthKey(psCalMonths[psCalMonths.length - 1], 1));
@@ -16771,6 +16881,7 @@
 
         // [신규] 특정 달이 보이는 자리로 스크롤 — 아직 안 걸어 둔 달이면 그 방향으로 이어붙인 뒤 옮겨간다
         function psCalScrollToMonth(monthKey, behavior) {
+            psCalPage = monthKey; renderProductScheduleCalendar(); return;   // [수정 2026-10-08] 그 달로 넘긴다
             if (!psCalMonths.length) return;
             while (monthKey < psCalMonths[0]) psCalMonths.unshift(psShiftMonthKey(psCalMonths[0], -1));
             while (monthKey > psCalMonths[psCalMonths.length - 1]) psCalMonths.push(psShiftMonthKey(psCalMonths[psCalMonths.length - 1], 1));
@@ -16785,7 +16896,7 @@
             psCalOpenDay = '';
             psAddSearchOpenFor = '';
             // [수정 2026-10-05] 이번 달 1일이 아니라 오늘이 한가운데 오게 (사장님 요청)
-            psCalEnsureMonth(psTodayMonthKey());
+            psCalPage = psTodayMonthKey();   // [수정 2026-10-08] 이번 달로
             renderProductScheduleCalendar();   // 열어 둔 날짜 표시를 지운 모습으로
             psCalSuppressFor(1200);            // 부드럽게 옮기는 동안 위·아래 끝에 닿았다고 달을 덧붙이지 않게
             psCalCenterOn(fMsToDateKey(Date.now()), 'smooth');
@@ -16818,6 +16929,7 @@
            주마다 막대 줄 수가 달라 높이가 다르므로, 그린 주들 가운데 '이어진 4주'의 높이가 가장 큰 것에 맞춘다
            — 어디로 굴려도 4주는 다 보인다. 예전엔 520px 로 고정이라 시간 줄이 여덟 줄이 된 뒤 2~3주만 보였다. */
         function psCalFitHeight(box) {
+            box.style.maxHeight = 'none'; return;   // [수정 2026-10-08] 한 달을 통째로 보인다 (페이지가 스크롤)
             // 폰은 4주가 다 안 보여도 된다 (사장님 요청) — 예전 높이(520px, CSS) 그대로
             if (!PS_DND) { box.style.maxHeight = ''; return; }
             const weeks = [...box.querySelectorAll('.ps-gutter')].map(g => g.getBoundingClientRect().height);
@@ -16907,8 +17019,14 @@
             const firstMonth = psCalMonths[0], lastMonth = psCalMonths[psCalMonths.length - 1];
             const [fy, fm] = firstMonth.split('-').map(n => parseInt(n));
             const [ly, lm] = lastMonth.split('-').map(n => parseInt(n));
-            const rangeStart = new Date(fy, fm - 1, 1);
-            const rangeEnd = new Date(ly, lm, 0);   // 마지막 달의 마지막 날
+            // [수정 2026-10-08] 한 달씩 (사장님 요청) — 그 달이 든 주들 + 전달 마지막 주 + 다음 달 첫 주 (주는 일~토, 일요일 칸은 숨김)
+            const page = psCalPage || psTodayMonthKey();
+            const [py, pm] = page.split('-').map(n => parseInt(n));
+            const d1 = new Date(py, pm - 1, 1);
+            const rangeStart = new Date(py, pm - 1, 1 - d1.getDay() - (d1.getDay() <= 1 ? 7 : 0));   // 1일이 일·월요일이면 전달 칸이 없으니 한 주 앞부터
+            const nf = new Date(py, pm, 1); if (nf.getDay() === 0) nf.setDate(2);                    // 다음 달 첫 평일·토요일이 든 주까지
+            const rangeEnd = new Date(nf.getFullYear(), nf.getMonth(), nf.getDate() + (6 - nf.getDay()));
+            { const lb = document.getElementById('ps-month-label'); if (lb) lb.textContent = `${py}년 ${pm}월`; }
             const totalDays = Math.round((rangeEnd - rangeStart) / 86400000) + 1;
             const lead = rangeStart.getDay();
             const p2 = (x) => String(x).padStart(2, '0');
@@ -16927,7 +17045,7 @@
                 const row = weekLanes[w] || (weekLanes[w] = {});
                 rangeBars.forEach(b => { if (b.start <= key && key <= b.end) row[b.slot] = Math.max(row[b.slot] || 0, b.lane + 1); });
             });
-            const activeMonth = psCalOpenDay ? psCalOpenDay.slice(0, 7) : psTodayMonthKey();
+            const activeMonth = page;   // [수정 2026-10-08] 보는 달이 아닌 날은 흐리게
 
             // 맨 왼쪽 시간 기둥 — 날짜칸과 똑같은 모양으로 그려서 줄 높이가 꼭 맞는다
             const gutterHtml = (w) => {
@@ -21496,12 +21614,15 @@
             }));
             list.sort((a, b) => (b.at || 0) - (a.at || 0));
             _rva.reviews = list; _rva.keys = keys; _rva.points = pts; _rva.logs = logs;
+            try { const dl = await get('review_deleted'); const dlist = []; Object.keys(dl).forEach(code => Object.keys(dl[code] || {}).forEach(rid => { const v = dl[code][rid]; if (v && typeof v === 'object') dlist.push(Object.assign({ _code: code, _rid: rid }, v)); })); dlist.sort((a, b) => (b.delAt || 0) - (a.delAt || 0)); _rva.deleted = dlist; }
+            catch (e) { _rva.deleted = null; }   // [신규 2026-10-08] 규칙 게시 전이면 못 읽는다
         }
         async function rvaPaintCount() { try { await rvaFetch(); rvaSetCount(); } catch (e) { } }
         function rvaShow(t) {
             _rva.tab = t;
             document.getElementById('rva-tab-rv').classList.toggle('active', t === 'rv');
             document.getElementById('rva-tab-pt').classList.toggle('active', t === 'pt');
+            { const d = document.getElementById('rva-tab-del'); if (d) d.classList.toggle('active', t === 'del'); }
             renderReviewsAdmin(false);
         }
         async function renderReviewsAdmin(reload) {
@@ -21515,6 +21636,19 @@
             const E = gEscapeHtml;
             const when = t => { const d = new Date(t || 0); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
             const phone = p => String(p || '').replace(/^(\d{3})(\d{4})(\d{4})$/, '$1-$2-$3');
+            if (_rva.tab === 'del') {   // [신규 2026-10-08] 지운 후기 모음 — 지운 날·이유·손님에게 보였는지
+                const D = _rva.deleted;
+                if (D === null) { box.innerHTML = `<div class="card" style="padding:24px; text-align:center; color:#dc2626; font-weight:700;">삭제함을 못 읽었어요 · 규칙관리를 게시해야 열려요</div>`; return; }
+                if (!D || !D.length) { box.innerHTML = `<div class="card" style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">지운 후기가 없습니다.</div>`; return; }
+                const nm = ptaNameMap();
+                box.innerHTML = D.map(x => `<div class="card" style="background:#fff; border-radius:14px; padding:13px 15px; margin-bottom:10px; border:1px solid var(--border);">
+                        <div style="font-size:14px; font-weight:900; color:#0f172a; word-break:keep-all;"><span style="color:#f59e0b;">★ ${E(x.stars)}</span> ${E(x.item || x._code)}</div>
+                        <div style="margin-top:3px; font-size:11.5px; font-weight:700; color:#94a3b8;">${x.ph ? E(nm[x.ph] || '') + ' · ' + E(phone(x.ph)) + ' · ' : ''}쓴 날 ${when(x.at)} · 지운 날 ${when(x.delAt)} · ${E(x._code)}${x.pts ? ' · ' + x.pts + 'P 뺌' : ''}</div>
+                        ${x.text ? `<div style="margin-top:7px; font-size:13.5px; font-weight:600; color:#334155; line-height:1.55; white-space:pre-wrap; word-break:keep-all;">${E(x.text)}</div>` : ''}
+                        <div style="margin-top:8px; background:#fef2f2; border-radius:8px; padding:7px 10px; font-size:12.5px; color:#7f1d1d; font-weight:700;">삭제 이유: ${x.delReason ? E(x.delReason) : '(안 적음)'} · <b style="color:${x.delShow ? '#16a34a' : '#64748b'};">${x.delShow ? '손님에게 보임' : '손님에게 안 보임'}</b></div>
+                    </div>`).join('');
+                return;
+            }
             if (_rva.tab === 'rv') {
                 const seen = rvaSeenAt();
                 rvaSetCount();
@@ -21632,14 +21766,46 @@
             Object.values((_rva.logs || {})[ph] || {}).forEach(l => { s += Number(l && l.amt) || 0; });
             return s + (Number(extra) || 0);
         }
+        // [신규 2026-10-08] 후기 지우기 창 — 이유 · 쓴 손님에게 이유 보이기. 지우면 { reason, show }, 취소면 null
+        function rvaDeleteAsk(x) {
+            return new Promise(res => {
+                const E = gEscapeHtml;
+                const m = document.createElement('div');
+                m.style.cssText = 'position:fixed; inset:0; z-index:2147483400; background:rgba(15,23,42,.4); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;';
+                m.innerHTML = `<div style="background:#fff; border-radius:14px; padding:16px; width:100%; max-width:400px; display:flex; flex-direction:column; gap:10px; font-family:inherit;">
+                    <div style="font-size:15px; font-weight:900;">후기 지우기<div style="font-size:12px; color:#64748b; font-weight:700; margin-top:3px;">${E(x.item || x._code)} · ★ ${E(x.stars)}${x.pts ? ` · 준 포인트 ${x.pts}P도 뺍니다` : ''}</div></div>
+                    ${x.text ? `<div style="font-size:12.5px; color:#475569; background:#f8fafc; border-radius:8px; padding:8px 10px; max-height:90px; overflow:auto; white-space:pre-wrap;">${E(x.text)}</div>` : ''}
+                    <textarea id="rva-del-reason" rows="3" placeholder="삭제 이유 (예: 다른 상품 후기, 욕설)" style="border:1.5px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:13.5px; font-family:inherit; resize:vertical;"></textarea>
+                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:#334155; cursor:pointer;"><input type="checkbox" id="rva-del-show" style="width:18px; height:18px; position:static; opacity:1; appearance:auto; -webkit-appearance:checkbox;"> 쓴 손님에게 삭제 이유 보이기</label>
+                    <div style="font-size:11.5px; color:#94a3b8; font-weight:700;">보이기를 켜면 손님 포인트 내역에 '후기 삭제 · 이유'가 나와요. 지운 후기는 삭제함에 남아요.</div>
+                    <div style="display:flex; gap:8px;"><button type="button" data-a="ok" style="flex:1; height:40px; border:none; border-radius:9px; background:#dc2626; color:#fff; font-weight:900; font-size:14px; cursor:pointer;">삭제</button><button type="button" data-a="no" style="flex:1; height:40px; border:1.5px solid #cbd5e1; border-radius:9px; background:#fff; color:#334155; font-weight:900; font-size:14px; cursor:pointer;">취소</button></div>
+                </div>`;
+                document.body.appendChild(m);
+                const done = v => { m.remove(); res(v); };
+                m.onclick = e => {
+                    if (e.target === m) return done(null);
+                    const a = e.target.dataset && e.target.dataset.a; if (!a) return;
+                    if (a === 'no') return done(null);
+                    const reason = String(m.querySelector('#rva-del-reason').value || '').trim().slice(0, 100), show = m.querySelector('#rva-del-show').checked;
+                    if (show && !reason) { showToast('손님에게 보이려면 이유를 적어 주세요'); return; }
+                    done({ reason, show });
+                };
+                setTimeout(() => m.querySelector('#rva-del-reason').focus(), 50);
+            });
+        }
         async function rvaDelete(code, rid) {
             const x = _rva.reviews.find(v => v._code === code && v._rid === rid);
             if (!x) return;
             const ph = x._ph;
-            if (!await psConfirm(`이 후기를 지울까요?\n\n${x.item || code}\n${x.text ? x.text.slice(0, 60) : '(별점만)'}\n\n${x.pts ? `준 포인트 ${x.pts}P도 함께 뺍니다.` : ''}`)) return;
+            /* [수정 2026-10-08] 지울 때 이유를 적고 '쓴 손님에게 이유 보이기'를 고른다 (사장님 요청).
+               지운 후기는 review_deleted/<번호>/<후기id> 에 그대로 남는다(삭제함). 보이기를 고르면 손님 포인트 내역에 '후기 삭제 · 이유'가 나온다 */
+            const ask = await rvaDeleteAsk(x); if (!ask) return;
             try {
                 await rvaFetch();   // 지우기 직전 최신으로
-                const up = { [`product_reviews/${code}/${rid}`]: null };
+                const memo = ask.show && ask.reason ? ('후기 삭제 · ' + ask.reason).slice(0, 120) : '후기 삭제';
+                const keep = {}; ['stars', 'text', 'name', 'item', 'at', 'ref', 'pts', 'reply', 'hidden'].forEach(k => { if (x[k] !== undefined) keep[k] = x[k]; });
+                const up = { [`product_reviews/${code}/${rid}`]: null,
+                    [`review_deleted/${code}/${rid}`]: Object.assign(keep, { ph: ph || null, delReason: ask.reason || null, delShow: !!ask.show, delAt: Date.now() }) };
                 const st = await (await fetch(`${FIREBASE_DB_URL}review_stats/${encodeURIComponent(code)}.json?t=${Date.now()}`)).json();
                 if (st && Number(st.n) > 1) up[`review_stats/${code}`] = { n: Number(st.n) - 1, sum: Math.max(0, (Number(st.sum) || 0) - (x.stars || 0)), last: String(st.last || '') };
                 else up[`review_stats/${code}`] = null;
@@ -21648,10 +21814,12 @@
                     const cut = Math.min(x.pts, Math.max(0, bal));
                     if (cut > 0) {
                         const lid = `d_${rid}`, now = Date.now();
-                        up[`point_logs/${ph}/${lid}`] = { amt: -cut, why: 'delete', at: now, code, rid, memo: '후기 삭제' };
+                        up[`point_logs/${ph}/${lid}`] = { amt: -cut, why: 'delete', at: now, code, rid, memo };
                         up[`points/${ph}`] = { bal: bal - cut, last: lid, at: now };
                     }
                 }
+                // 뺄 포인트가 없어도 이유를 보이기로 했으면 0P 기록으로 알린다
+                if (ph && ask.show && ask.reason && !up[`point_logs/${ph}/d_${rid}`]) up[`point_logs/${ph}/d_${rid}`] = { amt: 0, why: 'delete', at: Date.now(), code, rid, memo };
                 await rvaPatch(up);
                 showToast('후기를 지웠습니다.' + (x.pts && ph ? ' 포인트도 뺐습니다.' : ''));
                 await renderReviewsAdmin(true);
