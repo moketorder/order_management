@@ -3101,7 +3101,7 @@
                                 <!-- [수정] 과세·면세 단추를 가격 왼쪽으로: [과세][가격][재고][상세옵션] -->
                                 <div style="display:grid; grid-template-columns:minmax(0,0.6fr) minmax(0,1.2fr) minmax(0,0.8fr) minmax(0,1fr); gap:6px; align-items:stretch;">
                                     <button type="button" id="btn-tax-type" onclick="toggleFormTaxFree()" title="눌러서 과세·면세 바꾸기" style="width:100%; min-width:0; height:45px; box-sizing:border-box; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; background:#f1f5f9; color:#64748b; border:1.5px solid #e2e8f0;">과세</button>
-                                    <input type="number" id="productPrice" class="form-control" placeholder="가격" min="0" required style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <input type="number" id="productPrice" class="form-control" placeholder="가격" min="0" required onfocus="gPriceCostShow(this)" onblur="gPriceCostHide()" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <input type="number" id="productStock" class="form-control" placeholder="재고" title="999를 넣으면 무제한" min="0" required onchange="gStock999ToUnlimited(this)" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <button type="button" id="btn-detail-option" class="price-option-btn" onclick="openDetailOptionSetting()" style="width:100%; min-width:0; height:45px; box-sizing:border-box; padding:0 8px; overflow:hidden; text-overflow:ellipsis;">상세옵션</button>
                                 </div>
@@ -20123,6 +20123,62 @@
             }
         }
 
+        /* [신규 2026-10-09] 가격 칸을 누르면 그 밑에 매입가와 20%·30% 마진 가격 (사장님 요청 — 가격 칸 누를 때만).
+           매입가 = 이 상품 식별번호의 가장 최근 발주 낱개 단가(unitPrice). 번호가 없으면 품목명이 같은 발주.
+           마진은 판매가 기준(발주 등록 화면과 같은 셈 — 매입가 ÷ 0.8, ÷ 0.7)이고 100원 올림. 누르면 가격 칸에 들어간다 */
+        let gPriceCostTimer = null;
+        function gFormProductCode() {
+            const v = String((document.getElementById('productCodeView') || {}).value || '').trim();
+            if (/^[PFS]\d+$/.test(v)) return v;
+            if (typeof pendingProductCodeFromPurchase !== 'undefined' && pendingProductCodeFromPurchase) return String(pendingProductCodeFromPurchase).trim();
+            const p = (uploadIsEditMode && uploadEditProductKey !== null) ? uploadProducts[uploadEditProductKey] : null;
+            return p && p.productCode ? String(p.productCode).trim() : '';
+        }
+        function gFormLatestPo(code, name) {
+            const nk = x => String(x || '').replace(/\[[^\]]*\]/g, '').replace(/\s/g, '').toLowerCase();
+            const all = [].concat(purchaseOrders || [], purchaseArchive || []).filter(po => po && (parseInt(po.unitPrice) || 0) > 0);
+            const hit = code ? all.filter(po => String(po.productCode || '').trim() === code) : (nk(name) ? all.filter(po => nk(po.itemName) === nk(name)) : []);
+            return hit.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0] || null;
+        }
+        async function gPriceCostShow(input) {
+            if (!input || input.readOnly) return;
+            clearTimeout(gPriceCostTimer);
+            let pop = document.getElementById('price-cost-pop');
+            if (!pop) {
+                pop = document.createElement('div'); pop.id = 'price-cost-pop';
+                pop.addEventListener('mousedown', e => e.preventDefault());   // 눌러도 가격 칸에서 손이 떨어지지 않게
+                pop.addEventListener('click', e => {
+                    const b = e.target.closest('[data-price]'); if (!b) return;
+                    const el = document.getElementById('productPrice'); if (!el) return;
+                    el.value = b.dataset.price;
+                    el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+                    gPriceCostHide(true);
+                });
+                document.body.appendChild(pop);
+            }
+            const r = input.getBoundingClientRect();
+            pop.style.cssText = 'position:fixed; z-index:10050; left:' + Math.max(8, Math.min(window.innerWidth - 328, r.left - 60)) + 'px; top:' + (r.bottom + 4) + 'px; width:320px; max-width:calc(100vw - 16px); box-sizing:border-box;'
+                + ' background:#fff; border:1.5px solid #cbd5e1; border-radius:10px; box-shadow:0 8px 24px rgba(15,23,42,.18); padding:8px 10px; font-size:12px; font-weight:800; color:#334155;';
+            const code = gFormProductCode(), name = (document.getElementById('productName') || {}).value || '';
+            pop.innerHTML = '<span style="color:#94a3b8;">매입가 찾는 중…</span>';
+            let po = gFormLatestPo(code, name);
+            try {
+                if (!po && typeof purchaseOrders !== 'undefined' && !purchaseOrders.length && typeof loadPurchaseOrders === 'function') { await loadPurchaseOrders(); po = gFormLatestPo(code, name); }
+                if (!po && typeof loadPurchaseArchiveIfNeeded === 'function') { await loadPurchaseArchiveIfNeeded(); po = gFormLatestPo(code, name); }
+            } catch (e) { }
+            if (document.activeElement !== input || !document.getElementById('price-cost-pop')) return;
+            if (!po) { pop.innerHTML = '<span style="color:#94a3b8;">' + (code ? '식별번호 ' + gEscapeHtml(code) + ' 발주 기록이 없어요' : '발주 기록을 못 찾았어요 (식별번호 없음)') + '</span>'; return; }
+            const u = parseInt(po.unitPrice) || 0, up = x => Math.ceil(x / 100) * 100;
+            const btn = (lab, v) => '<button type="button" data-price="' + v + '" style="flex:1; height:32px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#3730a3; border-radius:8px; font-size:12px; font-weight:900; cursor:pointer;">' + lab + ' ' + v.toLocaleString() + '원</button>';
+            pop.innerHTML = '<div style="display:flex; align-items:baseline; gap:6px; margin-bottom:6px;">🧾 매입 ' + u.toLocaleString() + '원'
+                + '<small style="font-weight:700; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + gEscapeHtml(String(po.date || '').slice(5, 10).replace('-', '/') + ' · ' + (po.supplier || '') + (po.productCode ? ' · ' + po.productCode : '')) + '</small></div>'
+                + '<div style="display:flex; gap:6px;">' + btn('20%', up(u / 0.8)) + btn('30%', up(u / 0.7)) + '</div>';
+        }
+        function gPriceCostHide(now) {
+            clearTimeout(gPriceCostTimer);
+            const go = () => { const p = document.getElementById('price-cost-pop'); if (p) p.remove(); };
+            if (now) go(); else gPriceCostTimer = setTimeout(go, 150);
+        }
         // 가격칸을 잠금 해제된 빈 숫자칸으로 되돌린다 (이전 상품에서 잠겨 있던 흔적 제거)
         function resetPriceField() {
             const input = document.getElementById('productPrice');
