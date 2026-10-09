@@ -4379,7 +4379,7 @@
                         (o.ref ? '<button type="button" class="ord" data-act="polink">' + (srcPoLinkNow(o.ref) ? '🧾 발주 수정' : '🧾 발주 연결') + '</button>' : '') +   // [신규 2026-10-08] 이미 한 발주에 잇기 (사장님 요청)   // [수정 2026-10-09] 이어져 있으면 날짜 없이 '발주 수정' (사장님 요청)
                         '<button type="button" class="ord" data-act="purchase">🚚 발주 등록</button>' +
                         // [수정 2026-10-09] 상품이 이어져 있으면 '📎 연결 상품'(연결 바꾸기·끊기 창) · '🛒 상품 수정'(상품 수정 화면) (사장님 요청)
-                        (srcRegIdxOfTg(tg, o) >= 0 ? '<button type="button" class="reg" data-act="link">📎 연결 상품</button><button type="button" class="reg" data-act="product">🛒 상품 수정</button>'
+                        (srcRegIdxOfTg(tg, o) >= 0 ? '<button type="button" class="reg" data-act="link">📎 연결 상품' + (o.manual ? (n => n > 1 ? ' ' + n : '')(srcRegList(o.ref).length) : '') + '</button><button type="button" class="reg" data-act="product">🛒 상품 수정</button>'
                             : '<button type="button" class="reg" data-act="link">📎 상품 연결</button><button type="button" class="reg" data-act="product">🛒 상품 등록</button>') +
                         (o.ref ? '<button type="button" class="sch" data-act="sched">📅 일정 추가</button>' : '') +
                         // 판매일은 달력에 끌어다 놓기와 달력 이름표 × 로만 정한다 (창에는 안 둔다 — 사장님 요청)
@@ -4798,8 +4798,77 @@
                     ks.slice(0, -1).forEach(k => { o = (o[k] = o[k] || {}); });
                     if (v) o[ks[ks.length - 1]] = v; else delete o[ks[ks.length - 1]];
                 }
+                /* [신규 2026-10-09] 손으로 쓴 이름표(✍)는 상품을 여러 개 이을 수 있다 (사장님 요청 — '두부, 콩나물'처럼 적고 일정을 한 번에).
+                   sourcing/reg/<열쇠> = { many:[{sid,code,name}…], 그리고 예전 꼴과 맞게 첫 상품의 sid·code·name } — 하나만 보는 곳(색·거르기·상품 수정)은 첫 상품을 쓴다.
+                   srcRegList: 이 이름표에 이어진 상품 칸(uploadProducts 번호)들 — 여러 개가 아니면 srcRegIdx 하나 */
+                function srcRegList(rs, ix) {
+                    ix = ix || srcProdIndex();
+                    const r = typeof rs === 'string' ? JSON.parse(rs) : rs, p = srcRefGet(r);
+                    if (!p || !ix.list.length) return [];
+                    const link = (gSrc.reg || {})[srcNameKey(srcVendorOf(r, p), p.name)];
+                    if (link && Array.isArray(link.many) && link.many.length) {
+                        const out = [];
+                        link.many.forEach(m => { const i = (m && m.sid && m.sid in ix.bySid) ? ix.bySid[m.sid] : (m && m.code && m.code in ix.byCode) ? ix.byCode[m.code] : -1; if (i >= 0 && !out.includes(i)) out.push(i); });
+                        return out;
+                    }
+                    const i = srcRegIdx(r, ix); return (i != null && i >= 0) ? [i] : [];
+                }
+                function srcLinkManyDialog(tg, after, rs) {
+                    srcMenuClose();
+                    const old = document.getElementById('src-day'); if (old) old.remove();
+                    const key = srcNameKey(tg.vendor || '', tg.name);
+                    const list = (typeof uploadProducts !== 'undefined' && uploadProducts) || [];
+                    let sel = srcRegList(rs).map(i => list[i]).filter(Boolean).map(p => ({ sid: p.sid || null, code: p.productCode || null, name: p.name }));
+                    const q0 = String(tg.name || '').split(/[,·\/&+]/)[0].replace(/\[[^\]]*\]/g, '').trim().split(/\s+/).slice(0, 2).join(' ');
+                    const box = document.createElement('div'); box.id = 'src-day';
+                    box.innerHTML = '<div class="in"><div class="t">🔗 상품 연결<small>' + srcEsc(tg.name) + ' · 여러 개 고를 수 있어요 — 일정 추가 때 한 묶음으로 걸려요</small></div>' +
+                        '<div class="sec" id="src-linkm-cur"></div>' +
+                        '<input type="search" id="src-link-q" placeholder="등록된 상품 이름으로 찾기" value="' + srcEsc(q0) + '">' +
+                        '<div class="res" id="src-link-res"></div>' +
+                        '<div class="row"><button type="button" data-act="close">닫기</button></div></div>';
+                    document.body.appendChild(box);
+                    const has = p => sel.some(m => (m.sid && m.sid === p.sid) || (!m.sid && m.code && m.code === p.productCode));
+                    const paintCur = () => {
+                        document.getElementById('src-linkm-cur').innerHTML = sel.length ? sel.map((m, i) => '<div class="sl"><b class="src-rg o">O</b><span class="n">' + srcEsc(m.name) + '</span><button type="button" data-del="' + i + '" style="border-color:#fca5a5;color:#dc2626;">빼기</button></div>').join('')
+                            : '<span class="k">아직 이은 상품이 없어요 — 아래에서 찾아 누르면 더해져요</span>';
+                    };
+                    const res = () => {
+                        const q = document.getElementById('src-link-q').value.trim().replace(/\s/g, '').toLowerCase();
+                        const el = document.getElementById('src-link-res');
+                        if (!q) { el.innerHTML = '<span class="k">이름을 치면 나와요</span>'; return; }
+                        const hits = [];
+                        list.forEach((p, i) => { if (p && String(p.name || '').replace(/\s/g, '').toLowerCase().includes(q)) hits.push(i); });
+                        el.innerHTML = hits.length ? hits.slice(0, 40).map(i => { const p = list[i]; return '<button type="button" data-pick="' + i + '"' + (has(p) ? ' style="opacity:.45"' : '') + '>' + srcEsc(p.name) + '<small>' + srcEsc(p.productCode || '') + (p.hide === true ? ' · 숨김' : '') + (has(p) ? ' · 이어짐' : '') + '</small></button>'; }).join('')
+                            : '<span class="k">찾는 상품이 없어요</span>';
+                    };
+                    const save = async () => {
+                        const v = sel.length ? { many: sel, sid: sel[0].sid, code: sel[0].code, name: sel[0].name, src: tg.name, vendor: tg.vendor || '', manual: true, at: new Date().toISOString() } : null;
+                        await srcPut('reg/' + key, v);
+                        gSrc.reg = gSrc.reg || {}; if (v) gSrc.reg[key] = v; else delete gSrc.reg[key];
+                        _srcRegIx = null;
+                    };
+                    const done = () => { box.remove(); srcRender(); if (after) after(); };
+                    document.getElementById('src-link-q').oninput = res;
+                    paintCur(); res();
+                    box.onclick = async e => {
+                        if (e.target === box) return done();
+                        const b = e.target.closest('button'); if (!b) return;
+                        if (b.dataset.act === 'close') return done();
+                        const prev = sel.slice();
+                        if (b.dataset.del != null) sel.splice(+b.dataset.del, 1);
+                        else if (b.dataset.pick != null) {
+                            const p = list[+b.dataset.pick]; if (!p) return;
+                            if (has(p)) { showToast('이미 이어져 있어요'); return; }
+                            sel.push({ sid: p.sid || null, code: p.productCode || null, name: p.name });
+                        } else return;
+                        try { await save(); } catch (err) { sel = prev; showToast('저장 못 했어요: ' + err.message); return; }
+                        showToast(b.dataset.del != null ? '뺐어요' : '🔗 더했어요 — 지금 ' + sel.length + '개');
+                        paintCur(); res();
+                    };
+                    document.getElementById('src-link-q').focus();
+                }
                 function srcLinkDialog(tg, after, rs) {
-
+                    if (rs && JSON.parse(rs)[0] === 'manual') return srcLinkManyDialog(tg, after, rs);   // [신규 2026-10-09] 손으로 쓴 이름표는 여러 개
                     srcMenuClose();
                     const old = document.getElementById('src-day'); if (old) old.remove();
                     const key = srcNameKey(tg.vendor || '', tg.name), cur = (gSrc.reg || {})[key];
@@ -4989,7 +5058,13 @@
                     srcMenuClose();
                     const old = document.getElementById('src-day'); if (old) old.remove();
                     const ix = srcProdIndex();
-                    const rows = refs.map(rs => { const r = JSON.parse(rs), p = srcRefGet(r); return p ? { rs, r, p, idx: srcRegIdx(r, ix), date: srcRefDate(r, p) } : null; }).filter(Boolean);
+                    // [수정 2026-10-09] 손으로 쓴 이름표에 상품을 여러 개 이었으면 상품마다 한 줄 — 한 묶음으로 같이 건다 (사장님 요청)
+                    const rows = refs.flatMap(rs => {
+                        const r = JSON.parse(rs), p = srcRefGet(r); if (!p) return [];
+                        const date = srcRefDate(r, p);
+                        if (r[0] === 'manual' && ix.list.length) { const L = srcRegList(r, ix); if (L.length > 1) return L.map(i => ({ rs, r, p, idx: i, date, pname: ix.list[i].name })); }
+                        return [{ rs, r, p, idx: srcRegIdx(r, ix), date }];
+                    });
                     if (!rows.length) return;
                     const miss = rows.filter(x => x.idx === null || x.idx < 0);
                     const day0 = rows.map(x => x.date).filter(Boolean).sort()[0] || srcToday();
@@ -5006,13 +5081,13 @@
                     const fld = (t, inner) => '<div style="display:flex;flex-direction:column;gap:3px;"><span style="font-size:12px;font-weight:800;color:#475569;">' + t + '</span><div class="line" style="align-items:center;">' + inner + '</div></div>';
                     const box = document.createElement('div'); box.id = 'src-day';
                     box.innerHTML = '<div class="in"><div class="t">노출일정에 일정 추가<small>' + (many ? rows.length + '개를 한 묶음으로 걸어요' : '이 상품에 일정을 걸어요') + '</small></div>' +
-                        (many ? '<label style="display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:800;color:#475569;">일정 이름<input type="text" id="src-sch-name" placeholder="예: 추석 선물세트"></label>' : '') +
+                        (many ? '<label style="display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:800;color:#475569;">일정 이름<input type="text" id="src-sch-name" placeholder="예: 추석 선물세트" value="' + srcEsc(refs.length === 1 ? rows[0].p.name : '') + '"></label>' : '') +
                         fld('노출일', '<input type="date" id="src-sch-date" value="' + relVal.slice(0, 10) + '"><select id="src-sch-hour">' + psTimeOptsHtml(relVal) + '</select>') +
                         fld('마감', '<input type="date" id="src-sch-exp" value="' + expVal.slice(0, 10) + '"><select id="src-sch-exph">' + psExpOptsHtml(expVal) + '</select>') +
                         fld('픽업/배달일', '<input type="date" id="src-sch-pick" value="' + pick0 + '"' + (linked0 ? ' disabled style="background:#f1f5f9;color:#64748b;"' : '') + '>' +
                             '<label title="켜 두면 마감 날짜를 바꿀 때 픽업/배달일도 같이 바뀌어요" style="flex:0 0 auto;display:flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;color:#475569;white-space:nowrap;cursor:pointer;">' +
                             '<input type="checkbox" id="src-sch-link"' + (linked0 ? ' checked' : '') + ' style="width:16px !important;height:16px !important;position:static !important;opacity:1 !important;margin:0 !important;"> 마감일과 같게</label>') +
-                        '<div class="sec">' + rows.map((x, i) => '<div class="sl">' + (x.idx === null ? '' : x.idx >= 0 ? '<b class="src-rg o">O</b>' : '<b class="src-rg x">X</b>') + '<span class="n">' + srcEsc(x.p.name) + '</span>' +
+                        '<div class="sec">' + rows.map((x, i) => '<div class="sl">' + (x.idx === null ? '' : x.idx >= 0 ? '<b class="src-rg o">O</b>' : '<b class="src-rg x">X</b>') + '<span class="n">' + srcEsc(x.pname || x.p.name) + '</span>' +
                             (x.idx === null || x.idx < 0 ? '<button type="button" data-link="' + i + '">연결</button><button type="button" data-reg="' + i + '">상품 등록</button>' : '') + '</div>').join('') + '</div>' +
                         (miss.length ? '<div style="font-size:12px;font-weight:800;color:#dc2626;">' + (miss.some(x => x.idx === null) ? '상품 목록을 아직 못 받았어요 — 잠시 뒤 다시 열어 주세요' : '상품 등록이 안 된 것이 ' + miss.length + '개 있어요 — 모두 등록해야 일정을 걸 수 있어요') + '</div>' : '') +
                         '<div class="row"><button type="button" data-act="close">닫기</button><button type="button" class="ok" data-act="go"' + (miss.length ? ' disabled style="opacity:.4;cursor:default"' : '') + '>일정 추가</button></div></div>';
@@ -5027,7 +5102,7 @@
                         if (b.dataset.act === 'close') return box.remove();
                         if (b.dataset.link != null) {
                             const x = rows[+b.dataset.link]; box.remove();
-                            return srcLinkDialog({ name: x.p.name, vendor: srcVendorOf(x.r, x.p) }, () => srcSchedDialog(refs));
+                            return srcLinkDialog({ name: x.p.name, vendor: srcVendorOf(x.r, x.p) }, () => srcSchedDialog(refs), x.rs);
                         }
                         if (b.dataset.reg != null) {
                             const x = rows[+b.dataset.reg]; box.remove();
@@ -5889,10 +5964,10 @@
                 }
                 function srcBandPickHtml() {
                     const Q = gSrc.pickQ, q = Q.q.trim().replace(/\s/g, '').toLowerCase();
-                    if (!q) return '<span class="k">상품 이름을 치면 여기에 나와요 (점수 높은 순 40개)</span>';
+                    if (!q && !Q.vendor) return '<span class="k">상품 이름을 치면 여기에 나와요 (점수 높은 순 40개)</span>';
                     if (!gSrc.band) return '<span class="k">밴드 상품을 불러오는 중…</span>';
                     const from = Q.days ? srcDaysAgo(Q.days) : '';
-                    const list = srcBandRows().filter(r => String(r.n).replace(/\s/g, '').toLowerCase().includes(q) && srcInPeriod(r.d, from, ''))
+                    const list = srcBandRows().filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().includes(q)) && (!Q.vendor || String(r.v || '').trim() === Q.vendor) && srcInPeriod(r.d, from, ''))
                         .sort((a, b) => (+b.s || 0) - (+a.s || 0)).slice(0, 40);
                     if (!list.length) return '<span class="k">찾는 상품이 없어요</span>';
                     const sold = srcSoldMap();
@@ -5951,7 +6026,7 @@
                    결과는 곳마다 따로 묶어 보여 주고, 그리는 일은 예전 칸들의 함수(srcOnsiteChipsHtml·srcBandPickHtml·srcHistHtml)를 그대로 쓴다.
                    상시·밴드 이름표는 예전처럼 달력 날짜에 끌어다 놓으면 저장된다 (data-code·data-no). */
                 function srcUniState() {
-                    gSrc.uniQ = gSrc.uniQ || { q: '', on: { onsite: false, band: false, hist: false } };   // [수정 2026-10-07] 처음엔 다 꺼 둔다 (사장님 요청)
+                    gSrc.uniQ = gSrc.uniQ || { q: '', on: { onsite: true, band: true, hist: true } };   // [수정 2026-10-09] 처음엔 셋 다 켜 둔다 (사장님 요청 — 10/7 엔 다 꺼 뒀었다)
                     return gSrc.uniQ;
                 }
                 function srcSearchPanel() {
@@ -5960,15 +6035,30 @@
                     return '<div class="src-onsite src-uni">' +
                         '<div class="bar">' + tg('band', '📦 밴드') + tg('hist', '🗓 공구') + tg('onsite', '🏪 상시') +   // [수정 2026-10-07] 차례: 밴드 · 공구 · 상시 (사장님 요청)
                         '<input type="search" id="src-uni-q" placeholder="상품 이름으로 찾기" value="' + srcEsc(U.q) + '" oninput="srcUniInput(this.value)">' +
+                        (on.band ? srcVendorSelHtml() : '') +   // [신규 2026-10-09] 업체 거르기 (사장님 요청)
                         (on.band ? '<select onchange="gSrc.pickQ.days=+this.value; srcUniChips()" title="밴드 상품 기간">' + [[7, '최근 1주'], [14, '최근 2주'], [28, '최근 4주'], [56, '최근 8주'], [0, '기간 전체']].map(([d, l]) => '<option value="' + d + '"' + (Q.days === d ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>' : '') +
                         '</div><div id="src-uni-res">' + srcUniHtml() + '</div>' +
                         '<div class="k">밴드·공구·상시 이름표는 달력 날짜에 끌어다 놓으면 저장돼요 · 밴드 이름표는 누르면 창</div></div>';
                 }
+                /* [신규 2026-10-09] 검색창 옆 업체 거르기 (사장님 요청) — 밴드 상품의 업체 목록(상품 많은 순).
+                   업체만 골라도 그 업체 상품이 나온다 (이름을 같이 치면 그 안에서 찾는다). 밴드 상품을 아직 안 받았으면 받아 와서 다시 그린다 */
+                function srcVendorSelHtml() {
+                    const Q = gSrc.pickQ, cnt = {};
+                    if (!gSrc.band) {
+                        if (!gSrc._bandLoading) { gSrc._bandLoading = true; srcGet('band').then(b => { gSrc.band = b || {}; srcRender(); }).catch(() => { }).finally(() => { gSrc._bandLoading = false; }); }
+                    } else srcBandRows().forEach(r => { const v = String(r.v || '').trim(); if (v) cnt[v] = (cnt[v] || 0) + 1; });
+                    const vs = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a] || a.localeCompare(b, 'ko'));
+                    if (Q.vendor && !(Q.vendor in cnt)) vs.unshift(Q.vendor);
+                    return '<select onchange="gSrc.pickQ.vendor=this.value; srcUniChips()" title="밴드 상품 업체">' +
+                        '<option value="">업체 전체</option>' + vs.map(v => '<option value="' + srcEsc(v) + '"' + (Q.vendor === v ? ' selected' : '') + '>' + srcEsc(v) + (cnt[v] ? ' (' + cnt[v] + ')' : '') + '</option>').join('') + '</select>';
+                }
                 function srcUniHtml() {
                     const U = srcUniState(), on = U.on;
                     if (!on.onsite && !on.band && !on.hist) return '<span class="k">왼쪽에서 찾을 곳을 켜 주세요</span>';
-                    if (!String(U.q || '').trim()) return '<span class="k">상품 이름을 치면 켜 둔 곳에서 찾아요</span>';
+                    const hasQ = !!String(U.q || '').trim(), vOnly = !hasQ && on.band && !!gSrc.pickQ.vendor;   // [신규 2026-10-09] 업체만 고른 때는 밴드 상품만
+                    if (!hasQ && !vOnly) return '<span class="k">상품 이름을 치면 켜 둔 곳에서 찾아요</span>';
                     const sec = (k, t, html) => '<div class="src-uni-sec ' + k + '"><b>' + t + '</b><div class="chips">' + html + '</div></div>';
+                    if (vOnly) return sec('band', '📦 밴드 상품 · ' + srcEsc(gSrc.pickQ.vendor), srcBandPickHtml());
                     return (on.band ? sec('band', '📦 밴드 상품', srcBandPickHtml()) : '') +
                         (on.hist ? sec('hist', '🗓 공동구매 했던 상품', srcHistHtml()) : '') +
                         (on.onsite ? sec('onsite', '🏪 상시판매', srcOnsiteChipsHtml()) : '');
@@ -5987,7 +6077,7 @@
                     const U = srcUniState(), q = String(U.q || '').trim();
                     const paint = () => { const el = document.getElementById('src-uni-res'); if (el) el.innerHTML = srcUniHtml(); };
                     paint();
-                    if (!q) return;
+                    if (!q && !gSrc.pickQ.vendor) return;
                     if (U.on.band && !gSrc.band) { try { gSrc.band = (await srcGet('band')) || {}; } catch (e) { } paint(); }
                     if ((U.on.hist || U.on.onsite) && !gSrc.hist) {   // [수정 2026-10-08] 상시판매에도 마지막 공구 날짜를 붙이려고
                         try {
