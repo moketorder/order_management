@@ -18777,8 +18777,8 @@
             let box = document.getElementById('ps-bar-pop');
             if (!box) {
                 box = document.createElement('div'); box.id = 'ps-bar-pop';
-                box.style.cssText = 'position:fixed; inset:0; z-index:9985; background:rgba(15,23,42,0.45); display:flex; align-items:center; justify-content:center; padding:16px;';
-                box.addEventListener('click', e => { if (e.target === box) psBarPopClose(); });
+                // [수정 2026-10-09] 가운데 덮개 대신 아래쪽에 (사장님 요청 — 상품 목록에서 상품을 누르면 아래에 단추가 나오듯이). 달력은 그대로 누를 수 있다
+                box.style.cssText = 'position:fixed; z-index:9985; left:50%; bottom:16px; transform:translateX(-50%); width:min(460px, calc(100vw - 32px));';
                 document.body.appendChild(box);
             }
             const B = 'flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; background:#fff; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap;';
@@ -18822,7 +18822,7 @@
                     <div style="display:flex; gap:6px;"><button type="button" onclick="psPopMode='merge'; psBarPopPaint()" style="${B}">뒤로</button><button type="button" onclick="psPopMergeTime()" style="${B} border:none; background:#2563eb; color:#fff;">이 시각으로 합치기</button></div>
                 </div>`;
             }
-            box.innerHTML = `<div style="background:#fff; border-radius:14px; width:min(460px,100%); max-height:86vh; overflow:auto; padding:16px; box-sizing:border-box; display:flex; flex-direction:column; gap:10px;">
+            box.innerHTML = `<div style="background:#fff; border:1.5px solid #93c5fd; border-radius:14px; box-shadow:0 12px 36px rgba(15,23,42,.28); width:100%; max-height:62vh; overflow:auto; padding:12px 14px; box-sizing:border-box; display:flex; flex-direction:column; gap:8px;">
                 <div>
                     <div style="font-size:15px; font-weight:900; color:#0f172a;">📦 ${gEscapeHtml(psGroupName(psPopKey))} <span style="font-size:11.5px; font-weight:800; color:#64748b;">· 상품 ${ms.length}개</span></div>
                     <div style="font-size:11.5px; font-weight:700; color:#64748b; margin-top:2px;">${psItemSummary(it) || '일정 없음'}</div>
@@ -18865,12 +18865,13 @@
             }
         }
         async function psPopRemove(k) {
-            const rest = psGroupMembers(k).filter(j => j !== k);
+            const rest = psGroupMembers(k).filter(j => j !== k), cur = psPopKey;
             await psGroupRemove(k);
-            if (psItem(k)) { psBarPopPaint(); return; }   // 안 뺐다 (취소)
+            if (psItem(k)) { psPopKey = cur; psBarPopPaint(); return; }   // 안 뺐다 (취소)
             if (!rest.length) { psBarPopClose(); return; }
             if (rest.length === 1) await psItemSave(rest[0], { group: null });   // 혼자 남으면 묶음 표시만 푼다 (일정 이름은 그대로)
-            if (psPopKey === k) psPopKey = rest[0];
+            psPopKey = (cur === k || !cur) ? rest[0] : cur;
+            rest.forEach(j => psSelectedIdxs.add(j));
             renderProductScheduleCalendar();
             psBarPopPaint();
         }
@@ -18912,8 +18913,10 @@
             if (clear) { psSelectedIdxs.clear(); renderProductScheduleCalendar(); }
         }
         function psMultiSync() {
-            const box0 = document.getElementById('ps-cal-box');
-            const units = (box0 && box0.offsetParent && !document.getElementById('ps-bar-pop')) ? psMultiUnits() : [];
+            const box0 = document.getElementById('ps-cal-box'), vis = !!(box0 && box0.offsetParent);
+            const units = vis ? psMultiUnits() : [];
+            // [수정 2026-10-09] 한 개 창도 아래쪽이라 달력을 계속 누를 수 있다 — 다른 막대를 고르거나·풀거나·둘 이상 고르면 닫는다
+            if (document.getElementById('ps-bar-pop') && (!vis || units.length >= 2 || !psPopKey || !psSelectedIdxs.has(psPopKey))) psBarPopClose();
             if (units.length < 2) { if (document.getElementById('ps-multi-pop')) psMultiClose(false); return; }
             const sig = units.map(u => u.join(',')).join('|');
             if (sig === psMultiSig && document.getElementById('ps-multi-pop')) return;
@@ -19001,6 +19004,7 @@
         }
         // 달력을 다시 그릴 때마다 여러 개 고른 창을 맞춘다
         { const _orig = renderProductScheduleCalendar; renderProductScheduleCalendar = function () { const r = _orig.apply(this, arguments); try { psMultiSync(); } catch (e) { } return r; }; }
+        { const _sw = switchAdminTab; switchAdminTab = function () { const r = _sw.apply(this, arguments); try { psMultiSync(); } catch (e) { } return r; }; }   // 다른 탭으로 가면 창을 닫는다
         async function psPopEditSave() {
             const it = psItem(psPopKey); if (!it) return;
             const v = id => (document.getElementById(id) || {}).value || '';
