@@ -4489,6 +4489,38 @@
                     const n = srcNormName(tg.name);
                     return (n && n in ix.byName) ? ix.byName[n] : -1;
                 }
+                // [신규 2026-10-09] 상품 등록 칸에 발주의 낱개 수량(재고)·식별번호를 넣는다 — 넣은 것 이름들
+                function srcFillFromPo(po) {
+                    const out = []; if (!po) return out;
+                    const units = parseInt(po.totalUnits) || parseInt(po.qty) || 0, stEl = document.getElementById('productStock');
+                    if (units && stEl && !stEl.disabled) { stEl.value = units; stEl.dispatchEvent(new Event('input', { bubbles: true })); stEl.dispatchEvent(new Event('change', { bubbles: true })); out.push('수량'); }
+                    const pc = String(po.productCode || '').trim();
+                    if (/^[PFS]\d+$/.test(pc) && typeof paintProductCodeField === 'function') { pendingProductCodeFromPurchase = pc; paintProductCodeField({ productCode: pc }); out.push('식별번호'); }
+                    return out;
+                }
+                // [신규 2026-10-09] 이어 둔 발주가 없을 때 — 알리고 '발주 연결할까요?'
+                function srcAskPoLink(tg, rs) {
+                    const old = document.getElementById('src-day'); if (old) old.remove();
+                    const box = document.createElement('div'); box.id = 'src-day';
+                    box.innerHTML = '<div class="in"><div class="t">🧾 연결된 발주가 없어요<small>' + srcEsc(tg.name) + '</small></div>' +
+                        '<span class="k">발주를 연결하면 그 발주의 낱개 수량(재고)과 식별번호를 같이 넣어 드려요. 연결할까요?</span>' +
+                        '<div class="row"><button type="button" data-act="no">안 함</button><button type="button" data-act="yes" style="background:#2563eb;color:#fff;border-color:#2563eb;">🧾 발주 연결</button></div></div>';
+                    document.body.appendChild(box);
+                    box.onclick = e => {
+                        if (e.target === box) return box.remove();
+                        const b = e.target.closest('button'); if (!b) return;
+                        box.remove();
+                        if (b.dataset.act === 'yes') srcPoLinkDialog(tg, rs, po => { const f = srcFillFromPo(po); showToast(f.length ? '상품등록에 넣었어요 · ' + f.join('·') : '발주에 수량·식별번호가 없어요'); });
+                    };
+                }
+                // [신규 2026-10-09] 상품설명에서 보관방법 — '보관' 이 들어간 줄을 먼저 보고, 없으면 글 전체의 '냉동보관' 같은 말
+                function srcStorageOf(ds) {
+                    const pick = t => /냉동/.test(t) ? '냉동' : /냉장/.test(t) ? '냉장' : /상온|실온/.test(t) ? '상온' : '';
+                    const s = String(ds || '');
+                    for (const l of s.split('\n')) if (/보관/.test(l)) { const v = pick(l); if (v) return v; }
+                    const m = s.match(/(냉동|냉장|상온|실온)\s*보관/);
+                    return m ? pick(m[1]) : '';
+                }
                 async function srcToProduct(tg, o) {
                     o = o || {};
                     // [신규 2026-10-07] 이미 등록된 상품이면 새로 등록하지 않고 상품 수정으로 연다 (사장님 요청)
@@ -4503,7 +4535,7 @@
                         exitEditMode();   // 새 상품 등록 상태로
                         gSrcPendingReg = { key: srcNameKey(tg.vendor, tg.name), name: tg.name, vendor: tg.vendor };   // [신규 2026-10-07] 등록 완료 때 이어 둔다
                         // [신규 2026-10-07] 이 상품을 발주한 적이 있으면 그 식별번호를 물려받는다 — 발주와 상품이 같은 번호로 이어진다
-                        const _poCode = srcLatestPoCode(tg);
+                        const _poCode = o.ref ? '' : srcLatestPoCode(tg);   // [수정 2026-10-09] 달력 이름표는 이어 둔 발주의 번호만 (아래)
                         if (_poCode && typeof paintProductCodeField === 'function') { pendingProductCodeFromPurchase = _poCode; paintProductCodeField({ productCode: _poCode }); }
                         const nameEl = document.getElementById('productName');
                         const priceEl = document.getElementById('productPrice');
@@ -4516,9 +4548,28 @@
                         if (priceEl && price) { priceEl.value = price; fire(priceEl); }
                         const ds = String((band && band.ds) || '').trim();
                         if (descEl && ds) { descEl.value = ds; fire(descEl); if (typeof setDescBoxOpen === 'function') setDescBoxOpen(true); if (typeof autoResizeTextarea === 'function') autoResizeTextarea(descEl); }
+                        /* [신규 2026-10-09] 달력 이름표에서 열면 (사장님 요청)
+                           · 공구 날짜 = 달력에 놓인 날짜  · 재고 = 이어진 발주의 낱개 수량(totalUnits, 없으면 qty)
+                           · 보관방법 = 상품설명의 '보관' 줄에서 냉동·냉장·상온(실온) 단추를 눌러 둔다 */
+                        const filled = [];
+                        if (o.ref) {
+                            const r = JSON.parse(o.ref), sp = srcRefGet(r), day = srcRefDate(r, sp);
+                            const dEl = document.getElementById('categoryValue');
+                            if (day && dEl) { dEl.value = day; uploadSelectedDate = day; if (dEl._paintFace) dEl._paintFace(); filled.push('날짜'); }
+                            /* [수정 2026-10-09] 수량·식별번호는 이 이름표에 이어 둔 발주(🧾 발주 연결)에서만 (사장님 요청).
+                               이어 둔 발주가 없으면 없다고 알리고 '발주 연결할까요?' 묻는다 — 이으면 그 발주의 낱개 수량·식별번호가 같이 들어간다 */
+                            const lk = srcPoLinkGet(r);
+                            if (lk) {
+                                if (!srcPoById(lk.id)) { try { if (typeof purchaseOrders !== 'undefined' && !purchaseOrders.length && typeof loadPurchaseOrders === 'function') await loadPurchaseOrders(); if (typeof loadPurchaseArchiveIfNeeded === 'function') await loadPurchaseArchiveIfNeeded(); } catch (e) { } }
+                                filled.push(...srcFillFromPo(srcPoById(lk.id) || lk));
+                            } else setTimeout(() => srcAskPoLink(tg, o.ref), 350);
+                        }
+                        if (!o.ref && typeof pendingProductCodeFromPurchase !== 'undefined' && pendingProductCodeFromPurchase) filled.push('식별번호');
+                        const stg = srcStorageOf(ds);
+                        if (stg && typeof setStorageType === 'function') { uploadStorageType = ''; setStorageType(stg); filled.push('보관'); }
                         if (typeof gPaintNamePreview === 'function') gPaintNamePreview();
                         try { nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { }
-                        showToast(ds ? '상품등록에 채웠어요 — 밴드 상품설명도 불러왔어요' : (band ? '상품등록에 채웠어요 — 밴드에 상품설명이 없어요' : '상품등록에 채웠어요 — 저장된 밴드 상품이 없어 이름·가격만'));
+                        showToast((ds ? '상품등록에 채웠어요 — 밴드 상품설명도 불러왔어요' : (band ? '상품등록에 채웠어요 — 밴드에 상품설명이 없어요' : '상품등록에 채웠어요 — 저장된 밴드 상품이 없어 이름·가격만')) + (filled.length ? ' · ' + filled.join('·') : ''));
                     } catch (e) { showToast('상품등록을 못 열었어요: ' + e.message); }
                 }
 
@@ -4686,7 +4737,7 @@
                 function srcPoLinkNow(rs) { try { const l = srcPoLinkGet(JSON.parse(rs)); return l ? ' (' + srcEsc(String(l.date || '').slice(5, 10).replace('-', '/')) + ')' : ''; } catch (e) { return ''; } }
                 function srcPoAll() { return [].concat((typeof purchaseOrders !== 'undefined' && purchaseOrders) || [], (typeof purchaseArchive !== 'undefined' && purchaseArchive) || []).filter(po => po && po.id); }
                 function srcPoById(id) { return srcPoAll().find(po => po.id === id) || null; }
-                async function srcPoLinkDialog(tg, rs) {
+                async function srcPoLinkDialog(tg, rs, after) {   // [수정 2026-10-09] after(po) — 이은 뒤 부를 일 (상품 등록에서 수량·식별번호 채우기)
                     srcMenuClose();
                     const old = document.getElementById('src-day'); if (old) old.remove();
                     const r = JSON.parse(rs), path = 'polink/' + srcRefPath(r), cur = srcPoLinkGet(r);
@@ -4728,6 +4779,7 @@
                                 const v = { id: po.id, date: String(po.date || '').slice(0, 10), item: po.itemName || '', supplier: po.supplier || '', qty: parseInt(po.totalUnits) || parseInt(po.qty) || 0, at: new Date().toISOString() };
                                 await srcPut(path, v); srcPoLinkSet(r, v); showToast('🧾 발주에 연결했어요: ' + v.item);
                                 srcLockBand(tg, 'purchase');   // 발주한 밴드 상품은 값 고정 (발주 등록과 같게)
+                                if (typeof after === 'function') { box.remove(); srcRender(); after(po); return; }
                             } else return;
                         } catch (err) { showToast('저장 못 했어요: ' + err.message); return; }
                         box.remove(); srcRender();
@@ -28743,7 +28795,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
         // [신규] 합친 '공동구매' 목록에 들어가는 상품 — 날짜 공구·사다드림 + 옛 당일 과일
         function isGroupBuyListProduct(prod) {
-            return isReserveListProduct(prod) || isLegacyTodayListProduct(prod) || gListIsSaleToday(prod);
+            return isReserveListProduct(prod) || isLegacyTodayListProduct(prod) || gListIsSaleToday(prod) || !!gListOnsiteWait(prod);
+        }
+        /* [신규 2026-10-09] 공동구매 일정을 기다리는 상시판매 상품 (사장님 요청 — 상시판매에 숨겨져 있어 찾기 힘들었다).
+           관리 상품 목록에서는 상시판매에서 빼고 공동구매 목록의 그 픽업일 칸에 보인다. 손님 화면은 그대로 (그날 0시에 공동구매로 바뀌며 보인다).
+           돌려주는 값 = 가장 먼저 올라갈 일정의 픽업일(없으면 마감 날·올라가는 날), 기다리는 일정이 없으면 '' */
+        function gListOnsiteWait(prod) {
+            try {
+                if (!prod || !prod.sid || prod.showWeekly === true || !psIsOnsiteProd(prod)) return '';
+                const now = Date.now();
+                const it = Object.values(psSched[prod.sid] || {}).filter(x => x && psOpenAt(x.releaseAt) > now)
+                    .sort((a, b) => Number(a.releaseAt) - Number(b.releaseAt))[0];
+                if (!it) return '';
+                return toISODate(it.pickup || '') || fMsToDateKey(it.expireAt) || fMsToDateKey(it.releaseAt) || '';
+            } catch (e) { return ''; }
         }
         /* [신규 2026-09-30] '당일 상품에 넣기'를 켠 특가 — 주문서 gIsSaleToday 와 같은 잣대.
            원래 상시판매 상품이어도 공동구매 목록(날짜 없으면 오늘 칸)으로 옮겨 보이고 상시판매 목록에서는 빠진다.
@@ -28766,6 +28831,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
         function getReserveGroupDate(prod) {
             if (!prod) return '';
+            const _w = gListOnsiteWait(prod); if (_w) return _w;   // [신규 2026-10-09] 일정 기다리는 상시판매 상품은 그 픽업일 칸
             const mk = String(prod.matchKey || '').trim();
             if (/^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(mk)) return toISODate(mk); // 공동구매: matchKey가 날짜
             const d = toISODate(prod.date); // 사다드림 등: date 필드가 실제 날짜
@@ -28988,6 +29054,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (!p || p.name === "배달비") return;
                 const c = gOnsiteTabCatOfList(p);
                 if (!c) return;   // 당일 과일·공동구매·사다드림 등은 상시판매가 아니다
+                if (gListOnsiteWait(p)) return;   // [신규 2026-10-09] 공동구매 일정을 기다리는 것은 공동구매 목록에
                 if (!out[c]) out[c] = { live: 0, total: 0 };
                 out[c].total++;
                 if (!gIsProductSoldOut(p)) out[c].live++;
@@ -29100,7 +29167,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const dateSet = new Set();
                 uploadProducts.forEach(p => {
                     if (isSadaListProduct(p)) return;   // 사다드림은 날짜 칸에 안 세고 따로 탭으로 뺀다
-                    if (!isReserveListProduct(p) && !gListIsSaleToday(p)) return;   // [신규] 당일 상품 특가도 날짜 칸에 센다
+                    if (!isReserveListProduct(p) && !gListIsSaleToday(p) && !gListOnsiteWait(p)) return;   // [신규] 당일 상품 특가도 날짜 칸에 센다 · [신규 2026-10-09] 일정 기다리는 상시판매도
                     const d = getReserveGroupDate(p);
                     if (d) dateSet.add(d);
                 });
@@ -31307,6 +31374,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 filteredProducts = filteredProducts.filter(({ prod }) => {
                     if (prod.name === "배달비") return false;
                     if (gListIsSaleToday(prod)) return false;   // [신규] 당일 상품에 넣은 특가는 공동구매 오늘 칸에만
+                    if (gListOnsiteWait(prod)) return false;   // [신규 2026-10-09] 공동구매 일정을 기다리는 것은 공동구매 목록 그 픽업일 칸에만
                     const cat = gOnsiteTabCatOfList(prod);
                     if (!cat) return false; // 당일 과일·공동구매 날짜·사다드림·코스트코 등은 제외
                     if (uploadManageTab !== 'inv-all' && cat !== uploadManageTab) return false;
