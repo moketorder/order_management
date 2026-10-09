@@ -22691,6 +22691,12 @@
         let _gHomePopLast = '', _gHomePopAt = 0;
         function gHomePopularPublish() {
             if (!isRealtimeFirstLoadDone || Date.now() - _gHomePopAt < 10 * 60000) return;
+            /* [수정 2026-10-09] 상품 목록·주문을 아직 다 못 받았으면 세지 않고 30초 뒤 다시 (사장님: 홈에 순위가 안 나온다).
+               주문관리를 연 지 5초 만에 셀 때 상품 목록이 비어 있으면 0개로 세어 빈 순위를 저장했다. */
+            if (!(uploadProducts || []).length || !(rawOrders || []).length) {
+                setTimeout(() => { try { gHomePopularPublish(); } catch (e) { } }, 30000);
+                return;
+            }
             const since = Date.now() - 14 * 86400000;
             const who = new Map();   // 상품 → 주문한 손님 모음
             const nameOf = new Map();
@@ -22720,6 +22726,8 @@
                 if (buyers.size) ranked.push({ sid, name: nm, n: buyers.size });
             });
             const items = ranked.sort((a, b) => b.n - a.n).slice(0, 20).map(({ sid, name }) => ({ sid, name }));
+            // [수정 2026-10-09] 0개면 저장하지 않는다 — 서버에 있던 순위를 빈 것으로 덮지 않게
+            if (!items.length) return;
             const sig = JSON.stringify(items);
             _gHomePopAt = Date.now();
             const put = () => fetch(`${FIREBASE_DB_URL}settings/home_popular.json`, { method: 'PUT', body: JSON.stringify({ at: Date.now(), v: 2, items }) })
