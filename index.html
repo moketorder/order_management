@@ -22718,6 +22718,9 @@
             const seen = new Set(), ranked = [];
             (uploadProducts || []).forEach(p => {
                 if (!p || !gProdVisibleNow(p)) return;
+                // [수정 2026-10-09] 마감(손으로 마감·노출일정 마감 시각 지남)·품절 상품도 뺀다 — 손님 홈에서 빠져 10개를 못 채웠다 (사장님 요청)
+                if (gIsClosedAdmin(p)) return;
+                if (p.stock !== undefined && p.stock !== null && String(p.stock).trim() !== '' && (parseInt(p.stock) || 0) <= 0) return;
                 const sid = String(p.sid || '').trim(), nm = String(p.name || '').trim();
                 const key = sid || ('명:' + nm);
                 if (!nm || seen.has(key)) return;   // 노출일정 복사본은 한 번만
@@ -22725,7 +22728,7 @@
                 const buyers = new Set([...(sid && who.get(sid) || []), ...(who.get('명:' + nm) || [])]);
                 if (buyers.size) ranked.push({ sid, name: nm, n: buyers.size });
             });
-            const items = ranked.sort((a, b) => b.n - a.n).slice(0, 20).map(({ sid, name }) => ({ sid, name }));
+            const items = ranked.sort((a, b) => b.n - a.n).slice(0, 30).map(({ sid, name }) => ({ sid, name }));   // [수정 2026-10-09] 여유를 30위까지 (손님 홈은 담을 수 있는 것만 10개)
             // [수정 2026-10-09] 0개면 저장하지 않는다 — 서버에 있던 순위를 빈 것으로 덮지 않게
             if (!items.length) return;
             const sig = JSON.stringify(items);
