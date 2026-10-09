@@ -4558,11 +4558,16 @@
                             if (day && dEl) { dEl.value = day; uploadSelectedDate = day; if (dEl._paintFace) dEl._paintFace(); filled.push('날짜'); }
                             /* [수정 2026-10-09] 수량·식별번호는 이 이름표에 이어 둔 발주(🧾 발주 연결)에서만 (사장님 요청).
                                이어 둔 발주가 없으면 없다고 알리고 '발주 연결할까요?' 묻는다 — 이으면 그 발주의 낱개 수량·식별번호가 같이 들어간다 */
-                            const lk = srcPoLinkGet(r);
-                            if (lk) {
-                                if (!srcPoById(lk.id)) { try { if (typeof purchaseOrders !== 'undefined' && !purchaseOrders.length && typeof loadPurchaseOrders === 'function') await loadPurchaseOrders(); if (typeof loadPurchaseArchiveIfNeeded === 'function') await loadPurchaseArchiveIfNeeded(); } catch (e) { } }
-                                filled.push(...srcFillFromPo(srcPoById(lk.id) || lk));
-                            } else setTimeout(() => srcAskPoLink(tg, o.ref), 350);
+                            /* [수정 2026-10-09] 달력의 '발주등록'과 같은 잣대(srcRegState) — 손으로 이은 발주, 없으면 저절로 이어진 발주
+                               (같은 상품 발주가 그 날짜 3주 전~3일 뒤에 있는 것). 저절로 이어진 것을 못 보고 '연결 안 됨'으로 묻던 것 (사장님 지적) */
+                            try {
+                                if (typeof purchaseOrders !== 'undefined' && !purchaseOrders.length && typeof loadPurchaseOrders === 'function') await loadPurchaseOrders();
+                                const lk0 = srcPoLinkGet(r); if (lk0 && !srcPoById(lk0.id) && typeof loadPurchaseArchiveIfNeeded === 'function') await loadPurchaseArchiveIfNeeded();
+                            } catch (e) { }
+                            _srcPoIx = null; _srcRegIx = null;   // 방금 받아 온 발주 목록으로 다시 센다
+                            const po = srcRegState(o.ref, day).po1;
+                            if (po) filled.push(...srcFillFromPo(po));
+                            else setTimeout(() => srcAskPoLink(tg, o.ref), 350);
                         }
                         if (!o.ref && typeof pendingProductCodeFromPurchase !== 'undefined' && pendingProductCodeFromPurchase) filled.push('식별번호');
                         const stg = srcStorageOf(ds);
@@ -8019,6 +8024,19 @@
             while (_orderEventTimes.length && now - _orderEventTimes[0] > 10 * 60 * 1000) _orderEventTimes.shift();
         }
         // 이 화면이 재고를 고칠 때는 알림에서 뺀다
+        /* [신규 2026-10-09] 창 안 글칸에서 글자를 끌어 고르다 창 바깥(어두운 바탕)에서 손을 떼면 브라우저가 바탕을 누른 것으로 쳐서
+           창이 꺼지던 것 (사장님 지적 — 소싱 상품 연결 창). 누르기 시작한 곳이 창 안이면 그 '바탕 누르기'는 없던 일로 한다.
+           화면에 고정된 덮개(position:fixed)를 누른 것일 때만 막는다 — 다른 단추·목록 누르기는 그대로 */
+        (function guardOverlayDragClose() {
+            let down = null;
+            document.addEventListener('pointerdown', e => { down = e.target; }, true);
+            document.addEventListener('click', e => {
+                const t = e.target, d = down; down = null;
+                if (!d || d === t || !(t instanceof Element) || !t.contains(d)) return;
+                try { if (getComputedStyle(t).position !== 'fixed') return; } catch (err) { return; }
+                e.stopImmediatePropagation(); e.preventDefault();
+            }, true);
+        })();
         (function watchMyStockWrites() {
             const orig = window.fetch;
             window.fetch = function (input, init) {
