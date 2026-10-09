@@ -3882,13 +3882,15 @@
                     const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() - (d.getDay() + 6) % 7);
                     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
                 }
+                // [수정 2026-10-09] 주소 칸마다 encodeURIComponent — '100% 민어'처럼 이름에 %·? 가 있으면 주소가 깨져 저장이 안 되던 것 (사장님 지적)
+                const srcUrlPath = path => String(path).split('/').map(encodeURIComponent).join('/');
                 async function srcGet(path) {
-                    const r = await fetch(`${FIREBASE_DB_URL}sourcing/${path}.json?t=${Date.now()}`);
+                    const r = await fetch(`${FIREBASE_DB_URL}sourcing/${srcUrlPath(path)}.json?t=${Date.now()}`);
                     if (!r.ok) throw new Error('서버 응답 ' + r.status);
                     return r.json();
                 }
                 async function srcPut(path, val) {
-                    const r = await fetch(`${FIREBASE_DB_URL}sourcing/${path}.json`, val === null ? { method: 'DELETE' } : { method: 'PUT', body: JSON.stringify(val) });
+                    const r = await fetch(`${FIREBASE_DB_URL}sourcing/${srcUrlPath(path)}.json`, val === null ? { method: 'DELETE' } : { method: 'PUT', body: JSON.stringify(val) });
                     if (!r.ok) throw new Error('서버 응답 ' + r.status);
                 }
 
@@ -31923,6 +31925,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const at = (fb === 1 || fb === 2) ? fb : 1;
             if (gIsDescBar(L[at])) L.splice(at + 1, 0, ...lines);       // '📦 택배가능'처럼 남은 막대 칸이 있으면 그 안 맨 위에
             else L.splice(at, 0, DESC_DATE_BAR, ...lines, DESC_DATE_BAR);
+            // [수정 2026-10-09] 날짜 칸 아래 막대 밑에 빈 줄을 두지 않는다 (사장님 요청)
+            const end = L.findIndex((l, i) => i > at && gIsDescBar(l));
+            if (end > 0) while (end + 1 < L.length && !L[end + 1].trim()) L.splice(end + 1, 1);
             return L.join('\n');
         }
 
