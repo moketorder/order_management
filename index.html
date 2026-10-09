@@ -26635,6 +26635,46 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            예전에는 목록 섬네일에도 1,000px 원본이 그대로 나가서 전송량이 열 배 넘게 들었고,
            그것이 이미지 저장소 무료 한도를 넘긴 원인이었다.
            Cloudinary 주소가 아니면 손대지 않는다. */
+        /* [신규 2026-10-09] 상품 사진 크게 보기 — 상품 등록·수정의 사진 칸 왼쪽 위 🔍 (사장님 요청).
+           까만 바탕에 화면 가득, ◀ ▶ 또는 ←/→ 로 다른 사진, 바탕·✕·Esc 로 닫기 */
+        function photoZoomSrc(item) {
+            if (!item) return '';
+            if (item.isExisting && item.id) {
+                const id = String(item.id);
+                return (id.startsWith('data:') || id.startsWith('http')) ? gCdnUrl(id, 1600) : `https://lh3.googleusercontent.com/d/${id}`;
+            }
+            if (item.file) { try { return URL.createObjectURL(item.file); } catch (e) { } }
+            return '';
+        }
+        function photoZoom(idx) {
+            const files = (typeof uploadSelectedFiles !== 'undefined' && uploadSelectedFiles) || [];
+            if (!files.length) return;
+            let i = Math.max(0, Math.min(files.length - 1, +idx || 0));
+            const old = document.getElementById('photo-zoom'); if (old) old.remove();
+            const box = document.createElement('div'); box.id = 'photo-zoom';
+            box.style.cssText = 'position:fixed; inset:0; z-index:10080; background:rgba(2,6,23,.88); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;';
+            const nav = 'position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; border:none; border-radius:50%; background:rgba(255,255,255,.18); color:#fff; font-size:20px; cursor:pointer;';
+            const paint = () => {
+                box.innerHTML = `<img src="${photoZoomSrc(files[i])}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:8px; background:#fff;">`
+                    + `<button type="button" data-z="x" title="닫기" style="position:absolute; right:14px; top:14px; width:38px; height:38px; border:none; border-radius:50%; background:rgba(255,255,255,.18); color:#fff; font-size:20px; cursor:pointer;">✕</button>`
+                    + (files.length > 1 ? `<button type="button" data-z="-1" style="${nav} left:14px;">◀</button><button type="button" data-z="1" style="${nav} right:14px;">▶</button>`
+                        + `<span style="position:absolute; left:50%; bottom:14px; transform:translateX(-50%); color:#fff; font-size:13px; font-weight:800;">${i + 1} / ${files.length}</span>` : '');
+            };
+            const move = d => { i = (i + d + files.length) % files.length; paint(); };
+            const close = () => { box.remove(); document.removeEventListener('keydown', key, true); };
+            const key = e => {
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+                else if (files.length > 1 && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); move(e.key === 'ArrowLeft' ? -1 : 1); }
+            };
+            box.onclick = e => {
+                const b = e.target.closest('button');
+                if (b && b.dataset.z && b.dataset.z !== 'x') return move(+b.dataset.z);
+                if (b || e.target === box) close();
+            };
+            document.addEventListener('keydown', key, true);
+            paint();
+            document.body.appendChild(box);
+        }
         function gCdnUrl(url, size) {
             const str = String(url || '').trim();
             if (!str || str.startsWith('data:') || str.startsWith('blob:')) return str;
@@ -30882,6 +30922,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             uploadSelectedFiles.forEach((item, idx) => {
                 const row = document.createElement('div');
                 row.dataset.photoRow = String(idx);   // [신규] 끌어서 옮긴 뒤 원래 어느 사진이었는지 찾는 표식
+                // [신규 2026-10-09] 왼쪽 위 🔍 — 사진 크게 보기 (사장님 요청). 크게 볼 때는 원본 크기로 (photoZoom)
                 // [수정] 한 줄에 하나씩 쌓던 것을 바둑판 칸으로 바꿨다. 칸은 정사각형.
                 row.style = "position: relative; aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden;";
 
@@ -30910,6 +30951,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 row.innerHTML = `
                     ${imgTag}
                     ${isChecked ? '<span style="position:absolute; left:3px; bottom:3px; pointer-events:none; color:#fff; font-size:10px; font-weight:900; background:var(--primary); padding:2px 6px; border-radius:5px;">대표</span>' : ''}
+                    ${imgSrc ? `<button type="button" onclick="photoZoom(${idx})" title="크게 보기" style="position:absolute; left:3px; top:3px; width:22px; height:22px; padding:0; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.6); border:none; border-radius:50%; color:#fff; font-size:11px; line-height:1; cursor:zoom-in;">🔍</button>` : ''}
                     <button type="button" onclick="removeSelectedFile(${idx})" title="이 사진 빼기" style="position:absolute; right:3px; top:3px; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,0.6); border:none; border-radius:50%; color:#fff; font-size:13px; font-weight:bold; line-height:1; cursor:pointer;">&times;</button>
                 `;
                 list.appendChild(row);
