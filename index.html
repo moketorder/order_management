@@ -5076,8 +5076,11 @@
                     let def0 = null;
                     try { const fp = rows.find(x => x.idx !== null && x.idx >= 0); if (fp) def0 = psDefaultSchedule(uploadProducts[fp.idx], rel0); } catch (e) { }
                     if (!def0 || !def0.expireAt) { const pk = srcAddDays(day0, 2); def0 = { pickup: pk, expireAt: new Date(pk + 'T15:00').getTime() }; }
-                    const relVal = fMsToScheduleInputValue(rel0), expVal = fMsToScheduleInputValue(def0.expireAt);
-                    const pick0 = def0.pickup || expVal.slice(0, 10), linked0 = pick0 === expVal.slice(0, 10);
+                    // [수정 2026-10-09] 노출일 기본 = 일정 짜는 날(오늘) 06시 (사장님 요청 — 다른 일정 창과 같게). 마감·픽업/배달일은 그대로 이름표 날짜 기준
+                    const relVal = fMsToScheduleInputValue(new Date(srcToday() + 'T' + pad2(PS_DEFAULT_SLOT) + ':00').getTime());
+                    // [수정 2026-10-09] 마감일 기본 = 공구일(이름표 날짜), 시각은 그대로 (사장님 요청) — 픽업/배달일도 '마감일과 같게'로 공구일
+                    const expVal = day0 + fMsToScheduleInputValue(def0.expireAt).slice(10);
+                    const pick0 = day0, linked0 = true;
                     const fld = (t, inner) => '<div style="display:flex;flex-direction:column;gap:3px;"><span style="font-size:12px;font-weight:800;color:#475569;">' + t + '</span><div class="line" style="align-items:center;">' + inner + '</div></div>';
                     const box = document.createElement('div'); box.id = 'src-day';
                     box.innerHTML = '<div class="in"><div class="t">노출일정에 일정 추가<small>' + (many ? rows.length + '개를 한 묶음으로 걸어요' : '이 상품에 일정을 걸어요') + '</small></div>' +
@@ -18752,6 +18755,168 @@
             renderProductScheduleCalendar();
         }
 
+        /* ===== [신규 2026-10-09] 노출일정 달력 막대를 누르면 뜨는 창 (사장님 요청) =====
+           그 일정(묶음)에 담긴 상품 목록 — 상품 옆 ✕ = 이 일정에서 빼기(psGroupRemove)
+           밑 단추: ＋ 상품 추가(psGroupAddTo) · 🔗 그룹 합치기 · ✂️ 상품 나누기 · 닫기
+           그룹 합치기: 다른 일정을 고르면 — 노출·마감·픽업이 같으면 바로 한 묶음, 다르면 새 일정 칸(처음 값은 이 일정)을 보여 주고 그 시각으로 둘 다 맞춰 묶는다.
+           상품 나누기: 담긴 상품마다 따로인 일정으로 (시각은 그대로) */
+        let psPopKey = null, psPopMode = '', psPopQ = '', psPopWith = null;
+        function psBarPopOpen(key) { psPopKey = key; psPopMode = ''; psPopQ = ''; psPopWith = null; psBarPopPaint(); }
+        function psBarPopClose() { psPopKey = null; const b = document.getElementById('ps-bar-pop'); if (b) b.remove(); }
+        function psPopSetMode(m) { psPopMode = (psPopMode === m) ? '' : m; psPopQ = ''; psBarPopPaint(); setTimeout(() => { const e = document.getElementById('ps-pop-q'); if (e) e.focus(); }, 0); }
+        function psPopOtherUnits() {
+            const mine = new Set(psGroupMembers(psPopKey)), now = Date.now();
+            return psUnitsOf(psAllItems().map(x => x.key).filter(k => !mine.has(k)))
+                .filter(u => { const x = psItem(u[0]); return x && (!Number(x.expireAt) || Number(x.expireAt) > now); })
+                .sort((a, b) => (Number(psItem(a[0]).releaseAt) || 0) - (Number(psItem(b[0]).releaseAt) || 0));
+        }
+        function psBarPopPaint() {
+            if (!psPopKey) return;
+            if (!psItem(psPopKey)) { psBarPopClose(); return; }
+            const it = psItem(psPopKey), ms = psGroupMembers(psPopKey), q = psPopQ.trim(), kq = gEscapeHtml(psPopKey);
+            let box = document.getElementById('ps-bar-pop');
+            if (!box) {
+                box = document.createElement('div'); box.id = 'ps-bar-pop';
+                box.style.cssText = 'position:fixed; inset:0; z-index:9985; background:rgba(15,23,42,0.45); display:flex; align-items:center; justify-content:center; padding:16px;';
+                box.addEventListener('click', e => { if (e.target === box) psBarPopClose(); });
+                document.body.appendChild(box);
+            }
+            const B = 'flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; background:#fff; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap;';
+            const ON = 'border-color:#2563eb; background:#eff6ff; color:#1d4ed8;';
+            const ROW = 'display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid #e2e8f0; border-radius:8px; background:#fff;';
+            const INP = 'width:100%; box-sizing:border-box; height:38px; border:1.5px solid #93c5fd; border-radius:8px; padding:0 10px; font-size:13px;';
+            const search = ph => `<input type="search" id="ps-pop-q" placeholder="${ph}" value="${gEscapeHtml(q)}" oninput="psPopQ=this.value; psBarPopPaintList()" style="${INP}">`;
+            let extra = '';
+            if (psPopMode === 'add') extra = `<div style="display:flex; flex-direction:column; gap:6px; border:1.5px solid #bfdbfe; background:#f8fbff; border-radius:10px; padding:8px;">
+                    <div style="font-size:11.5px; font-weight:800; color:#1d4ed8;">＋ 이 일정에 담을 상품</div>${search('상품 이름·식별번호')}<div id="ps-pop-list"></div></div>`;
+            else if (psPopMode === 'merge') extra = `<div style="display:flex; flex-direction:column; gap:6px; border:1.5px solid #bfdbfe; background:#f8fbff; border-radius:10px; padding:8px;">
+                    <div style="font-size:11.5px; font-weight:800; color:#1d4ed8;">🔗 합칠 일정 고르기 <span style="font-weight:700; color:#64748b;">· 시각이 다르면 새 일정을 정해요</span></div>${search('일정·상품 이름')}<div id="ps-pop-list"></div></div>`;
+            else if (psPopMode === 'time' && psItem(psPopWith)) {
+                const W = psItem(psPopWith), relV = fMsToScheduleInputValue(Number(it.releaseAt) || Date.now()), expV = it.expireAt ? fMsToScheduleInputValue(Number(it.expireAt)) : '';
+                const pk = psItemPickup(it) || expV.slice(0, 10);
+                const LAB = 'flex:0 0 auto; width:62px; font-size:11.5px; font-weight:800; color:#475569;';
+                const IN = 'flex:1 1 0; min-width:0; height:36px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;';
+                const SEL = 'flex:0 0 auto; width:84px; height:36px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800;';
+                extra = `<div style="display:flex; flex-direction:column; gap:6px; border:1.5px solid #fcd34d; background:#fffbeb; border-radius:10px; padding:8px;">
+                    <div style="font-size:11.5px; font-weight:800; color:#b45309;">⚠️ 두 일정의 시각이 달라요 — 합친 일정의 시각을 정해 주세요</div>
+                    <div style="font-size:11px; font-weight:700; color:#64748b;">이 일정: ${psItemSummary(it) || '일정 없음'}<br>${gEscapeHtml(psGroupName(psPopWith))}: ${psItemSummary(W) || '일정 없음'}</div>
+                    <div style="display:flex; align-items:center; gap:6px;"><span style="${LAB}">📣 노출일</span><input type="date" id="ps-pop-rd" value="${relV.slice(0, 10)}" style="${IN}"><select id="ps-pop-rh" style="${SEL}">${psTimeOptsHtml(relV)}</select></div>
+                    <div style="display:flex; align-items:center; gap:6px;"><span style="${LAB}">⏰ 마감</span><input type="date" id="ps-pop-ed" value="${expV.slice(0, 10)}" style="${IN}"><select id="ps-pop-eh" style="${SEL}">${psExpOptsHtml(expV)}</select></div>
+                    <div style="display:flex; align-items:center; gap:6px;"><span style="${LAB}">🚚 픽업</span><input type="date" id="ps-pop-pk" value="${pk}" style="${IN}"></div>
+                    <div style="display:flex; gap:6px;"><button type="button" onclick="psPopMode='merge'; psBarPopPaint()" style="${B}">뒤로</button><button type="button" onclick="psPopMergeTime()" style="${B} border:none; background:#2563eb; color:#fff;">이 시각으로 합치기</button></div>
+                </div>`;
+            }
+            box.innerHTML = `<div style="background:#fff; border-radius:14px; width:min(460px,100%); max-height:86vh; overflow:auto; padding:16px; box-sizing:border-box; display:flex; flex-direction:column; gap:10px;">
+                <div>
+                    <div style="font-size:15px; font-weight:900; color:#0f172a;">📦 ${gEscapeHtml(psGroupName(psPopKey))} <span style="font-size:11.5px; font-weight:800; color:#64748b;">· 상품 ${ms.length}개</span></div>
+                    <div style="font-size:11.5px; font-weight:700; color:#64748b; margin-top:2px;">${psItemSummary(it) || '일정 없음'}</div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    ${ms.map(k => { const x = psItem(k), xp = uploadProducts[x.idx] || {}; return `<div style="${ROW}">
+                        <span class="ps-dot" style="background:${PS_DOTC[psLiveStateOf(x.idx)]}; flex:0 0 auto;"></span>
+                        <span onclick="psBarPopClose(); editProduct(${x.idx})" title="상품 정보 고치기" style="flex:1 1 auto; min-width:0; font-size:13px; font-weight:800; color:#0f172a; cursor:pointer; overflow-wrap:anywhere;">${gEscapeHtml(xp.name || '')}</span>
+                        <button type="button" onclick="psPopRemove('${gEscapeHtml(k)}')" title="이 일정에서 빼기 (상품은 그대로)" style="flex:0 0 auto; width:26px; height:26px; padding:0; border:1.5px solid #fecaca; background:#fff; color:#dc2626; border-radius:50%; font-size:13px; font-weight:900; cursor:pointer;">✕</button>
+                    </div>`; }).join('')}
+                </div>
+                ${extra}
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button type="button" onclick="psPopSetMode('add')" style="${B}${psPopMode === 'add' ? ON : ''}">＋ 상품 추가</button>
+                    <button type="button" onclick="psPopSetMode('merge')" style="${B}${psPopMode === 'merge' || psPopMode === 'time' ? ON : ''}">🔗 그룹 합치기</button>
+                    ${ms.length > 1 ? `<button type="button" onclick="psPopSplit()" style="${B}">✂️ 상품 나누기</button>` : ''}
+                    <button type="button" onclick="psBarPopClose()" style="${B}">닫기</button>
+                </div>
+            </div>`;
+            psBarPopPaintList();
+        }
+        // 고르는 목록만 다시 그린다 (검색칸 글자 칠 때 칸이 다시 만들어져 손이 떨어지지 않게)
+        function psBarPopPaintList() {
+            const el = document.getElementById('ps-pop-list'); if (!el) return;
+            const q = psPopQ.trim().toLowerCase();
+            const R = 'padding:7px 9px; background:#fff; border:1px solid #dbeafe; border-radius:7px; font-size:12.5px; font-weight:700; cursor:pointer;';
+            if (psPopMode === 'add') {
+                const have = new Set(psGroupMembers(psPopKey).map(k => (psItem(k) || {}).sid));
+                const rs = q ? (uploadProducts || []).map((p, i) => ({ p, i })).filter(({ p }) => p && p.sid && p.showWeekly !== true && !have.has(p.sid)
+                    && (String(p.name || '').toLowerCase().includes(q) || String(p.productCode || '').toLowerCase().includes(q))).slice(0, 20) : [];
+                el.innerHTML = `<div style="display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto;">${rs.length ? rs.map(({ p, i }) => `<div onclick="psPopAdd(${i})" style="${R}">${gEscapeHtml(p.name)} <span style="color:#94a3b8;">${gEscapeHtml(p.productCode || '')}</span></div>`).join('')
+                    : `<div style="font-size:11.5px; color:#94a3b8;">${q ? '찾는 상품이 없어요' : '이름을 치면 나와요'}</div>`}</div>`;
+            } else if (psPopMode === 'merge') {
+                const us = psPopOtherUnits().filter(u => !q || u.some(k => String((uploadProducts[psItem(k).idx] || {}).name || '').toLowerCase().includes(q)) || psGroupName(u[0]).toLowerCase().includes(q)).slice(0, 30);
+                el.innerHTML = `<div style="display:flex; flex-direction:column; gap:4px; max-height:240px; overflow-y:auto;">${us.length ? us.map(u => `<div onclick="psPopMerge('${gEscapeHtml(u[0])}')" style="${R}">
+                        <div style="font-weight:800;">${gEscapeHtml(psGroupName(u[0]))}${u.length > 1 ? ` <span style="color:#64748b;">· 상품 ${u.length}개</span>` : ''}</div>
+                        <div style="font-size:11px; color:#64748b;">${psItemSummary(psItem(u[0])) || '일정 없음'}</div></div>`).join('')
+                    : `<div style="font-size:11.5px; color:#94a3b8;">합칠 일정이 없어요</div>`}</div>`;
+            }
+        }
+        async function psPopRemove(k) {
+            const rest = psGroupMembers(k).filter(j => j !== k);
+            await psGroupRemove(k);
+            if (psItem(k)) { psBarPopPaint(); return; }   // 안 뺐다 (취소)
+            if (!rest.length) { psBarPopClose(); return; }
+            if (rest.length === 1) await psItemSave(rest[0], { group: null });   // 혼자 남으면 묶음 표시만 푼다 (일정 이름은 그대로)
+            if (psPopKey === k) psPopKey = rest[0];
+            renderProductScheduleCalendar();
+            psBarPopPaint();
+        }
+        async function psPopAdd(i) {
+            await psGroupAddTo(psPopKey, i);
+            psPopQ = ''; psPopMode = 'add';
+            psBarPopPaint();
+            setTimeout(() => { const e = document.getElementById('ps-pop-q'); if (e) e.focus(); }, 0);
+        }
+        async function psPopSplit() {
+            const ms = psGroupMembers(psPopKey);
+            if (ms.length < 2 || !(await psConfirm(`담긴 상품 ${ms.length}개를 상품마다 따로인 일정으로 나눠요.\n시각(노출·마감·픽업)은 그대로예요.`))) return;
+            psUndoMark('나누기');
+            let n = 0;
+            for (const k of ms) if (await psItemSave(k, { group: null, groupLabel: null })) n++;
+            if (n) showToast(`✂️ 상품 ${n}개를 따로인 일정으로 나눴어요`);
+            psSelectedIdxs = new Set([psPopKey]);
+            renderProductScheduleCalendar();
+            psBarPopPaint();
+        }
+        function psPopMerge(otherKey) {
+            const A = psItem(psPopKey), W = psItem(otherKey); if (!A || !W) return;
+            const same = Number(A.releaseAt || 0) === Number(W.releaseAt || 0) && Number(A.expireAt || 0) === Number(W.expireAt || 0) && (psItemPickup(A) || '') === (psItemPickup(W) || '');
+            if (same) return psPopMergeDo(otherKey, Number(A.releaseAt) || null, Number(A.expireAt) || null, psItemPickup(A) || null);
+            psPopWith = otherKey; psPopMode = 'time'; psBarPopPaint();
+        }
+        function psPopMergeTime() {
+            const v = id => (document.getElementById(id) || {}).value || '';
+            const rd = v('ps-pop-rd'), rh = v('ps-pop-rh') || '06:00', ed = v('ps-pop-ed'), eh = v('ps-pop-eh') || '15:00', pk = v('ps-pop-pk');
+            if (!rd) { showToast('노출일을 골라 주세요'); return; }
+            if (!ed) { showToast('마감일을 골라 주세요'); return; }
+            const rel = new Date(rd + 'T' + rh).getTime(), exp = new Date(ed + 'T' + eh).getTime();
+            if (exp <= rel) { showToast('⚠️ 마감은 노출보다 뒤여야 해요'); return; }
+            return psPopMergeDo(psPopWith, rel, exp, pk || null);
+        }
+        async function psPopMergeDo(otherKey, rel, exp, pk) {
+            const A = psItem(psPopKey); if (!A || !psItem(otherKey)) return;
+            const mine = psGroupMembers(psPopKey), theirs = psGroupMembers(otherKey);
+            const all = mine.concat(theirs);
+            const moving = all.filter(k => { const x = psItem(k); return Number(x.releaseAt || 0) !== Number(rel || 0) || Number(x.expireAt || 0) !== Number(exp || 0) || (pk && psItemPickup(x) !== pk); });
+            const live = moving.filter(k => { const x = psItem(k); return psIsActive(x) && !psIsUpcoming(uploadProducts[x.idx]); });
+            if (live.length && !(await psConfirm(`판매 중인 일정 ${live.length}개의 시각이 바뀌어요.\n손님 화면의 마감 시각·픽업일도 바뀔 수 있어요. 합칠까요?`))) return;
+            psUndoMark('합치기');
+            const gid = A.group || psNewGroupId();
+            const label = A.groupLabel || (psItem(otherKey) || {}).groupLabel || null;
+            const used = new Set(mine.map(k => psItem(k).sid));
+            let done = 0; const skipped = [];
+            for (const k of all) {
+                const x = psItem(k); if (!x) continue;
+                const nm = (uploadProducts[x.idx] || {}).name || '';
+                if (!mine.includes(k) && used.has(x.sid)) { skipped.push(nm + '(같은 상품)'); continue; }
+                const ch = { releaseAt: rel, expireAt: exp, group: gid, groupLabel: label };
+                if (pk) ch.pickup = pk;
+                if (await psItemSave(k, ch)) { done++; used.add(x.sid); } else skipped.push(nm);
+            }
+            psPopMode = ''; psPopWith = null;
+            psSelectedIdxs = new Set(psGroupMembers(psPopKey));
+            showToast(`🔗 한 일정으로 합쳤어요 · 상품 ${psGroupMembers(psPopKey).length}개${skipped.length ? ` · 못 합친 것: ${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? ' 외' : ''}` : ''}`);
+            renderProductScheduleCalendar();
+            if (typeof renderProductsList === 'function') renderProductsList();
+            psBarPopPaint();
+        }
+
         /* ===== 일정은 그대로, 상품만 바꾸기 (사장님 요청) — 고른 상품이 이 일정을 받고, 원래 상품에서는 이 일정이 빠진다.
            이미 올라간 일정은 손님이 보고 있으므로 바꾸지 않는다. ===== */
         let psSwapFor = null, psAddToFor = null, psPickQuery = '';
@@ -18889,6 +19054,7 @@
             psCalOpenDay = '';
             psAddSearchOpenFor = '';
             renderProductScheduleCalendar();
+            if (!add && psSelectedIdxs.has(key)) psBarPopOpen(key);   // [신규 2026-10-09] 막대 하나를 누르면 담긴 상품 창 (사장님 요청)
         }
 
         /* 끌어서 한꺼번에 고르기 (PC 마우스) — 막대가 아닌 빈 곳에서 눌러 끌면 네모가 그려지고, 네모에 걸친 막대를 모두 고른다.
