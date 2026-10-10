@@ -3712,6 +3712,11 @@
                         #purchase-section-sourcing .src-plan-cat .ch { display:flex; align-items:center; justify-content:space-between; gap:4px; }
                         #purchase-section-sourcing .src-plan-rr { flex:0 0 auto; width:24px; height:22px; border:1px solid #cbd5e1; background:#fff; border-radius:6px; font-size:12px; line-height:1; cursor:pointer; padding:0; }
                         #purchase-section-sourcing .src-plan-rr:hover { background:#f1f5f9; }
+                        /* [신규 2026-10-10] 상품마다 🔄 — 이름표 오른쪽 작은 단추 */
+                        #purchase-section-sourcing .src-plan-item { display:flex; align-items:center; gap:3px; min-width:0; }
+                        #purchase-section-sourcing .src-plan-item > .src-ochip { flex:1 1 auto; min-width:0; }
+                        #purchase-section-sourcing .src-plan-rr1 { flex:0 0 auto; width:22px; height:22px; padding:0; border:1px solid #e2e8f0; background:#fff; border-radius:6px; font-size:11px; line-height:1; cursor:pointer; }
+                        #purchase-section-sourcing .src-plan-rr1:hover { background:#f1f5f9; }
                         #purchase-section-sourcing .src-plan-cat.on > b { color:#5b21b6; }
                         #purchase-section-sourcing .src-plan-cat .src-ochip { display:block; font-size:11.5px; padding:3px 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
                         #purchase-section-sourcing .src-plan-cat .src-ochip small { display:block; font-size:10px; font-weight:700; overflow:hidden; text-overflow:ellipsis; }
@@ -3790,6 +3795,8 @@
                         /* [신규 2026-10-08] 이름표 색은 셋만 — 신규 초록 · 상시/예전 공구 보라 · 직접 쓴 것 파랑 */
                         #purchase-section-sourcing .src-tag.c-new { background:var(--src-acc-soft); color:var(--src-acc); }
                         #purchase-section-sourcing .src-tag.c-old { background:#ede9fe; color:#5b21b6; }
+                        #purchase-section-sourcing .src-tag.c-regb { background:#fef3c7; color:#92400e; }   /* [신규 2026-10-10] 재공구 = 노랑 */
+                        #purchase-section-sourcing .src-tag.c-sada { background:#fce7f3; color:#be185d; }   /* [신규 2026-10-10] 사다드림 = 분홍 */
                         #purchase-section-sourcing .src-tag.c-hand { background:#dbeafe; color:#1e40af; }
                         #src-day { position:fixed; inset:0; z-index:2147483400; background:rgba(15,23,42,.35); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }
                         #src-day .in { background:#fff; border-radius:14px; padding:14px; width:100%; max-width:440px; max-height:calc(100vh - 32px); overflow:auto; display:flex; flex-direction:column; gap:8px; font-family:inherit; box-shadow:0 18px 40px rgba(15,23,42,.25); box-sizing:border-box; }
@@ -4201,10 +4208,15 @@
                     const boxes = allCats.map(c => {
                         // 🔄 누를 때마다 그 카테고리 후보에서 한 칸씩 뒤로 (밴드·상시·공구 같이). 이 기기에 주별로 기억
                         const k = st + '|' + c, o = RR[k] || 0;
-                        const pick = list => list && list.length ? list[o % list.length] : null;
-                        const r = pick(by[c]), x = pick(by4[c]), g = pick(by8[c]);
+                        /* [신규 2026-10-10] 상품마다 🔄 (사장님 요청 — 원하는 상품만 바꾸기). 칸마다 따로 센 횟수(k|b·k|4·k|8)를 카테고리 🔄 횟수에 더한다 */
+                        const pick = (list, s) => list && list.length ? list[(o + (RR[k + '|' + s] || 0)) % list.length] : null;
+                        const r = pick(by[c], 'b'), x = pick(by4[c], '4'), g = pick(by8[c], '8');
+                        const one = (s, list, chip) => {
+                            const kk = k + '|' + s, n = RR[kk] || 0, more = list && list.length > 1;
+                            return '<div class="src-plan-item">' + chip + (more ? '<button type="button" class="src-plan-rr1" onclick="srcPlanReroll(\'' + srcEsc(kk) + '\')" oncontextmenu="event.preventDefault(); srcPlanReroll(\'' + srcEsc(kk) + '\', true)" title="이 상품만 바꾸기' + (n ? ' (' + n + '번 바꿈 · 오른쪽 클릭·길게 누르면 처음으로)' : '') + '">🔄</button>' : '') + '</div>';
+                        };
                         return (r || x || g) ? '<div class="src-plan-cat"><div class="ch"><b>' + srcEsc(c) + '</b><button type="button" class="src-plan-rr" onclick="srcPlanReroll(\'' + srcEsc(k) + '\')" title="다른 상품 보기' + (o ? ' (' + o + '번 바꿈 · 오른쪽 클릭·길게 누르면 처음으로)' : '') + '" oncontextmenu="event.preventDefault(); srcPlanReroll(\'' + srcEsc(k) + '\', true)">🔄</button></div>' +
-                            (r ? bandChip(r) : '') + (x ? oldChip(x, '4~7주') : '') + (g ? oldChip(g, '8주+') : '') + '</div>' : '';
+                            (r ? one('b', by[c], bandChip(r)) : '') + (x ? one('4', by4[c], oldChip(x, '4~7주')) : '') + (g ? one('8', by8[c], oldChip(g, '8주+')) : '') + '</div>' : '';
                     }).join('');
                     return '<div class="src-plan"><div class="src-cathead"><b>다음 주 공구 추천 <small>' + md(st) + '~' + md(srcAddDays(st, 4)) + '</small></b></div>' +
                         '<div class="k">카테고리마다 · 초록 = 밴드 상품 · 보라 = 상시판매 · 노랑 = 공구 상품 (4~7주 · 8주+ = 마지막 공구 뒤 지난 주) · 달력 날짜에 끌어다 놓으면 저장돼요</div>' +
@@ -5256,7 +5268,7 @@
                         // [수정 2026-10-07] 'N개 고름 · 지우기 · 풀기' 줄은 뺐다 — Delete 키로 지운다 (사장님 요청)
                         '<span class="src-calf">' + SRC_CAL_F.map(([k, lab, tip]) => '<button type="button" class="src-btn' + ((gSrc.calF || {})[k] ? ' on' : '') + '" onclick="srcCalFToggle(\'' + k + '\')" title="' + tip + '">' + lab + '</button>').join('') + '</span>' +   // [신규 2026-10-07] 안 된 것만 보기
                         '<details class="src-calhelp"><summary>설명</summary>' +   // [수정 2026-10-07] 설명은 기본으로 접어 둔다 (사장님 요청)
-                        '<span class="k">초록 = 신규(밴드·추천) · 보라 = 상시판매·예전 공구(추천이라도 상시·예전 공구 상품에 이어지면 보라) · 파랑 = 직접 쓴 것 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span>' +
+                        '<span class="k">초록 = 신규(밴드·추천) · 노랑 = 재공구(전에 공구한 상품에 이어지면 그 공구 상품 이름으로 🔁) · 보라 = 상시판매 · 분홍 = 사다드림 · 파랑 = 직접 쓴 것 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span>' +
                         '<span class="k">초록 숫자 = 공구 진행한 횟수(마우스를 올리면 마지막 공구·재고) · 오른쪽 위 발주등록X·상품등록X·일정등록X = 켜면 그것이 안 된 것만 보기</span><span class="k">끌기 = 옮기기 · Ctrl+끌기 = 복사 · Ctrl+누르기 = 여러 개 · Delete 지우기 · Ctrl+Z 되돌리기 · 폰은 길게 눌러 끌기</span></details></div><div class="src-cal-grid">' +
                         SRC_DAYS.map(d => '<div class="src-cal-dow">' + d + '</div>').join('');
                     for (let d = new Date(start); d <= calEnd; d.setDate(d.getDate() + 7)) {
@@ -5272,7 +5284,7 @@
                             html += '<div class="' + cls.join(' ') + '" data-date="' + k + '"><div class="top"><span class="n">' + x.getDate() + '</span>' +
                                 srcWxHtml(k) + (hol ? '<span class="hn">' + hol + '</span>' : '') + (off ? '<span class="off" title="주문관리에 설정된 가게 휴무일">휴무</span>' : '') +
                                 '<button type="button" class="src-cal-add" title="이 날짜에 상품 넣기" onclick="srcDayAdd(\'' + k + '\')">+</button></div>' +
-                                (byDate[k] || []).filter(t => srcCalPass(t.ref, k)).sort((a, b) => SRC_TAG_RANK[a.kind] - SRC_TAG_RANK[b.kind]).map(t => '<div class="src-tag ' + t.kind + ' ' + srcTagColor(t, k) + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(t.name) + '">' + srcRegMark(t.ref, k) + '<span>' + srcEsc(t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>').join('') + '</div>';
+                                (byDate[k] || []).filter(t => srcCalPass(t.ref, k)).sort((a, b) => SRC_TAG_RANK[a.kind] - SRC_TAG_RANK[b.kind]).map(t => { const tv = srcTagView(t, k); /* [수정 2026-10-10] 재공구는 공구 상품 이름으로 */ return '<div class="src-tag ' + t.kind + ' ' + tv.cls + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(tv.tip || t.name) + '">' + srcRegMark(t.ref, k) + '<span>' + srcEsc(tv.name || t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>'; }).join('') + '</div>';
                         }
                     }
                     return html + '</div></div>';
@@ -5315,24 +5327,33 @@
                 /* [신규 2026-10-08] 달력 이름표 색은 셋만 (사장님 요청) — 초록 = 신규(밴드·추천·비슷한 상품·판매 표시),
                    보라 = 상시판매·예전 공구(공구 기록을 끌어다 놓은 것·사다드림, 그리고 추천이라도 상시판매 상품이나 전에 공구한 상품에 이어진 것),
                    파랑 = 직접 쓴 것(✍) */
-                function srcTagColor(t, date) {
-                    if (t.kind === 'onsite' || t.kind === 'sada') return 'c-old';
+                /* [수정 2026-10-10] 재공구와 상시판매 색을 나눈다 (사장님 요청) — 노랑 = 재공구(전에 공구한 상품), 보라 = 상시판매, 분홍 = 사다드림.
+                   밴드에서 가져다 놓았어도 이어진(연결된) 상품이 전에 공구한 상품이면 노랑 + 그 공구 상품 이름으로 보여 준다
+                   (앞의 숫자 = 공구 진행 횟수 — srcRegMark). 원래 밴드 이름은 마우스를 올리면 보인다.
+                   돌려주는 값: { cls, name(바꿔 보일 이름, 없으면 ''), tip } */
+                function srcTagView(t, date) {
+                    if (t.kind === 'sada') return { cls: 'c-sada', name: '', tip: '' };   // [수정 2026-10-10] 사다드림은 따로 분홍 (사장님 요청)
+                    if (t.kind === 'onsite') return { cls: 'c-old', name: '', tip: '' };
                     let r = null, p = null; try { r = t.ref ? JSON.parse(t.ref) : null; p = r ? srcRefGet(r) : null; } catch (e) { }
-                    if (t.kind === 'manual') return (p && p.memo === '공구' && p.code) ? 'c-old' : 'c-hand';
-                    // 신규(밴드 쪽) — 이어진 상품이 상시판매이거나 이 날 전에 공구한 적이 있으면 보라
+                    if (t.kind === 'manual') return { cls: (p && p.memo === '공구' && p.code) ? 'c-regb' : 'c-hand', name: '', tip: '' };
+                    // 신규(밴드 쪽) — 이어진 상품이 상시판매면 보라, 이 날 전에 공구한 적이 있으면 노랑(공구 상품 이름으로)
                     if (t.ref) {
                         const st = srcRegState(t.ref, date), prod = st.prod;
                         if (prod) {
-                            if (String(prod.displayTab || '').startsWith('onsite')) return 'c-old';
+                            if (String(prod.displayTab || '').startsWith('onsite')) return { cls: 'c-old', name: '', tip: '' };
                             srcHistEnsure();
                             const c = psSafeId(String(prod.productCode || '').trim()), nk = String(prod.name || '').replace(/\s/g, '');
                             const h = (gSrc.hist || []).find(x => x && ((c && x.code === c) || String(x.name || '').replace(/\s/g, '') === nk));
                             const cut = srcAddDays(date, -3);
-                            if (h && (h.rounds || []).some(x => x && x.pk && x.pk < cut)) return 'c-old';
+                            if (h && (h.rounds || []).some(x => x && x.pk && x.pk < cut)) {
+                                const pn = String(prod.name || '').trim();
+                                return { cls: 'c-regb', name: pn ? '🔁 ' + pn : '', tip: pn && pn !== t.name ? '재공구 · ' + pn + '\n밴드: ' + t.name : '' };
+                            }
                         }
                     }
-                    return 'c-new';
+                    return { cls: 'c-new', name: '', tip: '' };
                 }
+                function srcTagColor(t, date) { return srcTagView(t, date).cls; }
                 function srcCalMove(n) {
                     const [y, m] = gSrc.calMonth.split('-').map(Number);
                     const d = new Date(y, m - 1 + n, 1);
@@ -29961,14 +29982,25 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     if (!g) { top += btn(s); return; }
                     if (placed.has(g)) return;
                     placed.add(g);
-                    const n = subs.filter(x => groupOf(x) === g).length;
+                    const n = shelves.filter(x => groupOf(x) === g).length;   // [수정 2026-10-10] 빈 칸까지 센 묶음의 칸 수
                     const open = invShelfOpenGroup === g, on = curGroup === g;
                     const gl = GROUPS.find(x => x[0] === g)[1];
                     top += `<button type="button" class="sub-tab-btn${on ? ' active' : ''}" onclick="invShelfToggleGroup('${g}')" style="${open && !on ? 'background:#e2e8f0; color:var(--text-main);' : ''}">${gl} ${n} ${open ? '▴' : '▾'}</button>`;
                 });
-                const openSubs = subs.filter(s => groupOf(s) && groupOf(s) === invShelfOpenGroup);
+                /* [수정 2026-10-10] 상품이 하나도 없는 묶음도 단추를 단다 (사장님 요청 — 냉장1이 안 보였다: 그 칸에 상품이 없어서) */
+                GROUPS.forEach(([g, gl]) => {
+                    if (placed.has(g)) return;
+                    const n = shelves.filter(x => groupOf(x) === g).length;
+                    if (!n) return;
+                    const open = invShelfOpenGroup === g;
+                    top += `<button type="button" class="sub-tab-btn" onclick="invShelfToggleGroup('${g}')" title="이 묶음 칸에는 지금 상품이 없어요" style="opacity:.6;${open ? ' background:#e2e8f0; color:var(--text-main);' : ''}">${gl} ${n} ${open ? '▴' : '▾'}</button>`;
+                });
+                // 펼친 줄에는 그 묶음의 칸을 다 보여 준다 — 상품이 없는 칸은 흐리게 (눌러서 비어 있는 걸 볼 수 있다)
+                const openSubs = shelves.filter(s => groupOf(s) && groupOf(s) === invShelfOpenGroup);
+                const btnLow = s => shelfHas.has(s[0]) || uploadSubTab === s[0] ? btn(s)
+                    : `<button type="button" class="sub-tab-btn ${uploadSubTab === s[0] ? 'active' : ''}" data-sub-tab="${s[0]}" onclick="invShelfPick('${s[0]}')" title="이 칸에는 지금 상품이 없어요" style="opacity:.5;">${s[1]} 0</button>`;
                 const lower = openSubs.length
-                    ? `<div style="flex:0 0 100%; display:flex; flex-wrap:wrap; gap:6px; padding:6px 8px; background:#f8fafc; border:1px solid var(--border); border-radius:12px;">${[[`grp:${invShelfOpenGroup}`, '전체']].concat(openSubs).map(btn).join('')}</div>`
+                    ? `<div style="flex:0 0 100%; display:flex; flex-wrap:wrap; gap:6px; padding:6px 8px; background:#f8fafc; border:1px solid var(--border); border-radius:12px;">${btn([`grp:${invShelfOpenGroup}`, '전체']) + openSubs.map(btnLow).join('')}</div>`
                     : '';
 
                 subContainer.style.display = 'flex';
