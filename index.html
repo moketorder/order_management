@@ -16131,8 +16131,8 @@
         let psCalMonths = [];         // 지금 이어 붙여 보여주는 달들 'YYYY-MM' — 오래된→최신 차례
         // [신규 2026-10-01] 올라가는 시각은 이 다섯 칸 중에서만 고른다 (11·13·15·17·19시)
         // [수정 2026-10-03] 올라가는 시각 — 6시부터 2시간마다 20시까지 (사장님 요청. 예전 11·13·15·17·19시는 한 시간씩 당겼다). 달력의 시간 줄도 이것을 따른다
-        const PS_SLOTS = [6, 8, 10, 12, 14, 16, 18, 20];
-        const PS_DEFAULT_SLOT = 6;    // 고르지 않았을 때 — [수정 2026-10-05] 아침 6시 (사장님 요청, 예전 14시)
+        const PS_SLOTS = [0, 6, 8, 10, 12, 14, 16, 18, 20];   // [수정 2026-10-10] 00시도 고를 수 있게 (사장님 요청)
+        const PS_DEFAULT_SLOT = 0;    // 고르지 않았을 때 — [수정 2026-10-10] 00시 (사장님 요청, 예전 06시·그 전 14시)
 
         /* ===== [신규 2026-10-03] 시각 고르기 태엽 (사장님 요청) =====
            시각 칸(select.gw-wheel)을 누르면 목록이 통째로 펼쳐지는 대신, 작은 태엽이 떠서 위아래로 돌려 고른다.
@@ -16245,7 +16245,8 @@
         /* [신규 2026-10-03] 노출은 그날 0시부터 (사장님 요청).
            일정의 '시각'(releaseAt)은 이제 카톡 홍보 알림(🔔) 시각일 뿐이고, 손님 화면에 올리는 것은 그 날짜 0시에 한다.
            노출을 정하는 곳은 모두 psOpenAt(releaseAt) 와 견준다. 🔔 알림만 releaseAt 그대로 본다 */
-        function psOpenAt(t) { t = Number(t) || 0; if (!t) return 0; const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+        // [수정 2026-10-10] 노출도 카톡 알림처럼 고른 시각에 (사장님 요청 — 예전엔 그날 0시). 노출을 정하는 곳은 모두 이 함수와 견준다
+        function psOpenAt(t) { t = Number(t) || 0; return t; }
         function psNewRid() { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
         // 이 일정의 픽업일 — 공동구매(날짜 상품)의 지금 차례면 상품에 적힌 대로, 그 밖에는 일정에 적어 둔 날.
         //  [수정 2026-10-02] 날짜 없는 상품(상시판매 등)도 일정에 픽업일을 둘 수 있다 (사장님 요청) — 이때는 달력 표시용이고 상품 날짜는 안 바뀐다
@@ -16715,7 +16716,7 @@
             if (!(await fbPatchProducts(patch))) { showToast('⚠️ 상시판매 숨김을 바꾸지 못했어요 — 상품 목록에서 확인해 주세요'); return false; }
             Object.assign(p, f);
             updatePublishedProductsTimestamp();
-            showToast(on ? '🙈 공동구매 일정이 잡혀 상시판매에서 숨겼어요 — 그날 0시에 공동구매로 다시 보여요' : '👁️ 기다리던 공동구매 일정이 없어져 상시판매로 다시 보여요');
+            showToast(on ? '🙈 공동구매 일정이 잡혀 상시판매에서 숨겼어요 — 올라갈 시각에 공동구매로 다시 보여요' : '👁️ 기다리던 공동구매 일정이 없어져 상시판매로 다시 보여요');
             return true;
         }
         // 일정 지우기 — 일정만 없앤다. 지금 차례였으면 상품 줄의 일정 칸도 비운다(상품·재고는 그대로).
@@ -16915,14 +16916,14 @@
             const cur = Number(it[field]) || 0;
             let hh = cur ? new Date(cur).getHours() : 15, mm = cur ? new Date(cur).getMinutes() : 0;
             // 시작 손잡이를 시간칸에 놓으면 그 시각으로 올라간다 (마감은 시각 그대로)
-            if (mode === 'resize-start' && PS_SLOTS.includes(hour)) { hh = hour; mm = 0; }
+            // [수정 2026-10-10] 시간 줄에 놓아도 올라가는 시각은 안 바꾼다 — 시간 줄이 마감 시각으로 바뀌었다 (사장님 요청)
             const [y, m, d] = dropKey.split('-').map(Number);
             const newTs = new Date(y, m - 1, d, hh, mm, 0, 0).getTime();
             if (cur && newTs === cur) return;
             const word = mode === 'resize-start' ? '올라가는' : '마감';
             const keys = (group && group.length > 1 && cur) ? group : [key];
             const dDays = cur ? psDayDiff(fMsToDateKey(cur), dropKey) : 0;
-            const slotHour = (mode === 'resize-start' && PS_SLOTS.includes(hour)) ? hour : null;
+            const slotHour = null;   // [수정 2026-10-10] 시각은 그대로
             if (!(await psConfirmLive(keys, `${word} 날짜를 바꿔요.`))) { renderProductScheduleCalendar(); return; }   // [신규 2026-10-03]
             const nvOf = g => { const k = g.key, v = Number(g[field]); return (k === key) ? newTs : (v ? psShiftTs(v, dDays, slotHour) : 0); };
             const reveal = field === 'expireAt' ? await psAskRevealOnExtend(keys, nvOf) : null;   // [신규 2026-10-03]
@@ -16977,7 +16978,7 @@
             if (mode !== 'move') return psResizeDrop(key, mode, dropKey, hour, group);
             if (!origStart) return;
             const deltaDays = psDayDiff(origStart, dropKey);
-            const slotHour = PS_SLOTS.includes(hour) ? hour : null;
+            const slotHour = null;   // [수정 2026-10-10] 시간 줄에 놓아도 올라가는 시각은 그대로 (시간 줄 = 마감 시각, 사장님 요청)
             const relSame = it.releaseAt && slotHour !== null && new Date(Number(it.releaseAt)).getHours() === slotHour && !deltaDays;
             if (!deltaDays && (slotHour === null || relSame)) return;   // 안 끌었거나 같은 자리
             const keys = (group && group.length > 1) ? group : [key];
@@ -17319,17 +17320,18 @@
                 const start = rk || ek, end = ek || rk;
                 const relD = it.releaseAt ? new Date(Number(it.releaseAt)) : null;
                 const relMin = relD ? relD.getHours() * 60 + relD.getMinutes() : 9999;
-                const baseD = relD || (it.expireAt ? new Date(Number(it.expireAt)) : null);
-                const slot = psNearestSlot(baseD ? baseD.getHours() + baseD.getMinutes() / 60 : 15);
+                // [수정 2026-10-10] 시간 줄 = 마감 시각 (사장님 요청 — 예전엔 올라가는 시각). 마감이 없으면 올라가는 시각
+                const baseD = (it.expireAt ? new Date(Number(it.expireAt)) : null) || relD;
+                const slot = baseD ? baseD.getHours() : 15;
                 const s0 = start <= end ? start : end;
                 let e0 = start <= end ? end : start;
                 const pk = psItemPickup(it);
                 if (pk && pk > e0) e0 = pk;
                 const expD = it.expireAt ? new Date(Number(it.expireAt)) : null;
-                bars.push({ key: it.key, idx: it.idx, nm, st, live, slot, start: s0, end: e0, pk, expKey: ek, group: it.group || null, past: !active && !!_expT && _now >= _expT,
+                bars.push({ key: it.key, idx: it.idx, nm, st, live, slot, start: s0, end: e0, pk, expKey: ek, expMs: _expT || Infinity, group: it.group || null, past: !active && !!_expT && _now >= _expT,
                     expPct: expD ? Math.round((expD.getHours() + expD.getMinutes() / 60) / 24 * 100) : null,
-                    relMin, relKey: rk, timeTag: (relD && !(relD.getMinutes() === 0 && PS_SLOTS.includes(relD.getHours()))) ? psSlotLabel(relD.getHours(), relD.getMinutes()) : '',
-                    tip: `${it.releaseAt ? fFmtSchedTime(it.releaseAt) + ' 알림(그날 0시 노출)' : ''}${it.releaseAt && it.expireAt ? ' ~ ' : ''}${it.expireAt ? fFmtSchedTime(it.expireAt) + ' 마감' : ''}${pk ? ` · 🚚 ${Number(pk.slice(5, 7))}/${Number(pk.slice(8))} 픽업` : ''}` });
+                    relMin, relKey: rk, timeTag: (relD && (relD.getHours() || relD.getMinutes())) ? psSlotLabel(relD.getHours(), relD.getMinutes()) : '',   // [수정 2026-10-10] 시간 줄이 마감 시각이 됐으니, 00시가 아닌 노출 시각은 막대 앞에 적는다
+                    tip: `${it.releaseAt ? fFmtSchedTime(it.releaseAt) + ' 노출·카톡 알림' : ''}${it.releaseAt && it.expireAt ? ' ~ ' : ''}${it.expireAt ? fFmtSchedTime(it.expireAt) + ' 마감' : ''}${pk ? ` · 🚚 ${Number(pk.slice(5, 7))}/${Number(pk.slice(8))} 픽업` : ''}` });
             });
             // 한 일정에 담긴 상품들(group 같은 일정)은 막대 하나로 — 이름은 일정 이름 또는 '첫 상품 외 N'
             {
@@ -17348,7 +17350,8 @@
                 merged.forEach(m => { if (m.group) { m.nm = psGroupName(m.key); m.tip = `상품 ${m.members.length}개 · ` + m.tip; } });
                 bars.length = 0; merged.forEach(m => bars.push(m));
             }
-            bars.sort((a, b) => a.start.localeCompare(b.start) || a.relMin - b.relMin || a.end.localeCompare(b.end));
+            // [수정 2026-10-10] 마감 시각이 빠른 일정부터 위 줄에 (사장님 요청 — 예전엔 올라가는 날·시각 순). 마감이 없으면 맨 뒤
+            bars.sort((a, b) => (a.expMs - b.expMs) || a.start.localeCompare(b.start) || a.relMin - b.relMin);
             // 줄 자리(lane)는 시간 줄마다 따로 매긴다 — 같은 시간 줄 안에서만 겹치지 않게 쌓는다
             const laneEndBySlot = {};
             bars.forEach(b => {
@@ -17381,6 +17384,9 @@
             }
             const rangeFirstKey = dateKeys[0], rangeLastKey = dateKeys[dateKeys.length - 1];
             const rangeBars = bars.filter(b => b.end >= rangeFirstKey && b.start <= rangeLastKey);
+            // [신규 2026-10-10] 시간 줄은 이 달에 실제로 쓰인 마감 시각만 (0~23시 아무 때나라 다 그리면 빈 줄투성이). 하나도 없으면 15시 한 줄
+            const calSlots = [...new Set(rangeBars.map(b => b.slot))].sort((a, b) => a - b);
+            if (!calSlots.length) calSlots.push(15);
 
             // 주(달력 한 줄)마다·시간 줄마다 쓰이는 줄 수 — 같은 주의 칸은 같은 줄 수로 맞춰야 막대가 가지런하다
             const weekLanes = {};
@@ -17394,7 +17400,7 @@
             // 맨 왼쪽 시간 기둥 — 날짜칸과 똑같은 모양으로 그려서 줄 높이가 꼭 맞는다
             const gutterHtml = (w) => {
                 let g = `<div class="ms-cal-cell ps-gutter"><div class="ms-cal-day">&nbsp;</div><div class="ps-bars">`;
-                PS_SLOTS.forEach(slot => {
+                calSlots.forEach(slot => {   // [수정 2026-10-10] 마감 시각 줄
                     const n = (weekLanes[w] || {})[slot] || 0;
                     g += `<div class="ps-slot"><span class="ps-gutter-lbl">${String(slot).padStart(2, '0')}</span>`
                         + '<div class="ps-bar ps-bar-empty"></div>'.repeat(n) + `</div>`;
@@ -17420,7 +17426,7 @@
                     + (key.slice(0, 7) === activeMonth ? '' : ' ps-cal-fade')
                     + (dow === 0 ? ' ms-cal-sun' : dow === 6 ? ' ms-cal-sat' : '');
                 let namesHtml = '';
-                PS_SLOTS.forEach(slot => {
+                calSlots.forEach(slot => {   // [수정 2026-10-10] 마감 시각 줄
                 const nLanes = (weekLanes[w] || {})[slot] || 0;
                 namesHtml += `<div class="ps-slot" data-slot="${slot}" title="${psSlotLabel(slot)}" ondragover="event.preventDefault(); this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="this.classList.remove('over'); psHandleDrop(event, '${key}', ${slot})">`;
                 for (let l = 0; l < nLanes; l++) {
@@ -18467,7 +18473,7 @@
             return `<div class="ps-sec">
                     <div class="ps-sec-t">일정</div>
                     <div class="ps-g3">
-                        <div class="ps-f"><label title="그 날짜 0시에 손님 화면에 올라가요. 이 시각에는 카톡 홍보 알림(🔔)만 떠요">📣 노출일·카톡 알림</label>
+                        <div class="ps-f"><label title="이 시각에 손님 화면에 올라가고 카톡 알림(🔔)도 떠요">📣 노출일·카톡 알림</label>
                             <div class="ps-row">
                                 <input type="date" class="ps-in" id="ps-rel-date-${sid}" value="${relVal ? relVal.slice(0, 10) : ''}" onchange="psItemSetRelease('${kq}', ${G})">
                                 <select class="ps-in ps-in-time gw-wheel" id="ps-rel-hour-${sid}" onchange="psItemSetRelease('${kq}', ${G})">${psTimeOptsHtml(relVal)}</select>
@@ -20001,7 +20007,7 @@
             const p2 = x => String(x).padStart(2, '0');
             const dk = t => { const d = new Date(t); return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`; };
             const s = uploadFormSched;
-            const rel0 = s ? s.releaseAt : new Date(`${dk(Date.now())}T${p2(PS_DEFAULT_SLOT)}:00`).getTime();   // [수정 2026-10-09] 노출일 기본 = 오늘 06시 (사장님 요청, 예전 내일)
+            const rel0 = s ? s.releaseAt : new Date(`${dk(Date.now())}T${p2(PS_DEFAULT_SLOT)}:00`).getTime();   // [수정 2026-10-09] 노출일 기본 = 오늘 (시각은 PS_DEFAULT_SLOT — 2026-10-10부터 00시) (사장님 요청, 예전 내일)
             const stub = (uploadIsEditMode && uploadEditProductKey !== null && uploadProducts[uploadEditProductKey]) || {};
             const def = s ? { expireAt: s.expireAt, pickup: s.pickup } : psDefaultSchedule(stub, rel0);
             const relH = new Date(rel0).getHours();
@@ -20016,10 +20022,10 @@
             box.onclick = e => { if (e.target === box) box.remove(); };
             box.innerHTML = `<div style="background:#fff; border-radius:14px; width:min(420px,100%); padding:16px; box-sizing:border-box;">
                 <div style="font-size:14px; font-weight:900; margin-bottom:4px;">📅 노출일정${s && s.key ? ' <span style="font-size:11px; font-weight:800; color:#2563eb;">· 지금 걸린 일정</span>' : ''}</div>
-                <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:10px;">${s && s.key ? '고치고 상품을 저장하면 이 일정이 바뀌어요 (노출일정 달력에도 그대로)' : '상품을 저장하면 이 일정이 노출일정 달력에 담겨요'}. 노출일 0시에 손님 화면에 올라가요</div>
+                <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:10px;">${s && s.key ? '고치고 상품을 저장하면 이 일정이 바뀌어요 (노출일정 달력에도 그대로)' : '상품을 저장하면 이 일정이 노출일정 달력에 담겨요'}. 고른 시각에 손님 화면에 올라가고 카톡 알림도 떠요</div>
                 <div style="display:flex; flex-direction:column; gap:6px;">
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="${LAB}" title="그 날짜 0시에 손님 화면에 올라가요. 시각은 카톡 알림용이에요">📣 노출일</span>
+                        <span style="${LAB}" title="이 시각에 손님 화면에 올라가고 카톡 알림(🔔)도 떠요">📣 노출일</span>
                         <input type="date" id="fsp-date" value="${dk(rel0)}" onchange="fspFillDefaults()" style="${IN}">
                         <select id="fsp-hour" class="gw-wheel" style="${SEL}">${PS_SLOTS.map(h => `<option value="${h}"${h === relH ? ' selected' : ''}>${psSlotLabel(h)}</option>`).join('')}</select>
                     </div>
@@ -20050,7 +20056,7 @@
             fspSyncPickup();
         }
         function fspRelMs() {
-            const d = (document.getElementById('fsp-date') || {}).value, h = Number((document.getElementById('fsp-hour') || {}).value) || PS_DEFAULT_SLOT;
+            const d = (document.getElementById('fsp-date') || {}).value, _hv = (document.getElementById('fsp-hour') || {}).value, h = (_hv === undefined || _hv === '') ? PS_DEFAULT_SLOT : Number(_hv);   // 00시(0)도 그대로
             return d ? new Date(`${d}T${String(h).padStart(2, '0')}:00`).getTime() : null;
         }
         // 노출일을 바꾸면 마감·픽업 기본값도 따라 바꾼다 (손으로 고친 마감은 그대로)
@@ -32167,14 +32173,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                             if (_nextSched) {
                                 const _md = ms => { const d = new Date(Number(ms)); return `${d.getMonth() + 1}/${d.getDate()}(${'일월화수목금토'[d.getDay()]})`; };
                                 const _r = Number(_nextSched.releaseAt), _e = Number(_nextSched.expireAt);
-                                scheduleBadge += `<span title="노출일정에 걸린 다음 일정${_r ? ' · ' + fFmtSchedTime(_r) + ' 알림(그날 0시 노출)' : ''}${_e ? ' · ' + fFmtSchedTime(_e) + ' 마감' : ''}" style="font-size: 10px; font-weight: 800; background: #eef2ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">📅 다음 일정 ${_r ? _md(_r) + ' 노출' : ''}${_r && _e ? ' · ' : ''}${_e ? _md(_e) + ' 마감' : ''}</span>`;
+                                scheduleBadge += `<span title="노출일정에 걸린 다음 일정${_r ? ' · ' + fFmtSchedTime(_r) + ' 노출·카톡 알림' : ''}${_e ? ' · ' + fFmtSchedTime(_e) + ' 마감' : ''}" style="font-size: 10px; font-weight: 800; background: #eef2ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">📅 다음 일정 ${_r ? _md(_r) + ' 노출' : ''}${_r && _e ? ' · ' : ''}${_e ? _md(_e) + ' 마감' : ''}</span>`;
                             }
                         }
                         /* [수정 2026-10-05] 넷째 줄(노출 여부 · 노출일 · 마감일)에 노출일과 마감일을 둘 다 보여 준다 (사장님 요청).
                            예전엔 올라가기 전이면 노출일만, 올라간 뒤면 마감만 보였다 */
                         if (prod.releaseAt) {
                             const _od = new Date(psOpenAt(prod.releaseAt)), _up = _now < psOpenAt(prod.releaseAt);
-                            scheduleBadge += `<span title="${_up ? '이 날 0시에 자동으로 노출됩니다' : '이 날 0시에 노출됐어요'} (카톡 알림은 ${fFmtSchedTime(prod.releaseAt)})" style="font-size: 10px; font-weight: 800; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">📣 ${_od.getMonth() + 1}/${_od.getDate()} 노출</span>`;
+                            scheduleBadge += `<span title="${_up ? '이 시각에 자동으로 노출됩니다' : '노출됐어요'} (카톡 알림은 ${fFmtSchedTime(prod.releaseAt)})" style="font-size: 10px; font-weight: 800; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">📣 ${_od.getMonth() + 1}/${_od.getDate()}${(_od.getHours() || _od.getMinutes()) ? " " + psSlotLabel(_od.getHours(), _od.getMinutes()) : ""} 노출</span>`;
                         }
                         if (prod.expireAt) {
                             scheduleBadge += `<span title="주문 마감 시각" style="font-size: 10px; font-weight: 800; background: #fff7ed; color: #d97706; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🕕 ${fFmtSchedTime(prod.expireAt)} 마감</span>`;
@@ -32397,7 +32403,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                       올라감을 바꾸면 마감·픽업일 기본값이 따라 바뀐다 — 손으로 고친 칸은 그대로 둔다. 고른 상품 모두 같은 마감·픽업일로 담긴다 */''}
                 <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <span title="그 날짜 0시에 손님 화면에 올라가요. 이 시각에는 카톡 홍보 알림(🔔)만 떠요" style="flex:0 0 auto; width:58px; white-space:nowrap; font-size:11.5px; font-weight:800; color:#475569;">📣 노출일</span>
+                        <span title="이 시각에 손님 화면에 올라가고 카톡 알림(🔔)도 떠요" style="flex:0 0 auto; width:58px; white-space:nowrap; font-size:11.5px; font-weight:800; color:#475569;">📣 노출일</span>
                         <input type="date" id="bsp-date" value="${d0.getFullYear()}-${p2(d0.getMonth() + 1)}-${p2(d0.getDate())}" onchange="psBatchFillDefaults()" style="flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
                         <select id="bsp-hour" class="gw-wheel" onchange="psBatchFillDefaults()" style="flex:0 0 auto; width:84px; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800;">${PS_SLOTS.map(h => `<option value="${h}"${h === PS_DEFAULT_SLOT ? ' selected' : ''}>${psSlotLabel(h)}</option>`).join('')}</select>
                     </div>
@@ -32428,7 +32434,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
         // [신규 2026-10-03] 일정에 담기 창 — 올라감 시각
         function psBatchRelMs() {
-            const d = (document.getElementById('bsp-date') || {}).value, h = Number((document.getElementById('bsp-hour') || {}).value) || PS_DEFAULT_SLOT;
+            const d = (document.getElementById('bsp-date') || {}).value, _hv = (document.getElementById('bsp-hour') || {}).value, h = (_hv === undefined || _hv === '') ? PS_DEFAULT_SLOT : Number(_hv);   // 00시(0)도 그대로
             return d ? new Date(`${d}T${String(h).padStart(2, '0')}:00`).getTime() : null;
         }
         // [신규 2026-10-03] 마감·픽업일 칸을 기본값으로 채운다 (노출일정과 같은 규칙 — 고른 첫 상품 기준). 손으로 고친 칸은 건드리지 않는다
