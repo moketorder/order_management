@@ -20145,6 +20145,18 @@
             · list  : 정상가를 적는다           (지금 9,500에 팔고 있고 12,000 적음 → 판매가가 12,000이 되고 2,500 할인)
            list는 판매가 칸의 값 자체를 정상가로 올린다. 그래야 손님 화면에 정상가가 그어져 보인다. */
         let uploadDiscountAmountMode = 'cut';   // 'cut' | 'final' | 'list'
+        /* [신규 2026-10-11] 정상가는 따로 저장한다 (사장님 요청 — 정상가는 손님을 끌려고 적는 값).
+           정상가 방식이면: 가격 칸 = 판매가(손님이 내는 값, 그대로 저장) · listPrice = 정상가 · discountAmount = 정상가 − 판매가(표시용)
+           예전엔 가격 칸을 정상가로 올려 저장해서, 다시 열고 가격 칸을 판매가로 고치면 할인이 두 번 빠졌다 (8,500·9,500 → 7,500).
+           손님 주문서는 listPrice 가 있으면 그어진 값 = 정상가, 받는 값 = 가격 으로 본다 (gListPrice) */
+        let uploadDiscountListPrice = 0;
+        function gFormIsList() { return !!(uploadUseDiscount && uploadDiscountType === 'amount' && uploadDiscountAmountMode === 'list' && uploadDiscountListPrice > 0); }
+        // 상품의 할인 전·후 값 — 정상가(listPrice)가 따로 있으면 그것이 할인 전, 가격이 할인 후
+        function gProdListPrice(p) {
+            const lp = parseInt(p && p.listPrice) || 0, pr = parseInt(p && p.price) || 0;
+            const on = p && (p.useDiscount === true || p.useDiscount === 'true');
+            return (on && p.discountType === 'amount' && p.discountAmountMode === 'list' && lp > pr) ? lp : 0;
+        }
         const DISCOUNT_AMOUNT_MODES = [
             ['cut', '깎을 금액', '적은 금액만큼 판매가에서 뺍니다.'],
             ['final', '팔 금액', '판매가와의 차액만큼 할인합니다. 판매가는 그대로 둡니다.'],
@@ -20176,9 +20188,11 @@
             return { amount: v, price: p };
         }
         // 지금 손님이 내는 값 — 판매가에서 지금 걸린 원 할인을 뺀 값
+        /* [수정 2026-10-11] 정상가 방식에서는 가격 칸이 곧 손님이 내는 값(판매가)이다 (사장님 요청 — 가격 칸 8,500 · 정상가 9,500 → 8,500).
+           예전엔 '가격 칸 − 지금 걸린 할인'으로 잡아서, 전에 깎을 금액 할인이 남아 있으면 한 번 더 빠졌다 (7,500).
+           예전 방식(가격 칸 = 정상가)으로 저장된 상품은 열 때 가격 칸을 판매가로 바꿔 두므로(editProduct) 여기서는 가격 칸만 본다 */
         function gDiscSellBase(useDiscount, type, amount) {
-            const a = (useDiscount && type === 'amount') ? Math.max(0, parseInt(amount) || 0) : 0;
-            return Math.max(0, gFormPrice() - a);
+            return gFormPrice();
         }
         // [수정] 둘 다 기본은 꺼짐. 켤 일보다 안 켤 일이 많아 매번 지우는 게 번거로웠다.
         let uploadSaleToToday = false;     // 할인하면 '오늘의 상품'에 넣을지
@@ -20376,6 +20390,7 @@
             // [신규] 할인은 상품마다 다르므로 기본값으로 물려주지 않는다. 새 상품은 항상 꺼진 채로 시작.
             uploadUseDiscount = false;
             uploadDiscountRate = 0;
+            uploadDiscountListPrice = 0;   // [신규 2026-10-11]
             uploadDiscountType = 'amount'; uploadDiscountAmount = 0; uploadSaleToToday = false; uploadSaleBadge = false; uploadDiscountAmountMode = 'cut';   // [수정] 새 상품은 둘 다 꺼진 채로 시작 · [수정 2026-10-05] 할인 방식 기본은 '원 할인 · 깎을 금액'
 
             uploadMaxPerPerson = parseInt(pl.max) || 0;
@@ -20606,7 +20621,7 @@
                 discountType: (on && uploadUseDiscount) ? uploadDiscountType : 'amount',
                 discountAmount: uploadDiscountAmount,
                 discountAmountMode: (on && uploadUseDiscount) ? uploadDiscountAmountMode : 'cut',   // [신규] 원 할인 입력 방식 (깎을 금액/팔 금액/정상가)
-                discountNewPrice: 0,
+                discountNewPrice: gFormIsList() ? uploadDiscountListPrice : 0,   // [수정 2026-10-11] 정상가 방식이면 저장된 정상가 (미리보기·입력칸이 정상가로 보이게)
                 discountSellBase: gDiscSellBase(uploadUseDiscount, uploadDiscountType, uploadDiscountAmount),   // [수정 2026-10-02] 정상가 방식의 밑값
                 saleToToday: uploadSaleToToday,
                 saleBadge: uploadSaleBadge,
@@ -20725,10 +20740,17 @@
             /* [신규] '정상가' 방식으로 적었으면 판매가 칸을 그 정상가로 올린다.
                손님 화면은 판매가를 그어 놓고 할인가를 보여주므로, 정상가가 판매가 자리에 있어야 맞다.
                (확인을 눌렀을 때만 바꾼다 — 취소하면 판매가는 그대로) */
+            /* [수정 2026-10-11] 가격 칸은 판매가(손님이 내는 값) 그대로 두고 정상가는 따로 담는다 (사장님 요청).
+               예전엔 가격 칸을 정상가로 올렸다 — 그래서 다시 열어 가격 칸을 고치면 할인이 두 번 빠졌다 */
             if (uploadUseDiscount && uploadDiscountType === 'amount' && uploadDiscountAmountMode === 'list') {
-                const np = Math.max(0, parseInt(optionModalDraft.discountNewPrice) || 0);
+                const sell = Math.max(0, parseInt(optionModalDraft.discountSellBase) || 0);
+                const np = Math.max(0, parseInt(optionModalDraft.discountNewPrice) || 0) || (sell + draftAmt);
                 const priceEl = document.getElementById('productPrice');
-                if (np > 0 && priceEl && priceEl.type === 'number') priceEl.value = np;
+                if (sell > 0 && priceEl && priceEl.type === 'number') priceEl.value = sell;   // 할인 방식을 바꿔 들어왔을 때만 값이 달라진다 (깎을 금액 → 정상가 등)
+                uploadDiscountListPrice = np;
+                uploadDiscountAmount = Math.max(0, np - sell);
+            } else {
+                uploadDiscountListPrice = 0;
             }
             // [수정] 적어 두지 않았으면 '꺼짐'으로 본다 (예전에는 안 적으면 켜진 것으로 봤다)
             uploadSaleToToday = false;   // [수정 2026-10-02] '당일 상품에 넣기' 체크를 뺐다 — 늘 꺼짐
@@ -32207,7 +32229,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     const _listDiscRate = _listDiscOn ? Math.min(100, Math.max(0, parseInt(prod.discountRate) || 0)) : 0;
                     const _listDiscAmt = _listDiscOn ? Math.max(0, parseInt(prod.discountAmount) || 0) : 0;
                     const _listSale = _listDiscOn && gDiscHas(_listDType, _listDiscRate, _listDiscAmt);
-                    const _listBasePrice = parseInt(prod.price) || 0;
+                    const _listBasePrice = (_listDiscOn && gProdListPrice(prod)) || parseInt(prod.price) || 0;   // [수정 2026-10-11] 정상가를 따로 저장했으면 그것이 할인 전
                     const _listSalePrice = gDiscApply(_listBasePrice, _listDType, _listDiscRate, _listDiscAmt);
                     const discountBadge = _listSale
                         ? `<span title="할인 중인 상품입니다" style="font-size: 10px; font-weight: 800; background: #ffe4e6; color: #e11d48; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px;">🏷️ 할인중 ${gDiscLabel(_listDType, _listDiscRate, _listDiscAmt)}</span>`
@@ -33274,6 +33296,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     discountRate: uploadDiscountRate,
                     discountType: uploadDiscountType,
                     discountAmount: uploadDiscountAmount,
+                    listPrice: gFormIsList() ? uploadDiscountListPrice : null,   // [신규 2026-10-11] 정상가 (따로 저장 — 가격은 판매가 그대로)
                     discountAmountMode: uploadDiscountAmountMode,   // [신규] 원 할인을 어떻게 적었는지 (다시 열 때 같은 방식으로 보여 주려고 저장)
                     saleToToday: uploadSaleToToday,
                     saleBadge: uploadSaleBadge,
@@ -34348,6 +34371,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             uploadDiscountAmount = Math.max(0, parseInt(prod.discountAmount) || 0);
             // [신규] 원 할인 입력 방식 복원 (없으면 예전 상품이므로 깎을 금액 방식)
             uploadDiscountAmountMode = ["cut", "final", "list"].includes(prod.discountAmountMode) ? prod.discountAmountMode : "cut";
+            /* [신규 2026-10-11] 정상가 따로 저장 — listPrice 가 있으면 그대로. 예전 방식(가격 칸 = 정상가)으로 저장된 상품이면
+               가격 칸을 판매가(가격 − 할인)로, 정상가를 가격으로 옮겨 보여 준다. 저장하면 새 방식으로 바뀐다 */
+            uploadDiscountListPrice = 0;
+            if (uploadUseDiscount && uploadDiscountType === 'amount' && uploadDiscountAmountMode === 'list') {
+                const _pe = document.getElementById('productPrice'), _pr = parseInt(prod.price) || 0;
+                if (gProdListPrice(prod)) { uploadDiscountListPrice = gProdListPrice(prod); uploadDiscountAmount = Math.max(0, uploadDiscountListPrice - _pr); }
+                else if (uploadDiscountAmount > 0 && _pr > uploadDiscountAmount) {
+                    uploadDiscountListPrice = _pr;
+                    if (_pe && _pe.type === 'number') _pe.value = _pr - uploadDiscountAmount;
+                }
+            }
             // [수정] 적혀 있지 않으면 꺼진 것으로 본다 (기본이 꺼짐으로 바뀌었다)
             uploadSaleToToday = (prod.saleToToday === true || prod.saleToToday === "true");
             uploadSaleBadge = (prod.saleBadge === true || prod.saleBadge === "true");
@@ -40317,7 +40351,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (isRecommendListProduct(p)) heads.push('오늘의추천');
             const seen = new Set();   // '오늘의 추천'·'오늘의추천'처럼 띄어쓰기만 다른 것은 하나로
             const head = heads.filter(h => { const k = h.replace(/\s+/g, ''); if (!k || seen.has(k)) return false; seen.add(k); return true; }).join(' · ');
-            const price = Math.max(0, parseInt(p && p.price) || 0);
+            const price = Math.max(0, gProdListPrice(p) || parseInt(p && p.price) || 0);   // [수정 2026-10-11] 정상가를 따로 저장했으면 그것이 할인 전
             const yes = v => v === true || v === 'true';   // 상품 목록의 할인 표시와 같은 판단
             const on = p && (p.useOptions == null || yes(p.useOptions)) && yes(p.useDiscount);
             const type = (p && p.discountType === 'amount') ? 'amount' : 'rate';
