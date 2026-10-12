@@ -4518,6 +4518,9 @@
                     if (units && stEl && !stEl.disabled) { stEl.value = units; stEl.dispatchEvent(new Event('input', { bubbles: true })); stEl.dispatchEvent(new Event('change', { bubbles: true })); out.push('수량'); }
                     const pc = String(po.productCode || '').trim();
                     if (/^[PFS]\d+$/.test(pc) && typeof paintProductCodeField === 'function') { pendingProductCodeFromPurchase = pc; paintProductCodeField({ productCode: pc }); out.push('식별번호'); }
+                    // [신규 2026-10-12] 발주할 때 적은 예상 판매가가 있으면 상품 가격으로 (사장님 요청) — 밴드 권장가보다 앞선다
+                    const sp = parseInt(String(po.salePrice || '').replace(/[^\d]/g, ''), 10) || 0, prEl = document.getElementById('productPrice');
+                    if (sp > 0 && prEl) { prEl.value = sp; prEl.dispatchEvent(new Event('input', { bubbles: true })); prEl.dispatchEvent(new Event('change', { bubbles: true })); out.push('가격 ' + sp.toLocaleString() + '원'); }
                     return out;
                 }
                 // [신규 2026-10-09] 이어 둔 발주가 없을 때 — 알리고 '발주 연결할까요?'
@@ -4716,7 +4719,7 @@
                     S.prod = prod;
                     const lk = srcPoLinkGet(r);   // [신규 2026-10-08] 손으로 이은 발주가 있으면 그것
                     if (lk) { S.po1 = srcPoById(lk.id) || lk; S.po = true; }
-                    else if (srcPoIndex().n) { S.po1 = srcPoFor(p, date, prod); S.po = !!S.po1; }   // 발주 목록을 받아 왔을 때만
+                    else if (srcPoIndex().n) { S.po1 = srcPoFor(p, date, prod); S.po = false; }   // [수정 2026-10-12] 이름으로 저절로 찾은 발주(po1)는 상품등록 칸 채우기에만 쓰고, '발주됨'은 손으로 연결한 것만 (사장님 요청)
                     if (i === null) return S;
                     S.reg = !!prod;
                     const sc = srcSchedState(prod, date); if (sc) { S.sched = !!sc.hit; S.hit = sc.hit; }
@@ -4747,8 +4750,17 @@
                 function srcCalPass(rs, date) {
                     const F = gSrc.calF || {}, on = SRC_CAL_F.filter(([k]) => F[k]).map(([k]) => k);
                     if (!on.length) return true;
+                    /* [수정 2026-10-12] 발주 목록을 아직 안 받았으면 발주 상태를 몰라(null) '발주등록X'에서 다 사라졌다 (사장님 요청)
+                       — 한 번 받아 오고 다시 그린다 */
+                    if (on.includes('po') && !srcPoIndex().n && !srcCalPass._asked && typeof msEnsurePurchaseLoaded === 'function') {
+                        srcCalPass._asked = true;
+                        msEnsurePurchaseLoaded().then(() => { _srcPoIx = null; srcRender(); }).catch(() => { });
+                    }
                     const S = srcRegState(rs, date);
-                    return on.some(k => S[k] === false);
+                    // [수정 2026-10-12] 상시판매 이름표는 발주를 따로 안 하니 '발주등록X'에서는 뺀다 (사장님 요청)
+                    //  사다드림도 뺀다 — 사다드림 이름표(ref 없음)는 원래 안 나오고, 이름에 '사다드림'이 든 이름표도 뺀다
+                    let _onsite = false; try { const _r = JSON.parse(rs); _onsite = _r[0] === 'onsite' || /사다드림/.test(String((srcRefGet(_r) || {}).name || '')); } catch (e) { }
+                    return on.some(k => !(k === 'po' && _onsite) && S[k] === false);
                 }
                 function srcCalFToggle(k) { gSrc.calF = gSrc.calF || {}; gSrc.calF[k] = !gSrc.calF[k]; srcRender(); }
                 /* [신규 2026-10-07] 노출일정 표시 — 등록된 상품(노출번호 sid)의 일정 중
