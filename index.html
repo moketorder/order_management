@@ -3584,6 +3584,12 @@
                         #purchase-section-sourcing .src-cal-day { min-height:132px; border:1px solid var(--src-line); border-radius:8px; padding:4px; background:#f8fafc; display:flex; flex-direction:column; gap:3px; min-width:0; box-sizing:border-box; }
                         #purchase-section-sourcing .src-cal-day.other { opacity:.45; }
                         #purchase-section-sourcing .src-cal-day.inweek { background:#fff; border-color:#99d4c6; }
+                        /* [신규 2026-10-12] 다음 주 칸 · 위 줄 표시 (사장님 요청) */
+                        #purchase-section-sourcing .src-cal-day.inweek { border:2px solid #4caf50; }
+                        #purchase-section-sourcing .src-cal-day.nextwk { background:#fff; border:2px solid #f59e0b; }
+                        #purchase-section-sourcing .src-wk-lg { display:inline-block; font-size:12px; font-weight:800; padding:2px 8px; border-radius:6px; border:2px solid; background:#fff; }
+                        #purchase-section-sourcing .src-wk-lg.this { border-color:#4caf50; color:#2f7d14; }
+                        #purchase-section-sourcing .src-wk-lg.next { border-color:#f59e0b; color:#b45309; }
                         #purchase-section-sourcing .src-cal-day.today .n { color:#fff; background:var(--src-acc); border-radius:999px; padding:0 6px; }
                         #purchase-section-sourcing .src-cal-day.over { outline:2px dashed var(--src-acc); outline-offset:-1px; background:var(--src-acc-soft); }
                         #purchase-section-sourcing .src-cal-day .n { font-size:11px; font-weight:900; font-variant-numeric:tabular-nums; align-self:center; line-height:16px; flex:0 0 auto; }   /* [수정 2026-10-07] 날씨와 한 줄에 (사장님 요청) */
@@ -3963,7 +3969,8 @@
                 function srcRenderLineup(v) {
                     try { srcApplyBandEditsToLineup(); } catch (e) { }   // [신규 2026-10-07]
                     const weeks = Object.keys(gSrc.lineup).sort().reverse();
-                    if (!weeks.length) { v.innerHTML = '<div class="src-none">아직 짜 둔 주간 구성이 없어요. 주간 구성이 올라오면 여기 보여요.</div>'; return; }
+                    /* [수정 2026-10-12] 주간 구성(월요일 예약 작업이 올리는 lineup) 없이도 그린다 — 주 고르기 줄은 뺐다.
+                       달력은 날짜로 이번 주·다음 주를 표시한다 (사장님 요청). 달력에 넣어 둔 것(picks·direct·manual·onsite)은 그대로 둔다 */
                     const w = gSrc.lineup[gSrc.week] || {};
                     const items = Object.entries(w.items || {}).map(([key, it]) => Object.assign({ key }, it));
                     const picks = gSrc.picks[gSrc.week] || {};
@@ -3978,11 +3985,7 @@
                     const cut3m = srcAddDays(srcToday(), -92);
                     const weeksShown = weeks.filter((k, i) => i === 0 || k >= cut3m || k === gSrc.week);
                     let html = '<div class="src-bar">' +
-                        '<select onchange="gSrc.week=this.value; gSrc.calMonth=this.value.slice(0, 7); srcRender()">' + weeksShown.map(k => '<option value="' + k + '"' + (k === gSrc.week ? ' selected' : '') + '>' + srcEsc((gSrc.lineup[k] || {}).label || k) + (k === weeks[0] ? ' (최신)' : '') + '</option>').join('') + '</select>' +
-                        '<span><span class="k">상품</span> <b>' + items.length + '개</b></span>' +
-                        '<span><span class="k">고른 상품</span> <b>' + pickedN + '개</b></span>' +
-                        '<span><span class="k">평균 마진</span> <b>' + avgM + '</b></span>' +
-                        (w.weatherNote ? '<span><span class="k">날씨</span> <b>' + srcEsc(w.weatherNote) + '</b></span>' : '') +
+                        '<span><b class="src-wk-lg this">이번 주</b> <b class="src-wk-lg next">다음 주</b></span>' +   // [수정 2026-10-12] 주 고르기·상품 수·마진 대신 이번 주·다음 주 표시 (사장님 요청)
                         '<span class="k">아래 카테고리별 추천에서 상품명을 누르면 수정·밴드·건너뜀·추천제외, 달력 날짜에 끌어다 놓으면 그날 판매로 표시돼요. 판매·건너뜀한 상품은 4주 동안 다시 추천하지 않아요.</span></div>';
 
                     html += srcCalendar() + srcSearchPanel() + srcPlanPanel();   // [신규 2026-10-08] 찾기 칸과 카테고리 추천 사이에 다음 2주 공구 추천   // [수정 2026-10-07] 상시판매·밴드 상품·예전 공구 찾기를 한 칸으로 (왼쪽 켜고 끄기 세 개)
@@ -4483,7 +4486,8 @@
                    · 저장해 둔 밴드 상품(sourcing/band)이 있으면 그 상품설명(ds)을 상세설명 칸에 불러온다
                      (밴드 목록에서 연 창은 그 줄, 아니면 업체+상품명 → 상품명만 같은 것 차례로 찾는다)
                    · 상품명, 판매가 = 권장최저가(없으면 공급가 ÷ 0.7 을 100원 올림) — 발주 → 상품등록과 같은 셈
-                   · 저장은 하지 않는다. 사진·수량·분류는 사장님이 넣고 '등록 완료'를 누른다 */
+                   · 저장은 하지 않는다. 사진·수량·분류는 사장님이 넣고 '등록 완료'를 누른다
+                   · [2026-10-11] 밴드 사진을 미리 올려 둔 상품(band.im)은 사진도 채운다 */
                 async function srcFindBand(tg) {
                     if (!gSrc.band) { try { gSrc.band = (await srcGet('band')) || {}; } catch (e) { return null; } }
                     const nk = s => String(s || '').replace(/\s/g, '');
@@ -4561,6 +4565,16 @@
                         if (priceEl && price) { priceEl.value = price; fire(priceEl); }
                         const ds = String((band && band.ds) || '').trim();
                         if (descEl && ds) { descEl.value = ds; fire(descEl); if (typeof setDescBoxOpen === 'function') setDescBoxOpen(true); if (typeof autoResizeTextarea === 'function') autoResizeTextarea(descEl); }
+                        /* [신규 2026-10-11] 밴드 사진(im — imgbb에 미리 올려 둔 주소)이 있으면 사진 칸에 넣어 둔다 (사장님 요청).
+                           이미 올라간 사진이라 '기존 사진'처럼 넣는다 — 등록 완료 때 다시 올리지 않는다. 첫 장이 대표 사진 */
+                        const bandIm = (band && Array.isArray(band.im)) ? band.im.filter(u => /^https?:\/\//.test(String(u || ''))) : [];
+                        let imFilled = 0;
+                        if (bandIm.length && typeof renderSelectedFilesList === 'function') {
+                            uploadSelectedFiles = bandIm.map((u, i) => ({ file: null, id: u, isExisting: true, displayName: `밴드 사진 ${i + 1}` }));
+                            uploadThumbnailIndex = 0;
+                            renderSelectedFilesList();
+                            imFilled = bandIm.length;
+                        }
                         /* [신규 2026-10-09] 달력 이름표에서 열면 (사장님 요청)
                            · 공구 날짜 = 달력에 놓인 날짜  · 재고 = 이어진 발주의 낱개 수량(totalUnits, 없으면 qty)
                            · 보관방법 = 상품설명의 '보관' 줄에서 냉동·냉장·상온(실온) 단추를 눌러 둔다 */
@@ -4583,6 +4597,7 @@
                             else setTimeout(() => srcAskPoLink(tg, o.ref), 350);
                         }
                         if (!o.ref && typeof pendingProductCodeFromPurchase !== 'undefined' && pendingProductCodeFromPurchase) filled.push('식별번호');
+                        if (imFilled) filled.push('사진 ' + imFilled + '장');
                         const stg = srcStorageOf(ds);
                         if (stg && typeof setStorageType === 'function') { uploadStorageType = ''; setStorageType(stg); filled.push('보관'); }
                         if (typeof gPaintNamePreview === 'function') gPaintNamePreview();
@@ -4653,6 +4668,17 @@
                     _srcPoIx = { byName, byCode, n: list.length }; _srcPoIxAt = Date.now();
                     return _srcPoIx;
                 }
+                /* [신규 2026-10-12] 같은 상품(띄어쓰기 뺀 이름) 이름표들의 날짜 — 차례대로. 발주를 이름표 하나에만 주려고 쓴다 (srcPoFor) */
+                let _srcTagDx = null, _srcTagDxAt = 0;
+                function srcTagDatesOf(norm) {
+                    if (!_srcTagDx || Date.now() - _srcTagDxAt > 2000) {
+                        const m = new Map(), add = (p, d) => { if (!p || !d) return; const n = srcNormName(p.name); if (n) (m.get(n) || m.set(n, new Set()).get(n)).add(String(d).slice(0, 10)); };
+                        Object.entries(gSrc.picks || {}).forEach(([wk, items]) => Object.values(items || {}).forEach(p => p && add(p, p.date || srcAddDays(wk, Math.max(0, SRC_DAYS.indexOf(p.day))))));
+                        ['direct', 'manual', 'onsite'].forEach(k => Object.values(gSrc[k] || {}).forEach(p => p && add(p, p.date)));
+                        _srcTagDx = m; _srcTagDxAt = Date.now();
+                    }
+                    return [...(_srcTagDx.get(norm) || [])].sort();
+                }
                 function srcPoFor(p, date, prod) {
                     const ix = srcPoIndex();
                     const me = srcNormName(p.name);
@@ -4661,7 +4687,13 @@
                        — 띄어쓰기 뺀 이름이 6글자 넘고 한쪽이 다른 쪽에 들어 있으면 같은 상품으로 본다 */
                     if (me.length >= 6) ix.byName.forEach((list, n) => { if (n !== me && n.length >= 6 && (me.includes(n) || n.includes(me))) c = c.concat(list); });
                     if (!c.length) return null;
-                    const lo = srcAddDays(date || srcToday(), -21), hi = srcAddDays(date || srcToday(), 3);
+                    let lo = srcAddDays(date || srcToday(), -21), hi = srcAddDays(date || srcToday(), 3);
+                    /* [수정 2026-10-12] 발주 하나는 이름표 하나에만 (사장님 요청 — 매주 하는 상품을 다음 주로 복사하면 지난주 발주가 따라갔다)
+                       같은 상품 이름표가 앞에 있으면 그 날짜까지의 발주는 앞 이름표 것, 뒤에 있으면 이 이름표 날짜 뒤 발주는 뒤 이름표 것 */
+                    const D = date || srcToday(), ds = srcTagDatesOf(me);
+                    const prev = ds.filter(d => d < D).pop(), next = ds.find(d => d > D);
+                    if (prev && srcAddDays(prev, 1) > lo) lo = srcAddDays(prev, 1);
+                    if (next && D < hi) hi = D;
                     const inWin = c.filter(po => String(po.date).slice(0, 10) >= lo && String(po.date).slice(0, 10) <= hi);
                     if (!inWin.length) return null;
                     return inWin.sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
@@ -5226,7 +5258,7 @@
                 const SRC_TAG_RANK = { sada: 0, '': 1, alt: 2, direct: 3, onsite: 4, manual: 5 };
                 // 고른 상품(식단표)과 판매 표시(밴드 목록)를 판 날짜 칸에 보여 준다. 날짜 칸은 끌어다 놓는 자리다.
                 function srcCalendar() {
-                    const month = gSrc.calMonth || (gSrc.week || srcToday()).slice(0, 7);
+                    const month = gSrc.calMonth || srcToday().slice(0, 7);   // [수정 2026-10-12] 처음엔 오늘 달 (주간 구성 주 말고)
                     gSrc.calMonth = month;
                     const [y, m] = month.split('-').map(Number);
                     const first = new Date(y, m - 1, 1), last = new Date(y, m, 0);
@@ -5237,7 +5269,7 @@
                     const nf = new Date(y, m, 1); while (nf.getDay() === 0 || nf.getDay() === 6) nf.setDate(nf.getDate() + 1);
                     const calEnd = new Date(nf); calEnd.setDate(calEnd.getDate() - (calEnd.getDay() + 6) % 7);
                     const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-                    const today = srcToday(), weekEnd = gSrc.week ? srcAddDays(gSrc.week, 4) : '';
+                    const today = srcToday(), wk0 = srcMonday(today), wk1 = srcAddDays(wk0, 7), wkEnd = srcAddDays(wk0, 11);   // [수정 2026-10-12] 이번 주·다음 주는 날짜로 (사장님 요청)
                     const byDate = {};
                     Object.entries(gSrc.picks).forEach(([wk, items]) => Object.entries(items || {}).forEach(([key, p]) => {
                         if (!p) return;
@@ -5279,7 +5311,7 @@
                             const k = iso(x);
                             const cls = ['src-cal-day'];
                             if (x.getMonth() !== m - 1) cls.push('other');
-                            if (gSrc.week && k >= gSrc.week && k <= weekEnd) cls.push('inweek');
+                            if (k >= wk0 && k <= wkEnd) cls.push(k < wk1 ? 'inweek' : 'nextwk');
                             if (k === today) cls.push('today');
                             const hol = SRC_HOLIDAYS[k], off = gSrc.closed.indexOf(k) >= 0;
                             if (hol) cls.push('hol');
@@ -5567,6 +5599,7 @@
                 function srcRefGet(r) { return (r[0] === 'pick' ? (gSrc.picks[r[1]] || {})[r[2]] : (gSrc[r[0]] || {})[r[1]]) || null; }
                 function srcRefSet(r, val) {
                     let m;
+                    _srcTagDx = null;   // [신규 2026-10-12] 이름표가 바뀌면 같은 상품 날짜 목록도 새로
                     if (r[0] === 'pick') { m = gSrc.picks[r[1]] = gSrc.picks[r[1]] || {}; r = [0, r[2]]; }
                     else m = gSrc[r[0]] = gSrc[r[0]] || {};
                     if (val) m[r[1]] = val; else delete m[r[1]];
@@ -33297,7 +33330,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     discountType: uploadDiscountType,
                     discountAmount: uploadDiscountAmount,
                     listPrice: gFormIsList() ? uploadDiscountListPrice : null,   // [신규 2026-10-11] 정상가 (따로 저장 — 가격은 판매가 그대로)
-                    discountAmountMode: uploadDiscountAmountMode,   // [신규] 원 할인을 어떻게 적었는지 (다시 열 때 같은 방식으로 보여 주려고 저장)
+                    discountAmountMode: uploadDiscountAmountMode,   // [신규] 원 할인을 어떻게 적었는지 (다시 열 때 같은 방식으로 보여주려고 저장)
                     saleToToday: uploadSaleToToday,
                     saleBadge: uploadSaleBadge,
                     saleBadgeText: uploadSaleBadgeText,   // [신규 2026-10-02] 섬네일 띠 문구 — 비우면 주문서는 'n원 할인!'
