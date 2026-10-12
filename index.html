@@ -6492,7 +6492,8 @@
 
                             <!-- 버튼 영역 -->
                             <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                <button type="button" id="btn-purchase-cancel" onclick="resetPurchaseOrderForm()" class="btn-common btn-secondary" style="display: none; flex: 1 1 0; min-width: 0; justify-content: center; box-sizing: border-box; border: 1.5px solid transparent; padding: 10px 2px; font-size: 13px; white-space: nowrap;">취소</button>
+                                <!-- [수정 2026-10-12] 취소는 늘 보인다 (사장님 요청) — 새 발주면 칸을 비우고, 다른 화면에서 열었으면 그 화면으로 돌아간다 -->
+                                <button type="button" id="btn-purchase-cancel" onclick="cancelPurchaseOrderForm()" class="btn-common btn-secondary" style="display: flex; flex: 1 1 0; min-width: 0; justify-content: center; box-sizing: border-box; border: 1.5px solid transparent; padding: 10px 2px; font-size: 13px; white-space: nowrap;">취소</button>
                                 <button type="submit" id="btn-purchase-submit" class="btn-common" style="flex: 1 1 0; min-width: 0; justify-content: center; box-sizing: border-box; padding: 10px 2px; font-size: 13px; white-space: nowrap; background: #10b981; color: white; border: 1.5px solid #10b981; border-radius: var(--radius-sub); font-weight: 800; cursor: pointer;">💾 저장</button>
                                 <!-- [신규] 저장하고 바로 상품등록까지 이어서 하는 버튼.
                                      예전에는 저장 후 '상품등록 할래요?' 창을 띄웠는데, 매번 묻는 것이 성가셔서 버튼으로 바꿨다. -->
@@ -37551,9 +37552,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             
             document.getElementById('purchase-form-title').innerText = "✏️ 발주 내역 수정";
             document.getElementById('purchase-edit-mode-badge').style.display = "inline-block";
-            document.getElementById('btn-purchase-cancel').style.display = "inline-block";
             document.getElementById('btn-purchase-submit').innerText = "💾 저장";
-            
+
             switchPurchaseSubTab('register');
             onPurchaseCodeChange();
             calcPurchaseTotal();
@@ -37578,10 +37578,23 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             document.getElementById('purchase-form-title').innerText = "🚚 발주 내역 등록";
             document.getElementById('purchase-edit-mode-badge').style.display = "none";
-            document.getElementById('btn-purchase-cancel').style.display = "none";
             document.getElementById('btn-purchase-submit').innerText = "💾 저장";
-            
+
             calcPurchaseTotal();
+        }
+
+        /* [신규 2026-10-12] 발주 등록 '취소' (사장님 요청) — 저장하지 않고 칸을 비운다.
+           수정 중이었으면 새 발주 칸으로, 다른 화면(소싱 달력·상품 목록 등)에서 열었으면 그 화면으로 돌아간다. */
+        function cancelPurchaseOrderForm() {
+            const wasEditing = !!document.getElementById('purchase-editing-id').value;
+            const back = wasEditing ? null : gPurchaseReturn;
+            gPurchaseReturn = null;
+            resetPurchaseOrderForm();
+            if (back && back.tab && back.tab !== 'purchase-history') {
+                switchAdminTab(back.tab);
+                setTimeout(() => window.scrollTo(0, back.scroll || 0), 80);
+            }
+            showToast('발주 등록을 취소했어요');
         }
 
         async function deletePurchaseOrder(id, skipConfirm = false) {
