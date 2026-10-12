@@ -16403,8 +16403,11 @@
             const today = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
             getSalesSourceOrders().forEach(o => {
                 if (!o || isSalesCanceled(o)) return;
-                const st = String(o.status || ''); if (st === '픽업' || st === '배달완료') return;
-                if (salesFindProduct(o) !== p) return;
+                const st = String(o.status || ''); if (st === '픽업' || st === '픽업완료' || st === '배달완료' || st === '취소') return;
+                /* [수정 2026-10-12] 같은 이름 상품 줄이 여럿이면 salesFindProduct 가 다른 줄을 돌려줘 0개로 셌다 (사장님: 상품목록에서 안 뜸)
+                   — 찾은 상품이 같은 줄이거나, 노출번호(sid)가 같거나, 주문 상품 이름이 같으면 이 상품 주문으로 센다 */
+                const fp = salesFindProduct(o), nm = String(p.name || '').trim();
+                if (!(fp === p || (fp && p.sid && fp.sid === p.sid) || (nm && String(o.item || '').trim() === nm))) return;
                 const d = getOrderDateInfo(o).dateStr; if (!d || d === '기타' || d < today) return;
                 const q = parseInt(o.qty || 0, 10) || 0; if (!q) return;
                 out.qty += q; out.byDate[d] = (out.byDate[d] || 0) + q;
@@ -16419,7 +16422,7 @@
                 box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px;';
                 box.innerHTML = `<div style="background:#fff; border-radius:14px; padding:18px; max-width:360px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25);">
                     <div style="font-size:13.5px; font-weight:800; color:#0f172a; line-height:1.55; white-space:pre-line; margin-bottom:16px;">${gEscapeHtml(String(msg || ''))}</div>
-                    <div style="display:flex; flex-direction:column; gap:7px;">${opts.map((o, i) => `<button type="button" data-i="${i}" style="height:40px; border:${o.main ? 'none' : '1.5px solid var(--border)'}; background:${o.main ? '#2563eb' : '#f8fafc'}; color:${o.main ? '#fff' : '#334155'}; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">${gEscapeHtml(o.label)}</button>`).join('')}</div></div>`;
+                    <div style="display:flex; gap:6px;">${opts.map((o, i) => `<button type="button" data-i="${i}" style="flex:${o.main ? 1.4 : 1} 1 0; min-width:0; white-space:nowrap; height:42px; border:${o.main ? 'none' : '1.5px solid var(--border)'}; background:${o.main ? '#2563eb' : '#f8fafc'}; color:${o.main ? '#fff' : '#334155'}; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">${gEscapeHtml(o.label)}</button>`).join('')}</div></div>`;
                 const done = v => { box.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); };
                 const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
                 box.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) done(opts[+b.dataset.i].value); else if (e.target === box) done(null); });
@@ -16436,9 +16439,45 @@
             if (!(pend.qty > 0)) return n;
             const ds = Object.keys(pend.byDate).sort().map(d => `${Number(d.slice(5, 7))}/${Number(d.slice(8))} ${pend.byDate[d]}개`).join(' · ');
             const left = Math.max(0, n - pend.qty);
-            const pick = await psChoose(`📦 ${uploadProducts[idx].name || ''}\n오늘부터 나가야 할 주문이 ${pend.qty}개 있어요.\n(${ds})\n\n빼서 ${left}개로 넣을까요?`,
-                [{ label: `빼서 ${left}개로 넣기 (${n} − ${pend.qty})`, value: 'sub', main: true }, { label: `그대로 ${n}개로 넣기`, value: 'keep' }, { label: '취소', value: null }]);
+            // [수정 2026-10-12] 창을 다시 짰다 (사장님 요청 — 단추 짧게, 전체가 조잡하다) — 계산을 세 줄로 보여 주고 단추는 둘 + 닫기 ✕
+            const pick = await gPendDialog(uploadProducts[idx].name || '', n, pend, left);
             return pick === 'sub' ? left : (pick === 'keep' ? n : null);
+        }
+        function gPendDialog(name, n, pend, left) {
+            return new Promise(resolve => {
+                let box = document.getElementById('ps-confirm-box'); if (box) box.remove();
+                box = document.createElement('div'); box.id = 'ps-confirm-box';
+                box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.42); display:flex; align-items:center; justify-content:center; padding:16px;';
+                const NUM = 'font-variant-numeric:tabular-nums; white-space:nowrap;';
+                const chips = Object.keys(pend.byDate).sort().map(d => `<span style="display:inline-flex; gap:4px; align-items:baseline; padding:2px 7px; border-radius:6px; background:#f1f5f9; color:#475569; font-size:11.5px; font-weight:700; ${NUM}">${Number(d.slice(5, 7))}/${Number(d.slice(8))}<b style="color:#0f172a; font-weight:800;">${pend.byDate[d]}개</b></span>`).join('');
+                box.innerHTML = `<div role="dialog" aria-modal="true" aria-labelledby="pd-t" style="background:#fff; border-radius:16px; width:100%; max-width:340px; box-shadow:0 24px 60px rgba(15,23,42,.28); overflow:hidden;">
+                    <div style="display:flex; align-items:flex-start; gap:10px; padding:16px 16px 12px;">
+                        <div style="flex:1 1 auto; min-width:0;">
+                            <div style="font-size:11px; font-weight:800; color:#2563eb; letter-spacing:.04em;">재고 맞추기</div>
+                            <div id="pd-t" style="margin-top:3px; font-size:15px; font-weight:900; color:#0f172a; line-height:1.35; overflow-wrap:anywhere;">${gEscapeHtml(name)}</div>
+                        </div>
+                        <button type="button" data-v="" aria-label="닫기" style="flex:0 0 auto; width:30px; height:30px; border:none; background:#f1f5f9; color:#64748b; border-radius:50%; font-size:14px; font-weight:900; cursor:pointer;">✕</button>
+                    </div>
+                    <div style="margin:0 16px; padding:12px 14px; border-radius:12px; background:#f8fafc; border:1px solid #e2e8f0; display:flex; flex-direction:column; gap:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:13px; font-weight:700; color:#475569;"><span>적은 재고</span><b style="color:#0f172a; font-weight:800; ${NUM}">${n}개</b></div>
+                        <div style="display:flex; flex-direction:column; gap:5px;">
+                            <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:13px; font-weight:700; color:#475569;"><span>오늘부터 나갈 주문</span><b style="color:#dc2626; font-weight:800; ${NUM}">− ${pend.qty}개</b></div>
+                            <div style="display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end;">${chips}</div>
+                        </div>
+                        <div style="height:1px; background:#e2e8f0;"></div>
+                        <div style="display:flex; justify-content:space-between; align-items:baseline;"><span style="font-size:13px; font-weight:800; color:#0f172a;">넣을 재고</span><b style="font-size:22px; font-weight:900; color:#2563eb; ${NUM}">${left}개</b></div>
+                    </div>
+                    <div style="display:flex; gap:8px; padding:14px 16px 16px;">
+                        <button type="button" data-v="keep" style="flex:1 1 0; min-width:0; height:44px; border:1.5px solid #cbd5e1; background:#fff; color:#334155; border-radius:10px; font-size:13.5px; font-weight:800; cursor:pointer; ${NUM}">그대로 ${n}개</button>
+                        <button type="button" data-v="sub" style="flex:1.3 1 0; min-width:0; height:44px; border:none; background:#2563eb; color:#fff; border-radius:10px; font-size:13.5px; font-weight:800; cursor:pointer; ${NUM}">빼서 ${left}개</button>
+                    </div></div>`;
+                const done = v => { box.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); };
+                const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } else if (e.key === 'Enter') { e.stopPropagation(); e.preventDefault(); done('sub'); } };
+                box.addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (b) done(b.dataset.v || null); else if (e.target === box) done(null); });
+                document.addEventListener('keydown', onKey, true);
+                document.body.appendChild(box);
+                setTimeout(() => { const b = box.querySelector('button[data-v="sub"]'); if (b) b.focus(); }, 0);
+            });
         }
         async function psItemSetStock(key, value) {
             const v = String(value || '').trim();
