@@ -26550,6 +26550,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         const per = m ? (parseInt(m[2]) || 1) : 1;
                         if (!nm) return;
                         g.optionItemQty.set(nm, (g.optionItemQty.get(nm) || 0) + per * _q);
+                        // [신규 2026-10-12] 옵션 항목마다 누가 몇 개 주문했는지 (사장님 요청 — 사올 개수를 누르면 보여 준다)
+                        //  [수정 2026-10-12] 옵션마다가 아니라 손님마다 묶는다 (소분할 때 — 사장님 요청)
+                        g.custOpt = g.custOpt || new Map();
+                        const ck = String(o.name || o.phone || '이름 없음') + '|' + info.dateStr;
+                        if (!g.custOpt.has(ck)) g.custOpt.set(ck, { who: String(o.name || o.phone || '이름 없음'), date: info.dateStr, items: new Map() });
+                        const cu = g.custOpt.get(ck).items; cu.set(nm, (cu.get(nm) || 0) + per * _q);
                     });
                 }
             });
@@ -26627,6 +26633,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 // [신규] 옵션 항목별 총 개수 — 발주할 때 실제로 세야 하는 숫자라 카드에 바로 보여준다
                 const optionItemRows = [...(r.optionItemQty || new Map()).entries()].sort((a, b) => b[1] - a[1])
                     .map(([nm, q]) => `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:4px 2px; border-top:1px dashed #ffe0bf;"><span style="color:var(--text-main); font-weight:700; font-size:12.5px; word-break:keep-all;">${nm}</span><b style="flex-shrink:0; color:#c2610a; font-weight:900; font-size:14px;">${q}개</b></div>`).join('');
+                /* [신규 2026-10-12] 옵션 전체 아래에 손님별로 무엇을 몇 개 주문했는지 — 소분할 때 본다 (사장님 요청).
+                   '손님별 보기'를 누르면 펼친다. 날짜순, 같은 날이면 이름순 */
+                const custList = [...((r.custOpt && r.custOpt.values()) || [])].sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.who.localeCompare(b.who, 'ko'));
+                const custRows = custList.map(c => `<div style="display:flex; align-items:baseline; gap:8px; padding:5px 2px; border-top:1px dashed #ffe0bf;">
+                        <span style="flex:0 0 auto; color:#94a3b8; font-size:11.5px; font-weight:700; font-variant-numeric:tabular-nums;">${gEscapeHtml(String(c.date || '').slice(5).replace('-', '/'))}</span>
+                        <span style="flex:0 1 auto; min-width:0; color:var(--text-main); font-weight:800; font-size:12.5px; overflow-wrap:anywhere;">${gEscapeHtml(c.who)}</span>
+                        <span style="flex:1 1 auto; min-width:0; text-align:right; font-size:12px; font-weight:700; color:#475569; overflow-wrap:anywhere;">${[...c.items.entries()].map(([nm, n]) => `${gEscapeHtml(nm)} <b style="color:#c2610a; font-weight:900;">${n}</b>`).join(' · ')}</span></div>`).join('');
                 return `<div onclick="const d=this.querySelector('.sales-card-detail'); if(d) d.style.display=(d.style.display==='none'?'block':'none');" style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff; cursor:pointer;">
                     <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
                         <div style="font-weight:700; font-size:13px; word-break:break-all; line-height:1.3;">${gEscapeHtml(r.name)}</div>
@@ -26647,6 +26660,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     ${optionItemRows ? `<div style="margin-top:6px; padding:6px 9px 7px; background:#fff8f0; border:1px solid #ffe0bf; border-radius:6px;">
                         <div style="font-size:10.5px; font-weight:800; color:#c2610a;">옵션별 사올 개수</div>
                         ${optionItemRows}
+                        ${custRows ? `<button type="button" onclick="event.stopPropagation(); const d=this.nextElementSibling; const o=d.style.display==='none'; d.style.display=o?'block':'none'; this.querySelector('b').textContent=o?'▾':'▸';" style="display:flex; align-items:center; gap:5px; width:100%; margin-top:6px; padding:6px 2px 2px; border:none; border-top:1px solid #ffd3a6; background:none; color:#c2610a; font-size:11.5px; font-weight:800; cursor:pointer; text-align:left;"><b style="font-size:10px;">▸</b>손님별 보기 · ${custList.length}명</button>
+                        <div onclick="event.stopPropagation();" style="display:none; cursor:default;">${custRows}</div>` : ''}
                     </div>` : ''}
                     <div class="sales-card-detail" style="display:none; margin-top:7px; padding-top:5px; border-top:1px solid var(--border); font-size:12px;">
                         ${detailRows || '<div style="color:var(--text-sub); padding:3px 2px;">날짜 정보 없음</div>'}
