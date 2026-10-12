@@ -16395,10 +16395,56 @@
             const kq = gEscapeHtml(key);
             return `onfocus="if(!this.value && '${cur}' !== ''){this.value='${cur}'; this.dataset.auto='1'; try{this.select();}catch(e){}}" oninput="delete this.dataset.auto" onchange="if(!this.dataset.auto) psItemSetStock('${kq}', this.value)" onblur="if(this.dataset.auto){this.value=''; delete this.dataset.auto;}"`;
         }
+        /* [신규 2026-10-12] 이 상품이 오늘부터 앞으로 나갈 주문 수량 (취소·픽업 완료·배달 완료는 뺀다) — 날짜별로 */
+        function psPendingOutQty(idx) {
+            const p = uploadProducts[idx], out = { qty: 0, byDate: {} };
+            if (!p || typeof getSalesSourceOrders !== 'function') return out;
+            const t = new Date(); t.setHours(0, 0, 0, 0);
+            const today = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+            getSalesSourceOrders().forEach(o => {
+                if (!o || isSalesCanceled(o)) return;
+                const st = String(o.status || ''); if (st === '픽업' || st === '배달완료') return;
+                if (salesFindProduct(o) !== p) return;
+                const d = getOrderDateInfo(o).dateStr; if (!d || d === '기타' || d < today) return;
+                const q = parseInt(o.qty || 0, 10) || 0; if (!q) return;
+                out.qty += q; out.byDate[d] = (out.byDate[d] || 0) + q;
+            });
+            return out;
+        }
+        // [신규 2026-10-12] 고르는 창 — 단추마다 값을 돌려준다 (바탕·Esc 는 null)
+        function psChoose(msg, opts) {
+            return new Promise(resolve => {
+                let box = document.getElementById('ps-confirm-box'); if (box) box.remove();
+                box = document.createElement('div'); box.id = 'ps-confirm-box';
+                box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px;';
+                box.innerHTML = `<div style="background:#fff; border-radius:14px; padding:18px; max-width:360px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                    <div style="font-size:13.5px; font-weight:800; color:#0f172a; line-height:1.55; white-space:pre-line; margin-bottom:16px;">${gEscapeHtml(String(msg || ''))}</div>
+                    <div style="display:flex; flex-direction:column; gap:7px;">${opts.map((o, i) => `<button type="button" data-i="${i}" style="height:40px; border:${o.main ? 'none' : '1.5px solid var(--border)'}; background:${o.main ? '#2563eb' : '#f8fafc'}; color:${o.main ? '#fff' : '#334155'}; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">${gEscapeHtml(o.label)}</button>`).join('')}</div></div>`;
+                const done = v => { box.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); };
+                const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
+                box.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) done(opts[+b.dataset.i].value); else if (e.target === box) done(null); });
+                document.addEventListener('keydown', onKey, true);
+                document.body.appendChild(box);
+            });
+        }
+        /* [신규 2026-10-12] 재고를 적었는데 오늘부터 나갈 주문이 있으면 수량을 보여 주고 뺄지 묻는다 (사장님 요청)
+           재고를 고치는 곳(노출일정 재고 칸 · 상품 목록 재고 칸 · 주문 집계 재고 칸 · 재고 확인)이 모두 쓴다. 상품 등록·수정 화면은 빼고.
+           돌려주는 값: 넣을 수(뺀 수 또는 그대로), 취소면 null. 0·999(무제한)·나갈 주문 없음은 묻지 않고 그대로 */
+        async function gAskPendingDeduct(idx, n) {
+            if (!(n > 0) || n === 999 || idx < 0 || !uploadProducts[idx]) return n;
+            const pend = psPendingOutQty(idx);
+            if (!(pend.qty > 0)) return n;
+            const ds = Object.keys(pend.byDate).sort().map(d => `${Number(d.slice(5, 7))}/${Number(d.slice(8))} ${pend.byDate[d]}개`).join(' · ');
+            const left = Math.max(0, n - pend.qty);
+            const pick = await psChoose(`📦 ${uploadProducts[idx].name || ''}\n오늘부터 나가야 할 주문이 ${pend.qty}개 있어요.\n(${ds})\n\n빼서 ${left}개로 넣을까요?`,
+                [{ label: `빼서 ${left}개로 넣기 (${n} − ${pend.qty})`, value: 'sub', main: true }, { label: `그대로 ${n}개로 넣기`, value: 'keep' }, { label: '취소', value: null }]);
+            return pick === 'sub' ? left : (pick === 'keep' ? n : null);
+        }
         async function psItemSetStock(key, value) {
-            psUndoMark('이번 차례 재고');
             const v = String(value || '').trim();
-            const n = v === '' ? null : Math.max(0, parseInt(v, 10) || 0);
+            let n = v === '' ? null : Math.max(0, parseInt(v, 10) || 0);
+            if (n !== null) { const it0 = psItem(key); n = it0 ? await gAskPendingDeduct(it0.idx, n) : n; if (n === null) { renderProductScheduleCalendar(); return; } }
+            psUndoMark('이번 차례 재고');
             if (await psItemSave(key, { stock: n, stockApplied: null })) showToast(n === null ? '📦 재고를 이어가요' : n === 999 ? '♾️ 이번 차례가 시작하면 재고를 무제한으로 해요' : `📦 이번 차례가 시작하면 재고를 ${n}개로 맞춰요`);
             renderProductScheduleCalendar();
         }
@@ -34207,6 +34253,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (n === 999) { wantUnlimited = true; newStock = ''; } // [신규] 999 입력 시 무제한
                 else newStock = n;
             }
+            // [신규 2026-10-12] 오늘부터 나갈 주문이 있으면 빼서 넣을지 묻는다 (사장님 요청 — 재고 고치는 곳 모두)
+            if (!wantUnlimited && newStock > 0) {
+                const r = await gAskPendingDeduct(index, newStock);
+                if (r === null) { renderProductsList(); if (typeof renderSalesUpcoming === 'function') renderSalesUpcoming(); return; }
+                newStock = r;
+            }
 
             const prevStock = prod.stock;
             const adjKey = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
@@ -35473,8 +35525,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const r = (scLastRows || []).find(x => x && x.code === scEditCode);
             const inp = document.getElementById('sc-stock-input');
             if (!r || !inp) return;
-            const want = parseInt(inp.value, 10);
+            let want = parseInt(inp.value, 10);
             if (isNaN(want) || want < 0) { showToast('0 이상 숫자로 적어 주세요.'); return; }
+            // [신규 2026-10-12] 오늘부터 나갈 주문이 있으면 빼서 넣을지 묻는다 (사장님 요청)
+            { const w2 = await gAskPendingDeduct(uploadProducts.indexOf(r.prod), want); if (w2 === null) return; want = w2; }
             if (want === r.stock) { closeScStock(); showToast('바뀐 것이 없습니다.'); return; }
 
             const p = r.prod;
