@@ -30457,6 +30457,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     paintDateFace();   // [신규] 사다드림이 아니면 '날짜 없음'을 고를 수 있다
                     try { paintAutoCodePrefix(); } catch (e) {}   // [신규] 사다드림 (S) · 과일 (F)
                     try { gAutoTaxByKind(); } catch (e) {}        // [신규] 과일·야채는 면세가 기본
+                    try { gPaintNamePreview(); } catch (e) {}     // [신규 2026-10-12] 손님 화면 미리보기의 [사다드림]·[신선식품]도 바로
                 };
                 paintKind();
 
@@ -33950,8 +33951,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!v && !f.tags.length && !f.lead && !_rec) { box.style.display = 'none'; return; }
             const ns = gNameSplit(v);
             // [수정 2026-10-05] 손님 화면처럼 대괄호는 수식어 윗줄에 따로 보여 준다
-            const brs = [uploadIsFresh ? '신선식품' : '', _rec ? '오늘의추천' : '', ...f.tags].filter(Boolean).map(t => `[${t}]`).join(' ');
-            const leads = [f.lead, ...ns.leads].filter(Boolean);
+            /* [수정 2026-10-12] 사다드림은 손님 화면처럼 [신선식품] 대신 [사다드림] (사장님 요청 — 사다드림도 isFresh 를 켜서 저장해 미리보기에 [신선식품]이 나왔다) */
+            const _sada = uploadKind === 'sada';
+            const brs = [...new Set([_sada ? '사다드림' : (uploadIsFresh ? '신선식품' : ''), _rec ? '오늘의추천' : '', ...f.tags].filter(Boolean))].map(t => `[${t}]`).join(' ');
+            const leads = [f.lead, ...ns.leads].filter(Boolean).filter(t => !(_sada && t === '사다드림'));
             const _bw = gLeadWidth(brs), _bOver = _bw > G_LEAD_MAX_PX;
             const E = gEscapeHtml;
             const _lw = gLeadWidth(gLeadLineText()), _over = _lw > G_LEAD_MAX_PX;
