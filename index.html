@@ -3234,6 +3234,11 @@
                             <input type="text" id="product-search-input" placeholder="🔍 상품명 또는 식별번호(P0013)로 검색..." oninput="onProductSearchInput(this.value)" style="width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; box-sizing: border-box; outline: none; transition: var(--transition);">
                             <button type="button" onclick="clearProductSearch(); renderProductsList();" id="btn-clear-product-search" style="display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 18px; color: var(--text-sub); cursor: pointer; line-height: 1;">&times;</button>
                         </div>
+                        <!-- [신규 2026-10-12] 상시판매 정렬 — 이름순 · 재고순 (사장님 요청). 상시판매 목록에서만 보인다 -->
+                        <select id="inv-sort-sel" onchange="gSetInvSort(this.value)" title="정렬" style="display:none; flex:0 0 auto; height:42px; padding:0 8px; border:1.5px solid var(--border); border-radius:var(--radius-sm); background:#fff; font-size:13px; font-weight:800; color:var(--text-main); cursor:pointer;">
+                            <option value="name">이름순</option>
+                            <option value="stock">재고순</option>
+                        </select>
                         <button type="button" onclick="exportProductsToCSV()" title="상품 목록을 CSV로 내려받기" style="flex:0 0 auto; width:42px; height:42px; padding:0; display:flex; align-items:center; justify-content:center; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:var(--radius-sm); font-size:16px; cursor:pointer;">📤</button>
                         <button type="button" onclick="document.getElementById('product-csv-file').click()" title="CSV로 상품 목록 올리기" style="flex:0 0 auto; width:42px; height:42px; padding:0; display:flex; align-items:center; justify-content:center; border:1.5px solid #059669; background:#ecfdf5; color:#059669; border-radius:var(--radius-sm); font-size:16px; cursor:pointer;">📥</button>
                         <input type="file" id="product-csv-file" accept=".csv,text/csv" style="display:none;" onchange="importProductsFromCSV(this)">
@@ -18928,7 +18933,9 @@
         let psPopKey = null, psPopMode = '', psPopQ = '', psPopWith = null;
         let psPopChk = new Set();   // [신규 2026-10-12] 창의 상품 앞 체크박스로 고른 것 (수정·나누기를 체크한 것만)
         function psBarPopOpen(key) { psPopKey = key; psPopMode = ''; psPopQ = ''; psPopWith = null; psPopChk = new Set(); if (typeof psMultiClose === 'function') psMultiClose(false); psBarPopPaint(); }
-        function psBarPopClose() { psPopKey = null; const b = document.getElementById('ps-bar-pop'); if (b) b.remove(); }
+        function psBarPopClose() { psPopKey = null; const b = document.getElementById('ps-bar-pop'); if (b) b.remove(); psPopPadSet(0); }
+        /* [신규 2026-10-12] 창이 떠 있는 동안 페이지 아래에 창 높이만큼 빈자리를 둔다 — 달력을 더 올려 창 위에서 볼 수 있게 (사장님 요청) */
+        function psPopPadSet(h) { document.body.style.paddingBottom = h ? (h + 32) + 'px' : ''; }
         function psPopSetMode(m) { psPopMode = (psPopMode === m) ? '' : m; psPopQ = ''; psBarPopPaint(); setTimeout(() => { const e = document.getElementById('ps-pop-q'); if (e) e.focus(); }, 0); }
         function psPopOtherUnits() {
             const mine = new Set(psGroupMembers(psPopKey)), now = Date.now();
@@ -19016,6 +19023,7 @@
                 </div>
             </div>`;
             psBarPopPaintList();
+            psPopPadSet(box.offsetHeight);   // [신규 2026-10-12] 달력을 창 위로 올려 볼 수 있게
         }
         // 고르는 목록만 다시 그린다 (검색칸 글자 칠 때 칸이 다시 만들어져 손이 떨어지지 않게)
         function psBarPopPaintList() {
@@ -32131,7 +32139,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             box.onclick = e => e.stopPropagation();
             el.after(box);
         }
+        // [신규 2026-10-12] 상시판매 정렬 (이름순 · 재고순) — 이 기기에 기억
+        let gInvSort = (() => { try { return localStorage.getItem('moket_inv_sort') === 'stock' ? 'stock' : 'name'; } catch (e) { return 'name'; } })();
+        function gSetInvSort(v) {
+            gInvSort = v === 'stock' ? 'stock' : 'name';
+            try { localStorage.setItem('moket_inv_sort', gInvSort); } catch (e) { }
+            renderProductsList();
+        }
         function renderProductsList() {
+            { const s = document.getElementById('inv-sort-sel'); if (s) { s.style.display = uploadManageDeliveryType === 'inventory' ? '' : 'none'; s.value = gInvSort; } }
             try { psRoundTick(); } catch (e) { }   // [신규 2026-10-05] 상품 목록이 바뀌면 공동구매 회차(노출·숨김·바뀜)를 맞춘다
             const container = document.getElementById('products-list-container');
             container.innerHTML = '';
@@ -32319,6 +32335,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     const flagB = isRecommendListProduct(b.prod) || isSadaListProduct(b.prod);
                     if (flagA !== flagB) return flagA ? -1 : 1;
 
+                    // [신규 2026-10-12] 상시판매 재고순 — 많은 것부터 (무제한이 맨 위), 같으면 이름순
+                    if (isInventoryView && gInvSort === 'stock') {
+                        const sa = salesRealStock(a.prod), sb = salesRealStock(b.prod);
+                        const va = sa === Infinity ? 1e12 : (Number(sa) || 0), vb = sb === Infinity ? 1e12 : (Number(sb) || 0);
+                        if (va !== vb) return vb - va;
+                    }
                     return String(a.prod.name || "").localeCompare(String(b.prod.name || ""), 'ko');
                 });
 
