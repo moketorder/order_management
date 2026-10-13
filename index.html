@@ -3111,9 +3111,9 @@
                                      정상가 — 가격표에 찍는 값이고 할인 설정의 정상가(listPrice)와 같은 값이다 (사장님 결정 — 하나로). 할인을 안 켜면 손님 화면엔 안 보인다 -->
                                 <div class="price-row6" style="display:grid; grid-template-columns:minmax(0,0.55fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,0.75fr) minmax(0,0.9fr); gap:5px; align-items:stretch;">
                                     <button type="button" id="btn-tax-type" onclick="toggleFormTaxFree()" title="눌러서 과세·면세 바꾸기" style="width:100%; min-width:0; height:45px; box-sizing:border-box; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; background:#f1f5f9; color:#64748b; border:1.5px solid #e2e8f0;">과세</button>
-                                    <input type="number" id="productPrice" class="form-control" placeholder="공구가" min="0" required onfocus="gPriceCostShow(this)" onblur="gPriceCostHide()" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
-                                    <input type="number" id="productPriceOnsite" class="form-control" placeholder="상시가" min="0" oninput="gPriceReqSync()" onfocus="gPriceCostShow(this)" onblur="gPriceCostHide()" title="상시판매로 팔 때 가격 — 상시판매로 넘어가면 이 값으로" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
-                                    <input type="number" id="productPriceStore" class="form-control" placeholder="정상가" min="0" oninput="gListPriceFieldSync()" onfocus="gPriceCostShow(this)" onblur="gPriceCostHide()" title="정상가 — 매장 가격표에 찍는 가격 (할인 설정의 정상가와 같은 값)" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <input type="number" id="productPrice" class="form-control" placeholder="공구가" min="0" required onfocus="gPriceCostShow(this)" onkeydown="gPriceEnter(event, this)" onblur="gPriceCostHide()" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <input type="number" id="productPriceOnsite" class="form-control" placeholder="상시가" min="0" oninput="gPriceReqSync()" onfocus="gPriceCostShow(this)" onkeydown="gPriceEnter(event, this)" onblur="gPriceCostHide()" title="상시판매로 팔 때 가격 — 상시판매로 넘어가면 이 값으로" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <input type="number" id="productPriceStore" class="form-control" placeholder="정상가" min="0" oninput="gListPriceFieldSync()" onfocus="gPriceCostShow(this)" onkeydown="gPriceEnter(event, this)" onblur="gPriceCostHide()" title="정상가 — 매장 가격표에 찍는 가격 (할인 설정의 정상가와 같은 값)" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <input type="number" id="productStock" class="form-control" placeholder="재고" title="999를 넣으면 무제한" min="0" required onchange="gStock999ToUnlimited(this)" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <button type="button" id="btn-detail-option" class="price-option-btn" onclick="openDetailOptionSetting()" style="width:100%; min-width:0; height:45px; box-sizing:border-box; padding:0 8px; overflow:hidden; text-overflow:ellipsis;">상세옵션</button>
                                 </div>
@@ -20897,6 +20897,13 @@
             box.innerHTML = '<div style="display:flex; align-items:baseline; gap:6px; margin-bottom:6px;">🧾 매입 ' + u.toLocaleString() + '원'
                 + '<small style="font-weight:700; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + gEscapeHtml(String(po.date || '').slice(5, 10).replace('-', '/') + ' · ' + (po.supplier || '') + (po.productCode ? ' · ' + po.productCode : '')) + '</small></div>'
                 + '<div style="display:flex; gap:6px;">' + btn('20%', up(u / 0.8)) + btn('30%', up(u / 0.7)) + '</div>';
+        }
+        // [신규 2026-10-13] 가격 칸에서 Enter — 상품 저장(등록 완료) 대신 적은 값을 넣고 창을 닫는다 (사장님 요청)
+        function gPriceEnter(e, el) {
+            if (e.key !== 'Enter' || e.isComposing) return;
+            e.preventDefault();
+            el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+            gPriceCostHide(true);
         }
         function gPriceCostHide(now) {
             clearTimeout(gPriceCostTimer);
