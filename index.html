@@ -20862,7 +20862,13 @@
                     if (b.dataset.base) { gPcalc.base = b.dataset.base; return gPcalcPaint(); }
                     if (b.dataset.sign) { gPcalc.sign = Number(b.dataset.sign) < 0 ? -1 : 1; return gPcalcPaint(); }
                     if (b.dataset.unit) { gPcalc.unit = b.dataset.unit; return gPcalcPaint(); }
-                    if (b.dataset.act === 'put') { const v = gPcalcResult(); if (!v) { showToast('기준 가격과 숫자를 넣어 주세요'); return; } return gPriceFill(v); }
+                    if (b.dataset.act === 'put') {
+                        const v = gPcalcResult(); if (v) return gPriceFill(v);
+                        // [수정 2026-10-13] 계산기를 안 쓰고 칸에 바로 적은 값도 '넣기'로 그대로 반영하고 닫는다 (사장님 요청)
+                        const el = gPriceTarget;
+                        if (el && String(el.value).trim() !== '') { el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); return gPriceCostHide(true); }
+                        showToast('칸에 가격을 적거나 계산기에 숫자를 넣어 주세요'); return;
+                    }
                     if (b.dataset.act === 'cancel') return gPriceCostHide(true);
                 });
                 document.body.appendChild(pop);
