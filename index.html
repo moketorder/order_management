@@ -3866,12 +3866,32 @@
                             #purchase-section-sourcing .src-tag { font-size:9.5px; }
                         }
                     </style>
+                    <!-- [신규 2026-10-13] 📈 동향 탭 (3050 여성 주간 인기 검색어·쇼핑 순위) -->
+                    <style>
+                        #purchase-section-sourcing .src-tr-note { font-size:12px; color:var(--src-sub); font-weight:700; margin:0 0 10px; line-height:1.5; }
+                        #purchase-section-sourcing .src-tr-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(270px, 1fr)); gap:12px; margin-bottom:14px; }
+                        #purchase-section-sourcing .src-tr-box { background:#fff; border:1px solid var(--src-line); border-radius:12px; padding:10px 12px; min-width:0; }
+                        #purchase-section-sourcing .src-tr-box h4 { margin:0 0 8px; font-size:13px; font-weight:900; color:#0f172a; }
+                        #purchase-section-sourcing .src-tr-row { display:flex; gap:8px; align-items:baseline; padding:4px 0; border-top:1px solid #f1f5f9; font-size:12.5px; line-height:1.35; }
+                        #purchase-section-sourcing .src-tr-row:first-of-type { border-top:0; }
+                        #purchase-section-sourcing .src-tr-row .rk { flex:0 0 22px; text-align:right; font-weight:900; color:#475569; }
+                        #purchase-section-sourcing .src-tr-row .rk.top { color:#dc2626; }
+                        #purchase-section-sourcing .src-tr-row .tx { flex:1 1 auto; min-width:0; word-break:break-all; color:#0f172a; font-weight:700; }
+                        #purchase-section-sourcing .src-tr-row .tx a { color:inherit; text-decoration:none; }
+                        #purchase-section-sourcing .src-tr-row .tx a:hover { text-decoration:underline; }
+                        #purchase-section-sourcing .src-tr-row .tx small { display:block; color:var(--src-sub); font-weight:600; font-size:11px; }
+                        #purchase-section-sourcing .src-tr-row .we { flex:0 0 auto; font-size:10.5px; font-weight:900; color:#047857; background:#d1fae5; border-radius:6px; padding:1px 6px; white-space:nowrap; }
+                        #purchase-section-sourcing .src-tr-chips { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
+                        #purchase-section-sourcing .src-tr-chips button { border:1.5px solid #cbd5e1; background:#fff; color:#334155; border-radius:999px; padding:4px 11px; font-size:12px; font-weight:800; cursor:pointer; }
+                        #purchase-section-sourcing .src-tr-chips button.on { background:#0f172a; border-color:#0f172a; color:#fff; }
+                    </style>
 
                     <div class="src-top">
                         <div class="src-seg" role="tablist">
                             <button type="button" data-src-tab="lineup" class="on" onclick="srcTab('lineup')">📆 판매 일정</button>   <!-- [수정 2026-10-07] 식단표 → 판매 일정 (사장님 요청) -->
                             <button type="button" data-src-tab="band" onclick="srcTab('band')">📦 밴드 상품</button>
                             <button type="button" data-src-tab="kakao" onclick="srcTab('kakao')">💬 카톡 취합</button>
+                            <button type="button" data-src-tab="trend" onclick="srcTab('trend')">📈 동향</button>
                         </div>
                         <div class="src-meta"><span id="src-updated">불러오는 중…</span><button type="button" class="src-btn" onclick="srcLoad(true)">↻ 새로고침</button></div>
                     </div>
@@ -3901,6 +3921,7 @@
                     band: null, kakao: null, week: '', calMonth: '', closed: [], skip: {}, block: {}, onsite: {}, onsiteProducts: null, sada: [], manual: {}, dayQ: { days: 28 }, onsiteQ: { q: '', tab: '', open: true },
                     bandQ: { q: '', vendor: '', cat: '', sort: 's', dir: -1, soldOnly: false, limit: 100, from: '', to: '', days: 0 },
                     pickQ: { q: '', days: 28 }, edits: { band: {}, kakao: {} },
+                    trend: null, trendIdx: null, trendData: {}, trendQ: { week: '', cat: '식품 전체', grp: '3050' },   // [신규 2026-10-13] 📈 동향
                     kakaoQ: { q: '', vendor: '', cat: '', sort: 'd', dir: -1, limit: 100, from: '', to: '', days: 0 }   // [수정 2026-10-08] 카테고리·기간 (밴드 상품처럼)
                 };
                 const srcEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -3939,7 +3960,7 @@
                         gSrc.edits = { band: (edits && edits.band) || {}, kakao: (edits && edits.kakao) || {} };
                         if (force || !gSrc.onsiteProducts) gSrc.onsiteProducts = await srcLoadOnsiteProducts();
                         gSrc.meta = meta || {}; gSrc.lineup = lineup || {}; gSrc.picks = picks || {}; gSrc.direct = direct || {};
-                        if (force) { gSrc.band = null; gSrc.kakao = null; }
+                        if (force) { gSrc.band = null; gSrc.kakao = null; gSrc.trend = null; gSrc.trendIdx = null; }
                         gSrc.loaded = true;
                         try { gSrc.reroll = (await srcGet('reroll')) || {}; } catch (e) { gSrc.reroll = gSrc.reroll || {}; }   // [신규 2026-10-07] 추천 다시 고르기
                         try { gSrc.catdef = (await srcGet('catdef')) || null; } catch (e) { }   // [신규 2026-10-07] 카테고리 관리
@@ -3965,6 +3986,14 @@
                     if (gSrc.tab === 'band') {
                         if (!gSrc.band) { v.innerHTML = '<div class="src-none">밴드 상품을 불러오는 중…</div>'; try { gSrc.band = (await srcGet('band')) || {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
                         return srcRenderBand(v);
+                    }
+                    if (gSrc.tab === 'trend') {   // [신규 2026-10-13] 📈 동향
+                        if (!gSrc.trendIdx) { v.innerHTML = '<div class="src-none">동향 자료를 불러오는 중…</div>'; try { gSrc.trendIdx = (await srcGet('trend_idx')) || {}; gSrc.trendData = {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
+                        const wks = Object.keys(gSrc.trendIdx).sort().reverse();
+                        if (!gSrc.trendQ.week || !gSrc.trendIdx[gSrc.trendQ.week]) gSrc.trendQ.week = wks[0] || '';
+                        if (gSrc.trendQ.week && !gSrc.trendData[gSrc.trendQ.week]) { v.innerHTML = '<div class="src-none">동향 자료를 불러오는 중…</div>'; try { gSrc.trendData[gSrc.trendQ.week] = (await srcGet('trend_w/' + gSrc.trendQ.week)) || {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
+                        gSrc.trend = gSrc.trendData[gSrc.trendQ.week] || {};
+                        return srcRenderTrend(v);
                     }
                     if (!gSrc.kakao) { v.innerHTML = '<div class="src-none">카톡 취합을 불러오는 중…</div>'; try { gSrc.kakao = (await srcGet('kakao')) || {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
                     srcRenderKakao(v);
@@ -6390,6 +6419,32 @@
                     const box = document.getElementById('src-kakao-res');
                     if (onlyRes && box) { box.innerHTML = res; document.getElementById('src-kakao-n').textContent = list.length.toLocaleString() + '개'; return; }
                     (v || document.getElementById('src-view')).innerHTML = html + '<div id="src-kakao-res">' + res + '</div>';
+                }
+                // ── 📈 동향 (3050 여성 주간 인기 검색어·쇼핑 순위) [신규 2026-10-13] ──
+                // 자료는 PC의 자동\동향수집.ps1 이 한 주에 한 번 모아 sourcing/trend 로 올린다.
+                function srcRenderTrend(v) {
+                    const T = gSrc.trend || {}, Q = gSrc.trendQ;
+                    if (!T.kw || !T.kw.length) { v.innerHTML = '<div class="src-none">아직 동향 자료가 없어요.<br>PC에서 <b>자동\\동향수집.ps1</b> 을 한 번 돌리면 여기에 나와요.</div>'; return; }
+                    // 우리 밴드 상품에 같은 검색어가 든 것이 있으면 표시 (밴드 상품이 아직 안 불러와졌으면 불러온 뒤 다시 그린다)
+                    let names = null;
+                    if (gSrc.band) { try { names = srcBandRows().map(r => String(r.n || '').replace(/\s/g, '').toLowerCase()); } catch (e) { names = null; } }
+                    else if (!gSrcCat.loading) { gSrcCat.loading = true; srcGet('band').then(b => { gSrc.band = b || {}; gSrcCat.loading = false; if (gSrc.tab === 'trend') srcRender(); }).catch(() => { gSrcCat.loading = false; }); }
+                    const have = k => { if (!names) return 0; const q = String(k).replace(/\s/g, '').toLowerCase(); return q.length < 2 ? 0 : names.filter(n => n.includes(q)).length; };
+                    const cat = T.kw.find(c => c.cat === Q.cat) || T.kw[0];
+                    const grpName = (T.groups || []).reduce((m, g) => (m[g.key] = g.label, m), {});
+                    const kwRows = (cat.rows && cat.rows[Q.grp]) || [];
+                    const row = (rk, main, sub, link, tag) => '<div class="src-tr-row"><span class="rk' + (rk <= 3 ? ' top' : '') + '">' + rk + '</span><span class="tx">' + (link ? '<a href="' + srcEsc(link) + '" target="_blank" rel="noopener">' + srcEsc(main) + '</a>' : srcEsc(main)) + (sub ? '<small>' + srcEsc(sub) + '</small>' : '') + '</span>' + (tag || '') + '</div>';
+                    const prod = x => row(x.r, x.t, [x.mall, x.p ? x.p + '원' : '', x.rv ? '리뷰 ' + x.rv : ''].filter(Boolean).join(' · '), x.u);
+                    const clickBox = k => '<div class="src-tr-box"><h4>🖱️ 클릭 순위 · ' + srcEsc((grpName[k] || k + '대 여성')) + '</h4>' + (((T.click || {})[k] || []).map(prod).join('') || '<div class="src-none">자료 없음</div>') + '</div>';
+                    let html = '<p class="src-tr-note">기간 <b>' + srcEsc(T.range || (T.start + ' ~ ' + T.end)) + '</b> (지난 한 주) · 올린 때 ' + srcEsc(T.updated || '') + ' · 네이버 쇼핑인사이트와 네이버쇼핑 BEST 자료예요. 여성 30·40·50대 기준이고, 구매 순위는 연령 구분이 없어 전체 기준이에요.</p>';
+                    html += '<div class="src-bar"><span class="k">주</span><select onchange="gSrc.trendQ.week=this.value; srcRender()">' + Object.keys(gSrc.trendIdx || {}).sort().reverse().map(w => '<option value="' + w + '"' + (w === Q.week ? ' selected' : '') + '>' + srcEsc((gSrc.trendIdx[w] && gSrc.trendIdx[w].range) || w) + '</option>').join('') + '</select><span class="k">분야</span><select onchange="gSrc.trendQ.cat=this.value; srcRender()">' + T.kw.map(c => '<option' + (c.cat === cat.cat ? ' selected' : '') + '>' + srcEsc(c.cat) + '</option>').join('') + '</select>' +
+                        '<span class="k">연령</span><span class="src-tr-chips" style="margin:0">' + (T.groups || []).map(g => '<button type="button" class="' + (g.key === Q.grp ? 'on' : '') + '" onclick="gSrc.trendQ.grp=\'' + g.key + '\'; srcRender()">' + srcEsc(g.label) + '</button>').join('') + '</span></div>';
+                    html += '<div class="src-tr-grid"><div class="src-tr-box"><h4>🔎 인기 검색어 · ' + srcEsc(cat.cat) + ' · ' + srcEsc(grpName[Q.grp] || Q.grp) + '</h4>' +
+                        (kwRows.map(x => { const n = have(x.k); return row(x.r, x.k, '', '', n ? '<span class="we" title="밴드 상품 이름에 이 검색어가 들어간 상품 수">밴드 ' + n + '개</span>' : ''); }).join('') || '<div class="src-none">자료 없음</div>') + '</div>' +
+                        '<div class="src-tr-box"><h4>🛒 구매(판매) 순위 · 식품 · 전체 연령 · 주간</h4>' + ((T.buy || []).map(prod).join('') || '<div class="src-none">자료 없음</div>') + '</div></div>';
+                    html += '<div class="src-tr-grid">' + ['30', '40', '50'].map(clickBox).join('') + '</div>';
+                    html += '<div class="src-tr-grid">' + [['🥬 마켓컬리 베스트 · 추천순 · 전체 연령', T.kurlyBest], ['🥬 마켓컬리 베스트 · 판매량순 · 전체 연령', T.kurlySales]].map(([h4, list]) => '<div class="src-tr-box"><h4>' + h4 + '</h4>' + ((list || []).map(prod).join('') || '<div class="src-none">자료 없음</div>') + '</div>').join('') + '</div>';
+                    v.innerHTML = html;
                 }
                 function srcSortKakao(k) {
                     const Q = gSrc.kakaoQ; if (Q.sort === k) Q.dir = -Q.dir; else { Q.sort = k; Q.dir = (k === 'v' || k === 'n' || k === 'g') ? 1 : -1; }
