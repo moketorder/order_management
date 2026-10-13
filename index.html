@@ -6464,11 +6464,16 @@
                     const list = (a, fn, none) => { const l = arr(a); return l.length ? l.map(fn).join('') : '<div class="src-none" style="padding:12px 4px;">' + (none || '자료 없음') + '</div>'; };
                     const subName = i => (arr(C.subs)[i] === '' || arr(C.subs)[i] == null) ? '전체' : arr(C.subs)[i];
                     const sel = (onch, opts, cur) => '<select onchange="' + onch + '">' + opts.map(([val, lab]) => '<option value="' + srcEsc(val) + '"' + (String(val) === String(cur) ? ' selected' : '') + '>' + srcEsc(lab) + '</option>').join('') + '</select>';
+                    // [신규 2026-10-13] 분야·하위는 드롭다운 대신 단추 줄 (사장님 요청 — 공구 상품처럼). act(i) = 누를 때 할 일 (값 대신 번호로 넘긴다)
+                    const chips = (act, labs, curIdx) => '<span class="src-tr-chips" style="margin:0">' + labs.map((lab, i) => '<button type="button" class="' + (i === curIdx ? 'on' : '') + '" onclick="' + act(i) + '">' + srcEsc(lab) + '</button>').join('') + '</span>';
                     let html = '<p class="src-tr-note">기간 <b>' + srcEsc(M.range || (M.start + ' ~ ' + M.end)) + '</b> (한 주) · 올린 때 ' + srcEsc(M.updated || '') + ' · 네이버 쇼핑인사이트·네이버쇼핑 BEST·마켓컬리·네이버 검색광고 자료예요. 여성 30·40·50대 기준이고, 구매 순위·컬리는 연령 구분이 없어 전체 기준이에요. ' + srcEsc(M.note || '') + '</p>';
                     html += '<div class="src-bar"><span class="k">주</span>' + sel("gSrc.trendQ.week=this.value; srcRender()", idxKeys.map(w => [w, (gSrc.trendIdx[w] && gSrc.trendIdx[w].range) || w]), Q.week) +
-                        '<span class="k">분야</span>' + sel("gSrc.trendQ.cat=this.value; gSrc.trendQ.sub=0; srcRender()", cats.map(c => [c, c]), Q.cat) +
-                        '<span class="k">하위</span>' + sel("gSrc.trendQ.sub=+this.value; srcRender()", subs.map((s, i) => [i, subName(i) === '전체' ? '전체 (' + Q.cat + ')' : s]), Q.sub) +
+
                         '<span class="k">연령</span><span class="src-tr-chips" style="margin:0">' + arr(M.groups).map(g => '<button type="button" class="' + (g.key === Q.grp ? 'on' : '') + '" onclick="gSrc.trendQ.grp=\'' + g.key + '\'; srcRender()">' + srcEsc(g.label) + '</button>').join('') + '</span></div>';
+
+                    gSrc._tc = cats;   // [신규 2026-10-13] 분야 단추가 번호로 고른다
+                    html += '<div class="src-bar"><span class="k">분야</span>' + chips(i => 'gSrc.trendQ.cat=gSrc._tc[' + i + ']; gSrc.trendQ.sub=0; srcRender()', cats, ci) + '</div>';
+                    if (subs.length > 1) html += '<div class="src-bar"><span class="k">하위</span>' + chips(i => 'gSrc.trendQ.sub=' + i + '; srcRender()', subs.map((x, i) => subName(i)), Q.sub) + '</div>';
                     const kwRow = at(C.kw, Q.sub) || {};
                     html += '<div class="src-tr-grid"><div class="src-tr-box"><h4>🔎 인기 검색어 · ' + srcEsc(Q.cat) + (Q.sub ? ' › ' + srcEsc(subName(Q.sub)) : '') + ' · ' + srcEsc(grpName[Q.grp] || Q.grp) + '</h4>' +
                         list(kwRow[Q.grp], (k, i) => row(i + 1, k, '', '', bandTag(k)), Q.sub && Q.grp !== '3050' ? '하위 분야는 3050 여성 합친 순위만 모아요' : '자료 없음') + '</div>' +
@@ -6479,8 +6484,8 @@
                     const K = arr(D.k); const kc = Math.min(Math.max(+Q.kcat || 0, 0), Math.max(K.length - 1, 0)); const KC = K[kc] || {};
                     const ksubs = arr(KC.subs); const ks = Math.min(Math.max(+Q.ksub || 0, 0), Math.max(ksubs.length - 1, 0));
                     if (K.length) {
-                        html += '<div class="src-bar"><span class="k">🥬 마켓컬리 분야</span>' + sel("gSrc.trendQ.kcat=+this.value; gSrc.trendQ.ksub=0; srcRender()", K.map((x, i) => [i, x.name]), kc) +
-                            sel("gSrc.trendQ.ksub=+this.value; srcRender()", ksubs.map((s, i) => [i, s === '' ? '전체' : s]), ks) + '<span class="k">전체 연령 기준</span></div>';
+                        html += '<div class="src-bar"><span class="k">🥬 마켓컬리 분야</span>' + chips(i => 'gSrc.trendQ.kcat=' + i + '; gSrc.trendQ.ksub=0; srcRender()', K.map(x => x.name), kc) + '<span class="k">전체 연령 기준</span></div>';
+                        if (ksubs.length > 1) html += '<div class="src-bar"><span class="k">하위</span>' + chips(i => 'gSrc.trendQ.ksub=' + i + '; srcRender()', ksubs.map(x => x === '' ? '전체' : x), ks) + '</div>';
                         html += '<div class="src-tr-grid">' + [['추천순 (베스트)', KC.best], ['판매량순', KC.sales]].map(([h4, L]) => '<div class="src-tr-box"><h4>🥬 마켓컬리 · ' + srcEsc(KC.name || '') + (ks ? ' › ' + srcEsc(ksubs[ks]) : '') + ' · ' + h4 + '</h4>' + list(at(L, ks), prod) + '</div>').join('') + '</div>';
                     }
                     // 맛집 (사다드림 영감)
