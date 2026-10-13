@@ -3921,7 +3921,7 @@
                     band: null, kakao: null, week: '', calMonth: '', closed: [], skip: {}, block: {}, onsite: {}, onsiteProducts: null, sada: [], manual: {}, dayQ: { days: 28 }, onsiteQ: { q: '', tab: '', open: true },
                     bandQ: { q: '', vendor: '', cat: '', sort: 's', dir: -1, soldOnly: false, limit: 100, from: '', to: '', days: 0 },
                     pickQ: { q: '', days: 28 }, edits: { band: {}, kakao: {} },
-                    trend: null, trendIdx: null, trendData: {}, trendQ: { week: '', cat: '전체', sub: 0, grp: '3050', kcat: 0, ksub: 0 },   // [신규 2026-10-13] 📈 동향
+                    trend: null, trendIdx: null, trendData: {}, trendQ: { week: '', cat: '전체', sub: 0, grp: '3050', kcat: 0, ksub: 0, scat: 0 },   // [신규 2026-10-13] 📈 동향
                     kakaoQ: { q: '', vendor: '', cat: '', sort: 'd', dir: -1, limit: 100, from: '', to: '', days: 0 }   // [수정 2026-10-08] 카테고리·기간 (밴드 상품처럼)
                 };
                 const srcEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -6491,7 +6491,10 @@
                     // 맛집 (사다드림 영감)
                     if (D.m) {
                         const mm = D.m;
-                        html += '<p class="src-tr-note" style="margin-top:6px"><b>🍽 맛집·사다드림 영감</b> — ' + srcEsc(mm.note || '') + ' 지역은 키워드에 든 지역 이름으로 수도권(서울·경기·인천)과 지방을 나눴어요.</p><div class="src-tr-grid">' +
+                        const SN = arr(mm.n), sc = Math.min(Math.max(+Q.scat || 0, 0), Math.max(SN.length - 1, 0)), SC = SN[sc] || {};
+                        const storeHtml = SN.length ? '<div class="src-bar"><span class="k">🏪 상호명(가게·브랜드) 분류</span>' + sel("gSrc.trendQ.scat=+this.value; srcRender()", SN.map((x, i) => [i, x.c + ' (' + arr(x.l).length + ')']), sc) + '<span class="k">컬리·네이버쇼핑·밴드 상품 이름의 [가게/브랜드]를 모아 한 달 검색량으로 줄 세웠어요 (제조사·마트는 뺌)</span></div>' +
+                            '<div class="src-tr-grid"><div class="src-tr-box" style="grid-column:1/-1"><h4>🏪 상호명 순위 · ' + srcEsc(SC.c || '') + ' <small style="font-weight:600;color:var(--src-sub)">(한 달 검색량)</small></h4>' + list(SC.l, (x, i) => row(i + 1, x.k, Number(x.v).toLocaleString() + '회' + (x.s ? ' · ' + x.s : ''), '', bandTag(x.k))) + '</div></div>' : '';
+                        html += storeHtml + '<p class="src-tr-note" style="margin-top:6px"><b>🍽 맛집·사다드림 영감</b> — ' + srcEsc(mm.note || '') + ' 지역은 키워드에 든 지역 이름으로 수도권(서울·경기·인천)과 지방을 나눴어요.</p><div class="src-tr-grid">' +
                             [['🏙️ 수도권 맛집 검색어 TOP', mm.s], ['🌄 지방 맛집 검색어 TOP', mm.j], ['🍜 메뉴·기타 맛집 검색어', mm.a], ['📦 택배·밀키트·포장 검색어 TOP', mm.b]].map(([h4, L]) => '<div class="src-tr-box"><h4>' + h4 + ' <small style="font-weight:600;color:var(--src-sub)">(한 달 검색량)</small></h4>' + list(L, (x, i) => row(i + 1, x.k, Number(x.v).toLocaleString() + '회', '', bandTag(x.k))) + '</div>').join('') + '</div>';
                     }
                     v.innerHTML = html;
