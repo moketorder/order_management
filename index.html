@@ -2706,6 +2706,14 @@
         @media (max-width: 360px) {
             #tab-admin-products .storage-btn { font-size: 12px; padding: 10px 2px; }
         }
+        /* [신규 2026-10-13] 과세·공구가·상시가·정상가·재고·상세옵션 한 줄 — 폰에선 칸이 좁아 여백·글자를 줄인다 (숫자가 잘리지 않게) */
+        @media (max-width: 600px) {
+            .price-row6 { gap: 3px !important; }
+            .price-row6 input.form-control { padding: 0 3px !important; font-size: 12.5px !important; text-align: center; -moz-appearance: textfield; }
+            .price-row6 input.form-control::-webkit-outer-spin-button, .price-row6 input.form-control::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+            .price-row6 input.form-control::placeholder { font-size: 11px; }
+            .price-row6 button { padding: 0 2px !important; font-size: 11px !important; white-space: normal !important; line-height: 1.15 !important; }
+        }
 
         #tab-admin-products .price-option-btn:hover {
             border-color: #7c3aed;
@@ -3092,27 +3100,22 @@
                             <!-- [수정] 가격·상세옵션·재고가 각각 줄을 차지하던 것을 한 줄 세 칸으로 합쳤다. -->
                             <div class="form-group">
                                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
-                                    <label style="margin-bottom:0;">과세·공구가(원)  ·  재고  ·  상세옵션</label>
+                                    <label style="margin-bottom:0;">과세 · 공구가 · 상시가 · 정상가 · 재고 · 상세옵션</label>
                                     <label class="switch-container" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
                                         <input type="checkbox" id="unlimitedStock" onchange="toggleUnlimitedStock()" style="cursor:pointer; width:16px; height:16px;">
                                         <span style="font-size:12px; font-weight:700; color:var(--text-sub); user-select:none;">재고 무제한</span>
                                     </label>
                                 </div>
-                                <!-- [수정] 과세·면세 단추를 가격 왼쪽으로: [과세][가격][재고][상세옵션] -->
-                                <div style="display:grid; grid-template-columns:minmax(0,0.6fr) minmax(0,1.2fr) minmax(0,0.8fr) minmax(0,1fr); gap:6px; align-items:stretch;">
+                                <!-- [수정 2026-10-13] 한 줄에 모두 (사장님 요청): [과세][공구가][상시가][정상가][재고][상세옵션].
+                                     상시가 — 상시판매로 저장하거나 공구가 끝나 상시판매로 넘어가면 이 값으로 판다 (비우면 공구가).
+                                     정상가 — 가격표에 찍는 값이고 할인 설정의 정상가(listPrice)와 같은 값이다 (사장님 결정 — 하나로). 할인을 안 켜면 손님 화면엔 안 보인다 -->
+                                <div class="price-row6" style="display:grid; grid-template-columns:minmax(0,0.55fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,0.75fr) minmax(0,0.9fr); gap:5px; align-items:stretch;">
                                     <button type="button" id="btn-tax-type" onclick="toggleFormTaxFree()" title="눌러서 과세·면세 바꾸기" style="width:100%; min-width:0; height:45px; box-sizing:border-box; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; background:#f1f5f9; color:#64748b; border:1.5px solid #e2e8f0;">과세</button>
                                     <input type="number" id="productPrice" class="form-control" placeholder="공구가" min="0" required onfocus="gPriceCostShow(this)" onblur="gPriceCostHide()" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <input type="number" id="productPriceOnsite" class="form-control" placeholder="상시가" min="0" oninput="gPriceReqSync()" title="상시판매로 팔 때 가격 — 상시판매로 넘어가면 이 값으로" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <input type="number" id="productPriceStore" class="form-control" placeholder="정상가" min="0" oninput="gListPriceFieldSync()" title="정상가 — 매장 가격표에 찍는 가격 (할인 설정의 정상가와 같은 값)" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <input type="number" id="productStock" class="form-control" placeholder="재고" title="999를 넣으면 무제한" min="0" required onchange="gStock999ToUnlimited(this)" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <button type="button" id="btn-detail-option" class="price-option-btn" onclick="openDetailOptionSetting()" style="width:100%; min-width:0; height:45px; box-sizing:border-box; padding:0 8px; overflow:hidden; text-overflow:ellipsis;">상세옵션</button>
-                                </div>
-                                <!-- [신규 2026-10-13] 가격 세 가지 (사장님 요청) — 공구가(위 칸) · 상시가 · 정상가.
-                                     상시판매로 저장하거나 공구가 끝나 상시판매로 넘어가면 상시가로 판다. 가격표는 정상가로 찍는다.
-                                     정상가는 할인 설정의 정상가(listPrice)와 같은 값이다 (사장님 결정 — 하나로). 할인을 안 켜면 손님 화면엔 안 보인다 -->
-                                <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr); gap:6px; align-items:center; margin-top:6px;">
-                                    <span style="font-size:12px; font-weight:800; color:var(--text-sub); white-space:nowrap;">🏪 상시가</span>
-                                    <input type="number" id="productPriceOnsite" class="form-control" placeholder="비우면 공구가" min="0" oninput="gPriceReqSync()" title="상시판매로 팔 때 가격 — 상시판매로 넘어가면 이 값으로" style="width:100%; min-width:0; height:40px; box-sizing:border-box;">
-                                    <span style="font-size:12px; font-weight:800; color:var(--text-sub); white-space:nowrap;">🏷️ 정상가</span>
-                                    <input type="number" id="productPriceStore" class="form-control" placeholder="비우면 판매가" min="0" oninput="gListPriceFieldSync()" title="정상가 — 매장 가격표에 찍는 가격 (할인 설정의 정상가와 같은 값)" style="width:100%; min-width:0; height:40px; box-sizing:border-box;">
                                 </div>
                             </div>
 
