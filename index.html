@@ -3921,7 +3921,7 @@
                     band: null, kakao: null, week: '', calMonth: '', closed: [], skip: {}, block: {}, onsite: {}, onsiteProducts: null, sada: [], manual: {}, dayQ: { days: 28 }, onsiteQ: { q: '', tab: '', open: true },
                     bandQ: { q: '', vendor: '', cat: '', sort: 's', dir: -1, soldOnly: false, limit: 100, from: '', to: '', days: 0 },
                     pickQ: { q: '', days: 28 }, edits: { band: {}, kakao: {} },
-                    trend: null, trendIdx: null, trendData: {}, trendQ: { week: '', cat: '식품 전체', grp: '3050' },   // [신규 2026-10-13] 📈 동향
+                    trend: null, trendIdx: null, trendData: {}, trendQ: { week: '', cat: '전체', sub: 0, grp: '3050', kcat: 0, ksub: 0 },   // [신규 2026-10-13] 📈 동향
                     kakaoQ: { q: '', vendor: '', cat: '', sort: 'd', dir: -1, limit: 100, from: '', to: '', days: 0 }   // [수정 2026-10-08] 카테고리·기간 (밴드 상품처럼)
                 };
                 const srcEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -3987,12 +3987,19 @@
                         if (!gSrc.band) { v.innerHTML = '<div class="src-none">밴드 상품을 불러오는 중…</div>'; try { gSrc.band = (await srcGet('band')) || {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
                         return srcRenderBand(v);
                     }
-                    if (gSrc.tab === 'trend') {   // [신규 2026-10-13] 📈 동향
-                        if (!gSrc.trendIdx) { v.innerHTML = '<div class="src-none">동향 자료를 불러오는 중…</div>'; try { gSrc.trendIdx = (await srcGet('trend_idx')) || {}; gSrc.trendData = {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
+                    if (gSrc.tab === 'trend') {   // [신규 2026-10-13] 📈 동향 (주별 기록·분야별)
+                        const Q = gSrc.trendQ, fail = e => { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; };
+                        const loading = () => { v.innerHTML = '<div class="src-none">동향 자료를 불러오는 중…</div>'; };
+                        if (!gSrc.trendIdx) { loading(); try { gSrc.trendIdx = (await srcGet('trend_idx')) || {}; gSrc.trendData = {}; } catch (e) { return fail(e); } }
                         const wks = Object.keys(gSrc.trendIdx).sort().reverse();
-                        if (!gSrc.trendQ.week || !gSrc.trendIdx[gSrc.trendQ.week]) gSrc.trendQ.week = wks[0] || '';
-                        if (gSrc.trendQ.week && !gSrc.trendData[gSrc.trendQ.week]) { v.innerHTML = '<div class="src-none">동향 자료를 불러오는 중…</div>'; try { gSrc.trendData[gSrc.trendQ.week] = (await srcGet('trend_w/' + gSrc.trendQ.week)) || {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
-                        gSrc.trend = gSrc.trendData[gSrc.trendQ.week] || {};
+                        if (!Q.week || !gSrc.trendIdx[Q.week]) Q.week = wks[0] || '';
+                        if (!Q.week) { gSrc.trend = null; return srcRenderTrend(v); }
+                        const D = gSrc.trendData[Q.week] = gSrc.trendData[Q.week] || { c: {} };
+                        if (!D.meta) { loading(); try { const [m, k, mj] = await Promise.all([srcGet('trend_w/' + Q.week + '/meta'), srcGet('trend_w/' + Q.week + '/k'), srcGet('trend_w/' + Q.week + '/m')]); D.meta = m || {}; D.k = k || []; D.m = mj || null; } catch (e) { return fail(e); } }
+                        const cats = D.meta.cats ? Object.values(D.meta.cats) : [];
+                        let ci = cats.indexOf(Q.cat); if (ci < 0) { ci = 0; Q.cat = cats[0] || ''; }
+                        if (cats.length && !D.c[ci]) { loading(); try { D.c[ci] = (await srcGet('trend_w/' + Q.week + '/c/' + ci)) || {}; } catch (e) { return fail(e); } }
+                        gSrc.trend = D;
                         return srcRenderTrend(v);
                     }
                     if (!gSrc.kakao) { v.innerHTML = '<div class="src-none">카톡 취합을 불러오는 중…</div>'; try { gSrc.kakao = (await srcGet('kakao')) || {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
@@ -6420,30 +6427,68 @@
                     if (onlyRes && box) { box.innerHTML = res; document.getElementById('src-kakao-n').textContent = list.length.toLocaleString() + '개'; return; }
                     (v || document.getElementById('src-view')).innerHTML = html + '<div id="src-kakao-res">' + res + '</div>';
                 }
-                // ── 📈 동향 (3050 여성 주간 인기 검색어·쇼핑 순위) [신규 2026-10-13] ──
-                // 자료는 PC의 자동\동향수집.ps1 이 한 주에 한 번 모아 sourcing/trend 로 올린다.
+                // ── 📈 동향 (3050 여성 주간 인기 검색어·쇼핑 순위·컬리·맛집) [신규 2026-10-13] ──
+                // 자료는 PC의 자동\동향수집.ps1 이 한 주에 한 번 모아 sourcing/trend_w/<월요일 날짜> 로 올린다 (주마다 따로 쌓임).
+                // 분야 → 하위 분야를 고르면 인기 검색어·구매 순위·연령별 클릭 순위가 나오고, 검색어의 '밴드 N개'를 누르면 어떤 상품인지 보여 준다.
+                function srcTrendBand(el) {
+                    const k = el && el.dataset ? el.dataset.k : '';
+                    const q = String(k).replace(/\s/g, '').toLowerCase(); if (!q) return;
+                    const rows = srcBandRows().filter(r => String(r.n || '').replace(/\s/g, '').toLowerCase().includes(q)).sort((a, b) => (+b.s || 0) - (+a.s || 0));
+                    const old = document.getElementById('src-trend-pop'); if (old) old.remove();
+                    const box = document.createElement('div'); box.id = 'src-trend-pop';
+                    box.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:14px;';
+                    box.onclick = e => { if (e.target === box) box.remove(); };
+                    box.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.3);">' +
+                        '<div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:8px;"><b style="font-size:14px;">“' + srcEsc(k) + '” 이름이 든 밴드 상품 ' + rows.length + '개</b><button type="button" class="src-btn" onclick="document.getElementById(\'src-trend-pop\').remove()">닫기 ✕</button></div>' +
+                        '<div style="overflow:auto;padding:6px 16px 14px;">' + (rows.length ? rows.slice(0, 80).map(r => '<div class="src-tr-row" style="gap:10px;"><span class="tx">' + srcEsc(r.n) + '<small>' + srcEsc(r.v) + (r.c ? ' · ' + srcEsc(r.c) : '') + (r.sp ? ' · 공급 ' + Number(r.sp).toLocaleString() + '원' : '') + (r.rp ? ' · 권장 ' + Number(r.rp).toLocaleString() + '원' : '') + (r.s ? ' · 점수 ' + srcEsc(r.s) : '') + '</small></span>' +
+                            (r.u ? '<a class="we" style="text-decoration:none;" href="' + srcEsc(r.u) + '" target="_blank" rel="noopener">밴드 글 ↗</a>' : '') + '</div>').join('') : '<div class="src-none">찾은 상품이 없어요</div>') + '</div></div>';
+                    document.body.appendChild(box);
+                }
                 function srcRenderTrend(v) {
-                    const T = gSrc.trend || {}, Q = gSrc.trendQ;
-                    if (!T.kw || !T.kw.length) { v.innerHTML = '<div class="src-none">아직 동향 자료가 없어요.<br>PC에서 <b>자동\\동향수집.ps1</b> 을 한 번 돌리면 여기에 나와요.</div>'; return; }
-                    // 우리 밴드 상품에 같은 검색어가 든 것이 있으면 표시 (밴드 상품이 아직 안 불러와졌으면 불러온 뒤 다시 그린다)
+                    const D = gSrc.trend, Q = gSrc.trendQ;
+                    const idxKeys = Object.keys(gSrc.trendIdx || {}).sort().reverse();
+                    if (!D || !D.meta) { v.innerHTML = '<div class="src-none">아직 동향 자료가 없어요.<br>PC에서 <b>자동\\동향수집.ps1</b> 을 한 번 돌리면 여기에 나와요.</div>'; return; }
+                    const M = D.meta, arr = x => Array.isArray(x) ? x : (x ? Object.values(x) : []);
+                    const cats = arr(M.cats), ci = Math.max(0, cats.indexOf(Q.cat)), C = D.c[ci] || {};
+                    const subs = arr(C.subs); if (Q.sub >= subs.length || Q.sub < 0) Q.sub = 0;
+                    const at = (o, i) => (o == null ? undefined : o[i]);
+                    // 우리 밴드 상품 이름에 든 검색어 세기 (밴드 상품이 안 불러와졌으면 불러온 뒤 다시 그린다)
                     let names = null;
                     if (gSrc.band) { try { names = srcBandRows().map(r => String(r.n || '').replace(/\s/g, '').toLowerCase()); } catch (e) { names = null; } }
                     else if (!gSrcCat.loading) { gSrcCat.loading = true; srcGet('band').then(b => { gSrc.band = b || {}; gSrcCat.loading = false; if (gSrc.tab === 'trend') srcRender(); }).catch(() => { gSrcCat.loading = false; }); }
                     const have = k => { if (!names) return 0; const q = String(k).replace(/\s/g, '').toLowerCase(); return q.length < 2 ? 0 : names.filter(n => n.includes(q)).length; };
-                    const cat = T.kw.find(c => c.cat === Q.cat) || T.kw[0];
-                    const grpName = (T.groups || []).reduce((m, g) => (m[g.key] = g.label, m), {});
-                    const kwRows = (cat.rows && cat.rows[Q.grp]) || [];
+                    const bandTag = k => { const n = have(k); return n ? '<span class="we" style="cursor:pointer" data-k="' + srcEsc(k) + '" onclick="srcTrendBand(this)" title="누르면 어떤 상품인지 보여 줘요">밴드 ' + n + '개 ›</span>' : ''; };
+                    const grpName = arr(M.groups).reduce((m, g) => (m[g.key] = g.label, m), {});
                     const row = (rk, main, sub, link, tag) => '<div class="src-tr-row"><span class="rk' + (rk <= 3 ? ' top' : '') + '">' + rk + '</span><span class="tx">' + (link ? '<a href="' + srcEsc(link) + '" target="_blank" rel="noopener">' + srcEsc(main) + '</a>' : srcEsc(main)) + (sub ? '<small>' + srcEsc(sub) + '</small>' : '') + '</span>' + (tag || '') + '</div>';
                     const prod = x => row(x.r, x.t, [x.mall, x.p ? x.p + '원' : '', x.rv ? '리뷰 ' + x.rv : ''].filter(Boolean).join(' · '), x.u);
-                    const clickBox = k => '<div class="src-tr-box"><h4>🖱️ 클릭 순위 · ' + srcEsc((grpName[k] || k + '대 여성')) + '</h4>' + (((T.click || {})[k] || []).map(prod).join('') || '<div class="src-none">자료 없음</div>') + '</div>';
-                    let html = '<p class="src-tr-note">기간 <b>' + srcEsc(T.range || (T.start + ' ~ ' + T.end)) + '</b> (지난 한 주) · 올린 때 ' + srcEsc(T.updated || '') + ' · 네이버 쇼핑인사이트와 네이버쇼핑 BEST 자료예요. 여성 30·40·50대 기준이고, 구매 순위는 연령 구분이 없어 전체 기준이에요.</p>';
-                    html += '<div class="src-bar"><span class="k">주</span><select onchange="gSrc.trendQ.week=this.value; srcRender()">' + Object.keys(gSrc.trendIdx || {}).sort().reverse().map(w => '<option value="' + w + '"' + (w === Q.week ? ' selected' : '') + '>' + srcEsc((gSrc.trendIdx[w] && gSrc.trendIdx[w].range) || w) + '</option>').join('') + '</select><span class="k">분야</span><select onchange="gSrc.trendQ.cat=this.value; srcRender()">' + T.kw.map(c => '<option' + (c.cat === cat.cat ? ' selected' : '') + '>' + srcEsc(c.cat) + '</option>').join('') + '</select>' +
-                        '<span class="k">연령</span><span class="src-tr-chips" style="margin:0">' + (T.groups || []).map(g => '<button type="button" class="' + (g.key === Q.grp ? 'on' : '') + '" onclick="gSrc.trendQ.grp=\'' + g.key + '\'; srcRender()">' + srcEsc(g.label) + '</button>').join('') + '</span></div>';
-                    html += '<div class="src-tr-grid"><div class="src-tr-box"><h4>🔎 인기 검색어 · ' + srcEsc(cat.cat) + ' · ' + srcEsc(grpName[Q.grp] || Q.grp) + '</h4>' +
-                        (kwRows.map(x => { const n = have(x.k); return row(x.r, x.k, '', '', n ? '<span class="we" title="밴드 상품 이름에 이 검색어가 들어간 상품 수">밴드 ' + n + '개</span>' : ''); }).join('') || '<div class="src-none">자료 없음</div>') + '</div>' +
-                        '<div class="src-tr-box"><h4>🛒 구매(판매) 순위 · 식품 · 전체 연령 · 주간</h4>' + ((T.buy || []).map(prod).join('') || '<div class="src-none">자료 없음</div>') + '</div></div>';
-                    html += '<div class="src-tr-grid">' + ['30', '40', '50'].map(clickBox).join('') + '</div>';
-                    html += '<div class="src-tr-grid">' + [['🥬 마켓컬리 베스트 · 추천순 · 전체 연령', T.kurlyBest], ['🥬 마켓컬리 베스트 · 판매량순 · 전체 연령', T.kurlySales]].map(([h4, list]) => '<div class="src-tr-box"><h4>' + h4 + '</h4>' + ((list || []).map(prod).join('') || '<div class="src-none">자료 없음</div>') + '</div>').join('') + '</div>';
+                    const list = (a, fn, none) => { const l = arr(a); return l.length ? l.map(fn).join('') : '<div class="src-none" style="padding:12px 4px;">' + (none || '자료 없음') + '</div>'; };
+                    const subName = i => (arr(C.subs)[i] === '' || arr(C.subs)[i] == null) ? '전체' : arr(C.subs)[i];
+                    const sel = (onch, opts, cur) => '<select onchange="' + onch + '">' + opts.map(([val, lab]) => '<option value="' + srcEsc(val) + '"' + (String(val) === String(cur) ? ' selected' : '') + '>' + srcEsc(lab) + '</option>').join('') + '</select>';
+                    let html = '<p class="src-tr-note">기간 <b>' + srcEsc(M.range || (M.start + ' ~ ' + M.end)) + '</b> (한 주) · 올린 때 ' + srcEsc(M.updated || '') + ' · 네이버 쇼핑인사이트·네이버쇼핑 BEST·마켓컬리·네이버 검색광고 자료예요. 여성 30·40·50대 기준이고, 구매 순위·컬리는 연령 구분이 없어 전체 기준이에요. ' + srcEsc(M.note || '') + '</p>';
+                    html += '<div class="src-bar"><span class="k">주</span>' + sel("gSrc.trendQ.week=this.value; srcRender()", idxKeys.map(w => [w, (gSrc.trendIdx[w] && gSrc.trendIdx[w].range) || w]), Q.week) +
+                        '<span class="k">분야</span>' + sel("gSrc.trendQ.cat=this.value; gSrc.trendQ.sub=0; srcRender()", cats.map(c => [c, c]), Q.cat) +
+                        '<span class="k">하위</span>' + sel("gSrc.trendQ.sub=+this.value; srcRender()", subs.map((s, i) => [i, subName(i) === '전체' ? '전체 (' + Q.cat + ')' : s]), Q.sub) +
+                        '<span class="k">연령</span><span class="src-tr-chips" style="margin:0">' + arr(M.groups).map(g => '<button type="button" class="' + (g.key === Q.grp ? 'on' : '') + '" onclick="gSrc.trendQ.grp=\'' + g.key + '\'; srcRender()">' + srcEsc(g.label) + '</button>').join('') + '</span></div>';
+                    const kwRow = at(C.kw, Q.sub) || {};
+                    html += '<div class="src-tr-grid"><div class="src-tr-box"><h4>🔎 인기 검색어 · ' + srcEsc(Q.cat) + (Q.sub ? ' › ' + srcEsc(subName(Q.sub)) : '') + ' · ' + srcEsc(grpName[Q.grp] || Q.grp) + '</h4>' +
+                        list(kwRow[Q.grp], (k, i) => row(i + 1, k, '', '', bandTag(k)), Q.sub && Q.grp !== '3050' ? '하위 분야는 3050 여성 합친 순위만 모아요' : '자료 없음') + '</div>' +
+                        '<div class="src-tr-box"><h4>🛒 구매(판매) 순위 · ' + srcEsc(Q.cat) + (Q.sub ? ' › ' + srcEsc(subName(Q.sub)) : '') + ' · 전체 연령</h4>' + list(at(C.buy, Q.sub), prod) + '</div></div>';
+                    const clk = at(C.click, Q.sub) || {};
+                    html += '<div class="src-tr-grid">' + ['30', '40', '50'].map(k => '<div class="src-tr-box"><h4>🖱️ 클릭 순위 · ' + srcEsc(Q.cat) + (Q.sub ? ' › ' + srcEsc(subName(Q.sub)) : '') + ' · ' + srcEsc(grpName[k] || k + '대 여성') + '</h4>' + list(clk[k], prod) + '</div>').join('') + '</div>';
+                    // 마켓컬리 (컬리 분야는 네이버와 달라 따로 고른다)
+                    const K = arr(D.k); const kc = Math.min(Math.max(+Q.kcat || 0, 0), Math.max(K.length - 1, 0)); const KC = K[kc] || {};
+                    const ksubs = arr(KC.subs); const ks = Math.min(Math.max(+Q.ksub || 0, 0), Math.max(ksubs.length - 1, 0));
+                    if (K.length) {
+                        html += '<div class="src-bar"><span class="k">🥬 마켓컬리 분야</span>' + sel("gSrc.trendQ.kcat=+this.value; gSrc.trendQ.ksub=0; srcRender()", K.map((x, i) => [i, x.name]), kc) +
+                            sel("gSrc.trendQ.ksub=+this.value; srcRender()", ksubs.map((s, i) => [i, s === '' ? '전체' : s]), ks) + '<span class="k">전체 연령 기준</span></div>';
+                        html += '<div class="src-tr-grid">' + [['추천순 (베스트)', KC.best], ['판매량순', KC.sales]].map(([h4, L]) => '<div class="src-tr-box"><h4>🥬 마켓컬리 · ' + srcEsc(KC.name || '') + (ks ? ' › ' + srcEsc(ksubs[ks]) : '') + ' · ' + h4 + '</h4>' + list(at(L, ks), prod) + '</div>').join('') + '</div>';
+                    }
+                    // 맛집 (사다드림 영감)
+                    if (D.m) {
+                        const mm = D.m;
+                        html += '<p class="src-tr-note" style="margin-top:6px"><b>🍽 맛집·사다드림 영감</b> — ' + srcEsc(mm.note || '') + ' 지역은 키워드에 든 지역 이름으로 수도권(서울·경기·인천)과 지방을 나눴어요.</p><div class="src-tr-grid">' +
+                            [['🏙️ 수도권 맛집 검색어 TOP', mm.s], ['🌄 지방 맛집 검색어 TOP', mm.j], ['🍜 메뉴·기타 맛집 검색어', mm.a], ['📦 택배·밀키트·포장 검색어 TOP', mm.b]].map(([h4, L]) => '<div class="src-tr-box"><h4>' + h4 + ' <small style="font-weight:600;color:var(--src-sub)">(한 달 검색량)</small></h4>' + list(L, (x, i) => row(i + 1, x.k, Number(x.v).toLocaleString() + '회', '', bandTag(x.k))) + '</div>').join('') + '</div>';
+                    }
                     v.innerHTML = html;
                 }
                 function srcSortKakao(k) {
