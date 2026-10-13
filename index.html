@@ -3092,7 +3092,7 @@
                             <!-- [수정] 가격·상세옵션·재고가 각각 줄을 차지하던 것을 한 줄 세 칸으로 합쳤다. -->
                             <div class="form-group">
                                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
-                                    <label style="margin-bottom:0;">과세·가격(원)  ·  재고  ·  상세옵션</label>
+                                    <label style="margin-bottom:0;">과세·공구가(원)  ·  재고  ·  상세옵션</label>
                                     <label class="switch-container" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
                                         <input type="checkbox" id="unlimitedStock" onchange="toggleUnlimitedStock()" style="cursor:pointer; width:16px; height:16px;">
                                         <span style="font-size:12px; font-weight:700; color:var(--text-sub); user-select:none;">재고 무제한</span>
@@ -3101,9 +3101,18 @@
                                 <!-- [수정] 과세·면세 단추를 가격 왼쪽으로: [과세][가격][재고][상세옵션] -->
                                 <div style="display:grid; grid-template-columns:minmax(0,0.6fr) minmax(0,1.2fr) minmax(0,0.8fr) minmax(0,1fr); gap:6px; align-items:stretch;">
                                     <button type="button" id="btn-tax-type" onclick="toggleFormTaxFree()" title="눌러서 과세·면세 바꾸기" style="width:100%; min-width:0; height:45px; box-sizing:border-box; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; background:#f1f5f9; color:#64748b; border:1.5px solid #e2e8f0;">과세</button>
-                                    <input type="number" id="productPrice" class="form-control" placeholder="가격" min="0" required onfocus="gPriceCostShow(this)" onblur="gPriceCostHide()" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <input type="number" id="productPrice" class="form-control" placeholder="공구가" min="0" required onfocus="gPriceCostShow(this)" onblur="gPriceCostHide()" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <input type="number" id="productStock" class="form-control" placeholder="재고" title="999를 넣으면 무제한" min="0" required onchange="gStock999ToUnlimited(this)" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <button type="button" id="btn-detail-option" class="price-option-btn" onclick="openDetailOptionSetting()" style="width:100%; min-width:0; height:45px; box-sizing:border-box; padding:0 8px; overflow:hidden; text-overflow:ellipsis;">상세옵션</button>
+                                </div>
+                                <!-- [신규 2026-10-13] 가격 세 가지 (사장님 요청) — 공구가(위 칸) · 상시가 · 정상가.
+                                     상시판매로 저장하거나 공구가 끝나 상시판매로 넘어가면 상시가로 판다. 가격표는 정상가로 찍는다.
+                                     정상가는 할인 설정의 정상가(listPrice)와 같은 값이다 (사장님 결정 — 하나로). 할인을 안 켜면 손님 화면엔 안 보인다 -->
+                                <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr); gap:6px; align-items:center; margin-top:6px;">
+                                    <span style="font-size:12px; font-weight:800; color:var(--text-sub); white-space:nowrap;">🏪 상시가</span>
+                                    <input type="number" id="productPriceOnsite" class="form-control" placeholder="비우면 공구가" min="0" oninput="gPriceReqSync()" title="상시판매로 팔 때 가격 — 상시판매로 넘어가면 이 값으로" style="width:100%; min-width:0; height:40px; box-sizing:border-box;">
+                                    <span style="font-size:12px; font-weight:800; color:var(--text-sub); white-space:nowrap;">🏷️ 정상가</span>
+                                    <input type="number" id="productPriceStore" class="form-control" placeholder="비우면 판매가" min="0" oninput="gListPriceFieldSync()" title="정상가 — 매장 가격표에 찍는 가격 (할인 설정의 정상가와 같은 값)" style="width:100%; min-width:0; height:40px; box-sizing:border-box;">
                                 </div>
                             </div>
 
@@ -16562,7 +16571,7 @@
                 if (!tab) { console.warn('상시판매 전환 — 분류탭이 없어 건너뜀:', p.name); continue; }
                 const stg = String(p.storage || '');
                 const mk = ['냉동', '냉장', '상온'].includes(stg) ? stg : '상시판매';
-                const price = parseInt(raw.toOnsitePrice, 10);
+                const price = parseInt(raw.toOnsitePrice, 10) || parseInt(p.priceOnsite, 10);   // [수정 2026-10-13] 없으면 상품의 상시가
                 const now = Date.now();
                 const f = {
                     matchKey: mk, date: '', kind: null, displayTab: tab, nextDate: null,
@@ -16640,7 +16649,7 @@
                         <div class="ps-f"><label>냉장고 분류</label>
                             <select class="ps-in" onchange="psItemSetToOnsiteShelf('${kq}', this.value)">${shelfOpts}</select></div>
                         <div class="ps-f"><label>상시판매 금액</label>
-                            <input type="number" min="0" inputmode="numeric" class="ps-in" value="${Number(it.toOnsitePrice) > 0 ? Number(it.toOnsitePrice) : ''}" placeholder="${(Number(p.price) || 0).toLocaleString()}원 그대로" title="비우면 지금 가격 그대로" onchange="psItemSetToOnsitePrice('${kq}', this.value)"></div>
+                            <input type="number" min="0" inputmode="numeric" class="ps-in" value="${Number(it.toOnsitePrice) > 0 ? Number(it.toOnsitePrice) : ''}" placeholder="${Number(p.priceOnsite) > 0 ? Number(p.priceOnsite).toLocaleString() + '원 (상시가)' : (Number(p.price) || 0).toLocaleString() + '원 그대로'}" title="비우면 상품의 상시가(없으면 지금 가격) 그대로" onchange="psItemSetToOnsitePrice('${kq}', this.value)"></div>
                     </div>`;
             if (fieldsOnly) return `<div style="font-size:11px; font-weight:700; color:var(--text-sub); margin-bottom:6px;">🏪 상시판매 전환 — 픽업일이 지나면 남은 재고로${doneTxt}</div>${fields}`;
             // [수정 2026-10-03] 제목 '끝나면'을 '상시판매 전환' 체크박스 하나로 합쳤다 (사장님 요청)
@@ -16942,7 +16951,9 @@
         }
         // 상품 줄에 적을 값 (patch 꼴: { 칸: 값 })
         function psOnsiteToGroupFields(p, key) {
+            const _gb = Number(p && p.priceGb) || 0;   // [신규 2026-10-13] 공구가를 따로 적어 뒀으면 공동구매는 그 가격으로
             return {
+                ...(_gb > 0 && _gb !== Number(p.price) ? { price: _gb } : {}),
                 date: key, matchKey: key, kind: 'group', displayTab: null, nextDate: null,
                 onsiteTabPrev: String(p.displayTab || '') || null
             };
@@ -17470,7 +17481,8 @@
                 const relMin = relD ? relD.getHours() * 60 + relD.getMinutes() : 9999;
                 // [수정 2026-10-10] 시간 줄 = 마감 시각 (사장님 요청 — 예전엔 올라가는 시각). 마감이 없으면 올라가는 시각
                 const baseD = (it.expireAt ? new Date(Number(it.expireAt)) : null) || relD;
-                const slot = baseD ? baseD.getHours() : 15;
+                // [수정 2026-10-13] 반복 일정(상품에 repeatWeeks)은 시간 줄 말고 맨 아래 '🔁 반복' 줄로 따로 (사장님 요청)
+                const slot = Number(prod.repeatWeeks) > 0 ? 'R' : (baseD ? baseD.getHours() : 15);
                 const s0 = start <= end ? start : end;
                 let e0 = start <= end ? end : start;
                 const pk = psItemPickup(it);
@@ -17536,8 +17548,9 @@
             const rangeFirstKey = dateKeys[0], rangeLastKey = dateKeys[dateKeys.length - 1];
             const rangeBars = bars.filter(b => b.end >= rangeFirstKey && b.start <= rangeLastKey);
             // [신규 2026-10-10] 시간 줄은 이 달에 실제로 쓰인 마감 시각만 (0~23시 아무 때나라 다 그리면 빈 줄투성이). 하나도 없으면 15시 한 줄
-            const calSlots = [...new Set(rangeBars.map(b => b.slot))].sort((a, b) => a - b);
+            const calSlots = [...new Set(rangeBars.map(b => b.slot))].filter(x => x !== 'R').sort((a, b) => a - b);
             if (!calSlots.length) calSlots.push(15);
+            if (rangeBars.some(b => b.slot === 'R')) calSlots.push('R');   // [신규 2026-10-13] 반복 일정 줄은 맨 아래
 
             // 주(달력 한 줄)마다·시간 줄마다 쓰이는 줄 수 — 같은 주의 칸은 같은 줄 수로 맞춰야 막대가 가지런하다
             const weekLanes = {};
@@ -17553,7 +17566,8 @@
                 let g = `<div class="ms-cal-cell ps-gutter"><div class="ms-cal-day">&nbsp;</div><div class="ps-bars">`;
                 calSlots.forEach(slot => {   // [수정 2026-10-10] 마감 시각 줄
                     const n = (weekLanes[w] || {})[slot] || 0;
-                    g += `<div class="ps-slot"><span class="ps-gutter-lbl">${String(slot).padStart(2, '0')}</span>`
+                    g += (slot === 'R' ? `<div class="ps-slot" style="border-top:1.5px dashed #c4b5fd;"><span class="ps-gutter-lbl" title="반복 일정">🔁</span>`
+                        : `<div class="ps-slot"><span class="ps-gutter-lbl">${String(slot).padStart(2, '0')}</span>`)
                         + '<div class="ps-bar ps-bar-empty"></div>'.repeat(n) + `</div>`;
                 });
                 return g + `</div></div>`;
@@ -17579,7 +17593,7 @@
                 let namesHtml = '';
                 calSlots.forEach(slot => {   // [수정 2026-10-10] 마감 시각 줄
                 const nLanes = (weekLanes[w] || {})[slot] || 0;
-                namesHtml += `<div class="ps-slot" data-slot="${slot}" title="${psSlotLabel(slot)}" ondragover="event.preventDefault(); this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="this.classList.remove('over'); psHandleDrop(event, '${key}', ${slot})">`;
+                namesHtml += slot === 'R' ? `<div class="ps-slot ps-slot-rep" title="🔁 반복 일정" style="border-top:1.5px dashed #c4b5fd;">` : `<div class="ps-slot" data-slot="${slot}" title="${psSlotLabel(slot)}" ondragover="event.preventDefault(); this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="this.classList.remove('over'); psHandleDrop(event, '${key}', ${slot})">`;
                 for (let l = 0; l < nLanes; l++) {
                     const b = todays.find(x => x.slot === slot && x.lane === l);
                     if (!b) { namesHtml += `<div class="ps-bar ps-bar-empty"></div>`; continue; }
@@ -20196,9 +20210,10 @@
             const b = document.getElementById('btnFormSched');
             if (!b) return;
             const s = uploadFormSched;
-            if (s) { const d = new Date(psOpenAt(s.releaseAt)); b.innerText = `📅 ${d.getMonth() + 1}/${d.getDate()}`; }
+            if (s && s.off) b.innerText = '📅 끔';   // [신규 2026-10-13] 걸린 일정을 꺼 둠 — 저장하면 빠진다
+            else if (s) { const d = new Date(psOpenAt(s.releaseAt)); b.innerText = `📅 ${d.getMonth() + 1}/${d.getDate()}`; }
             else b.innerText = '📅 일정';
-            b.classList.toggle('active', !!s);
+            b.classList.toggle('active', !!s && !s.off);
         }
         function openFormSchedule() {
             const p2 = x => String(x).padStart(2, '0');
@@ -20219,7 +20234,7 @@
             box.onclick = e => { if (e.target === box) box.remove(); };
             box.innerHTML = `<div style="background:#fff; border-radius:14px; width:min(420px,100%); padding:16px; box-sizing:border-box;">
                 <div style="font-size:14px; font-weight:900; margin-bottom:4px;">📅 노출일정${s && s.key ? ' <span style="font-size:11px; font-weight:800; color:#2563eb;">· 지금 걸린 일정</span>' : ''}</div>
-                <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:10px;">${s && s.key ? '고치고 상품을 저장하면 이 일정이 바뀌어요 (노출일정 달력에도 그대로)' : '상품을 저장하면 이 일정이 노출일정 달력에 담겨요'}. 고른 시각에 손님 화면에 올라가고 카톡 알림도 떠요</div>
+                <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:10px;">${s && s.off ? '<b style="color:#dc2626;">꺼 둠 — 상품을 저장하면 이 일정이 빠져요</b>' : s && s.key ? '고치고 상품을 저장하면 이 일정이 바뀌어요 (노출일정 달력에도 그대로)' : '상품을 저장하면 이 일정이 노출일정 달력에 담겨요'}. 고른 시각에 손님 화면에 올라가고 카톡 알림도 떠요</div>
                 <div style="display:flex; flex-direction:column; gap:6px;">
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span style="${LAB}" title="이 시각에 손님 화면에 올라가고 카톡 알림(🔔)도 떠요">📣 노출일</span>
@@ -20245,7 +20260,7 @@
                     ${isShowWeekly ? `<div style="font-size:11px; font-weight:800; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:6px 8px; line-height:1.5;">이 상품은 지금 '매주 노출'이에요. 일정을 정하면 매주 노출은 꺼지고 이 일정(반복)대로 올라가요</div>` : ''}
                 </div>
                 <div style="display:flex; gap:6px; margin-top:12px;">
-                    ${(s && !s.key) ? `<button type="button" onclick="fspClear()" style="flex:0 0 auto; height:38px; padding:0 12px; border:1.5px solid #fecaca; background:#fff; color:#dc2626; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">지우기</button>` : ''}
+                    ${s ? `<button type="button" onclick="${s.key ? 'fspOff()' : 'fspClear()'}" title="${s.key ? '이 상품의 이 일정을 빼요 — 상품을 저장할 때 빠져요' : '정한 일정을 비워요'}" style="flex:0 0 auto; height:38px; padding:0 12px; border:1.5px solid #fecaca; background:#fff; color:#dc2626; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">${s.off ? '끄기 취소' : '끄기'}</button>` : ''}
                     <button type="button" onclick="document.getElementById('form-sched-pick').remove()" style="flex:1; height:38px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">닫기</button>
                     <button type="button" onclick="fspApply()" style="flex:1; height:38px; border:none; background:#2563eb; color:#fff; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">정하기</button>
                 </div>
@@ -20290,12 +20305,20 @@
             const old = uploadFormSched;
             const repeat = Number((document.getElementById('fsp-repeat') || {}).value) || 0;   // [신규 2026-10-10]
             if (repeat && exp && (exp - rel) > repeat * 7 * 86400000) { showToast(`⚠️ 판매 기간이 ${repeat === 1 ? '1주' : repeat + '주'}보다 길어서 다음 차례와 겹쳐요`); return; }
-            uploadFormSched = (old && old.key) ? { ...old, releaseAt: rel, expireAt: exp, pickup, repeat } : { releaseAt: rel, expireAt: exp, pickup, repeat };
+            uploadFormSched = (old && old.key) ? { ...old, releaseAt: rel, expireAt: exp, pickup, repeat, off: false } : { releaseAt: rel, expireAt: exp, pickup, repeat };
             // [신규 2026-10-10] 매주 노출 상품에 일정을 정하면 매주 노출을 끈다 (저장할 때 함께 저장 — 매주 노출이면 일정을 못 건다)
             if (isShowWeekly) { isShowWeekly = false; updateExposureButtonsUI(); showToast("🔁 매주 노출을 껐어요 — 저장하면 이 일정대로 올라가요"); }
             paintFormSchedBtn();
             document.getElementById('form-sched-pick').remove();
             showToast((old && old.key) ? '📅 일정을 고쳤어요 — 상품을 저장하면 바뀌어요' : '📅 일정을 정했어요 — 상품을 저장하면 노출일정에 담겨요');
+        }
+        // [신규 2026-10-13] 걸린 일정 끄기 (사장님 요청) — 바로 지우지 않고, 상품을 저장할 때 뺀다 (한 번 더 누르면 취소)
+        function fspOff() {
+            const s = uploadFormSched; if (!s || !s.key) return;
+            uploadFormSched = { ...s, off: !s.off };
+            paintFormSchedBtn();
+            const b = document.getElementById('form-sched-pick'); if (b) b.remove();
+            showToast(uploadFormSched.off ? '📅 일정을 껐어요 — 상품을 저장하면 노출일정에서 빠져요' : '📅 끄기를 취소했어요');
         }
         function fspClear() {
             uploadFormSched = null;
@@ -20749,10 +20772,25 @@
             const go = () => { const p = document.getElementById('price-cost-pop'); if (p) p.remove(); };
             if (now) go(); else gPriceCostTimer = setTimeout(go, 150);
         }
+        // [신규 2026-10-13] 정상가 칸 = 할인 설정의 정상가 — 할인이 정상가 방식이면 그 값과 할인 금액도 같이 맞춘다
+        function gListPriceFieldSync() {
+            const v = Math.max(0, parseInt((document.getElementById('productPriceStore') || {}).value) || 0);
+            if (uploadUseDiscount && uploadDiscountType === 'amount' && uploadDiscountAmountMode === 'list') {
+                const sell = Math.max(0, parseInt((document.getElementById('productPrice') || {}).value) || 0);
+                uploadDiscountListPrice = v; uploadDiscountAmount = Math.max(0, v - sell);
+            }
+        }
+        // [신규 2026-10-13] 상시판매로 등록하면서 상시가를 적었으면 공구가 칸은 비워도 된다
+        function gPriceReqSync() {
+            const pe = document.getElementById('productPrice'), on = document.getElementById('productPriceOnsite');
+            if (!pe || pe.type !== 'number' || pe.readOnly) return;
+            pe.required = !(typeof uploadCurrentTab !== 'undefined' && uploadCurrentTab === 'onsite' && on && (parseInt(on.value) || 0) > 0);
+        }
         // 가격칸을 잠금 해제된 빈 숫자칸으로 되돌린다 (이전 상품에서 잠겨 있던 흔적 제거)
         function resetPriceField() {
             const input = document.getElementById('productPrice');
             if (!input) return;
+            ['productPriceOnsite', 'productPriceStore'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });   // [신규 2026-10-13]
             input.type = 'number';
             input.value = '';
             delete input.dataset.prevValue;
@@ -20943,6 +20981,7 @@
                 if (sell > 0 && priceEl && priceEl.type === 'number') priceEl.value = sell;   // 할인 방식을 바꿔 들어왔을 때만 값이 달라진다 (깎을 금액 → 정상가 등)
                 uploadDiscountListPrice = np;
                 uploadDiscountAmount = Math.max(0, np - sell);
+                { const _s = document.getElementById('productPriceStore'); if (_s) _s.value = np || ''; }   // [신규 2026-10-13] 정상가 칸도 같은 값
             } else {
                 uploadDiscountListPrice = 0;
             }
@@ -21034,7 +21073,17 @@
             syncDetailOptionDraft();
             if (!optionModalDraft) return;
             optionModalDraft.useDiscount = !optionModalDraft.useDiscount;
+            gDraftListFromField(false);   // [신규 2026-10-13]
             renderDetailOptionBody();
+        }
+        /* [신규 2026-10-13] 할인 창의 '정상가' 방식 — 상품 등록의 정상가 칸에 적어 둔 값을 그대로 쓴다 (사장님 요청 — 정상가 단추만 누르면 적용).
+           정상가 방식으로 바꿀 때는 늘 그 값으로, 할인을 켜거나 원 할인으로 바꿀 때는 아직 할인이 없을 때만. 정상가가 판매가보다 커야 할인이 된다 */
+        function gDraftListFromField(force) {
+            const d = optionModalDraft;
+            if (!d || !d.useDiscount || d.discountType !== 'amount' || d.discountAmountMode !== 'list') return;
+            const lp = Math.max(0, parseInt((document.getElementById('productPriceStore') || {}).value) || 0);
+            const sell = Math.max(0, parseInt(d.discountSellBase) || 0) || gFormPrice();
+            if (lp > sell && (force || !(parseInt(d.discountAmount) > 0))) { d.discountSellBase = sell; d.discountAmount = lp - sell; d.discountNewPrice = lp; }
         }
 
         // 폼의 판매가 칸 값 (할인 계산의 밑값)
@@ -21047,6 +21096,7 @@
             syncDetailOptionDraft();
             if (!optionModalDraft) return;
             optionModalDraft.discountType = (t === 'amount') ? 'amount' : 'rate';
+            gDraftListFromField(false);   // [신규 2026-10-13]
             renderDetailOptionBody();
         }
 
@@ -21062,6 +21112,7 @@
             if (optionModalDraft.discountAmountMode === 'list' && was !== 'list') {
                 optionModalDraft.discountSellBase = gDiscSellBase(optionModalDraft.useDiscount, optionModalDraft.discountType, optionModalDraft.discountAmount);
                 optionModalDraft.discountNewPrice = 0;
+                gDraftListFromField(true);   // [신규 2026-10-13] 정상가 칸 값으로 바로
             } else if (was === 'list' && optionModalDraft.discountAmountMode !== 'list') {
                 // 정상가 방식에서 나갈 때 — 적은 정상가는 아직 판매가 칸에 안 들어갔으니 버리고, 손님이 내는 값은 그대로 둔다
                 optionModalDraft.discountAmount = Math.max(0, gFormPrice() - (parseInt(optionModalDraft.discountSellBase) || 0));
@@ -30357,6 +30408,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // [수정 2026-10-03] 등록 칸은 공동구매(reserve)·상시판매(onsite) 둘뿐이다. 그 밖의 값이 오면 공동구매로 연다.
             if (tab !== 'reserve' && tab !== 'onsite') tab = 'reserve';
             uploadCurrentTab = tab;
+            setTimeout(() => { if (typeof gPriceReqSync === "function") gPriceReqSync(); }, 0);   // [신규 2026-10-13] 상시판매면 상시가만 적어도 된다
             document.querySelectorAll('#tab-upload .segment-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.tab === tab);
             });
@@ -33447,10 +33499,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     } catch (e) { console.warn('과세·면세 저장 실패(상품 저장에는 지장 없음):', e); }
                 }
 
+                // [신규 2026-10-13] 가격 세 가지 — 공구가(price 칸) · 상시가 · 매장가. 손님이 보는 price 는 상시판매면 상시가(없으면 공구가), 아니면 공구가
+                const _pOnsite = parseInt((document.getElementById('productPriceOnsite') || {}).value) || 0;
+                const _pStore = parseInt((document.getElementById('productPriceStore') || {}).value) || 0;
+                const _priceNow = (uploadCurrentTab === 'onsite' && _pOnsite > 0) ? _pOnsite : price;
                 const productObj = {
                     name: name,
                     productCode: _productCode,
-                    price: price,
+                    price: _priceNow,
+                    priceGb: price > 0 ? price : null,
+                    priceOnsite: _pOnsite > 0 ? _pOnsite : null,
+
                     stock: stock,
                     // [신규] 처음 올린 시각 — 언제 올려야 주문이 많은지 보려고 남긴다. 수정할 때는 처음 값을 그대로 둔다.
                     //  (예전에 올려 시각이 없는 상품은 수정해도 비워 둔다 — 지금 시각을 넣으면 방금 올린 것처럼 잘못 셈해진다)
@@ -33520,7 +33579,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     discountRate: uploadDiscountRate,
                     discountType: uploadDiscountType,
                     discountAmount: uploadDiscountAmount,
-                    listPrice: gFormIsList() ? uploadDiscountListPrice : null,   // [신규 2026-10-11] 정상가 (따로 저장 — 가격은 판매가 그대로)
+                    listPrice: gFormIsList() ? uploadDiscountListPrice : (_pStore > 0 ? _pStore : null),   // [수정 2026-10-13] 할인이 아니어도 정상가 칸 값을 담는다 (가격표용)   // [신규 2026-10-11] 정상가 (따로 저장 — 가격은 판매가 그대로)
                     discountAmountMode: uploadDiscountAmountMode,   // [신규] 원 할인을 어떻게 적었는지 (다시 열 때 같은 방식으로 보여주려고 저장)
                     saleToToday: uploadSaleToToday,
                     saleBadge: uploadSaleBadge,
@@ -33802,7 +33861,18 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 exitEditMode();
                 await loadProductsFromServer(); // [수정] 서버에서 최신 재고 조정값(global_stock) 다시 불러오기
                 /* [신규 2026-10-05] 등록·수정 화면에서 정한 노출일정을 이 상품에 담는다 → 노출일정 달력에도 보인다 */
-                if (_formSched && _formSched.key) {
+                if (_formSched && _formSched.key && _formSched.off) {
+                    // [신규 2026-10-13] 끈 일정 — 이 일정을 빼고(상품은 그대로), 반복이 걸려 있었으면 반복도 끈다
+                    const k = _formSched.key;
+                    if (psItem(k) && await psConfirmLive([k], '노출일정을 빼요 (상품은 그대로).')) {
+                        psUndoMark('상품 수정 — 일정 끄기');
+                        const _p = uploadProducts[psItem(k).idx];
+                        if (_p && Number(_p.repeatWeeks) > 0) await psSetRepeat(k, 0);
+                        if (psItem(k)) await psItemDelete(k);
+                        showToast('📅 노출일정을 뺐어요');
+                        if (typeof renderProductScheduleCalendar === 'function') renderProductScheduleCalendar();
+                    }
+                } else if (_formSched && _formSched.key) {
                     /* [신규 2026-10-05] 이미 걸린 일정을 고쳤으면 그 일정을 바꾼다 — 노출일정 카드에서 고치는 것과 같은 길 (판매 중이면 한 번 묻는다) */
                     const o = _formSched.orig || {}, k = _formSched.key;
                     const chRel = Number(_formSched.releaseAt) !== Number(o.releaseAt);
@@ -34536,6 +34606,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // 이전 상품에서 잠겨 있었을 수 있으므로 가격칸을 먼저 깨끗한 숫자칸으로 되돌린 뒤 값을 넣는다
             resetPriceField();
             document.getElementById('productPrice').value = prod.price || 0;
+            { // [신규 2026-10-13] 가격 세 가지 — 상시판매 상품은 공구가를 따로 적어 뒀으면 그것, 상시가 칸엔 지금 가격
+              const _on = String(prod.displayTab || '').startsWith('onsite');
+              if (_on && Number(prod.priceGb) > 0) document.getElementById('productPrice').value = prod.priceGb;
+              const _o = document.getElementById('productPriceOnsite'), _s = document.getElementById('productPriceStore');
+              if (_o) _o.value = Number(prod.priceOnsite) > 0 ? prod.priceOnsite : (_on ? (prod.price || '') : '');
+              if (_s) _s.value = Number(prod.listPrice) > 0 ? prod.listPrice : '';
+              setTimeout(gPriceReqSync, 0); }
             /* [용량절감] 상품 설명은 product_desc 서랍으로 옮기는 중이다.
                상품 목록에 아직 남아 있으면 그것을 쓰고, 없으면 서랍에서 받아 채운다.
                (이 대비가 없으면 서랍으로 옮긴 뒤 수정 화면이 빈 칸으로 열리고,
@@ -34614,6 +34691,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     if (_pe && _pe.type === 'number') _pe.value = _pr - uploadDiscountAmount;
                 }
             }
+            { const _s = document.getElementById('productPriceStore'); if (_s && uploadDiscountListPrice > 0) _s.value = uploadDiscountListPrice; }   // [신규 2026-10-13] 정상가 칸
             // [수정] 적혀 있지 않으면 꺼진 것으로 본다 (기본이 꺼짐으로 바뀌었다)
             uploadSaleToToday = (prod.saleToToday === true || prod.saleToToday === "true");
             uploadSaleBadge = (prod.saleBadge === true || prod.saleBadge === "true");
@@ -40605,6 +40683,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const now = sale ? gDiscApply(price, type, p.discountRate, p.discountAmount) : price;
             const st = String((p && p.storage) || '');
             const storage = st.includes('냉동') ? '🧊 냉동' : st.includes('냉장') ? '❄️ 냉장' : (st.includes('상온') || st.includes('실온')) ? '🌡️ 상온' : '';
+            // [신규 2026-10-13] 가격표는 정상가 (사장님 요청) — 할인 중이면 예전대로 정상가를 긋고 할인가, 아니면 정상가를 적어 둔 상품은 정상가
+            const lp = parseInt(p && p.listPrice) || 0;
+            if (!sale && lp > 0) return { key: gStableKeyOf(p), head, name: rest, desc: lead, storage, price: lp, orig: 0, off: '' };
             return { key: gStableKeyOf(p), head, name: rest, desc: lead, storage, price: now,
                      orig: sale && now < price ? price : 0, off: sale ? gDiscLabel(type, p.discountRate, p.discountAmount) + ' 할인' : '' };
         }
