@@ -3994,7 +3994,7 @@
                     if (gSrc.tab === 'trend') {   // [신규 2026-10-13] 📈 동향 (주별 기록·분야별)
                         const Q = gSrc.trendQ, fail = e => { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; };
                         const loading = () => { v.innerHTML = '<div class="src-none">동향 자료를 불러오는 중…</div>'; };
-                        if (!gSrc.trendIdx) { loading(); try { gSrc.trendIdx = (await srcGet('trend_idx')) || {}; gSrc.trendData = {}; } catch (e) { return fail(e); } try { gSrc.matOff = (await srcGet('mat_off')) || {}; } catch (e) { gSrc.matOff = gSrc.matOff || {}; } }   // [신규 2026-10-14] 뺀 맛집 가게
+                        if (!gSrc.trendIdx) { loading(); try { gSrc.trendIdx = (await srcGet('trend_idx')) || {}; gSrc.trendData = {}; } catch (e) { return fail(e); } try { const [mo, ma] = await Promise.all([srcGet('mat_off'), srcGet('mat_add')]); gSrc.matOff = mo || {}; gSrc.matAdd = ma || {}; } catch (e) { gSrc.matOff = gSrc.matOff || {}; gSrc.matAdd = gSrc.matAdd || {}; } }   // [신규 2026-10-14] 뺀·넣은 맛집 가게
                         const wks = Object.keys(gSrc.trendIdx).sort().reverse();
                         if (!Q.week || !gSrc.trendIdx[Q.week]) Q.week = wks[0] || '';
                         if (!Q.week) { gSrc.trend = null; return srcRenderTrend(v); }
@@ -6506,12 +6506,25 @@
                         const mm = D.m, G = arr(mm.g).filter(x => !OFF[srcMatKey(x.k)]);
                         const gc = ['전체'].concat([...new Set(G.map(x => x.c || '한식·기타'))]);
                         const gi = Math.min(Math.max(+Q.scat || 0, 0), gc.length - 1), GF = gi ? G.filter(x => (x.c || '한식·기타') === gc[gi]) : G;
-                        const gl = (L, tk) => list(L, (x, i) => row(i + 1, x.k, [x.a, gi ? '' : x.c, '한 달 ' + Number(tk ? x.t : x.v).toLocaleString() + '회', !tk && x.t ? '택배 ' + Number(x.t).toLocaleString() + '회' : ''].filter(Boolean).join(' · '), '', bandTag(x.k) + '<span class="we" style="cursor:pointer;background:#fee2e2;color:#b91c1c" data-k="' + srcEsc(x.k) + '" onclick="srcMatOff(this, 1)" title="이 가게를 목록에서 빼요 (아래 \'뺀 가게\'에서 되돌릴 수 있어요)">빼기</span>'));
+                        const gl = (L, tk) => list(L, (x, i) => row(i + 1, x.k, [x.a, gi ? '' : x.c, tk === 2 ? '블로그 최근 한 달 ' + (x.b >= 100 ? '100+' : x.b) + '개' : '한 달 ' + Number(tk ? x.t : x.v).toLocaleString() + '회', !tk && x.t ? '택배 ' + Number(x.t).toLocaleString() + '회' : '', tk !== 2 && x.b > 0 ? '블로그 ' + (x.b >= 100 ? '100+' : x.b) + '개' : ''].filter(Boolean).join(' · '), '', bandTag(x.k) + '<span class="we" style="cursor:pointer;background:#fee2e2;color:#b91c1c" data-k="' + srcEsc(x.k) + '" onclick="srcMatOff(this, 1)" title="이 가게를 목록에서 빼요 (아래 \'뺀 가게\'에서 되돌릴 수 있어요)">빼기</span>'));
                         const offKeys = Object.keys(OFF).map(k => typeof OFF[k] === 'string' ? OFF[k] : k);   // 값에 원래 이름이 들어 있다
-                        html += '<p class="src-tr-note">유명 가게 이름을 한 달 검색량으로 줄 세웠어요. 가게 목록은 PC의 <b>자동\\맛집가게.tsv</b> 에 있고, 줄을 더하면 다음 주부터 같이 모아요. ' + srcEsc(mm.note || '') + '</p>' +
+                        // [신규 2026-10-14] 화면에서 가게 넣기 (sourcing/mat_add). 넣은 가게는 다음 수집 때 검색량을 모아 순위에 나온다
+                        const ADD = gSrc.matAdd || {}, inG = new Set(arr(mm.g).map(x => srcMatKey(x.k)));
+                        const waiting = Object.keys(ADD).filter(k => !inG.has(k)).map(k => ADD[k]).filter(x => x && x.k);
+                        const MCATS = ['빵·디저트', '고기·닭', '국밥·탕', '면·냉면', '해물·게장', '분식·만두', '한식·기타'];
+                        const addForm = '<div class="src-bar" style="flex-wrap:wrap"><span class="k">가게 넣기</span>' +
+                            '<input id="mat-add-k" placeholder="가게 이름 (예: 성심당)" style="width:160px" onkeydown="if(event.key===\'Enter\')srcMatAdd()">' +
+                            '<input id="mat-add-a" placeholder="지역 (예: 대전)" style="width:110px" onkeydown="if(event.key===\'Enter\')srcMatAdd()">' +
+                            '<select id="mat-add-r"><option value="s">수도권</option><option value="j">지방</option></select>' +
+                            '<select id="mat-add-c">' + MCATS.map(c => '<option>' + c + '</option>').join('') + '</select>' +
+                            '<button type="button" class="src-btn" onclick="srcMatAdd()">넣기</button>' +
+                            '<span class="k">넣은 가게는 다음 수집 때(주 1번) 순위에 나와요</span></div>' +
+                            (waiting.length ? '<div class="src-bar"><span class="k">넣고 기다리는 가게 ' + waiting.length + '곳 (누르면 취소)</span><span class="src-tr-chips" style="margin:0">' + waiting.map(x => '<button type="button" data-k="' + srcEsc(x.k) + '" onclick="srcMatAddCancel(this)">' + srcEsc(x.k) + (x.a ? ' · ' + srcEsc(x.a) : '') + ' ✕</button>').join('') + '</span></div>' : '');
+                        html += '<p class="src-tr-note">유명 가게 이름을 한 달 검색량으로 줄 세웠어요. ' + srcEsc(mm.note || '') + '</p>' + addForm +
                             '<div class="src-bar"><span class="k">분류</span>' + chips(i => 'gSrc.trendQ.scat=' + i + '; srcRender()', gc.map(c => c + ' (' + (c === '전체' ? G.length : G.filter(x => (x.c || '한식·기타') === c).length) + ')'), gi) + '</div>' +
                             '<div class="src-tr-grid">' +
                             [['수도권 가게', GF.filter(x => x.r === 's'), 0], ['지방 가게', GF.filter(x => x.r === 'j'), 0], ['택배 많이 찾는 가게 <small style="font-weight:600;color:var(--src-sub)">(가게이름+택배 검색량)</small>', GF.filter(x => x.t > 0).sort((p, q) => q.t - p.t), 1]]
+                                .concat(GF.some(x => x.b > 0) ? [['블로그 입소문 <small style="font-weight:600;color:var(--src-sub)">(최근 한 달 블로그 글 수)</small>', GF.filter(x => x.b > 0).sort((p, q) => q.b - p.b || q.v - p.v), 2]] : [])
                                 .map(([h4, L, tk]) => '<div class="src-tr-box"><h4>' + h4 + '</h4>' + gl(L, tk) + '</div>').join('') + '</div>' +
                             (offKeys.length ? '<div class="src-bar"><span class="k">뺀 가게 ' + offKeys.length + '곳 (누르면 되돌려요)</span><span class="src-tr-chips" style="margin:0">' + offKeys.map(k => '<button type="button" data-k="' + srcEsc(k) + '" onclick="srcMatOff(this, 0)">' + srcEsc(k) + ' ↩</button>').join('') + '</span></div>' : '');
                     } else if (Q.src === 'm' && D.m) {
@@ -6533,6 +6546,28 @@
                     if (on && !confirm('\'' + k + '\' 가게를 맛집 목록에서 뺄까요?\n(아래 \'뺀 가게\'에서 다시 되돌릴 수 있어요)')) return;
                     try { await srcPut('mat_off/' + srcMatKey(k), on ? k : null); } catch (e) { alert('저장 못 했어요 (' + e.message + ')'); return; }
                     gSrc.matOff = gSrc.matOff || {}; if (on) gSrc.matOff[srcMatKey(k)] = k; else delete gSrc.matOff[srcMatKey(k)];
+                    srcRender();
+                }
+                // [신규 2026-10-14] 맛집 가게 넣기 — sourcing/mat_add/저장용이름 = {k:이름, a:지역, r:s|j, c:분류, d:넣은 날}
+                async function srcMatAdd() {
+                    const g = id => document.getElementById(id);
+                    const k = (g('mat-add-k').value || '').replace(/\s/g, ''), a = (g('mat-add-a').value || '').trim();
+                    if (k.length < 2) { alert('가게 이름을 두 글자 이상 적어 주세요'); return; }
+                    const key = srcMatKey(k);
+                    const D = gSrc.trend, have = D && D.m && Array.isArray(D.m.g) ? D.m.g : Object.values((D && D.m && D.m.g) || {});
+                    if (have.some(x => srcMatKey(x.k) === key) && !(gSrc.matOff || {})[key]) { alert('\'' + k + '\' 은(는) 이미 목록에 있어요'); return; }
+                    const val = { k, a, r: g('mat-add-r').value, c: g('mat-add-c').value, d: srcToday() };
+                    try {
+                        await srcPut('mat_add/' + key, val);
+                        if ((gSrc.matOff || {})[key]) { await srcPut('mat_off/' + key, null); delete gSrc.matOff[key]; }   // 뺐던 가게를 다시 넣으면 되돌린다
+                    } catch (e) { alert('저장 못 했어요 (' + e.message + ')'); return; }
+                    gSrc.matAdd = gSrc.matAdd || {}; gSrc.matAdd[key] = val;
+                    srcRender();
+                }
+                async function srcMatAddCancel(el) {
+                    const k = el.dataset.k; if (!k || !confirm('\'' + k + '\' 넣은 것을 취소할까요?')) return;
+                    try { await srcPut('mat_add/' + srcMatKey(k), null); } catch (e) { alert('저장 못 했어요 (' + e.message + ')'); return; }
+                    if (gSrc.matAdd) delete gSrc.matAdd[srcMatKey(k)];
                     srcRender();
                 }
                 function srcSortKakao(k) {
