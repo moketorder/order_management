@@ -26860,6 +26860,56 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             renderSalesUpcoming();
         }
 
+        /* [신규 2026-10-14] 주문 집계 카드의 옵션 항목 이름 → { gi, ii, remain } (사장님 요청 — 옵션 수량도 여기서 고친다).
+           주문의 옵션 글자에는 항목 이름만 있으므로 이름으로 맞춘다. 같은 이름이 여러 묶음에 있으면 앞 묶음 것. */
+        function salesOptStockCells(prod) {
+            const out = new Map();
+            if (!prod || !gOptionRowsOf(prod).length) return out;   // 선택옵션을 안 쓰는 상품은 칸을 달지 않는다
+            ((prod.options) || []).forEach((g, gi) => {
+                ((g && g.items) || []).forEach((it, ii) => {
+                    const nm = String((it && it.name) || '').trim();
+                    if (!nm || out.has(nm)) return;
+                    out.set(nm, { gi, ii, remain: gOptRemain(prod, g.name, it) });
+                });
+            });
+            return out;
+        }
+
+        /* [신규 2026-10-14] 옵션 항목 남은 수량 고치기. 넣은 숫자는 '지금 남은 수량'이다.
+           주문으로 빠진 수(옵션 조정값)는 그대로 두고 기본 수량 = 넣은 값 - 조정값 으로 저장한다 (상품 재고 칸과 같은 방식 —
+           화면을 연 뒤 들어온 주문의 차감이 지워지지 않게). 999·무제한·∞ 는 수량 제한 없음(기본 수량 비움). */
+        async function salesUpdateOptStock(idx, gi, ii, value) {
+            const prod = uploadProducts[idx];
+            const grp = prod && prod.options && prod.options[gi];
+            const it = grp && grp.items && grp.items[ii];
+            if (!it) { showToast('옵션을 찾지 못했습니다. 화면을 새로 연 뒤 다시 해 주세요.'); renderSalesUpcoming(); return; }
+            const raw = String(value == null ? '' : value).trim();
+            if (raw === '') { renderSalesUpcoming(); return; }   // 빈 값이면 그대로
+            let base;
+            if (raw === '무제한' || raw === '∞' || raw.toLowerCase() === 'unlimited' || raw === '999') base = '';
+            else {
+                const n = parseInt(raw.replace(/[^\d-]/g, ''));
+                if (isNaN(n) || n < 0) { showToast('0 이상 숫자 또는 "무제한"을 입력하세요.'); renderSalesUpcoming(); return; }
+                const adj = parseInt(optionAdjustments[gOptStockKey(prod, grp.name, it.name)] || 0) || 0;
+                base = Math.max(0, n - adj);
+            }
+            const prev = it.stock, prevAt = prod.updatedAt;
+            it.stock = base; prod.updatedAt = Date.now();
+            let ok = false;
+            try {
+                ok = await fbPatchProducts({ [`${idx}/options/${gi}/items/${ii}/stock`]: base, [`${idx}/updatedAt`]: prod.updatedAt });
+            } catch (e) { console.error('옵션 수량 변경 실패:', e); }
+            if (!ok) {
+                it.stock = prev; prod.updatedAt = prevAt;
+                showToast('옵션 수량 변경 실패 — 다시 해 주세요.');
+            } else {
+                updatePublishedProductsTimestamp();
+                const left = gOptRemain(prod, grp.name, it);
+                showToast(`'${it.name}' 남은 수량 → ${left === null ? '무제한' : left + '개'}`);
+            }
+            renderSalesUpcoming();
+        }
+
         // A. 오늘 이후 주문 집계
         function renderSalesUpcoming(){
             const list = document.getElementById('sales-upcoming-list');
@@ -27012,8 +27062,26 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     .map(([txt, q]) => `<div style="display:flex; justify-content:space-between; gap:8px; padding:2px 2px; font-size:11.5px;"><span style="color:var(--text-sub); word-break:keep-all;">${txt}</span><b style="flex-shrink:0; color:#c2610a; font-weight:900;">${q}개</b></div>`).join('');
 
                 // [신규] 옵션 항목별 총 개수 — 발주할 때 실제로 세야 하는 숫자라 카드에 바로 보여준다
-                const optionItemRows = [...(r.optionItemQty || new Map()).entries()].sort((a, b) => b[1] - a[1])
-                    .map(([nm, q]) => `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:4px 2px; border-top:1px dashed #ffe0bf;"><span style="color:var(--text-main); font-weight:700; font-size:12.5px; word-break:keep-all;">${nm}</span><b style="flex-shrink:0; color:#c2610a; font-weight:900; font-size:14px;">${q}개</b></div>`).join('');
+                /* [신규 2026-10-14] 옵션 항목마다 남은 수량 칸 + [변경] (사장님 요청 — 옵션 상품도 주문 집계에서 수량을 고친다).
+                   상품에 그 옵션 항목이 있으면 칸을 단다. 주문이 아직 없는 항목도 수량을 고칠 수 있게 0개로 붙인다 */
+                const _optCells = (idx >= 0) ? salesOptStockCells(r.prod) : new Map();
+                const _optQty = new Map(r.optionItemQty || []);
+                _optCells.forEach((c, nm) => { if (!_optQty.has(nm)) _optQty.set(nm, 0); });
+                const optionItemRows = [..._optQty.entries()].sort((a, b) => b[1] - a[1])
+                    .map(([nm, q]) => {
+                        const c = _optCells.get(nm);
+                        const cell = c ? (() => {
+                            const id = `sales-optstock-${idx}-${c.gi}-${c.ii}`;
+                            const cur = (c.remain === null) ? '무제한' : c.remain;
+                            const out = (c.remain !== null && c.remain <= 0);
+                            return `<span onclick="event.stopPropagation();" style="flex-shrink:0; display:flex; gap:3px; align-items:center;">
+                                <span style="font-size:10px; font-weight:700; color:${out ? '#dc2626' : '#94a3b8'};">${out ? '품절' : '남음'}</span>
+                                <input type="text" id="${id}" value="${cur}" placeholder="${cur}" inputmode="numeric" onfocus="this.value='';" onkeydown="if(event.key==='Enter'){event.preventDefault(); salesUpdateOptStock(${idx}, ${c.gi}, ${c.ii}, this.value);}" title="옵션 남은 수량 (숫자, 999=무제한)" style="width:42px; padding:3px 2px; border:1.5px solid ${out ? '#fca5a5' : 'var(--border)'}; border-radius:6px; font-size:12px; font-weight:700; text-align:center; box-sizing:border-box;">
+                                <button type="button" onclick="salesUpdateOptStock(${idx}, ${c.gi}, ${c.ii}, document.getElementById('${id}').value)" style="padding:4px 8px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button>
+                            </span>`;
+                        })() : '';
+                        return `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:4px 2px; border-top:1px dashed #ffe0bf;"><span style="flex:1 1 auto; min-width:0; color:var(--text-main); font-weight:700; font-size:12.5px; word-break:keep-all;">${gEscapeHtml(nm)}</span><b style="flex-shrink:0; color:${q > 0 ? '#c2610a' : '#cbd5e1'}; font-weight:900; font-size:14px;">${q}개</b>${cell}</div>`;
+                    }).join('');
                 /* [신규 2026-10-12] 옵션 전체 아래에 손님별로 무엇을 몇 개 주문했는지 — 소분할 때 본다 (사장님 요청).
                    '손님별 보기'를 누르면 펼친다. 날짜순, 같은 날이면 이름순 */
                 const custList = [...((r.custOpt && r.custOpt.values()) || [])].sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.who.localeCompare(b.who, 'ko'));
