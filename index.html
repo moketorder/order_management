@@ -3194,7 +3194,11 @@
 
                                     <!-- [수정 2026-09-30] 다운로드 대신 카톡으로 바로 보내기 — 목록을 펼쳤을 때만 보이게 이 안에 둔다.
                                          (접혀 있을 때 버튼만 덩그러니 남아 무엇에 대한 것인지 알기 어려웠다) -->
-                                    <button type="button" id="btn-download-images" onclick="shareProductImages()" style="display: none; width: 100%; height: 50px; box-sizing: border-box; margin-top: 10px; background: #FEE500; border: 1.5px solid #ca8a04; color: #191919; border-radius: var(--radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">💬 카톡으로 보내기</button>
+                                    <!-- [신규 2026-10-14] 카톡 보내기 옆에 사진 다운로드 단추 (사장님 요청). 둘은 btn-img-row 안에서 함께 보이고 숨는다 -->
+                                    <div id="btn-img-row" style="display: none; gap: 8px; margin-top: 10px;">
+                                    <button type="button" id="btn-download-images" onclick="shareProductImages()" style="display: flex; flex: 1 1 0; min-width: 0; height: 50px; box-sizing: border-box; background: #FEE500; border: 1.5px solid #ca8a04; color: #191919; border-radius: var(--radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">💬 카톡으로 보내기</button>
+                                    <button type="button" id="btn-save-images" onclick="downloadProductImages()" style="display: flex; flex: 1 1 0; min-width: 0; height: 50px; box-sizing: border-box; background: #fff; border: 1.5px solid #334155; color: #0f172a; border-radius: var(--radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; align-items: center; justify-content: center; gap: 6px; transition: var(--transition);">⬇️ 사진 다운로드</button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -31898,7 +31902,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             }
 
             // [신규] 세 장 이하일 때는 ＋ 칸 아래 절반이 공유 버튼을 대신하므로 넓은 버튼은 감춘다
-            const dlBtn = document.getElementById('btn-download-images');
+            const dlBtn = document.getElementById('btn-img-row');   // [수정 2026-10-14] 카톡 보내기 + 다운로드 한 줄
             if (dlBtn) dlBtn.style.display = (!compact && canShare) ? 'flex' : 'none';
 
             if (compact) {
@@ -31977,7 +31981,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     shareSmall.style.cssText = 'width:100%; height:100%; padding:0; display:flex; align-items:center;'
                         + ' justify-content:center; border:1.5px solid #ca8a04; border-radius:8px; background:#FEE500;'
                         + ' color:#191919; font-family:inherit; font-size:16px; font-weight:800; line-height:1; cursor:pointer;';
-                    addTile.appendChild(shareSmall);
+                    // [신규 2026-10-14] 아래 절반을 둘로 나눠 💬 카톡 보내기 | ⬇️ 다운로드
+                    const saveSmall = document.createElement('button');
+                    saveSmall.type = 'button';
+                    saveSmall.title = '이 상품 사진 다운로드';
+                    saveSmall.innerText = '⬇️';
+                    saveSmall.onclick = downloadProductImages;
+                    saveSmall.style.cssText = shareSmall.style.cssText + ' border-color:#334155; background:#fff;';
+                    const pair = document.createElement('div');
+                    pair.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:4px; min-width:0; min-height:0;';
+                    pair.appendChild(shareSmall); pair.appendChild(saveSmall);
+                    addTile.appendChild(pair);
                 }
 
                 list.appendChild(addTile);
@@ -32089,6 +32103,43 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 uploadThumbnailIndex--;
             }
             renderSelectedFilesList();
+        }
+
+        // [신규 2026-10-14] 수정 중인 상품의 사진을 한 장씩 내려받는다 (카톡 보내기 옆 '사진 다운로드' — 사장님 요청)
+        async function downloadProductImages() {
+            if (!uploadSelectedFiles || uploadSelectedFiles.length === 0) { showToast("내려받을 사진이 없어요."); return; }
+            showLoader("⬇️ 사진 준비 중...");
+            const nameEl = document.getElementById('productName');
+            const base = String((nameEl && nameEl.value) || '상품사진').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 40) || '상품사진';
+            let ok = 0, fail = 0;
+            try {
+                for (let i = 0; i < uploadSelectedFiles.length; i++) {
+                    const item = uploadSelectedFiles[i];
+                    try {
+                        let blob = null, ext = 'jpg';
+                        if (item.file) {
+                            blob = item.file; ext = (String(item.file.name).split('.').pop() || 'jpg').toLowerCase();
+                        } else if (item.isExisting && item.id) {
+                            const s = String(item.id);
+                            const url = (s.startsWith('data:') || s.startsWith('http')) ? s : `https://lh3.googleusercontent.com/d/${item.id}`;
+                            const res = await fetch(url);
+                            if (!res.ok) throw new Error('HTTP ' + res.status);
+                            blob = await res.blob();
+                            const ct = blob.type || '';
+                            ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : ct.includes('gif') ? 'gif' : 'jpg';
+                        }
+                        if (!blob) { fail++; continue; }
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `${base}_${i + 1}.${ext}`;
+                        document.body.appendChild(a); a.click(); a.remove();
+                        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+                        ok++;
+                        await new Promise(r => setTimeout(r, 350));   // 한꺼번에 받으면 브라우저가 막는 일이 있어 조금씩 띄운다
+                    } catch (e) { fail++; }
+                }
+            } finally { hideLoader(); }
+            showToast(ok ? `사진 ${ok}장 내려받았어요${fail ? ` (${fail}장 실패)` : ''}` : "사진을 가져오지 못했어요. (권한/네트워크 문제)");
         }
 
         // [수정 2026-09-30] 다운로드(ZIP) 대신 — 수정 중인 상품의 사진들을 공유 창으로 카톡에 바로 보낸다
@@ -35106,7 +35157,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             uploadEditProductRef = null;
 
             { const dupBtn = document.getElementById('btn-duplicate-form'); if (dupBtn) dupBtn.style.display = 'none'; } // 신규 등록 모드에선 복제하기 숨김
-            { const dlBtn = document.getElementById('btn-download-images'); if (dlBtn) dlBtn.style.display = 'none'; } // 신규 등록 모드에선 사진 다운로드 숨김
+            { const dlBtn = document.getElementById('btn-img-row'); if (dlBtn) dlBtn.style.display = 'none'; } // 신규 등록 모드에선 사진 다운로드 숨김
             
             const submitBtn = document.getElementById('btn-submit-form');
             if (submitBtn) submitBtn.innerText = "📤 등록 완료";
