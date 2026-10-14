@@ -6327,7 +6327,47 @@
                     return '<b>' + n + '개 고름</b>' +
                         '<button type="button" class="ok" onclick="srcSameJoin()"' + (n < 2 ? ' disabled title="두 개 이상 골라 주세요"' : '') + '>같은 상품으로 묶기</button>' +
                         '<button type="button" onclick="srcSameSplit()">묶음에서 빼기</button>' +
+                        '<button type="button" onclick="srcBandCatBulk()">카테고리 바꾸기</button>' +   // [신규 2026-10-14] 고른 것 한꺼번에 (사장님 요청)
                         '<button type="button" onclick="gSrc.bandSel={}; srcRenderBand(null, true)">취소</button>';
+                }
+                /* [신규 2026-10-14] 체크한 밴드 상품의 카테고리를 한꺼번에 바꾼다 (사장님 요청).
+                   한 개 고치기(srcEdit)와 같은 자리(edits/band/<열쇠>.f.c)에 쓴다 — 이미 고쳐 둔 이름·가격 같은 다른 칸과 고정(locked)은 그대로 둔다.
+                   고른 카테고리가 자동으로 붙는 것과 같으면 손으로 고친 표시(c)는 지운다 (한 개 고치기와 같게) */
+                function srcBandCatBulk() {
+                    const rows = srcSelRows(); if (!rows.length) return showToast('상품을 골라 주세요');
+                    const old = document.getElementById('src-edit'); if (old) old.remove();
+                    const cs = [...new Set(rows.map(r => r.c || ''))], cur = cs.length === 1 ? cs[0] : '';
+                    const box = document.createElement('div'); box.id = 'src-edit';
+                    box.innerHTML = '<div class="in"><div class="t">🏷️ 카테고리 바꾸기<small>고른 밴드 상품 ' + rows.length + '개' + (cs.length > 1 ? ' · 지금 카테고리가 서로 달라요' : '') + '</small></div>' +
+                        srcCatSelectHtml(cur) +
+                        '<div class="row"><button type="button" class="ok" data-act="save">' + rows.length + '개 바꾸기</button><button type="button" data-act="close">닫기</button></div></div>';
+                    document.body.appendChild(box);
+                    box.onclick = async e => {
+                        if (e.target === box) return box.remove();
+                        const act = e.target.dataset && e.target.dataset.act; if (!act) return;
+                        if (act === 'close') return box.remove();
+                        if (act === 'catman') return srcCatManage(() => { const sel = box.querySelector('select[data-f="c"]'); if (sel) sel.outerHTML = srcCatSelectHtml(sel.value, true); });
+                        if (act !== 'save') return;
+                        const v = (box.querySelector('select[data-f="c"]') || {}).value || '';
+                        if (!v) return showToast('카테고리를 골라 주세요');
+                        let n = 0;
+                        try {
+                            for (const ek of [...new Set(rows.map(r => r._ek))]) {
+                                const r = rows.find(x => x._ek === ek), orig = gSrc.band[r.no] || {};
+                                const cur = (gSrc.edits.band || {})[ek] || null, f = Object.assign({}, (cur && cur.f) || {});
+                                if (v === srcCatAuto(orig.n, orig.c) && !(cur && cur.locked)) delete f.c; else f.c = v;
+                                if (!Object.keys(f).length && !(cur && cur.locked)) { if (cur) { await srcPut('edits/band/' + ek, null); delete gSrc.edits.band[ek]; } }
+                                else {
+                                    const val = { v: r._v0, n0: r._n0, f, at: new Date().toISOString() }; if (cur && cur.locked) val.locked = cur.locked;
+                                    await srcPut('edits/band/' + ek, val); gSrc.edits.band = gSrc.edits.band || {}; gSrc.edits.band[ek] = val;
+                                }
+                                n++;
+                            }
+                        } catch (err) { showToast('저장 못 했어요: ' + err.message + (n ? ' (' + n + '개는 바뀜)' : '')); box.remove(); srcRenderBand(null, true); return; }
+                        gSrc.bandSel = {};
+                        showToast('🏷️ ' + n + '개를 ' + v + '(으)로 바꿨어요');
+                        box.remove(); srcRender();
+                    };
                 }
                 function srcSelRows() { return Object.keys(gSrc.bandSel || {}).map(no => srcBandRow(no)).filter(Boolean); }
                 async function srcSameJoin() {
