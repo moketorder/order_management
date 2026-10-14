@@ -32105,12 +32105,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             renderSelectedFilesList();
         }
 
-        // [신규 2026-10-14] 수정 중인 상품의 사진을 한 장씩 내려받는다 (카톡 보내기 옆 '사진 다운로드' — 사장님 요청)
+        // [신규 2026-10-14] 수정 중인 상품의 사진을 압축파일(상품명.zip) 하나로 내려받는다 (카톡 보내기 옆 '사진 다운로드' — 사장님 요청)
         async function downloadProductImages() {
             if (!uploadSelectedFiles || uploadSelectedFiles.length === 0) { showToast("내려받을 사진이 없어요."); return; }
-            showLoader("⬇️ 사진 준비 중...");
+            if (typeof JSZip === 'undefined') { showToast("압축 도구를 못 불러왔어요 · 새로고침 후 다시 눌러 주세요"); return; }
+            showLoader("⬇️ 사진 묶는 중...");
             const nameEl = document.getElementById('productName');
             const base = String((nameEl && nameEl.value) || '상품사진').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 40) || '상품사진';
+            const zip = new JSZip();
             let ok = 0, fail = 0;
             try {
                 for (let i = 0; i < uploadSelectedFiles.length; i++) {
@@ -32129,17 +32131,21 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                             ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : ct.includes('gif') ? 'gif' : 'jpg';
                         }
                         if (!blob) { fail++; continue; }
-                        const a = document.createElement('a');
-                        a.href = URL.createObjectURL(blob);
-                        a.download = `${base}_${i + 1}.${ext}`;
-                        document.body.appendChild(a); a.click(); a.remove();
-                        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+                        zip.file(`${base}_${String(i + 1).padStart(2, '0')}.${ext}`, blob);
                         ok++;
-                        await new Promise(r => setTimeout(r, 350));   // 한꺼번에 받으면 브라우저가 막는 일이 있어 조금씩 띄운다
                     } catch (e) { fail++; }
                 }
-            } finally { hideLoader(); }
-            showToast(ok ? `사진 ${ok}장 내려받았어요${fail ? ` (${fail}장 실패)` : ''}` : "사진을 가져오지 못했어요. (권한/네트워크 문제)");
+                if (ok) {
+                    const out = await zip.generateAsync({ type: 'blob' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(out);
+                    a.download = `${base}.zip`;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+                }
+            } catch (e) { console.error('사진 압축 실패:', e); ok = 0; }
+            finally { hideLoader(); }
+            showToast(ok ? `사진 ${ok}장을 압축파일로 받았어요${fail ? ` (${fail}장 실패)` : ''}` : "사진을 가져오지 못했어요. (권한/네트워크 문제)");
         }
 
         // [수정 2026-09-30] 다운로드(ZIP) 대신 — 수정 중인 상품의 사진들을 공유 창으로 카톡에 바로 보낸다
