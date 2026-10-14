@@ -22673,7 +22673,12 @@
             // [수정] 전단지 기록은 맨 위 '🧾 전단지 기록' 단추를 눌렀을 때만 띄운다 (openFlyerModal)
             if (which === 'apart') renderApartmentAdmin();
             else if (which === 'profit') renderProfitReport();
-            else if (which === 'cust') { _custNewMap = gCustTodayMap(); gCustMarkSeen(); initCustomerAdmin(); }   // [신규 2026-10-01] 오늘 가입한 손님에 '신규'·'재가입' 표시
+            else if (which === 'cust') {   // [신규 2026-10-01] 오늘 가입한 손님에 '신규'·'재가입' 표시
+                _custNewMap = gCustTodayMap();
+                // [신규 2026-10-14] 확인 안 한 새 손님 알림이 있으면 새 손님(가입·재가입이 늦은) 순으로 연다 (사장님 요청)
+                if (gNewCustUnseen().length) { caSort = 'joined'; caSortDir = 'desc'; caFilter = 'all'; }
+                gCustMarkSeen(); initCustomerAdmin();
+            }
             else if (which === 'general') renderGeneralAdmin(true);
             else if (which === 'errors') renderErrorAdmin();
         }
@@ -24789,6 +24794,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
 
         // 가입한 지 며칠 됐나 (모르면 null)
+        /* [신규 2026-10-14] '늦게 온 순' 기준 시각 — 가입한 때와 최근 7일 가입·재가입 기록(_newCusts) 중 늦은 쪽.
+           재가입한 손님은 처음 가입한 때가 오래돼도 다시 온 때로 맨 위에 온다 */
+        function caJoinSortAt(r) {
+            const p = String((r && r.phone) || '').replace(/\D/g, '');
+            const log = p ? _newCusts.find(c => String(c.phone).replace(/\D/g, '') === p) : null;   // _newCusts 는 새것이 앞
+            return Math.max(Number(r && r.joined) || 0, (log && log.at) || 0);
+        }
         function caJoinDays(r) {
             if (!r || !r.joined) return null;
             const t = new Date(); t.setHours(0, 0, 0, 0);
@@ -24975,7 +24987,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 recent: (a, b) => ((parseTimestampToDate(b.last) || 0) - (parseTimestampToDate(a.last) || 0)),
                 idle: (a, b) => (b.idle ?? -1) - (a.idle ?? -1),
                 name: (a, b) => a.name.localeCompare(b.name, 'ko'),
-                joined: (a, b) => (b.joined || 0) - (a.joined || 0),    // 늦게 온 손님이 위로
+                joined: (a, b) => caJoinSortAt(b) - caJoinSortAt(a),    // 늦게 온 손님이 위로 (재가입도 다시 온 때로)
                 changed: (a, b) => ((b.lastChange && b.lastChange.at) || 0) - ((a.lastChange && a.lastChange.at) || 0),
                 visit: (a, b) => ((b.visit && b.visit.last) || 0) - ((a.visit && a.visit.last) || 0),   // [신규] 최근 접속 순
                 vcnt: (a, b) => (((b.visit && b.visit.visitDays) || 0) - ((a.visit && a.visit.visitDays) || 0))
