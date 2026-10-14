@@ -17662,7 +17662,8 @@
                 // [수정 2026-10-10] 시간 줄 = 마감 시각 (사장님 요청 — 예전엔 올라가는 시각). 마감이 없으면 올라가는 시각
                 const baseD = (it.expireAt ? new Date(Number(it.expireAt)) : null) || relD;
                 // [수정 2026-10-13] 반복 일정(상품에 repeatWeeks)은 시간 줄 말고 맨 아래 '🔁 반복' 줄로 따로 (사장님 요청)
-                const slot = Number(prod.repeatWeeks) > 0 ? 'R' : (baseD ? baseD.getHours() : 15);
+                // [수정 2026-10-14] 끝난(마감) 일정은 맨 아래 '🔒 마감' 줄로 따로 (사장님 요청)
+                const slot = (st === 'closed' || st === 'hidden') ? 'X' : Number(prod.repeatWeeks) > 0 ? 'R' : (baseD ? baseD.getHours() : 15);
                 const s0 = start <= end ? start : end;
                 let e0 = start <= end ? end : start;
                 const pk = psItemPickup(it);
@@ -17728,9 +17729,10 @@
             const rangeFirstKey = dateKeys[0], rangeLastKey = dateKeys[dateKeys.length - 1];
             const rangeBars = bars.filter(b => b.end >= rangeFirstKey && b.start <= rangeLastKey);
             // [신규 2026-10-10] 시간 줄은 이 달에 실제로 쓰인 마감 시각만 (0~23시 아무 때나라 다 그리면 빈 줄투성이). 하나도 없으면 15시 한 줄
-            const calSlots = [...new Set(rangeBars.map(b => b.slot))].filter(x => x !== 'R').sort((a, b) => a - b);
+            const calSlots = [...new Set(rangeBars.map(b => b.slot))].filter(x => x !== 'R' && x !== 'X').sort((a, b) => a - b);
             if (!calSlots.length) calSlots.push(15);
             if (rangeBars.some(b => b.slot === 'R')) calSlots.push('R');   // [신규 2026-10-13] 반복 일정 줄은 맨 아래
+            if (rangeBars.some(b => b.slot === 'X')) calSlots.push('X');   // [신규 2026-10-14] 마감된 일정 줄은 그보다 더 아래
 
             // 주(달력 한 줄)마다·시간 줄마다 쓰이는 줄 수 — 같은 주의 칸은 같은 줄 수로 맞춰야 막대가 가지런하다
             const weekLanes = {};
@@ -17747,6 +17749,7 @@
                 calSlots.forEach(slot => {   // [수정 2026-10-10] 마감 시각 줄
                     const n = (weekLanes[w] || {})[slot] || 0;
                     g += (slot === 'R' ? `<div class="ps-slot" style="border-top:1.5px dashed #c4b5fd;"><span class="ps-gutter-lbl" title="반복 일정">🔁</span>`
+                        : slot === 'X' ? `<div class="ps-slot" style="border-top:1.5px dashed #fbbf24;"><span class="ps-gutter-lbl" title="마감된 일정">🔒</span>`
                         : `<div class="ps-slot"><span class="ps-gutter-lbl">${String(slot).padStart(2, '0')}</span>`)
                         + '<div class="ps-bar ps-bar-empty"></div>'.repeat(n) + `</div>`;
                 });
@@ -17774,7 +17777,8 @@
                 let namesHtml = '';
                 calSlots.forEach(slot => {   // [수정 2026-10-10] 마감 시각 줄
                 const nLanes = (weekLanes[w] || {})[slot] || 0;
-                namesHtml += slot === 'R' ? `<div class="ps-slot ps-slot-rep" title="🔁 반복 일정" style="border-top:1.5px dashed #c4b5fd;">` : `<div class="ps-slot" data-slot="${slot}" title="${psSlotLabel(slot)}" ondragover="event.preventDefault(); this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="this.classList.remove('over'); psHandleDrop(event, '${key}', ${slot})">`;
+                namesHtml += slot === 'R' ? `<div class="ps-slot ps-slot-rep" title="🔁 반복 일정" style="border-top:1.5px dashed #c4b5fd;">`
+                    : slot === 'X' ? `<div class="ps-slot ps-slot-done" title="🔒 마감된 일정" style="border-top:1.5px dashed #fbbf24;">` : `<div class="ps-slot" data-slot="${slot}" title="${psSlotLabel(slot)}" ondragover="event.preventDefault(); this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="this.classList.remove('over'); psHandleDrop(event, '${key}', ${slot})">`;
                 for (let l = 0; l < nLanes; l++) {
                     const b = todays.find(x => x.slot === slot && x.lane === l);
                     if (!b) { namesHtml += `<div class="ps-bar ps-bar-empty"></div>`; continue; }
