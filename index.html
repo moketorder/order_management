@@ -18560,7 +18560,9 @@
             if (!units.length) html += `<div style="font-size:12px; font-weight:700; color:var(--text-sub);">앞으로 올라갈 일정이 없어요.</div>`;
             let lastDay = '';
             const W = ['일', '월', '화', '수', '목', '금', '토'];
-            units.forEach(u => {
+            // [수정 2026-10-14] 마감된 일정(픽업 기다리는 것)은 맨 아래로 따로 (사장님 요청)
+            const open = units.filter(u => !psUnitClosed(u)), closed = units.filter(u => psUnitClosed(u));
+            open.forEach(u => {
                 const it = psItem(u[0]);
                 const day = fMsToDateKey(it.releaseAt) || fMsToDateKey(it.expireAt);
                 if (day !== lastDay) {
@@ -18570,7 +18572,24 @@
                 }
                 html += psUnitCardHtml(u, false);
             });
+            if (closed.length) html += psUnitsClosedLastHtml(closed, !open.length);
             return html + `</div>`;
+        }
+        /* [신규 2026-10-14] 마감된 일정을 아래로 내려 구분한다 (사장님 요청).
+           마감 = 담긴 상품의 마감 시각이 모두 지난 일정. 마감 안 된 것을 먼저, 그 밑에 '마감된 일정' 줄을 긋고 흐리게 */
+        function psUnitClosed(u) {
+            const now = Date.now();
+            return u.every(k => { const it = psItem(k); return it && Number(it.expireAt) && now >= Number(it.expireAt); });
+        }
+        function psUnitsClosedLastHtml(units, onlyClosed) {
+            const open = units.filter(u => !psUnitClosed(u)), closed = units.filter(u => psUnitClosed(u));
+            let html = open.map(u => psUnitCardHtml(u, false)).join('');
+            if (closed.length) {
+                html += `<div style="display:flex; align-items:center; gap:8px; margin-top:${onlyClosed ? 0 : 8}px; font-size:11.5px; font-weight:900; color:#a16207;">
+                    <span style="flex:1; height:1px; background:#fde68a;"></span>🔒 마감된 일정 ${closed.length}개<span style="flex:1; height:1px; background:#fde68a;"></span></div>`;
+                html += `<div style="display:flex; flex-direction:column; gap:10px; opacity:.6;">${closed.map(u => psUnitCardHtml(u, false)).join('')}</div>`;
+            }
+            return html;
         }
 
         /* [신규 2026-10-02] 폰에서 막대 끌기 (사장님 요청) — 막대를 0.4초 길게 누르면 끌기가 시작되고, 손가락을 뗀 날짜·시간 줄로 옮겨진다.
@@ -18774,7 +18793,7 @@
             let html = `<div style="display:flex; flex-direction:column; gap:10px;">`;
             html += `<div style="font-size:12.5px; font-weight:900; color:#0f172a;">📅 ${dateKey}</div>`;
             if (!keys.length) html += `<div style="font-size:12px; font-weight:700; color:var(--text-sub);">이 날 일정이 없어요.</div>`;
-            else html += psUnitsOf(keys).map(u => psUnitCardHtml(u, false)).join('');
+            else { const _us = psUnitsOf(keys); html += psUnitsClosedLastHtml(_us, _us.every(psUnitClosed)); }
             html += psAddSearchHtml(dateKey, 15);
             html += `</div>`;
             return html;
