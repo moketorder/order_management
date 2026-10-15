@@ -35269,8 +35269,22 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             if (tabType === 'reserve') {
                 const _dv = document.getElementById('categoryValue');
-                _dv.value = prod.date || "";
-                uploadSelectedDate = prod.date || "";
+                /* [수정 2026-10-15] 예전에 올렸던 상품을 노출일정 달력에 다시 걸고 '상품 수정'을 열면 예전 날짜가 들어 있었다 (사장님 지적).
+                   상품 날짜가 이미 지났고 앞으로 올라갈 일정이 있으면, 가장 가까운 그 일정의 픽업일(없으면 마감 날)을 넣는다.
+                   상품 날짜가 오늘이거나 앞날이면(지금 파는 차례) 그대로 둔다 — 판매 중인 차례의 날짜를 건드리지 않게 */
+                let _d = prod.date || "";
+                try {
+                    const _today = fMsToDateKey(Date.now()), _cur = toISODate(_d);
+                    // 손님에게 안 보이거나(숨김) 마감인 상품만 — 보이며 파는 상품을 앞날로 바꾸면 일정이 올라가기 전에 팔릴 수 있다
+                    const _off = (prod.hide === true || prod.hide === 'true') || (typeof gIsClosedAdmin === 'function' && gIsClosedAdmin(prod));
+                    if (prod.sid && _off && typeof psItemsOfSid === 'function' && (!_cur || _cur < _today)) {
+                        const _next = psItemsOfSid(prod.sid).map(it => psItemPickup(it) || fMsToDateKey(it.expireAt) || '')
+                            .filter(k => k && k >= _today).sort()[0];
+                        if (_next) { _d = _next; showToast(`📅 노출일정 날짜(${_next.slice(5).replace('-', '/')})로 넣었어요`); }
+                    }
+                } catch (e) { }
+                _dv.value = _d;
+                uploadSelectedDate = _d;
                 // [신규] 값을 코드로 바꾸면 onchange가 안 걸리므로 보이는 글자를 직접 다시 그린다
                 if (typeof _dv._paintFace === 'function') _dv._paintFace();
             } else {
