@@ -27140,10 +27140,22 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 /* [신규 2026-10-12] 옵션 전체 아래에 손님별로 무엇을 몇 개 주문했는지 — 소분할 때 본다 (사장님 요청).
                    '손님별 보기'를 누르면 펼친다. 날짜순, 같은 날이면 이름순 */
                 const custList = [...((r.custOpt && r.custOpt.values()) || [])].sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.who.localeCompare(b.who, 'ko'));
-                const custRows = custList.map(c => `<div style="display:flex; align-items:baseline; gap:8px; padding:5px 2px; border-top:1px dashed #ffe0bf;">
-                        <span style="flex:0 0 auto; color:#94a3b8; font-size:11.5px; font-weight:700; font-variant-numeric:tabular-nums;">${gEscapeHtml(String(c.date || '').slice(5).replace('-', '/'))}</span>
-                        <span style="flex:0 1 auto; min-width:0; color:var(--text-main); font-weight:800; font-size:12.5px; overflow-wrap:anywhere;">${gEscapeHtml(c.who)}</span>
-                        <span style="flex:1 1 auto; min-width:0; text-align:right; font-size:12px; font-weight:700; color:#475569; overflow-wrap:anywhere;">${[...c.items.entries()].map(([nm, n]) => `${gEscapeHtml(nm)} <b style="color:#c2610a; font-weight:900;">${n}</b>`).join(' · ')}</span></div>`).join('');
+                /* [수정 2026-10-15] 날짜별로 나눠 보여 준다 (사장님 요청) — 날짜 머리에 그날 손님 수와 옵션별 합계, 그 아래 손님 줄 */
+                const _W = ['일', '월', '화', '수', '목', '금', '토'];
+                const custByDay = new Map();
+                custList.forEach(c => { const k = String(c.date || ''); if (!custByDay.has(k)) custByDay.set(k, []); custByDay.get(k).push(c); });
+                const custRows = [...custByDay.entries()].map(([day, cs]) => {
+                    const sum = new Map(); cs.forEach(c => c.items.forEach((n, nm) => sum.set(nm, (sum.get(nm) || 0) + n)));
+                    const dObj = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(day + 'T00:00') : null;
+                    const dLab = dObj ? `${dObj.getMonth() + 1}/${dObj.getDate()} (${_W[dObj.getDay()]})` : (day || '날짜 없음');
+                    return `<div style="margin-top:7px; padding:5px 7px; background:#ffedd5; border-radius:5px; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px;">
+                            <b style="font-size:12px; font-weight:900; color:#9a3412; font-variant-numeric:tabular-nums;">${gEscapeHtml(dLab)}</b>
+                            <span style="font-size:11px; font-weight:700; color:#c2610a;">${cs.length}명</span>
+                            <span style="flex:1 1 auto; text-align:right; font-size:11.5px; font-weight:700; color:#7c2d12; overflow-wrap:anywhere;">${[...sum.entries()].map(([nm, n]) => `${gEscapeHtml(nm)} <b style="font-weight:900;">${n}</b>`).join(' · ')}</span></div>`
+                        + cs.map(c => `<div style="display:flex; align-items:baseline; gap:8px; padding:5px 2px 5px 8px; border-top:1px dashed #ffe0bf;">
+                            <span style="flex:0 1 auto; min-width:0; color:var(--text-main); font-weight:800; font-size:12.5px; overflow-wrap:anywhere;">${gEscapeHtml(c.who)}</span>
+                            <span style="flex:1 1 auto; min-width:0; text-align:right; font-size:12px; font-weight:700; color:#475569; overflow-wrap:anywhere;">${[...c.items.entries()].map(([nm, n]) => `${gEscapeHtml(nm)} <b style="color:#c2610a; font-weight:900;">${n}</b>`).join(' · ')}</span></div>`).join('');
+                }).join('');
                 return `<div onclick="const d=this.querySelector('.sales-card-detail'); if(d) d.style.display=(d.style.display==='none'?'block':'none');" style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff; cursor:pointer;">
                     <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
                         <div style="font-weight:700; font-size:13px; word-break:break-all; line-height:1.3;">${gEscapeHtml(r.name)}</div>
