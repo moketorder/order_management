@@ -27014,6 +27014,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 else if (/^\d{4}-\d{2}-\d{2}$/.test(salesUpcomingRange)) { if (info.dateStr !== salesUpcomingRange) return; } // 특정 날짜만
                 else { if (d < today) return; } // 전체(오늘 포함 이후)
                 const _q = (parseInt(o.qty || 0) || 0);
+                const _odt = parseTimestampToDate(o.timestamp), _od = _odt ? `${_odt.getFullYear()}-${String(_odt.getMonth() + 1).padStart(2, '0')}-${String(_odt.getDate()).padStart(2, '0')}` : '';   // [신규 2026-10-15] 손님이 주문한 날 — 사다드림 손님별 보기에 쓴다
                 if (_done) { doneMap.set(key, (doneMap.get(key) || 0) + _q); return; } // 완료 수량은 별도 집계(발주 목록엔 미포함)
                 // [수정] ocat — 주문에 적힌 분류. 상품을 못 찾아도 이걸로 묶음(공동구매·상시판매…)을 정한다
                 if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, ocat: String(o.category || ''), qty: 0, amount: 0, dates: new Set(), dateQty: new Map(), optionQty: new Map(), optionItemQty: new Map() });
@@ -27039,15 +27040,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         // [신규 2026-10-12] 옵션 항목마다 누가 몇 개 주문했는지 (사장님 요청 — 사올 개수를 누르면 보여 준다)
                         //  [수정 2026-10-12] 옵션마다가 아니라 손님마다 묶는다 (소분할 때 — 사장님 요청)
                         g.custOpt = g.custOpt || new Map();
-                        const ck = String(o.name || o.phone || '이름 없음') + '|' + info.dateStr;
-                        if (!g.custOpt.has(ck)) g.custOpt.set(ck, { who: String(o.name || o.phone || '이름 없음'), date: info.dateStr, items: new Map() });
+                        const ck = String(o.name || o.phone || '이름 없음') + '|' + info.dateStr + '|' + _od;
+                        if (!g.custOpt.has(ck)) g.custOpt.set(ck, { who: String(o.name || o.phone || '이름 없음'), date: info.dateStr, odate: _od, items: new Map() });
                         const cu = g.custOpt.get(ck).items; cu.set(nm, (cu.get(nm) || 0) + per * _q);
                     });
                 } else {
                     // [신규 2026-10-15] 옵션 없는 주문도 손님마다 몇 개인지 — 사다드림 손님별 보기에 쓴다 (사장님 요청)
                     g.custPlain = g.custPlain || new Map();
-                    const ck = String(o.name || o.phone || '이름 없음') + '|' + info.dateStr;
-                    if (!g.custPlain.has(ck)) g.custPlain.set(ck, { who: String(o.name || o.phone || '이름 없음'), date: info.dateStr, items: new Map() });
+                    const ck = String(o.name || o.phone || '이름 없음') + '|' + info.dateStr + '|' + _od;
+                    if (!g.custPlain.has(ck)) g.custPlain.set(ck, { who: String(o.name || o.phone || '이름 없음'), date: info.dateStr, odate: _od, items: new Map() });
                     const cu = g.custPlain.get(ck).items; cu.set('수량', (cu.get('수량') || 0) + _q);
                 }
             });
@@ -27147,8 +27148,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    '손님별 보기'를 누르면 펼친다. 날짜순, 같은 날이면 이름순 */
                 // [수정 2026-10-15] 사다드림은 옵션이 없어도 손님별 수량을 보여 준다 (옵션 있는 주문과 섞이면 둘 다)
                 const _isSada = salesProductCategory(r.prod, r.name, r.ocat || '') === 'sada';
-                const _custSrc = new Map([...(r.custOpt || [])].map(([k, v]) => [k, { who: v.who, date: v.date, items: new Map(v.items) }]));
-                if (_isSada && r.custPlain) r.custPlain.forEach((v, k) => { if (_custSrc.has(k)) { const it = _custSrc.get(k).items; v.items.forEach((n, nm) => it.set(nm, (it.get(nm) || 0) + n)); } else _custSrc.set(k, { who: v.who, date: v.date, items: new Map(v.items) }); });
+                // [수정 2026-10-15] 사다드림은 손님이 주문한 날(odate)로 나눈다 (사장님 요청). 다른 상품은 픽업·배달 날짜
+                const _custSrc = new Map();
+                const _addCust = v => {
+                    const day = (_isSada && v.odate) ? v.odate : v.date, k = v.who + '|' + day;
+                    if (!_custSrc.has(k)) _custSrc.set(k, { who: v.who, date: day, items: new Map() });
+                    const it = _custSrc.get(k).items; v.items.forEach((n, nm) => it.set(nm, (it.get(nm) || 0) + n));
+                };
+                (r.custOpt || new Map()).forEach(_addCust);
+                if (_isSada && r.custPlain) r.custPlain.forEach(_addCust);
                 const custList = [..._custSrc.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.who.localeCompare(b.who, 'ko'));
                 /* [수정 2026-10-15] 날짜별로 나눠 보여 준다 (사장님 요청) — 날짜 머리에 그날 손님 수와 옵션별 합계, 그 아래 손님 줄 */
                 const _W = ['일', '월', '화', '수', '목', '금', '토'];
@@ -27159,19 +27167,19 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     const dObj = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(day + 'T00:00') : null;
                     const dLab = dObj ? `${dObj.getMonth() + 1}/${dObj.getDate()} (${_W[dObj.getDay()]})` : (day || '날짜 없음');
                     return `<div style="margin-top:7px; padding:5px 7px; background:#ffedd5; border-radius:5px; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px;">
-                            <b style="font-size:12px; font-weight:900; color:#9a3412; font-variant-numeric:tabular-nums;">${gEscapeHtml(dLab)}</b>
+                            <b style="font-size:12px; font-weight:900; color:#9a3412; font-variant-numeric:tabular-nums;">${gEscapeHtml(dLab)}${_isSada ? ' 주문' : ''}</b>
                             <span style="font-size:11px; font-weight:700; color:#c2610a;">${cs.length}명</span>
                             <span style="flex:1 1 auto; text-align:right; font-size:11.5px; font-weight:700; color:#7c2d12; overflow-wrap:anywhere;">${[...sum.entries()].map(([nm, n]) => `${gEscapeHtml(nm)} <b style="font-weight:900;">${n}</b>`).join(' · ')}</span></div>`
                         + cs.map(c => `<div style="display:flex; align-items:baseline; gap:8px; padding:5px 2px 5px 8px; border-top:1px dashed #ffe0bf;">
                             <span style="flex:0 1 auto; min-width:0; color:var(--text-main); font-weight:800; font-size:12.5px; overflow-wrap:anywhere;">${gEscapeHtml(c.who)}</span>
                             <span style="flex:1 1 auto; min-width:0; text-align:right; font-size:12px; font-weight:700; color:#475569; overflow-wrap:anywhere;">${[...c.items.entries()].map(([nm, n]) => `${gEscapeHtml(nm)} <b style="color:#c2610a; font-weight:900;">${n}</b>`).join(' · ')}</span></div>`).join('');
                 }).join('');
-                return `<div onclick="const d=this.querySelector('.sales-card-detail'); if(d) d.style.display=(d.style.display==='none'?'block':'none');" style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff; cursor:pointer;">
+                return `<div style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff;">
                     <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
                         <div style="font-weight:700; font-size:13px; word-break:break-all; line-height:1.3;">${gEscapeHtml(r.name)}</div>
                         <span style="flex-shrink:0; font-size:12px; color:var(--text-sub); white-space:nowrap;">주문액 <b style="color:var(--text-main);">${r.amount.toLocaleString()}원</b></span>
                     </div>
-                    <div style="font-size:10px; color:var(--text-sub); margin:2px 0 5px;">${dateHint} <span style="color:var(--primary); font-weight:800;">▾ 날짜별</span></div>
+                    <div style="font-size:10px; color:var(--text-sub); margin:2px 0 5px;">${dateHint}</div>
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                         <div style="display:flex; gap:12px; font-size:12px; flex-wrap:wrap;">
                             <span style="color:var(--text-sub);">주문수량 <b style="color:#2563eb; font-weight:900;">${r.qty}개</b></span>
@@ -27192,10 +27200,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         <button type="button" onclick="event.stopPropagation(); const d=this.nextElementSibling; const o=d.style.display==='none'; d.style.display=o?'block':'none'; this.querySelector('b').textContent=o?'▾':'▸';" style="display:flex; align-items:center; gap:5px; width:100%; padding:6px 2px 2px; border:none; background:none; color:#c2610a; font-size:11.5px; font-weight:800; cursor:pointer; text-align:left;"><b style="font-size:10px;">▸</b>손님별 보기 · ${custList.length}명</button>
                         <div onclick="event.stopPropagation();" style="display:none; cursor:default;">${custRows}</div>
                     </div>` : '')}
-                    <div class="sales-card-detail" style="display:none; margin-top:7px; padding-top:5px; border-top:1px solid var(--border); font-size:12px;">
-                        ${detailRows || '<div style="color:var(--text-sub); padding:3px 2px;">날짜 정보 없음</div>'}
-                        ${/* [수정 2026-10-15] '주문별 옵션 조합'은 뺐다 — 옵션별 사올 개수·손님별 보기로 충분 (사장님 요청) */''}
-                    </div>
+                    ${/* [수정 2026-10-15] 카드를 누르면 펼치던 '날짜별 수량'·'주문별 옵션 조합'은 뺐다 — 옵션별 사올 개수·손님별 보기로 충분 (사장님 요청) */''}
                 </div>`;
             };
             // [신규] 과일 · 공동구매 · 사다드림 · 상시판매 순으로 묶어서 보여준다.
