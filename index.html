@@ -5,8 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MOKET 관리 (사장님용)</title>
-    <!-- html2canvas & JSZip libraries for thumbnail generation -->
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- Firebase Realtime Database SDK (실시간 리스너용, REST 폴링 대체) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
@@ -2830,8 +2828,6 @@
             <div class="segment-btn admin-nav-btn" data-tab="sourcing-sched" onclick="switchAdminTab('sourcing-sched')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📅 일정</div>
             <div class="segment-btn admin-nav-btn" data-tab="purchase-history" onclick="switchAdminTab('purchase-history')" style="text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🚚 발주</div>
             <div class="segment-btn admin-nav-btn" data-tab="sales" onclick="switchAdminTab('sales')" style="position:relative; text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🏪 가게<span class="err-badge" id="err-badge-nav" style="display:none;"></span><span class="err-badge cust-badge" id="cust-badge-nav" style="display:none;"></span></div>
-            <!-- [숨김] 섬네일 탭 — 버튼만 숨기고 기능(tab-admin-thumbnail-generator, switchAdminTab)은 그대로 유지 -->
-            <div class="segment-btn admin-nav-btn" data-tab="thumbnail-generator" onclick="switchAdminTab('thumbnail-generator')" style="display:none; text-align:center; padding:12px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🎨 섬네일</div>
         </div>
     </div>
 
@@ -3285,7 +3281,6 @@
                         <!-- [신규 2026-09-30] 상품 하나만 골랐을 때만 나온다 — 한 상품 기준이라
                              [수정 2026-10-01] 사진 공유·설명 복사를 '공유&복사' 하나로 합쳤다 (사장님 요청) -->
                         <button id="btn-batch-sharecopy" class="btn-batch" onclick="handleBatchShareCopy()" style="display:none; flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid #ca8a04; background: #FEE500; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #191919; white-space: nowrap; overflow: hidden;">💬 공유&amp;복사</button>
-                        <button class="btn-batch type-print" onclick="switchAdminTab('thumbnail-generator')" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #d97706; border-color: rgba(217, 119, 6, 0.25); white-space: nowrap; overflow: hidden;">🎨 섬네일</button>
                         <!-- [신규 2026-10-02] 고른 상품으로 가격표 생성기와 같은 모양의 A4 가격표를 만든다 (할인이면 정상가 줄도) -->
                         <button class="btn-batch" onclick="handleBatchPriceTag()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(76, 175, 32, 0.35); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #3f8f1a; white-space: nowrap; overflow: hidden;">🏷️ 가격표</button>
                         <button class="btn-batch type-purchase" onclick="handleBatchPurchase()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #10b981; border-color: rgba(16, 185, 129, 0.25); white-space: nowrap; overflow: hidden;">🚚 발주</button>
@@ -3391,113 +3386,6 @@
                 </div>
                 <div id="rva-body"></div>
             </div>
-        </div>
-
-        <!-- 탭 4: 섬네일 생성 영역 -->
-        <div id="tab-admin-thumbnail-generator" class="admin-tab-content" style="display: none;">
-            <div class="container" style="max-width: 950px; margin: 0 auto;">
-                <div class="card" style="padding: 20px;">
-                    <div class="card-title" style="margin-bottom: 15px; font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px;">
-                        🎨 섬네일 일괄 생성기
-                    </div>
-                    
-                    <div class="generator-workspace" style="display: grid; grid-template-columns: 1fr 340px; gap: 20px;">
-                        <!-- 미리보기 영역 -->
-                        <div class="gen-preview-section" style="display: flex; flex-direction: column; align-items: center; background: #f1f5f9; border-radius: var(--radius-sm); padding: 16px; min-width: 0;">
-                            <div id="gen-thumbnail-preview" style="width: 500px; height: 500px; position: relative; background: var(--moket-green); overflow: hidden; display: flex; flex-direction: column; user-select: none; border: 8px solid var(--moket-green); box-sizing: border-box; font-family: 'Pretendard Variable', 'Pretendard', sans-serif;">
-                                <div class="gen-pickup-header" id="gen-preview-date" style="background: var(--moket-green); color: white; display: flex; align-items: center; justify-content: center; height: 52px; font-size: 35px; font-weight: 900; letter-spacing: -1.5px; z-index: 10; position: relative; box-sizing: border-box;">날짜 픽업</div>
-                                <div class="gen-content-area" style="flex: 1; display: flex; flex-direction: column; position: relative; z-index: 5; background: #fdf3e7; padding: 6px; overflow: hidden;">
-                                    <div class="gen-title-box" style="text-align: center; margin-bottom: 5px; padding: 12px 24px; width: 100%; height: auto; box-sizing: border-box; background-color: transparent; display: block; overflow: hidden;">
-                                        <div class="gen-preview-name" id="gen-preview-name" style="font-size: 40px; font-weight: 900; color: #222; letter-spacing: -1.5px; line-height: 1.1; display: block; width: 100%; text-align: center; word-break: keep-all;">상품명</div>
-                                    </div>
-                                    <div class="gen-image-frame" style="width: 100%; flex: 1; min-height: 0; border: 7px solid #FF6D00; border-radius: 20px; position: relative; overflow: hidden; background: #fff; box-sizing: border-box; margin-top: 2px; flex-shrink: 0; cursor: grab;">
-                                        <!-- [신규] 주문마감일자를 적으면 사진 맨 위에 띠로 얹는다. 비우면 안 나온다. -->
-                                        <div id="gen-preview-deadline" style="display:none; position:absolute; top:0; left:0; right:0; z-index:22; background:rgba(225,29,72,0.92); color:#fff; text-align:center; padding:6px 0; font-size:30px; font-weight:900; letter-spacing:-1.5px; line-height:1.15;"></div>
-                                        <img id="gen-bg-image" src="" alt="Thumbnail Image" style="position: absolute; width: 120%; height: auto; min-height: 100%; min-width: 100%; display: block; top: 0; left: 0; z-index: 1; transform-origin: center center;">
-                                        <div class="gen-footer-overlay" style="position: absolute; bottom: 0px; left: 0px; right: 0px; height: 90px; background: rgba(255, 255, 255, 0.85); z-index: 20; display: flex; justify-content: center; align-items: center; padding: 0 25px; gap: 10px;">
-                                            <div class="gen-price-right" style="display: flex; align-items: flex-end; gap: 4px; line-height: 1;">
-                                                <span class="gen-price-val" id="gen-preview-price" style="font-size: 86px; font-weight: 900; letter-spacing: -3px; line-height: 1; color: #FF6D00; white-space: nowrap; text-shadow: -2.5px -2.5px 0 #fff, 2.5px -2.5px 0 #fff, -2.5px 2.5px 0 #fff, 2.5px 2.5px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 5px 5px 0 var(--moket-green);">0</span>
-                                                <span class="gen-price-unit" style="font-size: 50px; font-weight: 900; color: #FF6D00; text-shadow: -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff, 3px 3px 0 var(--moket-green); margin-left: 0px; line-height: 1; transform: translateY(-7px);">원</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div style="font-size: 11px; color: var(--text-sub); margin-top: 8px; text-align: center; line-height: 1.4;">
-                                💡 <b>마우스 드래그/휠</b>로 이미지 위치 이동 및 확대/축소가 가능합니다.
-                            </div>
-                        </div>
-                        
-                        <!-- 입력 폼 영역 -->
-                        <div class="gen-form-section" style="display: flex; flex-direction: column; gap: 12px;">
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size:12px;">픽업일/날짜 (상단 타이틀)</label>
-                                <input type="text" id="gen-input-date" style="padding: 8px; font-size: 13px;" oninput="syncFormToQueue()">
-                            </div>
-                            <!-- [신규] 주문마감일자 — 픽업일과 따로 적는다. 적으면 사진 위에 빨간 띠로 얹힌다. -->
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size:12px;">주문마감일자 (사진 위 띠) · 비우면 안 나옴</label>
-                                <input type="text" id="gen-input-deadline" placeholder="예: 9월 4일 (금)  또는  9/4" style="padding: 8px; font-size: 13px;" oninput="syncFormToQueue()">
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size:12px;">상품명 (중간 대제목)</label>
-                                <textarea id="gen-input-name" style="padding: 8px; font-size: 13px; font-family: inherit; width: 100%; box-sizing: border-box; border: 1.5px solid var(--border); border-radius: var(--radius-sm); resize: none; height: 64px; outline: none;" oninput="syncFormToQueue()" onkeydown="limitTextareaLines(event)"></textarea>
-                                <!-- [신규] 상품명 글씨 크기를 손으로 조절한다.
-                                     한 번 손대면 그 크기로 굳고, '자동'을 누르면 다시 알아서 맞춘다. -->
-                                <div style="display:flex; align-items:center; gap:5px; margin-top:5px;">
-                                    <span style="font-size:11px; font-weight:800; color:var(--text-sub); flex:0 0 auto;">글씨 크기</span>
-                                    <button type="button" onclick="bumpGenTitleFont(-2)" style="flex:0 0 auto; width:28px; height:26px; border:1.5px solid var(--border); background:#fff; color:#475569; border-radius:6px; font-size:13px; font-weight:900; cursor:pointer;">−</button>
-                                    <span id="gen-name-size" style="flex:0 0 44px; text-align:center; font-size:11.5px; font-weight:800; color:#0f172a;">자동</span>
-                                    <button type="button" onclick="bumpGenTitleFont(2)" style="flex:0 0 auto; width:28px; height:26px; border:1.5px solid var(--border); background:#fff; color:#475569; border-radius:6px; font-size:13px; font-weight:900; cursor:pointer;">+</button>
-                                    <button type="button" onclick="resetGenTitleFont()" style="flex:0 0 auto; padding:0 9px; height:26px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer;">자동</button>
-                                </div>
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size:12px;">가격 (하단 오른쪽)</label>
-                                <input type="text" id="gen-input-price" style="padding: 8px; font-size: 13px;" oninput="syncFormToQueue()">
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size:12px;">배경 이미지 대체 (로컬 파일)</label>
-                                <input type="file" id="gen-input-file" accept="image/*" onchange="handleGenFileSelect(event)" style="font-size: 11px;">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 큐 관리 영역 -->
-                    <div class="gen-queue-section" style="margin-top: 12px; border-top: 1.5px solid var(--border); padding-top: 12px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <span style="font-size: 14px; font-weight: 800; color: var(--text-main);">
-                                대기 큐 리스트 (<span id="gen-queue-count">0</span>개)
-                            </span>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn-action-sm" onclick="clearGeneratorQueue()" style="color: var(--red); border-color: var(--border);">전체 비우기</button>
-                                <button class="btn-action-sm" onclick="rememberCurrentThumb()" style="color: var(--primary); border-color: var(--border); font-weight: 800;">💾 기억하기</button>
-                                <button class="btn-action-sm" id="btn-gen-download-all" onclick="generateAllThumbnails()" style="background: var(--primary); color: white; border: none; font-weight: 800; font-size: 12px; padding: 4px 10px;">📦 ZIP 다운로드</button>
-                            </div>
-                        </div>
-                        
-                        <!-- [수정] 미리보기를 줄인 만큼 목록을 늘렸다 (180px → 화면 높이의 42%) -->
-                        <div style="max-height: 42vh; min-height: 220px; overflow-y: auto; border: 1.5px solid var(--border); border-radius: var(--radius-sm);">
-                            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
-                                <thead style="background: #f8fafc; position: sticky; top: 0; z-index: 5; border-bottom: 1px solid var(--border);">
-                                    <tr>
-                                        <th style="padding: 8px;">날짜</th>
-                                        <th style="padding: 8px;">상품명</th>
-                                        <th style="padding: 8px;">가격</th>
-                                        <th style="padding: 8px; width: 40px; text-align: center;">삭제</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="gen-queue-table-body">
-                                    <tr>
-                                        <td colspan="4" style="text-align: center; padding: 30px; color: var(--text-sub);">선택된 상품이 없습니다. 상품 목록에서 상품들을 선택하고 상단의 '🎨 섬네일' 버튼을 클릭하거나 탭을 눌러주세요.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-            </div>
-        </div>
         </div>
 
         <!-- [신규 2026-10-07] 일정 관리 > 소싱 일정 (사장님 요청)
@@ -5371,6 +5259,7 @@
                         '<button type="button" class="src-btn" onclick="srcCalMove(1)">▶</button>' +
                         // [신규 2026-10-06] 되돌리기 · 폰용 Ctrl 단추 · 고른 것 지우기/풀기
                         '<button type="button" class="src-btn" onclick="srcUndo()" title="' + (gSrcUndo.length ? '되돌리기: ' + srcEsc(gSrcUndo[gSrcUndo.length - 1].label) + ' (Ctrl+Z)' : '되돌릴 것이 없어요') + '"' + (gSrcUndo.length ? '' : ' disabled style="opacity:.4"') + '>↩</button>' +
+                        '<button type="button" class="src-btn" onclick="srcThumbOpen()" title="이 주 달력 상품으로 단톡방 섬네일(한눈에 1장 + 요일별) 만들기">🖼 섬네일</button>' +   // [신규 2026-10-15] 단톡방 섬네일 (사장님 요청)
                         '<button type="button" class="src-btn src-ctrl-btn' + (gSrcCtrl ? ' on' : '') + '" onclick="srcCtrlToggle()" title="켜면 Ctrl 을 누른 것과 같아요 (여러 개 고르기·복사)">Ctrl</button>' +
                         // [수정 2026-10-07] 'N개 고름 · 지우기 · 풀기' 줄은 뺐다 — Delete 키로 지운다 (사장님 요청)
                         '<span class="src-calf">' + SRC_CAL_F.map(([k, lab, tip]) => '<button type="button" class="src-btn' + ((gSrc.calF || {})[k] ? ' on' : '') + '" onclick="srcCalFToggle(\'' + k + '\')" title="' + tip + '">' + lab + '</button>').join('') + '</span>' +   // [신규 2026-10-07] 안 된 것만 보기
@@ -5467,6 +5356,337 @@
                     gSrc.calMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
                     srcRender();
                 }
+                /* ===== [신규 2026-10-15] 단톡방 섬네일 만들기 (사장님 요청) =====
+                   달력에 넣은 한 주(월~금) 상품으로 1080×1080 그림을 만든다 — '한눈에' 1장 + 요일별 1장씩.
+                   · 상품 = 달력의 고른 것·밴드·직접 쓴 것·상시판매·사다드림. 가격·사진은 이어진 등록 상품(published_products)에서
+                   · 수식어 = 밴드 설명글 첫 줄에서 뽑는다. 창에서 이름·수식어·가격을 고치면 sourcing/thumb/<업체|이름> 에 남아 다음에도 쓴다
+                   · 주문 마감(마감 단추·이번 차례 마감 시각 지남·이번 차례 재고 0) = 사진 회색 + '주문 마감'
+                   · 그림은 화면(canvas)에서 바로 그린다 — 휴대폰에서도 만들어 받는다 (공유 단추 · 압축 받기 · 길게 눌러 저장) */
+                const SRC_TH_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABEAAAAHJCAMAAACyprzKAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAMAUExURQAAAP///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wc9CwgAAAEAdFJOUwBusdr/CypIWWVxfYmVoaSYjYF1aV1QMRI0bI+tzOrx0rOUPAQawcC/vr28u7q5uLe2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iGh46G+AzD0Su1Sudf88lohi6meArHQh9qRp+vApuCRN0y2uxl4iGgb6FyD7PfUetrTslayFi1qmPoP9RNR3fQqQj/6xAtZ3/G+SJAvjwrah/aUrPRBR//UjQNZ8+9a9sbrroXaBJlzSry+wNM4ioj6KHSBr7rvnVKzsmdWt2hBX5GY88P7cMJKI+iVigJz89n+8vB1WSRbNa/UJkqbpT8bdc/xuu0uziagfIgbIS1iBOu9fOhbClWg/oZiI+uPeJWuDm1KcdEz01SOk6lm4XraKVExEA+9QTAHRGPy96SlnYomIf4AQzWGexBQQnIXFSfLrx7GoZywWE9Gg2whzILP+OVjadvZOWJjh17lEc5wlMQc6DtAesv/jtfB6dR3jsJCIBp/q2Lkt5sUq0YmzlsWGNE1fwDIiGnw/xCRIp7yJNWj0K1th03isIaI5we+lILh+1rNYoPTqZz+U+lbEAiKaE/y2lwKbHv8ErjU4+4Hr805+AkI0h/pMKwHW2fzS3/wZ11j9+oPntmkHyHdwDRHNGT7a+rT/LvxG1d03X1331o1wIRERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERGR6P8ANM3nyH+S6T4AAAAASUVORK5CYII=';
+                const SRC_TH_DAYC = [['#47a823', '#2f7a14'], ['#13a08f', '#0b7466'], ['#2f7fd6', '#1d5ea8'], ['#7b5bd6', '#5a3db0'], ['#f76707', '#c24f00']];   // 월~금
+                const SRC_TH_W = ['월', '화', '수', '목', '금'];
+                let gSrcTh = null;   // { wk, items: [...], edits: {}, imgs: [{name, blob, url}] }
+                function srcThMd(iso) { const d = new Date(iso + 'T00:00:00'); return (d.getMonth() + 1) + '/' + d.getDate(); }
+                function srcThWon(n) { return Number(n || 0).toLocaleString('ko-KR'); }
+                // 밴드 설명글 첫 줄 → 짧은 수식어 ('🔥 반응 폭발, 참나무 직화 무뼈닭발!' → '반응 폭발')
+                function srcThModFrom(ds, prodName) {
+                    const clean = s => String(s || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu, '').replace(/\s+/g, ' ').trim();
+                    let s = clean(String(ds || '').split(/\n/).find(l => clean(l)) || '');
+                    if (s) { s = s.split(/!|！/)[0]; if (s.includes(', ')) s = s.split(', ')[0]; s = s.trim(); }
+                    if (!s && /!/.test(prodName || '')) s = clean(String(prodName).split(/!+/).slice(0, -1).join(' ')).replace(/[~·]+$/, '').trim();   // '얇고 쫄깃한 면이 일품인~!! 호랑이 해장 냉면' → 앞말
+                    return s.length > 18 ? s.slice(0, 18) : s;
+                }
+                function srcThShort(names) {   // 가장 짧은 이름, 괄호 안 군말은 뺀다
+                    const c = names.map(s => String(s || '').replace(/\((픽업|배달)[^)]*\)/g, '').replace(/^\s*\[[^\]]*\]\s*/, '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+                    return c.sort((a, b) => a.length - b.length)[0] || '';
+                }
+                async function srcThCollect(wk) {
+                    const get = async p => { const r = await fetch(`${FIREBASE_DB_URL}${p}.json?t=${Date.now()}`); return r.ok ? (await r.json()) : null; };
+                    const [pp, closed, saved] = await Promise.all([get('published_products'), get('product_closed').catch(() => null), srcGet('thumb').catch(() => null)]);
+                    if (!gSrc.band) { try { gSrc.band = (await srcGet('band')) || {}; } catch (e) { } }
+                    const list = Array.isArray(pp) ? pp.filter(Boolean) : Object.values(pp || {}).filter(Boolean);
+                    const byCode = {}, bySid = {}, byName = {};
+                    list.forEach(p => { if (p.productCode && !byCode[p.productCode]) byCode[p.productCode] = p; if (p.sid && !bySid[p.sid]) bySid[p.sid] = p; const n = srcNormName(p.name); if (n && !byName[n]) byName[n] = p; });
+                    const bandRows = srcBandRows(), nk = s => String(s || '').replace(/\s/g, '');
+                    const days = [0, 1, 2, 3, 4].map(i => srcAddDays(wk, i)), inWk = d => days.includes(d);
+                    const refs = [];
+                    Object.entries(gSrc.picks || {}).forEach(([w, items]) => Object.entries(items || {}).forEach(([key, p]) => { if (!p) return; const d = p.date || srcAddDays(w, Math.max(0, SRC_DAYS.indexOf(p.day))); if (inWk(d)) refs.push({ d, r: ['pick', w, key], p }); }));
+                    ['direct', 'manual', 'onsite'].forEach(k => Object.entries(gSrc[k] || {}).forEach(([id, p]) => { if (p && inWk(p.date)) refs.push({ d: p.date, r: [k, id], p }); }));
+                    (gSrc.sada || []).forEach(p => { if (inWk(p.date) && !p.hide) refs.push({ d: p.date, r: ['sada', p.code], p: { name: p.name, code: p.code, vendor: '사다드림' } }); });
+                    const now = Date.now(), seen = new Set(), items = [];
+                    refs.sort((a, b) => a.d.localeCompare(b.d)).forEach(({ d, r, p }) => {
+                        const vendor = r[0] === 'sada' ? '사다드림' : srcVendorOf(r, p);
+                        const key = srcNameKey(vendor, p.name);
+                        if (seen.has(d + key)) return; seen.add(d + key);
+                        // 이어진 등록 상품 — 연결 기록(reg) → 식별번호 → 이름
+                        const link = (gSrc.reg || {})[key];
+                        let prod = null, many = [];
+                        if (!(link && link.none)) {
+                            if (p.code && byCode[p.code]) prod = byCode[p.code];
+                            if (!prod && link) prod = (link.sid && bySid[link.sid]) || (link.code && byCode[link.code]) || null;
+                            if (link && Array.isArray(link.many)) many = link.many.map(m => (m.sid && bySid[m.sid]) || (m.code && byCode[m.code])).filter(Boolean);
+                            if (!prod) prod = byName[srcNormName(p.name)] || null;
+                        }
+                        // 가격 — 0원이고 옵션이 있으면 가장 싼 옵션 + '~', 묶음 연결(두부·콩나물)도 가장 싼 것 + '~'
+                        const optMin = q => { let m = 0; (q && q.options || []).forEach(o => (o.items || []).forEach(it => { const v = +it.price || 0; if (v > 0 && (!m || v < m)) m = v; })); return m; };
+                        let price = '', from = false;
+                        const ps = (many.length > 1 ? many : prod ? [prod] : []).map(q => (+q.price || 0) || optMin(q)).filter(v => v > 0);
+                        if (ps.length) { price = Math.min(...ps); from = many.length > 1 || !(prod && +prod.price); }
+                        const band = r[0] === 'pick' || r[0] === 'direct' ? (bandRows.find(x => x.v === p.vendor && x.n === p.name) || bandRows.find(x => nk(x.n) === nk(p.name))) : null;
+                        // 주문 마감 — 마감 단추, 이번 차례(픽업일 6일 전 뒤) 마감 시각이 지남, 이번 차례 재고 0
+                        let closedWhy = '';
+                        if (prod) {
+                            const sid = prod.sid || prod.productCode;
+                            if (closed && sid && (closed[sid] === true || closed[encodeURIComponent(sid)] === true)) closedWhy = '마감';
+                            const ex = Number(prod.expireAt) || 0;
+                            if (!closedWhy && ex && now >= ex && ex > new Date(srcAddDays(d, -6) + 'T00:00:00').getTime()) closedWhy = '마감 시각 지남';
+                            if (!closedWhy && prod.date === d && typeof salesRealStock === 'function') { const st = salesRealStock(prod); if (st === 0) closedWhy = '재고 0'; }
+                        }
+                        const sv = (saved || {})[key] || {};
+                        const imgs = (prod && Array.isArray(prod.images) ? prod.images : []).filter(Boolean);
+                        items.push({
+                            d, key, vendor, src: p.name, prod: prod ? (prod.productCode || prod.sid) : '',
+                            name: sv.n || srcThShort([p.disp, p.name, prod && prod.name]),
+                            mod: sv.m != null ? sv.m : srcThModFrom(band && band.ds, prod && prod.name),
+                            price: sv.p || (price ? srcThWon(price) + (from ? '~' : '') : ''),
+                            imgs, imgAt: Math.min(+sv.i || 0, Math.max(0, imgs.length - 1)),
+                            closed: !!closedWhy, closedWhy, on: true
+                        });
+                    });
+                    return items;
+                }
+                async function srcThumbOpen(wk) {
+                    if (!wk) wk = srcAddDays(srcMonday(srcToday()), 7);   // 처음엔 다음 주
+                    const old = document.getElementById('src-th'); if (old) old.remove();
+                    srcThStyle();
+                    const box = document.createElement('div'); box.id = 'src-th';
+                    box.innerHTML = '<div class="in"><div class="hd"><b>🖼 단톡방 섬네일</b><button type="button" data-act="close">✕</button></div><div class="bd"><div class="k">불러오는 중…</div></div></div>';
+                    document.body.appendChild(box);
+                    box.addEventListener('click', srcThClick);
+                    box.addEventListener('change', srcThInput); box.addEventListener('input', srcThInput);
+                    try { gSrcTh = { wk, items: await srcThCollect(wk), imgs: [] }; srcThPaint(); }
+                    catch (e) { box.querySelector('.bd').innerHTML = '<div class="k">못 불러왔어요: ' + srcEsc(e.message) + '</div>'; }
+                }
+                function srcThPaint() {
+                    const T = gSrcTh, box = document.getElementById('src-th'); if (!T || !box) return;
+                    const fri = srcAddDays(T.wk, 4);
+                    let h = '<div class="wk"><button type="button" data-act="wk" data-n="-7">◀</button><b>' + srcThMd(T.wk) + '(월) ~ ' + srcThMd(fri) + '(금)</b><button type="button" data-act="wk" data-n="7">▶</button></div>';
+                    if (!T.items.length) h += '<div class="k">이 주 달력에 넣은 상품이 없어요</div>';
+                    else {
+                        h += '<div class="k">이름·수식어·가격은 고치면 저장돼 다음에도 써요 · 사진을 누르면 다음 사진 · 마감은 저절로 켜지고 직접 바꿀 수도 있어요</div>';
+                        [0, 1, 2, 3, 4].forEach(i => {
+                            const d = srcAddDays(T.wk, i), its = T.items.map((it, j) => [it, j]).filter(([it]) => it.d === d);
+                            if (!its.length) return;
+                            h += '<div class="day"><div class="dl" style="background:' + SRC_TH_DAYC[i][0] + '">' + srcThMd(d) + ' ' + SRC_TH_W[i] + '</div>' + its.map(([it, j]) =>
+                                '<div class="it' + (it.on ? '' : ' off') + (it.closed ? ' x' : '') + '" data-j="' + j + '">' +
+                                '<input type="checkbox" data-f="on" title="넣기"' + (it.on ? ' checked' : '') + '>' +
+                                '<img data-act="img" src="' + srcEsc(it.imgs[it.imgAt] || '') + '" title="' + (it.imgs.length > 1 ? '눌러서 다음 사진 (' + (it.imgAt + 1) + '/' + it.imgs.length + ')' : '') + '">' +
+                                '<div class="f"><input data-f="mod" value="' + srcEsc(it.mod) + '" placeholder="수식어"><input data-f="name" value="' + srcEsc(it.name) + '" placeholder="이름"></div>' +
+                                '<input data-f="price" class="pr" value="' + srcEsc(it.price) + '" placeholder="가격">' +
+                                '<label class="cl" title="' + srcEsc(it.closedWhy || '직접 켜기') + '"><input type="checkbox" data-f="closed"' + (it.closed ? ' checked' : '') + '>마감</label></div>').join('') + '</div>';
+                        });
+                        h += '<div class="go"><button type="button" data-act="make" class="pri">🖼 6장 만들기</button></div>';
+                    }
+                    if (T.imgs.length) {
+                        h += '<div class="out"><div class="k">그림을 길게 누르거나(휴대폰) 눌러서 하나씩 받을 수 있어요</div><div class="g">' +
+                            T.imgs.map((m, i) => '<a href="' + m.url + '" download="' + srcEsc(m.name) + '"><img src="' + m.url + '"><span>' + srcEsc(m.name.replace(/\.png$/, '')) + '</span></a>').join('') + '</div><div class="go">' +
+                            (navigator.canShare ? '<button type="button" data-act="share" class="pri">📤 공유·저장</button>' : '') +
+                            (typeof JSZip !== 'undefined' ? '<button type="button" data-act="zip">⬇️ 압축으로 받기</button>' : '') + '</div></div>';
+                    }
+                    box.querySelector('.bd').innerHTML = h;
+                }
+                let _srcThSaveT = {};
+                function srcThInput(e) {
+                    const el = e.target, f = el.dataset && el.dataset.f, row = el.closest && el.closest('.it'); if (!f || !row || !gSrcTh) return;
+                    const it = gSrcTh.items[+row.dataset.j]; if (!it) return;
+                    if (f === 'on' || f === 'closed') { if (e.type !== 'change') return; it[f] = el.checked; row.classList.toggle(f === 'on' ? 'off' : 'x', f === 'on' ? !el.checked : el.checked); return; }
+                    it[f] = el.value;
+                    clearTimeout(_srcThSaveT[it.key]); _srcThSaveT[it.key] = setTimeout(() => srcThSave(it), 700);
+                }
+                async function srcThSave(it) {
+                    try { await srcPut('thumb/' + it.key, { n: it.name, m: it.mod, p: it.price, i: it.imgAt || 0, at: new Date().toISOString() }); }
+                    catch (e) { showToast('저장 못 했어요: ' + e.message); }
+                }
+                async function srcThClick(e) {
+                    const box = document.getElementById('src-th');
+                    if (e.target === box) return box.remove();
+                    const b = e.target.closest('[data-act]'); if (!b) return;
+                    const a = b.dataset.act, T = gSrcTh;
+                    if (a === 'close') return box.remove();
+                    if (a === 'wk') { srcThumbOpen(srcAddDays(T.wk, +b.dataset.n)); return; }
+                    if (a === 'img') { const it = T.items[+b.closest('.it').dataset.j]; if (it && it.imgs.length > 1) { it.imgAt = (it.imgAt + 1) % it.imgs.length; b.src = it.imgs[it.imgAt]; b.title = '눌러서 다음 사진 (' + (it.imgAt + 1) + '/' + it.imgs.length + ')'; srcThSave(it); } return; }
+                    if (a === 'make') {
+                        b.disabled = true; b.textContent = '만드는 중…';
+                        try { T.imgs.forEach(m => URL.revokeObjectURL(m.url)); T.imgs = await srcThMakeAll(); srcThPaint(); setTimeout(() => { const o = box.querySelector('.out'); if (o) o.scrollIntoView({ behavior: 'smooth' }); }, 50); }
+                        catch (err) { showToast('못 만들었어요: ' + err.message); b.disabled = false; b.textContent = '🖼 6장 만들기'; }
+                        return;
+                    }
+                    if (a === 'share') {
+                        const files = T.imgs.map(m => new File([m.blob], m.name, { type: 'image/png' }));
+                        try { if (navigator.canShare({ files })) await navigator.share({ files }); else showToast('이 기기는 그림 공유가 안 돼요 — 압축으로 받거나 하나씩 받아 주세요'); } catch (err) { }
+                        return;
+                    }
+                    if (a === 'zip') {
+                        const zip = new JSZip(); T.imgs.forEach(m => zip.file(m.name, m.blob));
+                        const blob = await zip.generateAsync({ type: 'blob' }), u = URL.createObjectURL(blob), l = document.createElement('a');
+                        l.href = u; l.download = 'MOKET_섬네일_' + T.wk.replace(/-/g, '') + '.zip'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000);
+                    }
+                }
+                function srcThStyle() {
+                    if (document.getElementById('src-th-css')) return;
+                    const s = document.createElement('style'); s.id = 'src-th-css';
+                    s.textContent = '#src-th{position:fixed;inset:0;z-index:10050;background:rgba(15,23,42,.45);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto}' +
+                        '#src-th .in{background:#fff;border-radius:16px;width:100%;max-width:760px;box-shadow:0 18px 40px rgba(0,0,0,.2)}' +
+                        '#src-th .hd{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #e5e7eb;position:sticky;top:-16px;background:#fff;border-radius:16px 16px 0 0;z-index:1}' +
+                        '#src-th .hd b{font-size:17px}#src-th .hd button{border:none;background:none;font-size:20px;cursor:pointer}' +
+                        '#src-th .bd{padding:12px 16px 18px}#src-th .k{font-size:12px;color:#64748b;margin:6px 0}' +
+                        '#src-th .wk{display:flex;align-items:center;justify-content:center;gap:12px;font-size:16px}#src-th .wk button{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:4px 12px;cursor:pointer}' +
+                        '#src-th .day{border:1px solid #e5e7eb;border-radius:12px;margin-top:10px;overflow:hidden}#src-th .dl{color:#fff;font-weight:800;font-size:13px;padding:5px 10px}' +
+                        '#src-th .it{display:flex;align-items:center;gap:8px;padding:6px 8px;border-top:1px solid #f1f5f9}#src-th .it.off{opacity:.4}' +
+                        '#src-th .it img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;cursor:pointer;background:#f1f5f9}#src-th .it.x img{filter:grayscale(1)}' +
+                        '#src-th .it .f{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}#src-th .it input:not([type]){border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:13px;width:100%;box-sizing:border-box;font-family:inherit}' +
+                        '#src-th .it input[data-f=mod]{color:#2f7a14;font-size:12px}#src-th .it .pr{width:84px !important;flex:none;text-align:right;font-weight:800;color:#f76707}' +
+                        '#src-th .cl{font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:2px;color:#64748b}#src-th .it.x .cl{color:#dc2626;font-weight:800}' +
+                        '#src-th .go{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}#src-th .go button{border:1px solid #cbd5e1;background:#fff;border-radius:10px;padding:10px 18px;font-weight:800;font-size:15px;cursor:pointer}#src-th .go .pri{background:#47a823;border-color:#47a823;color:#fff}' +
+                        '#src-th .out{margin-top:16px;border-top:1px solid #e5e7eb;padding-top:8px}#src-th .out .g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}#src-th .out a{display:block;text-decoration:none;color:#334155;font-size:11px;text-align:center}#src-th .out img{width:100%;border-radius:8px;display:block;box-shadow:0 1px 3px rgba(0,0,0,.15)}' +
+                        '@media(max-width:560px){#src-th{padding:0}#src-th .in{border-radius:0;min-height:100%}#src-th .out .g{grid-template-columns:repeat(2,1fr)}#src-th .it .pr{width:70px !important}}';
+                    document.head.appendChild(s);
+                }
+                /* ---- 그리기 (1080×1080 canvas) ---- */
+                let _srcThFontP = null;
+                function srcThFonts() {
+                    if (_srcThFontP) return _srcThFontP;
+                    const base = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/static/woff2/Pretendard-';
+                    const ws = [[600, 'SemiBold'], [700, 'Bold'], [800, 'ExtraBold'], [900, 'Black']];
+                    _srcThFontP = Promise.all(ws.map(([w, n]) => new FontFace('MoketTh', 'url(' + base + n + '.woff2)', { weight: String(w) }).load().then(f => { document.fonts.add(f); }).catch(() => { }))).then(() => "MoketTh, 'Malgun Gothic', sans-serif");
+                    return _srcThFontP;
+                }
+                const _srcThImgC = {};
+                function srcThImg(url) {
+                    if (!url) return Promise.resolve(null);
+                    if (_srcThImgC[url]) return _srcThImgC[url];
+                    return (_srcThImgC[url] = new Promise(res => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => res(null); im.src = url; }));
+                }
+                function srcThRR(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+                function srcThCover(c, im, x, y, w, h, gray) {   // 사진을 칸에 꽉 채워 가운데를 자른다 · gray = 회색 (아이폰도 되게 '채도' 섞기로)
+                    c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
+                    c.fillStyle = '#f1ebe0'; c.fillRect(x, y, w, h);
+                    if (im) { const s = Math.max(w / im.width, h / im.height), dw = im.width * s, dh = im.height * s; c.drawImage(im, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh); }
+                    if (gray) { c.globalCompositeOperation = 'saturation'; c.fillStyle = '#808080'; c.fillRect(x, y, w, h); c.globalCompositeOperation = 'source-over'; c.fillStyle = 'rgba(0,0,0,.06)'; c.fillRect(x, y, w, h); }
+                    c.restore();
+                }
+                function srcThFit(c, s, max) {   // 넘치면 … 으로 줄인다
+                    s = String(s || ''); if (c.measureText(s).width <= max) return s;
+                    while (s.length > 1 && c.measureText(s + '…').width > max) s = s.slice(0, -1);
+                    return s + '…';
+                }
+                function srcThPill(c, x, y, w, h, bg) { c.fillStyle = bg; srcThRR(c, x, y, w, h, h / 2); c.fill(); }
+                // 맨 위 띠: 왼쪽 로고, 오른쪽 제목(parts) + 흰 알약(pill parts). pillW = 'title' 이면 제목 너비에 맞춘다
+                async function srcThHeader(c, F, color, title, pill, pillFull) {
+                    c.fillStyle = color; c.fillRect(0, 0, 1080, 168);
+                    c.fillStyle = 'rgba(255,255,255,.09)'; c.beginPath(); c.arc(90, 60, 150, 0, Math.PI * 2); c.fill();
+                    const logo = await srcThImg(SRC_TH_LOGO);
+                    if (logo) { const h = 142, w = logo.width * h / logo.height; c.drawImage(logo, 36, 84 - h / 2, w, h); }
+                    c.textBaseline = 'alphabetic';
+                    c.font = '900 58px ' + F; const tw = title.reduce((a, [t]) => a + c.measureText(t).width, 0);
+                    let x = 1040 - tw; title.forEach(([t, col]) => { c.fillStyle = col; c.fillText(t, x, 84); x += c.measureText(t).width; });
+                    c.font = '800 24px ' + F; const pw0 = pill.reduce((a, [t]) => a + c.measureText(t).width, 0);
+                    const pw = pillFull ? tw : pw0 + 40, px = 1040 - pw;
+                    srcThPill(c, px, 100, pw, 46, '#fff');
+                    x = px + (pw - pw0) / 2; pill.forEach(([t, col]) => { c.fillStyle = col; c.fillText(t, x, 132); x += c.measureText(t).width; });
+                }
+                function srcThPrice(c, F, s, x, y, size, color, right) {   // '7,900~' → 7,900 + 작은 '원~'
+                    const num = String(s || '').replace(/~/g, '').replace(/원/g, '').trim(), tail = '원' + (/~/.test(s) ? '~' : '');
+                    if (!num) return 0;
+                    c.font = '900 ' + size + 'px ' + F; const w1 = c.measureText(num).width;
+                    c.font = '700 ' + Math.round(size * .72) + 'px ' + F; const w2 = c.measureText(tail).width;
+                    const x0 = right ? x - w1 - w2 : x;
+                    c.fillStyle = color; c.font = '900 ' + size + 'px ' + F; c.fillText(num, x0, y);
+                    c.font = '700 ' + Math.round(size * .72) + 'px ' + F; c.fillText(tail, x0 + w1, y);
+                    return w1 + w2;
+                }
+                async function srcThDrawWeek(items, wk) {
+                    const F = await srcThFonts(), cv = document.createElement('canvas'); cv.width = cv.height = 1080;
+                    const c = cv.getContext('2d');
+                    c.fillStyle = '#fff7ea'; c.fillRect(0, 0, 1080, 1080);
+                    await srcThHeader(c, F, '#47a823', [['다음주 ', '#fff'], ['공구', '#ffe066'], ['를 한눈에', '#fff']],
+                        [[srcThMd(wk) + '(월) ~ ' + srcThMd(srcAddDays(wk, 4)) + '(금) 픽업/배달 · ', '#2f7a14'], [items.length + '가지', '#f76707']], true);
+                    const byDay = [0, 1, 2, 3, 4].map(i => ({ i, d: srcAddDays(wk, i), its: items.filter(it => it.d === srcAddDays(wk, i)) })).filter(g => g.its.length);
+                    // 두 줄로 나눈다 — 위에서부터 채워 상품 수가 반반에 가깝게
+                    const total = items.length; let acc = 0, cut = byDay.length;
+                    for (let k = 0; k < byDay.length; k++) { if (acc + byDay[k].its.length / 2 >= total / 2) { cut = k; break; } acc += byDay[k].its.length; }
+                    if (cut === 0) cut = 1; if (byDay.length > 1 && cut >= byDay.length) cut = byDay.length - 1;
+                    const cols = [byDay.slice(0, cut), byDay.slice(cut)].filter(a => a.length);
+                    const colW = cols.length === 2 ? 501 : 1020, top = 188, H = 862, gap = 14;
+                    const imgs = await Promise.all(items.map(it => srcThImg(it.imgs[it.imgAt])));
+                    cols.forEach((col, ci) => {
+                        const x0 = 30 + ci * (colW + 18), n = col.reduce((a, g) => a + g.its.length, 0), room = H - gap * (col.length - 1);
+                        let y = top;
+                        col.forEach(g => {
+                            const h = room * g.its.length / n;
+                            c.save(); c.shadowColor = 'rgba(0,0,0,.05)'; c.shadowOffsetY = 2; c.fillStyle = '#fff'; srcThRR(c, x0, y, colW, h, 20); c.fill(); c.restore();
+                            c.save(); srcThRR(c, x0, y, colW, h, 20); c.clip(); c.fillStyle = SRC_TH_DAYC[g.i][0]; c.fillRect(x0, y, 66, h); c.restore();
+                            c.fillStyle = '#fff'; c.textAlign = 'center';
+                            c.font = '900 34px ' + F; c.fillText(String(+g.d.slice(8)), x0 + 33, y + h / 2 + 4);
+                            c.font = '700 20px ' + F; c.fillText(SRC_TH_W[g.i], x0 + 33, y + h / 2 + 32); c.textAlign = 'left';
+                            const rh = (h - 12) / g.its.length;
+                            g.its.forEach((it, k) => {
+                                const ry = y + 6 + rh * k, cy = ry + rh / 2, lx = x0 + 66 + 12, rx = x0 + colW - 14;
+                                if (k) { c.save(); c.strokeStyle = '#eadfcd'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(lx, ry); c.lineTo(rx, ry); c.stroke(); c.restore(); }
+                                c.save(); srcThRR(c, lx, cy - 23, 46, 46, 10); c.clip(); srcThCover(c, imgs[items.indexOf(it)], lx, cy - 23, 46, 46, it.closed); if (it.closed) { c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(lx, cy - 23, 46, 46); } c.restore();
+                                let pw;
+                                if (it.closed) {
+                                    c.font = '800 18px ' + F; const t = '주문 마감', tw = c.measureText(t).width; pw = tw + 24;
+                                    srcThPill(c, rx - pw, cy - 15, pw, 30, '#8f8f8f'); c.fillStyle = '#fff'; c.fillText(t, rx - pw + 12, cy + 6);
+                                } else pw = srcThPrice(c, F, it.price, rx, cy + 8, 23, '#f76707', true);
+                                c.font = '600 21px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222';
+                                c.fillText(srcThFit(c, it.name, rx - pw - 12 - (lx + 58)), lx + 58, cy + 7);
+                            });
+                            y += h + gap;
+                        });
+                    });
+                    return cv;
+                }
+                async function srcThDrawDay(items, d, di) {
+                    const F = await srcThFonts(), cv = document.createElement('canvas'); cv.width = cv.height = 1080;
+                    const c = cv.getContext('2d'), [col, colD] = SRC_TH_DAYC[di];
+                    c.fillStyle = '#fff7ea'; c.fillRect(0, 0, 1080, 1080);
+                    const dt = new Date(d + 'T00:00:00');
+                    await srcThHeader(c, F, col, [[(dt.getMonth() + 1) + '월 ' + dt.getDate() + '일 ', '#fff'], ['(' + SRC_TH_W[di] + ')', '#ffe066']],
+                        [['픽업/배달 상품 · ', colD], [items.length + '가지', '#f76707']], false);
+                    const n = items.length, cols = n <= 4 ? 2 : n <= 9 ? 3 : 4, r = Math.ceil(n / cols), base = Math.floor(n / r), extra = n % r;
+                    const rows = Array.from({ length: r }, (_, k) => base + (k >= r - extra ? 1 : 0));
+                    const gap = 18, top = 188, H = 862, rowH = (H - gap * (r - 1)) / r, cw = (1020 - gap * (cols - 1)) / cols;
+                    const nf = cols === 2 ? 30 : cols === 3 ? 25 : 21, pf = cols === 2 ? 40 : cols === 3 ? 31 : 26, mf = Math.round(nf * .72);
+                    const txH = 12 + (mf * 1.35 + 8) + nf * 1.3 + pf * 1.15 + 12;
+                    const imgs = await Promise.all(items.map(it => srcThImg(it.imgs[it.imgAt])));
+                    let i = 0;
+                    rows.forEach((k, ri) => {
+                        const y = top + ri * (rowH + gap), rw = k * cw + (k - 1) * gap; let x = 30 + (1020 - rw) / 2;
+                        for (let j = 0; j < k; j++, i++) {
+                            const it = items[i], phH = rowH - txH;
+                            c.save(); c.shadowColor = 'rgba(0,0,0,.05)'; c.shadowOffsetY = 2; c.fillStyle = '#fff'; srcThRR(c, x, y, cw, rowH, 22); c.fill(); c.restore();
+                            c.save(); srcThRR(c, x, y, cw, rowH, 22); c.clip(); srcThCover(c, imgs[i], x, y, cw, phH, it.closed); c.restore();
+                            if (it.closed) {
+                                c.font = '900 ' + Math.round(pf * 1.05) + 'px ' + F; const t = '주문 마감', tw = c.measureText(t).width, ph = pf * 1.05 * 1.5, pw = tw + pf * 1.6;
+                                srcThPill(c, x + (cw - pw) / 2, y + phH / 2 - ph / 2, pw, ph, 'rgba(40,40,40,.72)');
+                                c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(t, x + cw / 2, y + phH / 2 + pf * .38); c.textAlign = 'left';
+                            }
+                            let ty = y + phH + 12, tx = x + 18, mw = cw - 36;
+                            if (it.mod) {
+                                c.font = '700 ' + mf + 'px ' + F; const m = srcThFit(c, it.mod, mw - 20), w = c.measureText(m).width + 20, h = mf * 1.35;
+                                srcThPill(c, tx, ty, w, h, it.closed ? '#eeeeee' : srcThMix(col, .13)); c.fillStyle = it.closed ? '#999' : colD; c.fillText(m, tx + 10, ty + h * .74);
+                            }
+                            ty += mf * 1.35 + 8;
+                            c.font = '700 ' + nf + 'px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222'; c.fillText(srcThFit(c, it.name, mw), tx, ty + nf);
+                            ty += nf * 1.3;
+                            const pw = srcThPrice(c, F, it.price, tx, ty + pf * .95, pf, it.closed ? '#b5b5b5' : '#f76707', false);
+                            if (it.closed && pw) { c.fillStyle = '#b5b5b5'; c.fillRect(tx, ty + pf * .6, pw, 3); }
+                            x += cw + gap;
+                        }
+                    });
+                    return cv;
+                }
+                function srcThMix(hex, a) {   // 색을 흰색에 a 만큼 섞는다
+                    const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255, m = v => Math.round(v * a + 255 * (1 - a));
+                    return 'rgb(' + m(r) + ',' + m(g) + ',' + m(b) + ')';
+                }
+                async function srcThMakeAll() {
+                    const T = gSrcTh, use = T.items.filter(it => it.on);
+                    if (!use.length) throw new Error('넣을 상품이 없어요');
+                    const toBlob = cv => new Promise((res, rej) => { try { cv.toBlob(b => b ? res(b) : rej(new Error('그림을 못 만들었어요')), 'image/png'); } catch (e) { rej(new Error('사진을 그림에 넣지 못했어요 (사진 서버 허락 문제)')); } });
+                    const out = [], wkTag = T.wk.replace(/-/g, '');
+                    const wb = await toBlob(await srcThDrawWeek(use, T.wk));
+                    out.push({ name: 'MOKET_한눈에_' + wkTag + '.png', blob: wb });
+                    for (let i = 0; i < 5; i++) {
+                        const d = srcAddDays(T.wk, i), its = use.filter(it => it.d === d); if (!its.length) continue;
+                        const dt = new Date(d + 'T00:00:00');
+                        out.push({ name: (dt.getMonth() + 1) + '월 ' + dt.getDate() + '일 (' + SRC_TH_W[i] + ') 픽업.png', blob: await toBlob(await srcThDrawDay(its, d, i)) });
+                    }
+                    out.forEach(m => { m.url = URL.createObjectURL(m.blob); });
+                    return out;
+                }
+                window.srcThumbOpen = srcThumbOpen;
                 async function srcUndirect(no, noAsk) {
                     const p = gSrc.direct[no]; if (!p) return;
                     if (!noAsk && !confirm(p.name + '\n판매 표시(' + p.date + ')를 지울까요?')) return;
