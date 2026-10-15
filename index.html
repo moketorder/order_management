@@ -21278,7 +21278,8 @@
                 selectType: g.selectType === 'multi' ? 'multi' : 'single',
                 // 여러 개 선택일 때만 의미 있는 값 (항목별 수량 선택 허용 여부)
                 allowQty: (g.selectType === 'multi') && (g.allowQty === true || g.allowQty === 'true'),
-                items: (g.items || [])
+                ...((g.sortBy === 'price' || g.sortBy === 'name') ? { sortBy: g.sortBy } : {}),   // [신규 2026-10-15] 정렬 체크
+                items: gSortOptItems(g.items || [], g.sortBy)
                     .filter(it => String(it.name || "").trim() !== "")
                     .map(it => {
                         const row = { name: String(it.name).trim(), price: parseInt(it.price) || 0 };
@@ -21606,6 +21607,23 @@
             renderDetailOptionBody();
         }
 
+        /* [신규 2026-10-15] 옵션 항목 정렬 (사장님 요청) — 금액순(싼 것부터, 같으면 가나다) · 가나다순. 둘 중 하나만.
+           체크해 두면 그룹에 sortBy 로 남아 저장할 때마다 그 순서로 맞춘다 (빈 항목은 맨 아래). 옵션 수량 기록은 이름으로 세므로 순서가 바뀌어도 괜찮다 */
+        function gSortOptItems(items, by) {
+            if (by !== 'price' && by !== 'name') return items;
+            const nm = it => String(it.name || '').trim();
+            const byName = (a, b) => nm(a).localeCompare(nm(b), 'ko', { numeric: true });
+            return items.slice().sort((a, b) => (!nm(a) - !nm(b)) || (by === 'price' ? ((parseInt(a.price) || 0) - (parseInt(b.price) || 0)) || byName(a, b) : byName(a, b)));
+        }
+        function setDetailOptionSort(gi, by, on) {
+            syncDetailOptionDraft();
+            if (!optionModalDraft || !optionModalDraft.groups[gi]) return;
+            const g = optionModalDraft.groups[gi];
+            g.sortBy = on ? by : '';
+            if (on) g.items = gSortOptItems(g.items || [], by);
+            renderDetailOptionBody();
+        }
+
         function addDetailOptionItem(gi) {
             syncDetailOptionDraft();
             if (!optionModalDraft || !optionModalDraft.groups[gi]) return;
@@ -21689,6 +21707,12 @@
                     <!-- [수정] 항목마다 금액에 더해 남은 수량도 적을 수 있게 했다.
                          수량이 정해진 상품(빵처럼 종류별로 몇 개씩만 되는 것)을 다루려면 필요하다.
                          칸 이름을 머리글로 달아 어느 칸이 무엇인지 보이게 한다. -->
+                    ${/* [신규 2026-10-15] 항목 정렬 (사장님 요청) — 체크해 두면 저장할 때도 그 순서로 맞춘다 */''}
+                    <div style="display: flex; gap: 14px; align-items: center; font-size: 12px; font-weight: 800; color: var(--text-sub); margin-bottom: 8px;">
+                        <span>정렬</span>
+                        <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer; margin: 0;"><input type="checkbox" ${g.sortBy === 'price' ? 'checked' : ''} onchange="setDetailOptionSort(${gi}, 'price', this.checked)" style="position: static; opacity: 1; display: inline-block; appearance: auto; -webkit-appearance: checkbox; pointer-events: auto; width: 16px; height: 16px; margin: 0; accent-color: #7c3aed;">금액순 (싼 것부터)</label>
+                        <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer; margin: 0;"><input type="checkbox" ${g.sortBy === 'name' ? 'checked' : ''} onchange="setDetailOptionSort(${gi}, 'name', this.checked)" style="position: static; opacity: 1; display: inline-block; appearance: auto; -webkit-appearance: checkbox; pointer-events: auto; width: 16px; height: 16px; margin: 0; accent-color: #7c3aed;">가나다순</label>
+                    </div>
                     <div class="opt-item-head" style="display: flex; gap: 6px; align-items: center; font-size: 11px; font-weight: 800; color: var(--text-sub); margin-bottom: 6px;">
                         <span style="flex: 1 1 auto;">선택 항목</span>
                         <span style="flex: 0 0 84px; text-align: right;">금액</span>
