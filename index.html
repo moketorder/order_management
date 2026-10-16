@@ -5422,6 +5422,9 @@
                             if (!closedWhy && ex && now >= ex && ex > new Date(srcAddDays(d, -6) + 'T00:00:00').getTime()) closedWhy = '마감 시각 지남';
                             if (!closedWhy && prod.date === d && typeof salesRealStock === 'function') { const st = salesRealStock(prod); if (st === 0) closedWhy = '재고 0'; }
                         }
+                        // [신규 2026-10-16] 주문 마감이 일요일인 상품 — 그림에 '일요일 오후 6시 마감'을 빨갛게 (사장님 요청)
+                        let sun = '';
+                        if (prod) { const ex = Number(prod.expireAt) || 0; if (ex && ex > new Date(srcAddDays(d, -7) + 'T00:00:00').getTime() && new Date(ex).getDay() === 0) sun = srcThSunText(new Date(ex)); }
                         const sv = (saved || {})[key] || {};
                         const imgs = (prod && Array.isArray(prod.images) ? prod.images : []).filter(Boolean);
                         items.push({
@@ -5430,10 +5433,14 @@
                             mod: sv.m != null ? sv.m : srcThModFrom(band && band.ds, prod && prod.name),
                             price: sv.p || (price ? srcThWon(price) + (from ? '~' : '') : ''),
                             imgs, imgAt: Math.min(+sv.i || 0, Math.max(0, imgs.length - 1)),
-                            closed: !!closedWhy, closedWhy, on: true
+                            closed: !!closedWhy, closedWhy, on: true, sun, sunOn: !!sun
                         });
                     });
                     return items;
+                }
+                function srcThSunText(t) {   // '일요일 오후 6시 마감'
+                    const h = t.getHours(), m = t.getMinutes();
+                    return '일요일 ' + (h < 12 ? '오전 ' : '오후 ') + (h % 12 || 12) + '시' + (m ? ' ' + m + '분' : '') + ' 마감';
                 }
                 async function srcThumbOpen(wk) {
                     if (!wk) wk = srcAddDays(srcMonday(srcToday()), 7);   // 처음엔 다음 주
@@ -5463,7 +5470,8 @@
                                 '<img data-act="img" src="' + srcEsc(it.imgs[it.imgAt] || '') + '" title="' + (it.imgs.length > 1 ? '눌러서 다음 사진 (' + (it.imgAt + 1) + '/' + it.imgs.length + ')' : '') + '">' +
                                 '<div class="f"><input data-f="mod" value="' + srcEsc(it.mod) + '" placeholder="수식어"><input data-f="name" value="' + srcEsc(it.name) + '" placeholder="이름"></div>' +
                                 '<input data-f="price" class="pr" value="' + srcEsc(it.price) + '" placeholder="가격">' +
-                                '<label class="cl" title="' + srcEsc(it.closedWhy || '직접 켜기') + '"><input type="checkbox" data-f="closed"' + (it.closed ? ' checked' : '') + '>마감</label></div>').join('') + '</div>';
+                                '<label class="cl" title="' + srcEsc(it.closedWhy || '직접 켜기') + '"><input type="checkbox" data-f="closed"' + (it.closed ? ' checked' : '') + '>마감</label>' +
+                                (it.sun ? '<label class="cl sun" title="' + srcEsc(it.sun) + ' — 그림에 빨갛게 넣기"><input type="checkbox" data-f="sunOn"' + (it.sunOn ? ' checked' : '') + '>일 마감</label>' : '') + '</div>').join('') + '</div>';
                         });
                         h += '<div class="go"><button type="button" data-act="make" class="pri">🖼 6장 만들기</button></div>';
                     }
@@ -5479,6 +5487,7 @@
                 function srcThInput(e) {
                     const el = e.target, f = el.dataset && el.dataset.f, row = el.closest && el.closest('.it'); if (!f || !row || !gSrcTh) return;
                     const it = gSrcTh.items[+row.dataset.j]; if (!it) return;
+                    if (f === 'sunOn') { if (e.type === 'change') it.sunOn = el.checked; return; }
                     if (f === 'on' || f === 'closed') { if (e.type !== 'change') return; it[f] = el.checked; row.classList.toggle(f === 'on' ? 'off' : 'x', f === 'on' ? !el.checked : el.checked); return; }
                     it[f] = el.value;
                     clearTimeout(_srcThSaveT[it.key]); _srcThSaveT[it.key] = setTimeout(() => srcThSave(it), 700);
@@ -5526,7 +5535,7 @@
                         '#src-th .it img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;cursor:pointer;background:#f1f5f9}#src-th .it.x img{filter:grayscale(1)}' +
                         '#src-th .it .f{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}#src-th .it input:not([type]){border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:13px;width:100%;box-sizing:border-box;font-family:inherit}' +
                         '#src-th .it input[data-f=mod]{color:#2f7a14;font-size:12px}#src-th .it .pr{width:84px !important;flex:none;text-align:right;font-weight:800;color:#f76707}' +
-                        '#src-th .cl{font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:2px;color:#64748b}#src-th .it.x .cl{color:#dc2626;font-weight:800}' +
+                        '#src-th .cl{font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:2px;color:#64748b}#src-th .it.x .cl{color:#dc2626;font-weight:800}#src-th .cl.sun{color:#e03131;font-weight:800}' +
                         '#src-th .go{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}#src-th .go button{border:1px solid #cbd5e1;background:#fff;border-radius:10px;padding:10px 18px;font-weight:800;font-size:15px;cursor:pointer}#src-th .go .pri{background:#47a823;border-color:#47a823;color:#fff}' +
                         '#src-th .out{margin-top:16px;border-top:1px solid #e5e7eb;padding-top:8px}#src-th .out .g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}#src-th .out a{display:block;text-decoration:none;color:#334155;font-size:11px;text-align:center}#src-th .out img{width:100%;border-radius:8px;display:block;box-shadow:0 1px 3px rgba(0,0,0,.15)}' +
                         '@media(max-width:560px){#src-th{padding:0}#src-th .in{border-radius:0;min-height:100%}#src-th .out .g{grid-template-columns:repeat(2,1fr)}#src-th .it .pr{width:70px !important}}';
@@ -5599,20 +5608,35 @@
                     const cols = [byDay.slice(0, cut), byDay.slice(cut)].filter(a => a.length);
                     const colW = cols.length === 2 ? 501 : 1020, top = 188, H = 862, gap = 14;
                     const imgs = await Promise.all(items.map(it => srcThImg(it.imgs[it.imgAt])));
+                    /* [수정 2026-10-16] 일요일 마감은 한 묶음 — 묶음 위에 빨간 머리말 '일요일 오후 6시 마감'을 가로로 한 번, 묶음 줄은 옅은 빨강 바탕 + 빨간 테두리.
+                       머리말 높이만큼 그 요일 칸을 위로 늘린다(왼쪽 날짜 칸도 같이). 가격 줄은 다른 요일과 같은 자리 (사장님 요청 — 오른쪽 세로 띠는 줄이 안 맞았다) */
+                    const sunOf = it => (!it.closed && it.sun && it.sunOn) ? it.sun : '', HEAD = 36;
+                    const runsOf = g => { const runs = []; g.its.forEach((it, k) => { const s = sunOf(it); if (!s) return; const r = runs[runs.length - 1]; if (r && r.s === s && r.b === k - 1) r.b = k; else runs.push({ s, a: k, b: k }); }); return runs; };
                     cols.forEach((col, ci) => {
-                        const x0 = 30 + ci * (colW + 18), n = col.reduce((a, g) => a + g.its.length, 0), room = H - gap * (col.length - 1);
+                        const x0 = 30 + ci * (colW + 18), gs = col.map(g => ({ g, runs: runsOf(g) }));
+                        const heads = gs.reduce((a, o) => a + o.runs.length, 0), nRows = col.reduce((a, g) => a + g.its.length, 0);
+                        const rh = (H - gap * (col.length - 1) - 12 * col.length - HEAD * heads) / nRows;   // 줄 높이는 칸마다 같게
                         let y = top;
-                        col.forEach(g => {
-                            const h = room * g.its.length / n;
+                        gs.forEach(({ g, runs }) => {
+                            const h = 12 + rh * g.its.length + HEAD * runs.length;
                             c.save(); c.shadowColor = 'rgba(0,0,0,.05)'; c.shadowOffsetY = 2; c.fillStyle = '#fff'; srcThRR(c, x0, y, colW, h, 20); c.fill(); c.restore();
                             c.save(); srcThRR(c, x0, y, colW, h, 20); c.clip(); c.fillStyle = SRC_TH_DAYC[g.i][0]; c.fillRect(x0, y, 66, h); c.restore();
                             c.fillStyle = '#fff'; c.textAlign = 'center';
                             c.font = '900 34px ' + F; c.fillText(String(+g.d.slice(8)), x0 + 33, y + h / 2 + 4);
                             c.font = '700 20px ' + F; c.fillText(SRC_TH_W[g.i], x0 + 33, y + h / 2 + 32); c.textAlign = 'left';
-                            const rh = (h - 12) / g.its.length;
+                            // 줄마다 윗변 위치 (머리말 자리를 비운다)
+                            const rowY = []; let yy = y + 6;
+                            g.its.forEach((it, k) => { const r = runs.find(r2 => r2.a === k); if (r) { r.hy = yy; yy += HEAD; } rowY[k] = yy; yy += rh; });
+                            runs.forEach(r => {
+                                const bx = x0 + 66 + 4, bw = colW - 66 - 8, by = r.hy, bh = rowY[r.b] + rh - r.hy;
+                                c.fillStyle = '#fff1f1'; srcThRR(c, bx, by, bw, bh, 12); c.fill();
+                                c.save(); c.strokeStyle = '#e03131'; c.lineWidth = 3; srcThRR(c, bx, by, bw, bh, 12); c.stroke(); c.restore();
+                                c.save(); srcThRR(c, bx, by, bw, bh, 12); c.clip(); c.fillStyle = '#e03131'; c.fillRect(bx, by, bw, HEAD - 4); c.restore();
+                                c.font = '900 19px ' + F; c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(r.s, bx + bw / 2, by + (HEAD - 4) / 2 + 7); c.textAlign = 'left';
+                            });
                             g.its.forEach((it, k) => {
-                                const ry = y + 6 + rh * k, cy = ry + rh / 2, lx = x0 + 66 + 12, rx = x0 + colW - 14;
-                                if (k) { c.save(); c.strokeStyle = '#eadfcd'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(lx, ry); c.lineTo(rx, ry); c.stroke(); c.restore(); }
+                                const ry = rowY[k], cy = ry + rh / 2, lx = x0 + 66 + 12, rx = x0 + colW - 14;
+                                if (k && !runs.some(r => r.a === k)) { c.save(); c.strokeStyle = '#eadfcd'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(lx, ry); c.lineTo(rx, ry); c.stroke(); c.restore(); }
                                 c.save(); srcThRR(c, lx, cy - 23, 46, 46, 10); c.clip(); srcThCover(c, imgs[items.indexOf(it)], lx, cy - 23, 46, 46, it.closed); if (it.closed) { c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(lx, cy - 23, 46, 46); } c.restore();
                                 let pw;
                                 if (it.closed) {
@@ -5627,6 +5651,21 @@
                     });
                     return cv;
                 }
+                // [신규 2026-10-16] 세로 빨간 띠 + 글자 (일요일 마감 묶음). 칸이 낮으면 눕혀 쓴다
+                function srcThVLabel(c, F, bx, by, bw, bh, s, fz) {
+                    c.fillStyle = '#e03131'; srcThRR(c, bx, by, bw, bh, Math.min(14, bw / 2)); c.fill();
+                    const chars = [...s], lh = Math.round(fz * 1.12), sp = Math.round(fz * .4), tot = chars.reduce((a, ch) => a + (ch === ' ' ? sp : lh), 0);
+                    c.fillStyle = '#fff'; c.textAlign = 'center';
+                    if (tot <= bh - 20) {
+                        let yy = by + (bh - tot) / 2 + fz * .88; c.font = '900 ' + fz + 'px ' + F;
+                        chars.forEach(ch => { if (ch === ' ') { yy += sp; return; } c.fillText(ch, bx + bw / 2, yy); yy += lh; });
+                    } else {
+                        c.save(); c.translate(bx + bw / 2, by + bh / 2); c.rotate(-Math.PI / 2);
+                        let f2 = fz; c.font = '900 ' + f2 + 'px ' + F; while (f2 > 10 && c.measureText(s).width > bh - 16) { f2--; c.font = '900 ' + f2 + 'px ' + F; }
+                        c.fillText(s, 0, f2 * .36); c.restore();
+                    }
+                    c.textAlign = 'left';
+                }
                 async function srcThDrawDay(items, d, di) {
                     const F = await srcThFonts(), cv = document.createElement('canvas'); cv.width = cv.height = 1080;
                     const c = cv.getContext('2d'), [col, colD] = SRC_TH_DAYC[di];
@@ -5634,19 +5673,45 @@
                     const dt = new Date(d + 'T00:00:00');
                     await srcThHeader(c, F, col, [[(dt.getMonth() + 1) + '월 ' + dt.getDate() + '일 ', '#fff'], ['(' + SRC_TH_W[di] + ')', '#ffe066']],
                         [['픽업/배달 상품 · ', colD], [items.length + '가지', '#f76707']], false);
-                    const n = items.length, cols = n <= 4 ? 2 : n <= 9 ? 3 : 4, r = Math.ceil(n / cols), base = Math.floor(n / r), extra = n % r;
-                    const rows = Array.from({ length: r }, (_, k) => base + (k >= r - extra ? 1 : 0));
-                    const gap = 18, top = 188, H = 862, rowH = (H - gap * (r - 1)) / r, cw = (1020 - gap * (cols - 1)) / cols;
-                    const nf = cols === 2 ? 30 : cols === 3 ? 25 : 21, pf = cols === 2 ? 40 : cols === 3 ? 31 : 26, mf = Math.round(nf * .72);
-                    const txH = 12 + (mf * 1.35 + 8) + nf * 1.3 + pf * 1.15 + 12;
+                    /* [수정 2026-10-16] 일요일 마감 상품은 한 묶음 — 옅은 빨강 판 위에 모으고 왼쪽 세로 빨간 띠에 '일요일 오후 6시 마감' 한 번만 (사장님 요청)
+                       묶음(같은 마감 글)마다 줄을 따로 잡는다. 전체 줄 수는 예전과 같게 두고 상품 수에 맞춰 묶음마다 나눈다 */
+                    const n = items.length, cols0 = n <= 4 ? 2 : n <= 9 ? 3 : 4, R = Math.max(1, Math.ceil(n / cols0));
+                    const secs = [];
+                    items.forEach(it => { const s = (!it.closed && it.sun && it.sunOn) ? it.sun : ''; const last = secs[secs.length - 1]; if (last && last.s === s) last.its.push(it); else secs.push({ s, its: [it] }); });
+                    let left = R; secs.forEach((sc, k) => { const rest = secs.length - k - 1; sc.r = Math.max(1, Math.min(left - rest, Math.round(R * sc.its.length / n))); left -= sc.r; });
+                    if (left > 0) secs[secs.length - 1].r += left;
+                    const rowsAll = [];   // { sec, its: [...] }
+                    secs.forEach(sc => { const r = Math.min(sc.r, sc.its.length), base = Math.floor(sc.its.length / r), ex = sc.its.length % r; let at = 0; sc.r = r; for (let k = 0; k < r; k++) { const m = base + (k >= r - ex ? 1 : 0); rowsAll.push({ sec: sc, its: sc.its.slice(at, at + m) }); at += m; } });
+                    /* [수정 2026-10-16] 묶음 위에 빨간 머리말 '일요일 오후 6시 마감'을 가로로 (왼쪽 세로 띠는 뺐다 — 다른 줄과 카드 줄이 맞게, 사장님 요청)
+                       머리말 자리(HB + 4)만큼 줄 높이에서 덜어 낸다 */
+                    const gap = 18, top = 188, H = 862, Rn = rowsAll.length, HB = 46, EX = HB + 4;
+                    const nHead = secs.filter(sc => sc.s).length, rowH = (H - gap * (Rn - 1) - EX * nHead) / Rn;
                     const imgs = await Promise.all(items.map(it => srcThImg(it.imgs[it.imgAt])));
-                    let i = 0;
-                    rows.forEach((k, ri) => {
-                        const y = top + ri * (rowH + gap), rw = k * cw + (k - 1) * gap; let x = 30 + (1020 - rw) / 2;
-                        for (let j = 0; j < k; j++, i++) {
-                            const it = items[i], phH = rowH - txH;
+                    // 묶음 판과 머리말 먼저 · 줄마다 윗변 위치
+                    let yy = top; const rowYs = [];
+                    secs.forEach(sc => {
+                        const h = sc.r * rowH + (sc.r - 1) * gap, ry0 = yy + (sc.s ? EX : 0);
+                        if (sc.s) {
+                            const px = 22, pw = 1036, py = yy - 6, ph = EX + h + 14;
+                            c.fillStyle = '#ffe3e3'; srcThRR(c, px, py, pw, ph, 26); c.fill();
+                            c.save(); srcThRR(c, px, py, pw, ph, 26); c.clip(); c.fillStyle = '#e03131'; c.fillRect(px, py, pw, HB); c.restore();
+                            c.save(); c.strokeStyle = '#e03131'; c.lineWidth = 4; srcThRR(c, px, py, pw, ph, 26); c.stroke(); c.restore();   // 묶음 빨간 테두리 (사장님 요청)
+                            c.font = '900 28px ' + F; c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(sc.s, 540, py + HB / 2 + 10); c.textAlign = 'left';
+                        }
+                        for (let k = 0; k < sc.r; k++) rowYs.push(ry0 + k * (rowH + gap));
+                        yy = ry0 + h + gap;
+                    });
+                    rowsAll.forEach((row, ri) => {
+                        const y = rowYs[ri], k = row.its.length, lx = 30, aw = 1020;
+                        const maxK = Math.max(...rowsAll.filter(r2 => r2.sec === row.sec).map(r2 => r2.its.length));
+                        const cw = (aw - gap * (maxK - 1)) / maxK, rw = k * cw + (k - 1) * gap;
+                        const nf = cw >= 450 ? 30 : cw >= 290 ? 25 : 21, pf = cw >= 450 ? 40 : cw >= 290 ? 31 : 26, mf = Math.round(nf * .72);
+                        const txH = 12 + (mf * 1.35 + 8) + nf * 1.3 + pf * 1.15 + 12;
+                        let x = lx + (aw - rw) / 2;
+                        row.its.forEach(it => {
+                            const phH = rowH - txH, ii = items.indexOf(it);
                             c.save(); c.shadowColor = 'rgba(0,0,0,.05)'; c.shadowOffsetY = 2; c.fillStyle = '#fff'; srcThRR(c, x, y, cw, rowH, 22); c.fill(); c.restore();
-                            c.save(); srcThRR(c, x, y, cw, rowH, 22); c.clip(); srcThCover(c, imgs[i], x, y, cw, phH, it.closed); c.restore();
+                            c.save(); srcThRR(c, x, y, cw, rowH, 22); c.clip(); srcThCover(c, imgs[ii], x, y, cw, phH, it.closed); c.restore();
                             if (it.closed) {
                                 c.font = '900 ' + Math.round(pf * 1.05) + 'px ' + F; const t = '주문 마감', tw = c.measureText(t).width, ph = pf * 1.05 * 1.5, pw = tw + pf * 1.6;
                                 srcThPill(c, x + (cw - pw) / 2, y + phH / 2 - ph / 2, pw, ph, 'rgba(40,40,40,.72)');
@@ -5663,7 +5728,7 @@
                             const pw = srcThPrice(c, F, it.price, tx, ty + pf * .95, pf, it.closed ? '#b5b5b5' : '#f76707', false);
                             if (it.closed && pw) { c.fillStyle = '#b5b5b5'; c.fillRect(tx, ty + pf * .6, pw, 3); }
                             x += cw + gap;
-                        }
+                        });
                     });
                     return cv;
                 }
@@ -5672,7 +5737,9 @@
                     return 'rgb(' + m(r) + ',' + m(g) + ',' + m(b) + ')';
                 }
                 async function srcThMakeAll() {
-                    const T = gSrcTh, use = T.items.filter(it => it.on);
+                    const T = gSrcTh, sunFirst = it => (!it.closed && it.sun && it.sunOn) ? 0 : 1;
+                    // [신규 2026-10-16] 요일 안에서 일요일 마감 상품끼리 맨 앞에 묶는다 (사장님 요청)
+                    const use = T.items.filter(it => it.on).map((it, k) => [it, k]).sort((a, b) => a[0].d.localeCompare(b[0].d) || sunFirst(a[0]) - sunFirst(b[0]) || a[1] - b[1]).map(x => x[0]);
                     if (!use.length) throw new Error('넣을 상품이 없어요');
                     const toBlob = cv => new Promise((res, rej) => { try { cv.toBlob(b => b ? res(b) : rej(new Error('그림을 못 만들었어요')), 'image/png'); } catch (e) { rej(new Error('사진을 그림에 넣지 못했어요 (사진 서버 허락 문제)')); } });
                     const out = [], wkTag = T.wk.replace(/-/g, '');
