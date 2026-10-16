@@ -5455,7 +5455,7 @@
                             name: sv.n || srcThShort([p.disp, p.name, prod && prod.name]),
                             // [수정 2026-10-16] 수식어 = 섬네일 창에서 고친 것 → 상품등록 수식어(nameLead) → 밴드 설명글 (사장님 요청 — 상품등록 수식어가 안 나왔다)
                             mod: sv.m != null ? sv.m : (String((prod && prod.nameLead) || '').replace(/\s+/g, ' ').trim() || (r[0] === 'sada' ? '' : srcThModFrom(band && band.ds, prod && prod.name))),
-                            price: sv.p || (price ? srcThWon(price) + (from ? '~' : '') : ''),
+                            price: price ? srcThWon(price) + (from ? '~' : '') : '',   // [수정 2026-10-16] 가격은 고치지 않고 늘 상품등록 가격 (사장님 요청)
                             imgs, imgAt: Math.min(+sv.i || 0, Math.max(0, imgs.length - 1)),
                             closed: !!closedWhy, closedWhy, on: true, sun, sunOn: !!sun, early, dlT
                         });
@@ -5550,7 +5550,7 @@
                     let h = '<div class="wk"><b>' + T.days.map(d => srcThMd(d) + '(' + dw(d) + ')').join(' · ') + '</b></div>';
                     if (!T.items.length) h += '<div class="k">고른 날짜에 달력에 넣은 상품이 없어요</div>';
                     else {
-                        h += '<div class="k">이름·수식어·가격은 고치면 저장돼 다음에도 써요 · 사진을 누르면 다음 사진 · 마감은 저절로 켜지고 직접 바꿀 수도 있어요</div>';
+                        h += '<div class="k">이름·수식어는 고치면 저장돼 다음에도 써요 · 가격은 늘 상품등록 가격 · 사진을 누르면 다음 사진 · 주문마감은 저절로 켜지고 직접 바꿀 수도 있어요</div>';
                         T.days.forEach(d => {
                             const i = srcThDi(d), its = T.items.map((it, j) => [it, j]).filter(([it]) => it.d === d);
                             if (!its.length) return;
@@ -5559,9 +5559,9 @@
                                 '<input type="checkbox" data-f="on" title="넣기"' + (it.on ? ' checked' : '') + '>' +
                                 '<img data-act="img" src="' + srcEsc(it.imgs[it.imgAt] || '') + '" title="' + (it.imgs.length > 1 ? '눌러서 다음 사진 (' + (it.imgAt + 1) + '/' + it.imgs.length + ')' : '') + '">' +
                                 '<div class="f"><input data-f="mod" value="' + srcEsc(it.mod) + '" placeholder="수식어"><input data-f="name" value="' + srcEsc(it.name) + '" placeholder="이름"></div>' +
-                                '<input data-f="price" class="pr" value="' + srcEsc(it.price) + '" placeholder="가격">' +
-                                '<label class="cl" title="' + srcEsc(it.closedWhy || '직접 켜기') + '"><input type="checkbox" data-f="closed"' + (it.closed ? ' checked' : '') + '>주문마감</label>' +
-                                (it.sun ? '<label class="cl sun" title="' + srcEsc(it.sun) + ' — 그림에 빨갛게 넣기"><input type="checkbox" data-f="sunOn"' + (it.sunOn ? ' checked' : '') + '>일요일 주문마감</label>' : '') + '</div>').join('') + '</div>';
+                                '<span class="pr" title="상품등록 가격 (여기서는 못 고쳐요)">' + srcEsc(it.price ? it.price.replace('~', '') + '원' + (it.price.includes('~') ? '~' : '') : '가격 없음') + '</span>' +
+                                '<div class="ck"><label class="cl" title="' + srcEsc(it.closedWhy || '직접 켜기') + '"><input type="checkbox" data-f="closed"' + (it.closed ? ' checked' : '') + '>주문마감</label>' +
+                                (it.sun ? '<label class="cl sun" title="' + srcEsc(it.sun) + ' — 그림에 빨갛게 넣기"><input type="checkbox" data-f="sunOn"' + (it.sunOn ? ' checked' : '') + '>일요일 주문마감</label>' : '') + '</div></div>').join('') + '</div>';   // [수정 2026-10-16] 체크 칸은 오른쪽 고정 너비 · 일요일 주문마감은 주문마감 밑 (줄 맞춤, 사장님 요청)
                         });
                         h += '<div class="go"><button type="button" data-act="make" class="pri">🖼 6장 만들기</button></div>';
                     }
@@ -5583,7 +5583,7 @@
                     clearTimeout(_srcThSaveT[it.key]); _srcThSaveT[it.key] = setTimeout(() => srcThSave(it), 700);
                 }
                 async function srcThSave(it) {
-                    try { await srcPut('thumb/' + it.key, { n: it.name, m: it.mod, p: it.price, i: it.imgAt || 0, at: new Date().toISOString() }); }
+                    try { await srcPut('thumb/' + it.key, { n: it.name, m: it.mod, i: it.imgAt || 0, at: new Date().toISOString() }); }
                     catch (e) { showToast('저장 못 했어요: ' + e.message); }
                 }
                 async function srcThClick(e) {
@@ -5624,8 +5624,8 @@
                         '#src-th .it{display:flex;align-items:center;gap:8px;padding:6px 8px;border-top:1px solid #f1f5f9}#src-th .it.off{opacity:.4}' +
                         '#src-th .it img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none;cursor:pointer;background:#f1f5f9}#src-th .it.x img{filter:grayscale(1)}' +
                         '#src-th .it .f{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}#src-th .it input:not([type]){border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:13px;width:100%;box-sizing:border-box;font-family:inherit}' +
-                        '#src-th .it input[data-f=mod]{color:#2f7a14;font-size:12px}#src-th .it .pr{width:84px !important;flex:none;text-align:right;font-weight:800;color:#f76707}' +
-                        '#src-th .cl{font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:2px;color:#64748b}#src-th .it.x .cl{color:#dc2626;font-weight:800}#src-th .cl.sun{color:#e03131;font-weight:800}' +
+                        '#src-th .it input[data-f=mod]{color:#2f7a14;font-size:12px}#src-th .it .pr{display:inline-block;font-size:14px;width:84px !important;flex:none;text-align:right;font-weight:800;color:#f76707}' +
+                        '#src-th .cl{font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:2px;color:#64748b}#src-th .it.x .cl{color:#dc2626;font-weight:800}#src-th .cl.sun{color:#e03131;font-weight:800}#src-th .ck{flex:0 0 112px;display:flex;flex-direction:column;gap:3px}' +
                         '#src-th .go{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}#src-th .go button{border:1px solid #cbd5e1;background:#fff;border-radius:10px;padding:10px 18px;font-weight:800;font-size:15px;cursor:pointer}#src-th .go .pri{background:#47a823;border-color:#47a823;color:#fff}' +
                         '#src-th .out{margin-top:16px;border-top:1px solid #e5e7eb;padding-top:8px}#src-th .out .g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}#src-th .out a{display:block;text-decoration:none;color:#334155;font-size:11px;text-align:center}#src-th .out img{width:100%;border-radius:8px;display:block;box-shadow:0 1px 3px rgba(0,0,0,.15)}' +
 '#purchase-section-sourcing .src-cal-day{cursor:pointer}#purchase-section-sourcing .src-cal-day.thsel{box-shadow:inset 0 0 0 3px #7048e8;background:#f3f0ff !important}#purchase-section-sourcing .src-cal-day.thsel .n{color:#fff !important;background:#7048e8;border-radius:999px;padding:0 6px}' +
