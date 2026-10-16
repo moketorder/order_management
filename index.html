@@ -12169,6 +12169,25 @@
                     return;
                 }
 
+                /* [신규 2026-10-16] 신선식품인데 받는 날이 입고일과 다른 주문이 있으면 목록 맨 위에 빨간 띠 (날짜 탭과 상관없이 전체에서 찾는다).
+                   손님 이름을 누르면 검색칸에 넣어 그 손님 카드만 보여 준다 */
+                try {
+                    const _drift = (rawOrders || []).filter(o => gFreshDrift(o));
+                    if (_drift.length) {
+                        const _who = [...new Set(_drift.map(o => String(o.name || o.phone || '')))].filter(Boolean);
+                        const bar = document.createElement('div');
+                        bar.style.cssText = 'display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 12px; padding:10px 12px; border:1.5px solid #fca5a5; background:#fef2f2; border-radius:10px; color:#b91c1c; font-size:13px; font-weight:800;';
+                        bar.innerHTML = `<span>⚠️ 신선식품 날짜가 밀린 주문 ${_drift.length}건 · 입고일과 받는 날이 달라요</span>`
+                            + _who.map(n => `<button type="button" data-who="${escapeAttrValue(n)}" style="padding:4px 10px; border:1.5px solid #f87171; background:#fff; color:#b91c1c; border-radius:7px; font-size:12px; font-weight:800; cursor:pointer;">${gEscapeHtml(n)}</button>`).join('');
+                        bar.addEventListener('click', e => {
+                            const b = e.target.closest('button[data-who]'); if (!b) return;
+                            const s = document.getElementById('searchInput'); if (s) s.value = b.dataset.who;
+                            renderFilteredOrders();
+                        });
+                        listContainer.appendChild(bar);
+                    }
+                } catch (e) { console.warn('신선 날짜 경고 띠 실패:', e); }
+
                 let lastDateHeader = null;
 
                 /* [성능] 카드마다 rawOrders(3천여 줄)를 통째로 훑던 두 가지를 미리 한 번에 세어 둔다.
@@ -12308,7 +12327,7 @@
                                         <span class="custom-checkbox"></span>
                                     </label>
                                 </td>
-                                <td class="item-name-cell">${gEscapeHtml(it.item)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${gShopNoteAdm(it)}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</td>
+                                <td class="item-name-cell">${gEscapeHtml(it.item)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${gShopNoteAdm(it)}${gFreshDriftBadge(it)}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</td>
                                 <td style="width:70px;"><strong class="${qtyClass}">${qtyNum}</strong>개</td>
                                 <td style="width:100px;">${parseInt(it.price || 0).toLocaleString()}원</td>
                                 <td style="width:100px;"><strong>${parseInt(it.total || 0).toLocaleString()}원</strong></td>
@@ -12326,7 +12345,7 @@
                                         <input type="checkbox" class="item-checkbox" data-phone="${customer.phone}" data-key="${it.orderKey}" ${selectedItems.has(customer.phone + "|" + it.orderKey) ? 'checked' : ''} onchange="handleItemSelect(this)">
                                         <span class="custom-checkbox"></span>
                                     </label>
-                                    <span class="mobile-item-name">${gEscapeHtml(it.item)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${gShopNoteAdm(it)}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</span>
+                                    <span class="mobile-item-name">${gEscapeHtml(it.item)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${gShopNoteAdm(it)}${gFreshDriftBadge(it)}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</span>
                                     <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${escapeArg(customer.phone)}', '${escapeArg(it.orderKey)}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
                                 </div>
                                 <div class="mobile-item-middle">
@@ -13091,6 +13110,61 @@
             }
             const allSelected = currentItems.every(it => selectedItems.has(it.phone + "|" + it.orderKey));
             selectAllCb.checked = allSelected;
+        }
+
+        /* ===== [신규 2026-10-16] 신선식품 날짜 밀림 경고 (사장님 요청 — 10/15 신선 김치가 10/16으로 잡혀 입고에서 빠진 일) =====
+           주문서가 주문 줄마다 상품의 원래 입고일(prodDate)과 신선 여부(isFresh)를 남긴다. 받는 날(pickupDate)이 그와 다르면 경고.
+           상품의 '지금' 날짜와 견주지 않으므로 매주 다시 올리는 상품도 섞이지 않는다. prodDate 없는 옛 주문은 보지 않는다. */
+        function gFreshDrift(o) {
+            if (!o || !(o.isFresh === true || o.isFresh === 'true')) return null;
+            const prod = String(o.prodDate || '').trim();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(prod)) return null;
+            if (isSalesCanceled(o) || o.received === true || o.received === 'true' || o.delivered === true || o.delivered === 'true') return null;
+            const info = getOrderDateInfo(o);
+            const pick = String((info && info.dateStr) || '');
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(pick) || pick === prod) return null;
+            return { prod, pick };
+        }
+        function gFreshDriftBadge(o) {
+            const d = gFreshDrift(o);
+            if (!d) return '';
+            const md = s => `${Number(s.slice(5, 7))}/${Number(s.slice(8))}`;
+            return ` <span title="신선식품인데 받는 날이 입고일과 달라요" style="display:inline-block; font-size:11px; font-weight:800; background:#fee2e2; color:#b91c1c; padding:1px 7px; border-radius:6px; white-space:nowrap;">⚠️ 신선 · 입고 ${md(d.prod)} → 받는 날 ${md(d.pick)}</span>`;
+        }
+        // 같은 상품(번호·이름)이고 원래 입고일이 같은데, 받는 날이 달라 이번 선택에서 빠진 신선식품 주문
+        function gFreshSameBatchMissing(targets, picked) {
+            const keyOf = o => String(o.sid || o.productCode || o.item || '').trim();
+            const want = new Map();   // 상품 → 원래 입고일들
+            targets.forEach(t => {
+                if (!t || !(t.isFresh === true || t.isFresh === 'true') || !t.prodDate) return;
+                const k = keyOf(t); if (!want.has(k)) want.set(k, new Set()); want.get(k).add(t.prodDate);
+            });
+            if (!want.size) return [];
+            return (rawOrders || []).filter(o => {
+                if (picked.has(o.phone + '|' + o.orderKey)) return false;
+                const s = want.get(keyOf(o));
+                if (!s || !s.has(o.prodDate)) return false;
+                if (isSalesCanceled(o) || o.isStocked === true || o.isStocked === 'true') return false;
+                if (o.received === true || o.received === 'true' || o.delivered === true || o.delivered === 'true') return false;
+                return true;
+            });
+        }
+        // 세 갈래 창: 'all'(함께) · 'only'(고른 것만) · null(그만)
+        function gFreshMissDialog(msg, allText, onlyText) {
+            return new Promise(resolve => {
+                let box = document.getElementById('ps-confirm-box'); if (box) box.remove();
+                box = document.createElement('div'); box.id = 'ps-confirm-box';
+                box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px;';
+                box.innerHTML = `<div style="background:#fff; border-radius:14px; padding:18px; max-width:360px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                    <div style="font-size:13.5px; font-weight:800; color:#0f172a; line-height:1.55; white-space:pre-line; margin-bottom:16px;">${gEscapeHtml(String(msg || ''))}</div>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" data-v="" style="flex:0 0 auto; height:40px; padding:0 12px; border:1.5px solid var(--border); background:#f8fafc; color:#64748b; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">그만</button>
+                        <button type="button" data-v="only" style="flex:1; height:40px; border:1.5px solid #2563eb; background:#eff6ff; color:#2563eb; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">${gEscapeHtml(onlyText)}</button>
+                        <button type="button" data-v="all" style="flex:1; height:40px; border:none; background:#2563eb; color:#fff; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">${gEscapeHtml(allText)}</button>
+                    </div></div>`;
+                box.addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b && e.target !== box) return; box.remove(); resolve(b ? (b.dataset.v || null) : null); });
+                document.body.appendChild(box);
+            });
         }
 
         function getStatusPatchBody(status) {
@@ -14399,6 +14473,19 @@
                     ? "선택된 항목이 픽업완료/배달완료/취소 상태라 입고완료로 변경하지 않았습니다."
                     : "선택된 항목 중 변경 가능한 주문이 없습니다. (취소된 주문은 대기로만 변경 가능)");
                 return;
+            }
+
+            /* [신규 2026-10-16] 입고: 같은 신선식품·같은 입고일인데 받는 날이 달라 이번 선택에서 빠진 주문이 있으면 알려 준다
+               (10/15 김치 입고 때 10/16으로 잡힌 주문이 빠진 일) */
+            if (newStatus === '입고') {
+                const _miss = gFreshSameBatchMissing(itemsToProcess.map(x => x.target).filter(Boolean), new Set(itemsToProcess.map(x => x.phone + '|' + x.orderKey)));
+                if (_miss.length) {
+                    const md = s => { const m = String(s || '').match(/(\d{4})-(\d{2})-(\d{2})/); return m ? `${+m[2]}/${+m[3]}` : String(s || ''); };
+                    const lines = _miss.slice(0, 6).map(o => `· ${o.name || o.phone} — ${o.item} (받는 날 ${md(getOrderDateInfo(o).dateStr)})`).join('\n') + (_miss.length > 6 ? `\n외 ${_miss.length - 6}건` : '');
+                    const pick = await gFreshMissDialog(`⚠️ 같은 신선식품이 다른 날짜로 잡힌 주문이 ${_miss.length}건 더 있어요\n\n${lines}\n\n함께 입고로 바꿀까요?`, `${itemsToProcess.length + _miss.length}건 모두 입고`, `${itemsToProcess.length}건만`);
+                    if (!pick) return;
+                    if (pick === 'all') _miss.forEach(o => itemsToProcess.push({ phone: o.phone, orderKey: o.orderKey, target: o }));
+                }
             }
 
             // [신규 2026-10-08] 취소는 이유를 한 번 묻고 고른 줄 모두에 적는다
