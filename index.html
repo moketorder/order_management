@@ -5445,17 +5445,18 @@
                             if (!closedWhy && prod.date === d && typeof salesRealStock === 'function') { const st = salesRealStock(prod); if (st === 0) closedWhy = '재고 0'; }
                         }
                         // [신규 2026-10-16] 주문 마감이 일요일인 상품 — 그림에 '일요일 오후 6시 마감'을 빨갛게 (사장님 요청)
-                        let sun = '';
-                        if (prod) { const ex = Number(prod.expireAt) || 0; if (ex && ex > new Date(srcAddDays(d, -7) + 'T00:00:00').getTime() && new Date(ex).getDay() === 0) sun = srcThSunText(new Date(ex)); }
+                        let sun = '', early = false, dlT = 0;   // 일요일 주문마감 (early·dlT 는 나중에 다른 마감 시각도 묶을 때 쓴다)
+                        if (prod) { const ex = Number(prod.expireAt) || 0; if (ex && ex > new Date(srcAddDays(d, -7) + 'T00:00:00').getTime() && new Date(ex).getDay() === 0) { const t = new Date(ex), td = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); sun = srcThSunText(t); dlT = ex; early = td !== d; } }
                         const sv = (saved || {})[key] || {};
                         const imgs = (prod && Array.isArray(prod.images) ? prod.images : []).filter(Boolean);
                         items.push({
                             d, key, vendor, src: p.name, prod: prod ? (prod.productCode || prod.sid) : '',
                             name: sv.n || srcThShort([p.disp, p.name, prod && prod.name]),
-                            mod: sv.m != null ? sv.m : (r[0] === 'sada' ? '사다드림' : srcThModFrom(band && band.ds, prod && prod.name)),   // 사다드림은 수식어 자리에 '사다드림'
+                            // [수정 2026-10-16] 수식어 = 섬네일 창에서 고친 것 → 상품등록 수식어(nameLead) → 밴드 설명글 (사장님 요청 — 상품등록 수식어가 안 나왔다)
+                            mod: sv.m != null ? sv.m : (String((prod && prod.nameLead) || '').replace(/\s+/g, ' ').trim() || (r[0] === 'sada' ? '' : srcThModFrom(band && band.ds, prod && prod.name))),
                             price: sv.p || (price ? srcThWon(price) + (from ? '~' : '') : ''),
                             imgs, imgAt: Math.min(+sv.i || 0, Math.max(0, imgs.length - 1)),
-                            closed: !!closedWhy, closedWhy, on: true, sun, sunOn: !!sun
+                            closed: !!closedWhy, closedWhy, on: true, sun, sunOn: !!sun, early, dlT
                         });
                     });
                     return items;
@@ -5620,7 +5621,7 @@
                     const F = await srcThFonts(), cv = document.createElement('canvas'); cv.width = cv.height = 1080;
                     const c = cv.getContext('2d');
                     c.fillStyle = '#fff7ea'; c.fillRect(0, 0, 1080, 1080);
-                    await srcThHeader(c, F, '#47a823', [['다음주 ', '#fff'], ['공구', '#ffe066'], ['를 한눈에', '#fff']],
+                    await srcThHeader(c, F, '#47a823', [['다음주 ', '#fff'], ['상품', '#ffe066'], ['을 한눈에', '#fff']],
                         [[srcThMd(wk) + '(월) ~ ' + srcThMd(srcAddDays(wk, 4)) + '(금) 픽업/배달 · ', '#2f7a14'], [items.length + '가지', '#f76707']], true);
                     const byDay = [0, 1, 2, 3, 4].map(i => ({ i, d: srcAddDays(wk, i), its: items.filter(it => it.d === srcAddDays(wk, i)) })).filter(g => g.its.length);
                     // 두 줄로 나눈다 — 위에서부터 채워 상품 수가 반반에 가깝게
@@ -5747,10 +5748,15 @@
                                 c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(t, x + cw / 2, y + phH / 2 + pf * .38); c.textAlign = 'left';
                             }
                             let ty = y + phH + 12, tx = x + 18, mw = cw - 36;
-                            if (it.mod) {
-                                c.font = '700 ' + mf + 'px ' + F; const m = srcThFit(c, it.mod, mw - 20), w = c.measureText(m).width + 20, h = mf * 1.35;
-                                const sd = it.vendor === '사다드림';   // 사다드림은 진한 보라 알약 (한눈에와 같은 색)
-                                srcThPill(c, tx, ty, w, h, it.closed ? '#eeeeee' : sd ? '#7048e8' : srcThMix(col, .13)); c.fillStyle = it.closed ? '#999' : sd ? '#fff' : colD; c.fillText(m, tx + 10, ty + h * .74);
+                            // 사다드림은 수식어 앞에 진한 보라 '사다드림' 알약 (한눈에와 같은 색), 그 뒤에 수식어
+                            let mx = tx; const mh = mf * 1.35;
+                            if (it.vendor === '사다드림') {
+                                c.font = '800 ' + mf + 'px ' + F; const w = c.measureText('사다드림').width + 20;
+                                srcThPill(c, mx, ty, w, mh, it.closed ? '#bdbdbd' : '#7048e8'); c.fillStyle = '#fff'; c.fillText('사다드림', mx + 10, ty + mh * .74); mx += w + 8;
+                            }
+                            if (it.mod) {   // [수정 2026-10-16] 수식어는 배경 없이 글자만, 상품명과 같은 왼쪽 줄 (사장님 요청)
+                                c.font = '700 ' + mf + 'px ' + F; const m = srcThFit(c, it.mod, tx + mw - mx);
+                                c.fillStyle = it.closed ? '#999' : colD; c.fillText(m, mx, ty + mh * .74);
                             }
                             ty += mf * 1.35 + 8;
                             c.font = '700 ' + nf + 'px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222'; c.fillText(srcThFit(c, it.name, mw), tx, ty + nf);
