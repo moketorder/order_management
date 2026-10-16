@@ -5393,6 +5393,13 @@
                     Object.entries(gSrc.picks || {}).forEach(([w, items]) => Object.entries(items || {}).forEach(([key, p]) => { if (!p) return; const d = p.date || srcAddDays(w, Math.max(0, SRC_DAYS.indexOf(p.day))); if (inWk(d)) refs.push({ d, r: ['pick', w, key], p }); }));
                     ['direct', 'manual', 'onsite'].forEach(k => Object.entries(gSrc[k] || {}).forEach(([id, p]) => { if (p && inWk(p.date)) refs.push({ d: p.date, r: [k, id], p }); }));
                     (gSrc.sada || []).forEach(p => { if (inWk(p.date) && !p.hide) refs.push({ d: p.date, r: ['sada', p.code], p: { name: p.name, code: p.code, vendor: '사다드림' } }); });
+                    // [신규 2026-10-16] 사다드림이 빠지지 않게 — 달력 자료(gSrc.sada)에 없으면 등록 상품에서 사다드림·그 주 픽업일인 것을 직접 넣는다 (사장님 요청)
+                    list.forEach(q => {
+                        if (!(q.isSada === true || q.isSada === 'true') || q.hide || !inWk(q.date)) return;
+                        const code = String(q.productCode || q.sid || '');
+                        if (refs.some(o => o.r[0] === 'sada' && o.p.code === code && o.d === q.date)) return;
+                        refs.push({ d: q.date, r: ['sada', code], p: { name: String(q.name || '').replace(/^\s*\[사다드림\]\s*/, ''), code, vendor: '사다드림' } });
+                    });
                     const now = Date.now(), seen = new Set(), items = [];
                     refs.sort((a, b) => a.d.localeCompare(b.d)).forEach(({ d, r, p }) => {
                         const vendor = r[0] === 'sada' ? '사다드림' : srcVendorOf(r, p);
@@ -5430,7 +5437,7 @@
                         items.push({
                             d, key, vendor, src: p.name, prod: prod ? (prod.productCode || prod.sid) : '',
                             name: sv.n || srcThShort([p.disp, p.name, prod && prod.name]),
-                            mod: sv.m != null ? sv.m : srcThModFrom(band && band.ds, prod && prod.name),
+                            mod: sv.m != null ? sv.m : (r[0] === 'sada' ? '사다드림' : srcThModFrom(band && band.ds, prod && prod.name)),   // 사다드림은 수식어 자리에 '사다드림'
                             price: sv.p || (price ? srcThWon(price) + (from ? '~' : '') : ''),
                             imgs, imgAt: Math.min(+sv.i || 0, Math.max(0, imgs.length - 1)),
                             closed: !!closedWhy, closedWhy, on: true, sun, sunOn: !!sun
@@ -5643,8 +5650,15 @@
                                     c.font = '800 18px ' + F; const t = '주문 마감', tw = c.measureText(t).width; pw = tw + 24;
                                     srcThPill(c, rx - pw, cy - 15, pw, 30, '#8f8f8f'); c.fillStyle = '#fff'; c.fillText(t, rx - pw + 12, cy + 6);
                                 } else pw = srcThPrice(c, F, it.price, rx, cy + 8, 23, '#f76707', true);
+                                // [신규 2026-10-16] 사다드림 표시 — 이름 뒤, 진한 보라 바탕 흰 글씨 (빨간 묶음 바탕에서도 눈에 띄게, 사장님 요청)
+                                const nx = lx + 58, sd = it.vendor === '사다드림';
+                                c.font = '800 15px ' + F; const sdW = sd ? c.measureText('사다드림').width + 16 : 0;
                                 c.font = '600 21px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222';
-                                c.fillText(srcThFit(c, it.name, rx - pw - 12 - (lx + 58)), lx + 58, cy + 7);
+                                const nm = srcThFit(c, it.name, rx - pw - 12 - nx - (sd ? sdW + 8 : 0)); c.fillText(nm, nx, cy + 7);
+                                if (sd) {
+                                    const px = nx + c.measureText(nm).width + 8;
+                                    srcThPill(c, px, cy - 13, sdW, 26, it.closed ? '#bdbdbd' : '#7048e8'); c.font = '800 15px ' + F; c.fillStyle = '#fff'; c.fillText('사다드림', px + 8, cy + 5);
+                                }
                             });
                             y += h + gap;
                         });
@@ -5720,7 +5734,8 @@
                             let ty = y + phH + 12, tx = x + 18, mw = cw - 36;
                             if (it.mod) {
                                 c.font = '700 ' + mf + 'px ' + F; const m = srcThFit(c, it.mod, mw - 20), w = c.measureText(m).width + 20, h = mf * 1.35;
-                                srcThPill(c, tx, ty, w, h, it.closed ? '#eeeeee' : srcThMix(col, .13)); c.fillStyle = it.closed ? '#999' : colD; c.fillText(m, tx + 10, ty + h * .74);
+                                const sd = it.vendor === '사다드림';   // 사다드림은 진한 보라 알약 (한눈에와 같은 색)
+                                srcThPill(c, tx, ty, w, h, it.closed ? '#eeeeee' : sd ? '#7048e8' : srcThMix(col, .13)); c.fillStyle = it.closed ? '#999' : sd ? '#fff' : colD; c.fillText(m, tx + 10, ty + h * .74);
                             }
                             ty += mf * 1.35 + 8;
                             c.font = '700 ' + nf + 'px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222'; c.fillText(srcThFit(c, it.name, mw), tx, ty + nf);
