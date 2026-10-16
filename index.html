@@ -4495,7 +4495,22 @@
                     // [신규 2026-10-07] 이미 등록된 상품이면 새로 등록하지 않고 상품 수정으로 연다 (사장님 요청)
                     const regI = srcRegIdxOfTg(tg, o);
                     if (regI >= 0 && typeof editProduct === 'function') {
-                        try { editProduct(regI); showToast('등록된 상품이라 상품 수정으로 열었어요'); } catch (e) { showToast('상품 수정을 못 열었어요: ' + e.message); }
+                        try { editProduct(regI); showToast('등록된 상품이라 상품 수정으로 열었어요'); } catch (e) { showToast('상품 수정을 못 열었어요: ' + e.message); return; }
+                        /* [신규 2026-10-16] 전에 하던 공구를 달력에 다시 놓고 '상품 수정'을 누르면 날짜 칸을 이 이름표의 달력 날짜로 (사장님 요청).
+                           공동구매 상품만. 지금 손님 화면에서 팔고 있는 상품(숨김·마감 아니고 날짜가 오늘 이후)은 날짜를 그대로 둔다 — 파는 차례가 옮겨 가지 않게 */
+                        try {
+                            const r = o.ref ? JSON.parse(o.ref) : null, sp = r ? srcRefGet(r) : null, day = r ? srcRefDate(r, sp) : '';
+                            const p = uploadProducts[regI], dEl = document.getElementById('categoryValue');
+                            if (day && p && dEl && uploadCurrentTab === 'reserve' && toISODate(p.date || '') !== day) {
+                                const cur = toISODate(p.date || ''), today = srcToday();
+                                const selling = !(p.hide === true || p.hide === 'true') && !(typeof gIsClosedAdmin === 'function' && gIsClosedAdmin(p)) && cur && cur >= today;
+                                if (selling) showToast('지금 판매 중이라 날짜는 그대로 뒀어요 · 달력 날짜 ' + day.slice(5).replace('-', '/'));
+                                else {
+                                    dEl.value = day; uploadSelectedDate = day; if (dEl._paintFace) dEl._paintFace();
+                                    showToast('📅 날짜를 달력 날짜(' + day.slice(5).replace('-', '/') + ')로 넣었어요 · 수정 완료를 눌러야 저장돼요');
+                                }
+                            }
+                        } catch (e) { console.warn('달력 날짜 넣기 실패:', e); }
                         return;
                     }
                     const band = o.band || await srcFindBand(tg);
