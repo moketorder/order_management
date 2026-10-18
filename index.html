@@ -3492,6 +3492,14 @@
                         #purchase-section-sourcing .src-cal-dow { font-size:11px; color:var(--src-sub); font-weight:800; text-align:center; }
                         #purchase-section-sourcing .src-cal-day { min-height:132px; border:1px solid var(--src-line); border-radius:8px; padding:4px; background:#f8fafc; display:flex; flex-direction:column; gap:3px; min-width:0; box-sizing:border-box; }
                         #purchase-section-sourcing .src-cal-day.other { opacity:.45; }
+                        /* [신규 2026-10-18] 주 제목 줄 + 구분선 — 주와 주 사이를 또렷하게 (사장님 요청) */
+                        #purchase-section-sourcing .src-cal-wkbar { grid-column:1 / -1; display:flex; align-items:center; gap:8px; margin:10px 0 2px; padding-top:6px; border-top:2px solid #94a3b8; font-size:12px; color:#334155; }
+                        #purchase-section-sourcing .src-cal-wkbar b { font-weight:900; font-variant-numeric:tabular-nums; }
+                        #purchase-section-sourcing .src-cal-wkbar span { font-size:11px; font-weight:800; color:#fff; background:#64748b; border-radius:999px; padding:1px 8px; }
+                        #purchase-section-sourcing .src-cal-wkbar.now { border-top-color:#4caf50; }
+                        #purchase-section-sourcing .src-cal-wkbar.now span { background:#4caf50; }
+                        #purchase-section-sourcing .src-cal-wkbar.next { border-top-color:#f59e0b; }
+                        #purchase-section-sourcing .src-cal-wkbar.next span { background:#f59e0b; }
                         #purchase-section-sourcing .src-cal-day.inweek { background:#fff; border-color:#99d4c6; }
                         /* [신규 2026-10-12] 다음 주 칸 · 위 줄 표시 (사장님 요청) */
                         #purchase-section-sourcing .src-cal-day.inweek { border:2px solid #4caf50; }
@@ -3878,25 +3886,33 @@
                 async function srcRender() {
                     const v = document.getElementById('src-view');
                     if (!v) return;
+                    if (gSrc.tab !== 'trend') { v.style.opacity = ''; v.style.pointerEvents = ''; }   // [신규 2026-10-18] 동향에서 흐리게 해 둔 것 풀기
                     if (gSrc.tab === 'lineup') return srcRenderLineup(v);
                     if (gSrc.tab === 'band') {
                         if (!gSrc.band) { v.innerHTML = '<div class="src-none">밴드 상품을 불러오는 중…</div>'; try { gSrc.band = (await srcGet('band')) || {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
                         return srcRenderBand(v);
                     }
                     if (gSrc.tab === 'trend') {   // [신규 2026-10-13] 📈 동향 (주별 기록·분야별)
-                        const Q = gSrc.trendQ, fail = e => { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; };
-                        const loading = () => { v.innerHTML = '<div class="src-none">동향 자료를 불러오는 중…</div>'; };
+                        const Q = gSrc.trendQ, fail = e => { v.style.opacity = ''; v.style.pointerEvents = ''; v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; };
+                        /* [수정 2026-10-18] 분야를 누를 때 화면을 '불러오는 중'으로 통째로 바꿔 깜빡이고 아래로 밀렸다 (사장님 질문)
+                           — 이미 그려 둔 화면이 있으면 그대로 두고 흐리게만, 처음일 때만 '불러오는 중' 글. 그린 뒤 나머지 분야는 미리 받아 둔다 */
+                        const loading = () => { if (v.querySelector('.src-tr-big, .src-tr-grid')) { v.style.opacity = '.55'; v.style.pointerEvents = 'none'; } else v.innerHTML = '<div class="src-none">동향 자료를 불러오는 중…</div>'; };
+                        const done = () => { v.style.opacity = ''; v.style.pointerEvents = ''; };
                         if (!gSrc.trendIdx) { loading(); try { gSrc.trendIdx = (await srcGet('trend_idx')) || {}; gSrc.trendData = {}; } catch (e) { return fail(e); } try { const [mo, ma] = await Promise.all([srcGet('mat_off'), srcGet('mat_add')]); gSrc.matOff = mo || {}; gSrc.matAdd = ma || {}; } catch (e) { gSrc.matOff = gSrc.matOff || {}; gSrc.matAdd = gSrc.matAdd || {}; } }   // [신규 2026-10-14] 뺀·넣은 맛집 가게
                         const wks = Object.keys(gSrc.trendIdx).sort().reverse();
                         if (!Q.week || !gSrc.trendIdx[Q.week]) Q.week = wks[0] || '';
-                        if (!Q.week) { gSrc.trend = null; return srcRenderTrend(v); }
+                        if (!Q.week) { gSrc.trend = null; done(); return srcRenderTrend(v); }
                         const D = gSrc.trendData[Q.week] = gSrc.trendData[Q.week] || { c: {} };
                         if (!D.meta) { loading(); try { const [m, k, mj] = await Promise.all([srcGet('trend_w/' + Q.week + '/meta'), srcGet('trend_w/' + Q.week + '/k'), srcGet('trend_w/' + Q.week + '/m')]); D.meta = m || {}; D.k = k || []; D.m = mj || null; } catch (e) { return fail(e); } }
                         const cats = D.meta.cats ? Object.values(D.meta.cats) : [];
                         let ci = cats.indexOf(Q.cat); if (ci < 0) { ci = 0; Q.cat = cats[0] || ''; }
                         if (cats.length && !D.c[ci]) { loading(); try { D.c[ci] = (await srcGet('trend_w/' + Q.week + '/c/' + ci)) || {}; } catch (e) { return fail(e); } }
                         gSrc.trend = D;
-                        return srcRenderTrend(v);
+                        done();
+                        srcRenderTrend(v);
+                        // 나머지 분야를 조용히 미리 받아 둔다 — 다음에 누르면 바로 나온다
+                        if (!D._pre) { D._pre = true; const wk = Q.week; (async () => { for (let i = 0; i < cats.length; i++) { if (D.c[i]) continue; try { D.c[i] = (await srcGet('trend_w/' + wk + '/c/' + i)) || {}; } catch (e) { break; } } })(); }
+                        return;
                     }
                     if (!gSrc.kakao) { v.innerHTML = '<div class="src-none">카톡 취합을 불러오는 중…</div>'; try { gSrc.kakao = (await srcGet('kakao')) || {}; } catch (e) { v.innerHTML = '<div class="src-none">못 불러왔어요 (' + srcEsc(e.message) + ')</div>'; return; } }
                     srcRenderKakao(v);
@@ -3966,6 +3982,20 @@
                     Object.keys(by).forEach(c => { by[c] = srcGrpView(by[c], null); by[c].forEach(r => { if (r._grpAll) gSrcGrpAll[r.no] = r._grpAll; }); });   // [신규 2026-10-07] 같은 상품은 대표 하나만
                     return by;
                 }
+                /* [신규 2026-10-18] 밴드 상품 찾기 결과에 게시일 (사장님 요청) — r.d = 'YYYY-MM-DD HH:mm' → ' · 10/18 게시' */
+                function srcPostDay(d) {
+                    const m = String(d || '').match(/^\d{4}-(\d{2})-(\d{2})/);
+                    return m ? ' · ' + (+m[1]) + '/' + (+m[2]) + ' 게시' : '';
+                }
+                /* [신규 2026-10-18] 추천 제목 옆 — 밴드 자료가 언제 것인지 (사장님 요청: 날짜·요일·시간). meta.updated = 'YYYY-MM-DD HH:mm' (PC DB올리기) */
+                function srcMetaStamp() {
+                    const u = String((gSrc.meta && gSrc.meta.updated) || '');
+                    const m = u.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})/);
+                    if (!m) return '';
+                    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+                    const t = (+m[2]) + '/' + (+m[3]) + '(' + '일월화수목금토'[d.getDay()] + ') ' + m[4].padStart(2, '0') + ':' + m[5];
+                    return ' <small class="src-stamp" title="밴드 자료를 PC에서 올린 때" style="font-weight:600; color:#64748b; margin-left:6px;">🕒 ' + t + ' 자료</small>';
+                }
                 function srcCatBoard() {
                     if (!gSrc.band) {
                         if (!gSrcCat.loading) { gSrcCat.loading = true; srcGet('band').then(b => { gSrc.band = b || {}; gSrcCat.loading = false; srcRender(); }).catch(() => { gSrcCat.loading = false; }); }
@@ -3975,7 +4005,7 @@
                     srcHistEnsure();   // [신규 2026-10-08] 마지막 공구 날짜용 판매 기록 (처음 한 번 받아 오고 다시 그린다)
                     const order = srcCatDefs().map(d => d.name);   // [수정 2026-10-07] 카테고리 관리 순서
                     const cats = order.filter(c => by[c]).concat(Object.keys(by).filter(c => !order.includes(c)));
-                    const head = '<div class="src-cathead"><b>카테고리별 추천</b><span class="src-cathead-btns"><button type="button" onclick="srcCatRefresh(this)" title="DB에서 밴드 상품·판매·건너뜀을 새로 받아 다시 추천해요">새로 추천</button><button type="button" onclick="srcCatManage()">카테고리 관리</button></span></div>';   // [수정 2026-10-07] 새로 추천 (사장님 요청)
+                    const head = '<div class="src-cathead"><b>카테고리별 추천' + srcMetaStamp() + '</b><span class="src-cathead-btns"><button type="button" onclick="srcCatRefresh(this)" title="DB에서 밴드 상품·판매·건너뜀을 새로 받아 다시 추천해요">새로 추천</button><button type="button" onclick="srcCatManage()">카테고리 관리</button></span></div>';   // [수정 2026-10-07] 새로 추천 (사장님 요청)
                     if (!cats.length) return head + '<div class="src-none">추천할 밴드 상품이 없어요</div>';
                     const won = v => v ? Number(String(v).replace(/[^\d]/g, '')).toLocaleString('ko-KR') : '';
                     return head + '<div class="src-catgrid">' + cats.map(c => {
@@ -4170,7 +4200,7 @@
                         return (r || x || g) ? '<div class="src-plan-cat"><div class="ch"><b>' + srcEsc(c) + '</b><button type="button" class="src-plan-rr" onclick="srcPlanReroll(\'' + srcEsc(k) + '\')" title="다른 상품 보기' + (o ? ' (' + o + '번 바꿈 · 오른쪽 클릭·길게 누르면 처음으로)' : '') + '" oncontextmenu="event.preventDefault(); srcPlanReroll(\'' + srcEsc(k) + '\', true)">🔄</button></div>' +
                             (r ? one('b', by[c], bandChip(r)) : '') + (x ? one('4', by4[c], oldChip(x, '4~7주')) : '') + (g ? one('8', by8[c], oldChip(g, '8주+')) : '') + '</div>' : '';
                     }).join('');
-                    return '<div class="src-plan"><div class="src-cathead"><b>다음 주 공구 추천 <small>' + md(st) + '~' + md(srcAddDays(st, 4)) + '</small></b></div>' +
+                    return '<div class="src-plan"><div class="src-cathead"><b>다음 주 공구 추천 <small>' + md(st) + '~' + md(srcAddDays(st, 4)) + '</small>' + srcMetaStamp() + '</b></div>' +
                         '<div class="k">카테고리마다 · 초록 = 밴드 상품 · 보라 = 상시판매 · 노랑 = 공구 상품 (4~7주 · 8주+ = 마지막 공구 뒤 지난 주) · 달력 날짜에 끌어다 놓으면 저장돼요</div>' +
                         '<div class="src-plan-grid">' + (boxes || '<span class="k">추천할 상품이 없어요</span>') + '</div></div>';
                 }
@@ -4357,6 +4387,8 @@
                     m.onclick = async e => {
                         const act = e.target.dataset && e.target.dataset.act; if (!act) return;
                         srcMenuClose();
+                        // [신규 2026-10-18] 손으로 쓴 이름표에 상품이 여러 개('두부, 콩나물')면 어느 상품인지 먼저 고른다
+                        if ((act === 'purchase' || act === 'product') && o.ref && srcManualItems(o.ref).length) return srcItemPick(tg, o, act);
                         if (act === 'purchase') { srcLockBand(tg, 'purchase'); return srcToPurchase(tg, o.rec, o.ref); }   // [신규 2026-10-07] 발주한 밴드 상품은 값 고정
                         if (act === 'product') return srcToProduct(tg, o);
                         if (act === 'polink') return srcPoLinkDialog(tg, o.ref);
@@ -4446,6 +4478,49 @@
                         || rows.find(x => nk(x.n) === nk(tg.name)) || null;
                 }
                 // [신규 2026-10-07] 이 이름표·밴드 상품이 이미 등록된 상품이면 그 칸(uploadProducts 번호), 없거나 모르면 -1
+                /* [신규 2026-10-18] 손으로 쓴 이름표 하나에 상품 두세 개 (사장님 요청 — '두부, 콩나물'처럼 적고 상품마다 발주·상품등록)
+                   srcManualItems: 이름을 쉼표·/·+·· 로 나눈 상품들 (둘 이상일 때만, 아니면 빈 목록)
+                   srcItemRegIdx: 그 상품에 맞는 등록 상품 칸 — 이름표에 이은 상품 중 이름이 맞는 것, 없으면 이름으로 찾은 것
+                   srcItemPo: 이름표에 이은 발주 중 그 상품 이름이 맞는 것 (여러 개면 낱개 수를 더함) */
+                function srcManualItems(rs) {
+                    try { const r = typeof rs === 'string' ? JSON.parse(rs) : rs; if (!r || r[0] !== 'manual') return []; const p = srcRefGet(r); if (!p) return [];
+                        const a = String(p.disp || p.name || '').split(/\s*[,，/+·]\s*/).map(s => s.trim()).filter(Boolean); return a.length > 1 ? a : []; } catch (e) { return []; }
+                }
+                function srcItemMatch(a, b) { a = srcNormName(a); b = srcNormName(b); return !!(a && b && (a.includes(b) || b.includes(a))); }
+                function srcItemRegIdx(rs, item) {
+                    const ix = srcProdIndex(); if (!ix.list.length) return -1;
+                    const hit = srcRegList(rs, ix).find(i => srcItemMatch((ix.list[i] || {}).name, item));
+                    if (hit != null) return hit;
+                    const n = srcNormName(item); return (n && n in ix.byName) ? ix.byName[n] : -1;
+                }
+                function srcItemPo(r, item) {
+                    const ls = srcPoLinks(r).map(x => srcPoById(x.id) || x).filter(x => srcItemMatch(x.itemName || x.item, item));
+                    if (!ls.length) return null; if (ls.length === 1) return ls[0];
+                    const byNew = ls.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))), sum = ls.reduce((s, x) => s + (parseInt(x.totalUnits) || parseInt(x.qty) || 0), 0);
+                    return Object.assign({}, byNew[0], { totalUnits: sum, qty: sum, productCode: (byNew.find(x => x.productCode) || {}).productCode || '', salePrice: (byNew.find(x => +x.salePrice > 0) || {}).salePrice || '' });
+                }
+                // 어느 상품을 발주·상품등록할지 고르는 창 — 상품마다 발주 O/X · 상품 O/X 를 같이 보여 준다
+                function srcItemPick(tg, o, act) {
+                    srcMenuClose();
+                    const items = srcManualItems(o.ref), r = JSON.parse(o.ref);
+                    const old = document.getElementById('src-day'); if (old) old.remove();
+                    const box = document.createElement('div'); box.id = 'src-day';
+                    const badge = (ok, t) => '<b class="src-rg ' + (ok ? 'o' : 'x') + '">' + t + (ok ? 'O' : 'X') + '</b>';
+                    box.innerHTML = '<div class="in"><div class="t">' + (act === 'purchase' ? '🚚 어느 상품을 발주할까요?' : '🛒 어느 상품을 등록할까요?') + '<small>' + srcEsc(tg.name) + '</small></div>' +
+                        items.map((it, i) => '<div class="sl">' + badge(!!srcItemPo(r, it), '발') + badge(srcItemRegIdx(o.ref, it) >= 0, '상') + '<span class="n">' + srcEsc(it) + '</span><button type="button" data-i="' + i + '">' + (act === 'purchase' ? '발주 등록' : (srcItemRegIdx(o.ref, it) >= 0 ? '상품 수정' : '상품 등록')) + '</button></div>').join('') +
+                        '<span class="k">발=이은 발주 · 상=등록 상품. 발주한 것은 이 이름표에 더해져요.</span>' +
+                        '<div class="row"><button type="button" data-act="close">닫기</button></div></div>';
+                    document.body.appendChild(box);
+                    box.onclick = e => {
+                        if (e.target === box) return box.remove();
+                        const b = e.target.closest('button'); if (!b) return;
+                        box.remove(); if (b.dataset.act === 'close') return;
+                        const it = items[+b.dataset.i]; if (!it) return;
+                        const t2 = Object.assign({}, tg, { name: it, multiItem: true });
+                        if (act === 'purchase') { srcLockBand(t2, 'purchase'); return srcToPurchase(t2, o.rec, o.ref); }
+                        return srcToProduct(t2, Object.assign({}, o, { item: it }));
+                    };
+                }
                 function srcRegIdxOfTg(tg, o) {
                     const ix = srcProdIndex(); if (!ix.list.length) return -1;
                     if (o && o.ref) { const i = srcRegIdx(o.ref, ix); return (i != null && i >= 0) ? i : -1; }
@@ -4493,7 +4568,8 @@
                 async function srcToProduct(tg, o) {
                     o = o || {};
                     // [신규 2026-10-07] 이미 등록된 상품이면 새로 등록하지 않고 상품 수정으로 연다 (사장님 요청)
-                    const regI = srcRegIdxOfTg(tg, o);
+                    // [신규 2026-10-18] 손으로 쓴 여러 상품 중 하나(o.item)면 그 상품만 본다 — 이름표에 이은 상품 중 이름이 맞는 것, 없으면 이름으로 찾은 것
+                    const regI = o.item ? srcItemRegIdx(o.ref, o.item) : srcRegIdxOfTg(tg, o);
                     if (regI >= 0 && typeof editProduct === 'function') {
                         try { editProduct(regI); showToast('등록된 상품이라 상품 수정으로 열었어요'); } catch (e) { showToast('상품 수정을 못 열었어요: ' + e.message); return; }
                         /* [신규 2026-10-16] 전에 하던 공구를 달력에 다시 놓고 '상품 수정'을 누르면 날짜 칸을 이 이름표의 달력 날짜로 (사장님 요청).
@@ -4518,6 +4594,7 @@
                         switchAdminTab('product-upload');
                         exitEditMode();   // 새 상품 등록 상태로
                         gSrcPendingReg = { key: srcNameKey(tg.vendor, tg.name), name: tg.name, vendor: tg.vendor };   // [신규 2026-10-07] 등록 완료 때 이어 둔다
+                        if (o.item && o.ref) { const _r = JSON.parse(o.ref), _p = srcRefGet(_r); if (_p) gSrcPendingReg = { key: srcNameKey(srcVendorOf(_r, _p), _p.name), name: o.item, src: _p.name, vendor: srcVendorOf(_r, _p), addMany: true }; }   // [신규 2026-10-18] 이름표의 이은 상품에 더한다
                         // [신규 2026-10-07] 이 상품을 발주한 적이 있으면 그 식별번호를 물려받는다 — 발주와 상품이 같은 번호로 이어진다
                         const _poCode = o.ref ? '' : srcLatestPoCode(tg);   // [수정 2026-10-09] 달력 이름표는 이어 둔 발주의 번호만 (아래)
                         if (_poCode && typeof paintProductCodeField === 'function') { pendingProductCodeFromPurchase = _poCode; paintProductCodeField({ productCode: _poCode }); }
@@ -4559,9 +4636,10 @@
                                 const lk0 = srcPoLinkGet(r); if (lk0 && !srcPoById(lk0.id) && typeof loadPurchaseArchiveIfNeeded === 'function') await loadPurchaseArchiveIfNeeded();
                             } catch (e) { }
                             _srcPoIx = null; _srcRegIx = null;   // 방금 받아 온 발주 목록으로 다시 센다
-                            const po = srcRegState(o.ref, day).po1;
+                            // [신규 2026-10-18] 여러 상품 중 하나면 이은 발주 중 이름이 맞는 것만 (낱개 수 더함)
+                            const po = o.item ? srcItemPo(r, o.item) : srcRegState(o.ref, day).po1;
                             if (po) filled.push(...srcFillFromPo(po));
-                            else setTimeout(() => srcAskPoLink(tg, o.ref), 350);
+                            else if (!o.item) setTimeout(() => srcAskPoLink(tg, o.ref), 350);
                         }
                         if (!o.ref && typeof pendingProductCodeFromPurchase !== 'undefined' && pendingProductCodeFromPurchase) filled.push('식별번호');
                         if (imFilled) filled.push('사진 ' + imFilled + '장');
@@ -4584,10 +4662,12 @@
                 let gSrcPendingPo = null;
                 async function srcPoLinkAfterSave(pp, id, payload) {
                     const r = JSON.parse(pp.ref);
-                    const v = { id, date: String(payload.date || '').slice(0, 10), item: payload.itemName || '', supplier: payload.supplier || '', qty: payload.totalUnits || payload.qty || 0, at: new Date().toISOString() };
+                    const e0 = { id, date: String(payload.date || '').slice(0, 10), item: payload.itemName || '', supplier: payload.supplier || '', qty: payload.totalUnits || payload.qty || 0, at: new Date().toISOString() };
+                    // [수정 2026-10-18] 이미 이은 발주가 있으면 바꾸지 않고 더한다 (한 상품에 발주 여러 개)
+                    const v = srcPoLinksToVal(srcPoLinks(r).filter(l => l.id !== id).concat([e0]));
                     await srcPut('polink/' + srcRefPath(r), v); srcPoLinkSet(r, v);
                     const p = srcRefGet(r), nm = String(payload.itemName || '').trim();
-                    if (p && nm && nm !== String(p.disp || p.name || '').trim() && nm !== String(p.name || '').trim()) {
+                    if (!pp.multi && p && nm && nm !== String(p.disp || p.name || '').trim() && nm !== String(p.name || '').trim()) {
                         const val = Object.assign({}, p, { disp: nm }); await srcPut(srcRefPath(r), val); srcRefSet(r, val);
                     }
                 }
@@ -4677,7 +4757,7 @@
                     const prod = (i !== null && i >= 0) ? _srcRegIx.list[i] : null;
                     S.prod = prod;
                     const lk = srcPoLinkGet(r);   // [신규 2026-10-08] 손으로 이은 발주가 있으면 그것
-                    if (lk) { S.po1 = srcPoById(lk.id) || lk; S.po = true; }
+                    if (lk) { S.po1 = srcPoLinksMerged(r) || lk; S.po = true; }   // [수정 2026-10-18] 여러 발주면 낱개 수를 더한 것
                     else if (srcPoIndex().n) { S.po1 = srcPoFor(p, date, prod); S.po = false; }   // [수정 2026-10-12] 이름으로 저절로 찾은 발주(po1)는 상품등록 칸 채우기에만 쓰고, '발주됨'은 손으로 연결한 것만 (사장님 요청)
                     if (i === null) return S;
                     S.reg = !!prod;
@@ -4742,7 +4822,14 @@
                 async function srcLinkRegistered(sid, code, name) {
                     const pr = gSrcPendingReg; gSrcPendingReg = null;
                     if (!pr || !pr.key || (!sid && !code)) return;
-                    const v = { sid: sid || null, code: code || null, name: name || pr.name, src: pr.name, vendor: pr.vendor || '', at: new Date().toISOString() };
+                    let v = { sid: sid || null, code: code || null, name: name || pr.name, src: pr.name, vendor: pr.vendor || '', at: new Date().toISOString() };
+                    /* [신규 2026-10-18] 손으로 쓴 이름표('두부, 콩나물')의 상품 하나를 등록했으면 그 이름표의 이은 상품(many)에 더한다 */
+                    if (pr.addMany) {
+                        const old = (gSrc.reg || {})[pr.key] || null;
+                        const many = (old && Array.isArray(old.many)) ? old.many.slice() : ((old && (old.sid || old.code) && !old.none) ? [{ sid: old.sid || null, code: old.code || null, name: old.name || '' }] : []);
+                        if (!many.some(m => (sid && m.sid === sid) || (code && m.code === code))) many.push({ sid: sid || null, code: code || null, name: v.name });
+                        v = Object.assign({}, many[0], { many, src: pr.src || pr.name, vendor: pr.vendor || '', at: v.at });
+                    }
                     try { await srcPut('reg/' + pr.key, v); gSrc.reg = gSrc.reg || {}; gSrc.reg[pr.key] = v; } catch (e) { console.warn('소싱 등록 이음 저장 실패:', e); }
                     srcLockBand({ name: pr.name, vendor: pr.vendor }, 'product');   // [신규 2026-10-07] 등록한 밴드 상품은 값 고정
                 }
@@ -4760,19 +4847,41 @@
                     for (const k of srcRefPath(r).split('/')) { o = o && o[k]; if (!o) return null; }
                     return (o && o.id) ? o : null;
                 }
-                function srcPoLinkNow(rs) { try { const l = srcPoLinkGet(JSON.parse(rs)); return l ? ' (' + srcEsc(String(l.date || '').slice(5, 10).replace('-', '/')) + ')' : ''; } catch (e) { return ''; } }
+                /* [신규 2026-10-18] 한 이름표에 발주 여러 개 (사장님 요청) — 저장 모양은 예전 그대로 첫 발주 칸 + more: [그 밖의 발주]
+                   srcPoLinks: 이은 발주 전부 (차례대로), srcPoLinksToVal: 목록 → 저장 값 (비면 null) */
+                function srcPoLinks(r) { const l = srcPoLinkGet(r); if (!l) return []; const { more, ...first } = l; return [first].concat(Array.isArray(more) ? more.filter(x => x && x.id) : []); }
+                function srcPoLinksToVal(list) { list = (list || []).filter(x => x && x.id); if (!list.length) return null; const [first, ...rest] = list; return Object.assign({}, first, rest.length ? { more: rest } : {}); }
+                function srcPoLinkEntry(po) { return { id: po.id, date: String(po.date || '').slice(0, 10), item: po.itemName || po.item || '', supplier: po.supplier || '', qty: parseInt(po.totalUnits) || parseInt(po.qty) || 0, at: new Date().toISOString() }; }
+                // 이은 발주를 하나로 — 낱개 수는 더하고, 식별번호·예상 판매가는 가장 최근 발주 것 (상품등록 칸 채우기용)
+                function srcPoLinksMerged(r) {
+                    const ls = srcPoLinks(r).map(x => srcPoById(x.id) || x);
+                    if (ls.length < 2) return ls[0] || null;
+                    const latest = ls.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
+                    const sum = ls.reduce((s, x) => s + (parseInt(x.totalUnits) || parseInt(x.qty) || 0), 0);
+                    const byNew = ls.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+                    return Object.assign({}, latest, { totalUnits: sum, qty: sum, productCode: (byNew.find(x => x.productCode) || {}).productCode || '', salePrice: (byNew.find(x => +x.salePrice > 0) || {}).salePrice || '' });
+                }
+                function srcPoLinkNow(rs) { try { const ls = srcPoLinks(JSON.parse(rs)); return ls.length ? ' (' + srcEsc(String(ls[0].date || '').slice(5, 10).replace('-', '/')) + (ls.length > 1 ? ' 외 ' + (ls.length - 1) : '') + ')' : ''; } catch (e) { return ''; } }   // [수정 2026-10-18] 여러 개면 '외 N'
                 function srcPoAll() { return [].concat((typeof purchaseOrders !== 'undefined' && purchaseOrders) || [], (typeof purchaseArchive !== 'undefined' && purchaseArchive) || []).filter(po => po && po.id); }
                 function srcPoById(id) { return srcPoAll().find(po => po.id === id) || null; }
                 async function srcPoLinkDialog(tg, rs, after) {   // [수정 2026-10-09] after(po) — 이은 뒤 부를 일 (상품 등록에서 수량·식별번호 채우기)
                     srcMenuClose();
                     const old = document.getElementById('src-day'); if (old) old.remove();
-                    const r = JSON.parse(rs), path = 'polink/' + srcRefPath(r), cur = srcPoLinkGet(r);
+                    const r = JSON.parse(rs), path = 'polink/' + srcRefPath(r);
+                    let links = srcPoLinks(r);   // [신규 2026-10-18] 이은 발주 여러 개
+                    const paintCur = () => {
+                        const el = document.getElementById('src-polink-cur'); if (!el) return;
+                        el.innerHTML = links.map(l => '<div class="sl"><b class="src-rg o">O</b><span class="n">' + srcEsc(String(l.date || '').slice(5, 10).replace('-', '/') + ' ' + (l.supplier || '') + ' · ' + (l.item || '') + (l.qty ? ' · ' + l.qty + '개' : '')) +
+                            '</span><button type="button" data-unlink="' + srcEsc(l.id) + '" style="border-color:#fca5a5;color:#dc2626;">끊기</button></div>').join('') +
+                            (links.length > 1 ? '<span class="k">발주 ' + links.length + '개 · 낱개 합 ' + links.reduce((s, l) => s + (+l.qty || 0), 0) + '개</span>'
+                                : (links.length ? '' : '<span class="k">아래에서 발주를 누르면 이어져요. 여러 개 이을 수 있어요.</span>'));
+                    };
                     const box = document.createElement('div'); box.id = 'src-day';
                     // 처음 찾기 글 — 대괄호·용량·'100%·국내산' 같은 흔한 말은 빼고 앞 낱말 둘
                     const q0 = String(tg.name || '').replace(/\[[^\]]*\]/g, '').replace(/[\d.]+\s*(g|kg|ml|l|개입|개|팩|입|인분|구|마리|봉)\b/gi, '').split(/\s+/)
                         .filter(w => w && !/%|^(국내산|국산|수입산?|프리미엄|정품|특가|무료배송|신선한?)$/.test(w)).slice(0, 2).join(' ');
                     box.innerHTML = '<div class="in"><div class="t">🧾 발주 연결<small>' + srcEsc(tg.name) + (tg.vendor ? ' · ' + srcEsc(tg.vendor) : '') + '</small></div>' +
-                        (cur ? '<div class="sl"><b class="src-rg o">O</b><span class="n">지금: ' + srcEsc(String(cur.date || '').slice(5, 10).replace('-', '/') + ' ' + (cur.supplier || '') + ' · ' + (cur.item || '')) + '</span><button type="button" data-act="unlink" style="border-color:#fca5a5;color:#dc2626;">연결 끊기</button></div>' : '') +
+                        '<div id="src-polink-cur"></div>' +   // [수정 2026-10-18] 이은 발주를 여러 개 — 줄마다 ✕ 로 끊는다 (srcPoLinkPaintCur)
                         '<input type="search" id="src-polink-q" placeholder="발주 품목·업체로 찾기" value="' + srcEsc(q0) + '">' +
                         '<div class="res" id="src-polink-res"><span class="k">발주 목록을 불러오는 중…</span></div>' +
                         '<div class="row"><button type="button" data-act="close">닫기</button></div></div>';
@@ -4789,26 +4898,29 @@
                         const hits = all.map(po => { const h = (String(po.itemName || '') + ' ' + String(po.supplier || '')).replace(/\s/g, '').toLowerCase(); return { po, n: q.filter(w => h.includes(w)).length }; })
                             .filter(x => !q.length || x.n > 0).sort((a, b) => b.n - a.n).map(x => x.po);
                         el.innerHTML = hits.length ? hits.slice(0, 40).map(po => '<button type="button" data-po="' + srcEsc(po.id) + '">' + srcEsc(po.itemName || '') +
-                            '<small>' + srcEsc(String(po.date || '').slice(2, 10).replace(/-/g, '/')) + ' · ' + srcEsc(po.supplier || '') + ' · ' + (parseInt(po.totalUnits) || parseInt(po.qty) || 0) + '개' + (cur && cur.id === po.id ? ' · 지금 연결' : '') + '</small></button>').join('')
+                            '<small>' + srcEsc(String(po.date || '').slice(2, 10).replace(/-/g, '/')) + ' · ' + srcEsc(po.supplier || '') + ' · ' + (parseInt(po.totalUnits) || parseInt(po.qty) || 0) + '개' + (links.some(l => l.id === po.id) ? ' · ✓ 연결됨 (누르면 끊기)' : '') + '</small></button>').join('')
                             : '<span class="k">' + (all.length ? '찾는 발주가 없어요' : '발주 목록이 비어 있어요') + '</span>';
                     };
                     document.getElementById('src-polink-q').oninput = res;
+                    paintCur();
                     res();
+                    // [수정 2026-10-18] 발주를 누르면 더하고(이미 이었으면 끊고) 창은 그대로 — 여러 개를 이어 가며 고른다. 닫기로 끝낸다
+                    const saveLinks = async (next) => { const v = srcPoLinksToVal(next); await srcPut(path, v); srcPoLinkSet(r, v); links = next; paintCur(); res(); };
                     box.onclick = async e => {
-                        if (e.target === box) return box.remove();
+                        if (e.target === box) { box.remove(); srcRender(); return; }
                         const b = e.target.closest('button'); if (!b) return;
-                        if (b.dataset.act === 'close') return box.remove();
+                        if (b.dataset.act === 'close') { box.remove(); srcRender(); return; }
                         try {
-                            if (b.dataset.act === 'unlink') { await srcPut(path, null); srcPoLinkSet(r, null); showToast('발주 연결을 끊었어요'); }
+                            if (b.dataset.unlink) { await saveLinks(links.filter(l => l.id !== b.dataset.unlink)); showToast('발주 연결을 하나 끊었어요'); }
                             else if (b.dataset.po) {
                                 const po = srcPoById(b.dataset.po); if (!po) return;
-                                const v = { id: po.id, date: String(po.date || '').slice(0, 10), item: po.itemName || '', supplier: po.supplier || '', qty: parseInt(po.totalUnits) || parseInt(po.qty) || 0, at: new Date().toISOString() };
-                                await srcPut(path, v); srcPoLinkSet(r, v); showToast('🧾 발주에 연결했어요: ' + v.item);
+                                if (links.some(l => l.id === po.id)) { await saveLinks(links.filter(l => l.id !== po.id)); showToast('발주 연결을 하나 끊었어요'); return; }
+                                await saveLinks(links.concat([srcPoLinkEntry(po)]));
+                                showToast('🧾 발주에 연결했어요: ' + (po.itemName || '') + (links.length > 1 ? ' (발주 ' + links.length + '개)' : ''));
                                 srcLockBand(tg, 'purchase');   // 발주한 밴드 상품은 값 고정 (발주 등록과 같게)
-                                if (typeof after === 'function') { box.remove(); srcRender(); after(po); return; }
-                            } else return;
-                        } catch (err) { showToast('저장 못 했어요: ' + err.message); return; }
-                        box.remove(); srcRender();
+                                if (typeof after === 'function') { box.remove(); srcRender(); after(srcPoLinksMerged(r) || po); return; }
+                            }
+                        } catch (err) { showToast('저장 못 했어요: ' + err.message); }
                     };
                     document.getElementById('src-polink-q').focus();
                 }
@@ -5172,7 +5284,7 @@
                         gPurchaseReturn = _back;
                         switchPurchaseSubTab('register');
                         const set = (id, v) => { const el = document.getElementById(id); if (!el || v === undefined || v === null || v === '') return; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
-                        gSrcPendingPo = rs ? { ref: rs, name: tg.name } : null;   // [신규 2026-10-08] 달력 이름표에서 연 발주 — 저장되면 그 이름표에 잇는다
+                        gSrcPendingPo = rs ? { ref: rs, name: tg.name, multi: !!tg.multiItem } : null;   // [신규 2026-10-08] 달력 이름표에서 연 발주 — 저장되면 그 이름표에 잇는다 (multi: 손으로 쓴 여러 상품 중 하나 — 이름표 이름은 안 바꾼다)
                         set('purchase-supplier', tg.vendor);
                         set('purchase-item-name', tg.name);
                         // [신규 2026-10-07] 이미 등록된(이어진) 상품이 있으면 그 식별번호로 발주한다 — 발주와 상품이 같은 번호
@@ -5282,6 +5394,13 @@
                         '<span class="k">초록 숫자 = 공구 진행한 횟수(마우스를 올리면 마지막 공구·재고) · 오른쪽 위 발주등록X·상품등록X·일정등록X = 켜면 그것이 안 된 것만 보기</span><span class="k">끌기 = 옮기기 · Ctrl+끌기 = 복사 · Ctrl+누르기 = 여러 개 · Delete 지우기 · Ctrl+Z 되돌리기 · 폰은 길게 눌러 끌기</span></details></div><div class="src-cal-grid">' +
                         SRC_DAYS.map(d => '<div class="src-cal-dow">' + d + '</div>').join('');
                     for (let d = new Date(start); d <= calEnd; d.setDate(d.getDate() + 7)) {
+                        /* [신규 2026-10-18] 주 사이 제목 줄 + 구분선 (사장님 요청 — 주와 주가 잘 안 나뉘어 보임) */
+                        {
+                            const ws = iso(d), fr = new Date(d); fr.setDate(fr.getDate() + 4);
+                            const md2 = x => (x.getMonth() + 1) + '/' + x.getDate();
+                            const lab = ws === wk0 ? '이번 주' : ws === wk1 ? '다음 주' : ws === srcAddDays(wk0, -7) ? '지난 주' : '';
+                            html += '<div class="src-cal-wkbar' + (ws === wk0 ? ' now' : ws === wk1 ? ' next' : '') + '"><b>' + md2(d) + ' ~ ' + md2(fr) + '</b>' + (lab ? '<span>' + lab + '</span>' : '') + '</div>';
+                        }
                         for (let i = 0; i < 5; i++) {
                             const x = new Date(d); x.setDate(x.getDate() + i);
                             const k = iso(x);
@@ -5848,7 +5967,7 @@
                 async function srcThMakeAll() {
                     const T = gSrcTh, sunFirst = it => (!it.closed && it.sun && it.sunOn) ? 0 : 1;
                     // [신규 2026-10-16] 요일 안에서 일요일 마감 상품끼리 맨 앞에 묶는다 (사장님 요청)
-                    const use = T.items.filter(it => it.on).map((it, k) => [it, k]).sort((a, b) => a[0].d.localeCompare(b[0].d) || sunFirst(a[0]) - sunFirst(b[0]) || a[1] - b[1]).map(x => x[0]);
+                    const use = T.items.filter(it => it.on).map((it, k) => [it, k]).sort((a, b) => a[0].d.localeCompare(b[0].d) || (a[0].closed ? 1 : 0) - (b[0].closed ? 1 : 0) || sunFirst(a[0]) - sunFirst(b[0]) || a[1] - b[1])   /* [수정 2026-10-18] 주문 마감은 그 날 맨 아래로 (사장님 요청) */.map(x => x[0]);
                     if (!use.length) throw new Error('넣을 상품이 없어요');
                     const toBlob = cv => new Promise((res, rej) => { try { cv.toBlob(b => b ? res(b) : rej(new Error('그림을 못 만들었어요')), 'image/png'); } catch (e) { rej(new Error('사진을 그림에 넣지 못했어요 (사진 서버 허락 문제)')); } });
                     const out = [], wkTag = T.wk.replace(/-/g, '');
@@ -6502,7 +6621,7 @@
                     return list.map(r => {
                         const done = sold[r.v + '|' + r.n] || (r.kw && sold['#' + r.kw]);
                         return '<span class="src-ochip src-bchip' + (done ? ' done' : '') + '" data-no="' + srcEsc(r.no) + '" title="' + srcEsc(r.n + ' · ' + r.v) + '">' + srcEsc(r.n) +
-                            '<small>' + srcEsc(r.v) + (r.sp ? ' ' + Number(r.sp).toLocaleString() : '') + (r.s ? ' · ' + r.s + '점' : '') + (done ? ' · ' + String(done).slice(5).replace('-', '/') : '') + '</small></span>';
+                            '<small>' + srcEsc(r.v) + (r.sp ? ' ' + Number(r.sp).toLocaleString() : '') + (r.s ? ' · ' + r.s + '점' : '') + srcPostDay(r.d) + (done ? ' · ' + String(done).slice(5).replace('-', '/') : '') + '</small></span>';
                     }).join('');
                 }
                 async function srcBandPickChips() {
@@ -6925,7 +7044,7 @@
                     if (subs.length > 1) html += '<div class="src-bar"><span class="k">하위</span>' + chips(i => 'gSrc.trendQ.sub=' + i + '; srcRender()', subs.map((x, i) => subName(i)), Q.sub) + '</div>';
                     const kwRow = at(C.kw, Q.sub) || {};
                     html += '<div class="src-tr-grid"><div class="src-tr-box"><h4>🔎 인기 검색어 · ' + srcEsc(Q.cat) + (Q.sub ? ' › ' + srcEsc(subName(Q.sub)) : '') + ' · ' + srcEsc(grpName[Q.grp] || Q.grp) + '</h4>' +
-                        list(kwRow[Q.grp], (k, i) => row(i + 1, k, '', '', bandTag(k)), Q.sub && Q.grp !== '3050' ? '하위 분야는 3050 여성 합친 순위만 모아요' : '자료 없음') + '</div>' +
+                        list(kwRow[Q.grp], (k, i) => row(i + 1, k, '', '', bandTag(k)), Q.cat === '전체' ? '네이버는 전체 분야 인기 검색어를 주지 않아요.<br>위에서 분야(식품 등)를 골라 주세요.' : (Q.sub && Q.grp !== '3050' ? '하위 분야는 3050 여성 합친 순위만 모아요' : '자료 없음'))   /* [수정 2026-10-18] 전체는 네이버 쇼핑인사이트가 빈 목록을 준다 (사장님 질문) */ + '</div>' +
                         '<div class="src-tr-box"><h4>🛒 구매(판매) 순위 · ' + srcEsc(Q.cat) + (Q.sub ? ' › ' + srcEsc(subName(Q.sub)) : '') + ' · 전체 연령</h4>' + list(at(C.buy, Q.sub), prod) + '</div></div>';
                     const clk = at(C.click, Q.sub) || {};
                     html += '<div class="src-tr-grid">' + ['30', '40', '50'].map(k => '<div class="src-tr-box"><h4>🖱️ 클릭 순위 · ' + srcEsc(Q.cat) + (Q.sub ? ' › ' + srcEsc(subName(Q.sub)) : '') + ' · ' + srcEsc(grpName[k] || k + '대 여성') + '</h4>' + list(clk[k], prod) + '</div>').join('') + '</div>';
@@ -17937,10 +18056,14 @@
                         const pk = psItemPickup(last);
                         const data = { releaseAt: rel, expireAt: exp, pickup: pk ? psAddDays(pk, step) : null, autoRepeat: true,
                             group: last.group ? (String(last.group).split('@')[0] + '@' + rel) : null, groupLabel: last.groupLabel || null,
-                            stock: (last.stock === undefined) ? null : last.stock };   // 이번 차례 재고도 물려받는다
+                            stock: 999 };   // [수정 2026-10-18] 반복으로 새로 잡는 차례는 재고 무제한으로 시작 (사장님 요청 — 예전엔 앞 차례 재고를 물려받았다)
                         if (!(await psItemAdd(idx, data, 'R' + rel.toString(36)))) break;
                         made++;
                     }
+                    // [신규 2026-10-18] 이미 만들어 둔 반복 차례 중 아직 안 올라간 것도 무제한으로 맞춘다
+                    const _fix = {};
+                    psItemsOfSid(p.sid).forEach(it => { if (it.autoRepeat && Number(it.releaseAt) > Date.now() && Number(it.stock) !== 999 && it.stockApplied !== true) _fix[`${it.sid}/${it.rid}/stock`] = 999; });
+                    if (Object.keys(_fix).length && await psSchedPatch(_fix)) Object.keys(_fix).forEach(k => { const [s, r] = k.split('/'); if (psSched[s] && psSched[s][r]) psSched[s][r].stock = 999; });
                 }
             } catch (e) { console.error('반복 일정 만들기 실패:', e); }
             finally { psRepeatBusy = false; }
@@ -34912,6 +35035,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 //  exitEditMode 안에서 되살린 것만으로는 결과가 남지 않는다.
                 const _returnSearch = uploadIsEditMode ? uploadEditReturnSearch : '';
                 const _formSched = uploadFormSched;   // [신규 2026-10-05] exitEditMode 가 지우기 전에 챙긴다
+                // [신규 2026-10-18] 상품 수정에서 공동구매 → 상시판매로 바꿨는지 (아래에서 남은 노출일정을 끌지 묻는다)
+                const _toOnsiteSid = (uploadIsEditMode && uploadCurrentTab === 'onsite' && _existingProd && !String(_existingProd.displayTab || '').startsWith('onsite-')) ? (_existingProd.sid || null) : null;
+                const _onsiteSid = (uploadIsEditMode && uploadCurrentTab === 'onsite' && _existingProd) ? (_existingProd.sid || null) : null;   // 상시판매로 저장한 상품 (끝난 일정 마감 칸 정리용)
                 const _savedSid = (_savedIdx >= 0 && updatedProducts[_savedIdx]) ? updatedProducts[_savedIdx].sid : null;
                 /* [신규 2026-10-08] 저장 뒤 들어오기 전에 보던 화면으로 (사장님 요청 — 소싱 달력에서 열었으면 소싱 달력으로).
                    수정은 uploadEditReturnTab, 새 상품은 uploadNewReturn(상품 등록으로 들어올 때 기억한 화면) */
@@ -34965,6 +35091,44 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                             showToast('📅 노출일정에 담았어요');
                             if (typeof renderProductScheduleCalendar === 'function') renderProductScheduleCalendar();
                         }
+                    }
+                }
+                /* [신규 2026-10-18] 공동구매 상품을 상시판매로 바꿨는데 노출일정이 남아 있으면 끌지 묻는다 (사장님 요청)
+                   남겨 두면 상시판매에서 숨어 있다가 그 일정 시각에 다시 공동구매로 올라간다 (gListOnsiteWait·psSyncOnsiteHold) */
+                if (_toOnsiteSid && !(_formSched && _formSched.off) && typeof psItemsOfSid === 'function') {
+                    const _now = Date.now();
+                    const _left = psItemsOfSid(_toOnsiteSid).filter(it => !(Number(it.expireAt) && _now >= Number(it.expireAt)));
+                    // 끝난 일정은 기록으로만 남아 상관없다. 다만 반복이 켜져 있으면 끝난 일정에서 다음 차례가 또 생기니 그때도 묻는다
+                    const _all = psItemsOfSid(_toOnsiteSid), _pIdx = _all.length ? _all[0].idx : -1;
+                    const _rep = _pIdx >= 0 && Number((uploadProducts[_pIdx] || {}).repeatWeeks) > 0;
+                    if (_left.length || _rep) {
+                        const _pick = await psChoose(_left.length
+                            ? `📅 ${name}\n상시판매로 바꿨는데 노출일정이 ${_left.length}개 남아 있어요.\n남겨 두면 상시판매에서 숨었다가 그 일정 시각에 다시 공동구매로 올라가요.\n\n일정을 끌까요?`
+                            : `📅 ${name}\n상시판매로 바꿨는데 반복 일정이 켜져 있어요.\n그대로 두면 다음 차례 일정이 또 생겨 다시 공동구매로 올라가요.\n\n반복을 끌까요?`,
+                            [{ label: _left.length ? '일정 끄기' : '반복 끄기', value: 'off', main: true }, { label: '그대로 두기', value: 'keep' }]);
+                        if (_pick === 'off') {
+                            psUndoMark('상시판매로 바꿈 — 일정 끄기');
+                            if (_rep && _all.length) await psSetRepeat(_all[_all.length - 1].key, 0);
+                            let _n = 0;
+                            for (const it of psItemsOfSid(_toOnsiteSid).filter(it => !(Number(it.expireAt) && _now >= Number(it.expireAt)))) { if (psItem(it.key)) { await psItemDelete(it.key); _n++; } }
+                            showToast(_n ? `📅 노출일정 ${_n}개를 껐어요` : "🔁 반복을 껐어요");
+                            if (typeof renderProductScheduleCalendar === 'function') renderProductScheduleCalendar();
+                        }
+                    }
+                    /* [신규 2026-10-18] 끝난 일정의 마감 시각이 상품에 남아 있으면 상시판매에서도 '마감'으로 떴다 (사장님 지적)
+                       — 상품 줄의 일정 칸(올라감·마감 등)을 비우고, 손으로 해 둔 [마감]도 푼다 (끝나면 상시판매 전환 psConvertEndedToOnsite 와 같은 정리) */
+                }
+                if (_onsiteSid) {
+                    const _pi = uploadProducts.findIndex(x => x && x.sid === _onsiteSid);
+                    const _pp = _pi >= 0 ? uploadProducts[_pi] : null;
+                    if (_pp && Number(_pp.expireAt) && Date.now() >= Number(_pp.expireAt)) {
+                        await psDoClearSchedule(_pi);
+                        if (_pp.schedRid) { await fbPatchProducts({ [`${_pi}/schedRid`]: null }); _pp.schedRid = null; }
+                        const _ck = fGetAdjKey(_pp.matchKey, _pp.name, _pp.sid);
+                        if (uploadClosedMap[_ck] === true || uploadClosedMap[encodeURIComponent(_ck)] === true) {
+                            try { const _r = await fetch(`${FIREBASE_DB_URL}product_closed/${encodeURIComponent(_ck)}.json`, { method: 'DELETE' }); if (_r.ok) { delete uploadClosedMap[_ck]; delete uploadClosedMap[encodeURIComponent(_ck)]; } } catch (e) { }
+                        }
+                        updatePublishedProductsTimestamp();
                     }
                 }
                 buildManageCategoryTabs();
