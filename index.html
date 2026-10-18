@@ -7519,6 +7519,13 @@
         #ps-cal-box .ms-cal-cell.has { background: #fff; border-color: #eef2f6; }
         /* [신규 2026-10-13] 주 구분 — 홀수 주는 연한 푸른 바탕 + 진한 테두리, 짝수 주는 흰 바탕 (사장님 요청) */
         #ps-cal-box .ms-cal-cell.ps-wk-a { background: #ffffff; border-color: #cbd5e1; }
+        /* [신규 2026-10-18] 주 제목 줄 + 구분선 (소싱 달력과 같은 모양) */
+        #ps-cal-box .ps-wk-sep { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding-top: 5px; border-top: 2px solid #94a3b8; font-size: 12px; color: #334155; }
+        #ps-cal-box .ps-wk-sep:first-child { margin-top: 0; }
+        #ps-cal-box .ps-wk-sep b { font-weight: 900; font-variant-numeric: tabular-nums; }
+        #ps-cal-box .ps-wk-sep span { font-size: 11px; font-weight: 800; color: #fff; background: #64748b; border-radius: 999px; padding: 1px 8px; }
+        #ps-cal-box .ps-wk-sep.now { border-top-color: #4caf50; } #ps-cal-box .ps-wk-sep.now span { background: #4caf50; }
+        #ps-cal-box .ps-wk-sep.next { border-top-color: #f59e0b; } #ps-cal-box .ps-wk-sep.next span { background: #f59e0b; }
         #ps-cal-box .ms-cal-cell.ps-wk-b { background: #eff6ff; border-color: #bfdbfe; }
         #ps-cal-box .ms-cal-cell.ms-cal-open { background: #fffbeb; border-color: #fde68a; }
         .ps-bars { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
@@ -18420,11 +18427,18 @@
             if (rangeBars.some(b => b.slot === 'X')) calSlots.push('X');   // [신규 2026-10-14] 마감된 일정 줄은 그보다 더 아래
 
             // 주(달력 한 줄)마다·시간 줄마다 쓰이는 줄 수 — 같은 주의 칸은 같은 줄 수로 맞춰야 막대가 가지런하다
-            const weekLanes = {};
+            /* [수정 2026-10-18] 주마다 실제로 쓰는 줄만 위로 붙인다 (사장님 지적 — 마감 줄 사이가 벌어짐).
+               막대 줄 번호(b.lane)는 달 전체 기준이라, 다른 주에서만 쓰는 번호가 이 주에 빈 줄로 남았다.
+               weekLaneMap[w][slot] = 이 주에 쓰인 줄 번호들(작은 차례) → 화면 줄 j 에 그 번호의 막대를 그린다 */
+            const weekLanes = {}, weekLaneMap = {};
             dateKeys.forEach((key, i) => {
                 const w = Math.floor((lead + i) / 7);
-                const row = weekLanes[w] || (weekLanes[w] = {});
-                rangeBars.forEach(b => { if (b.start <= key && key <= b.end) row[b.slot] = Math.max(row[b.slot] || 0, b.lane + 1); });
+                const mp = weekLaneMap[w] || (weekLaneMap[w] = {});
+                rangeBars.forEach(b => { if (b.start <= key && key <= b.end) { const s = mp[b.slot] || (mp[b.slot] = new Set()); s.add(b.lane); } });
+            });
+            Object.keys(weekLaneMap).forEach(w => {
+                const row = weekLanes[w] = {};
+                Object.keys(weekLaneMap[w]).forEach(s => { weekLaneMap[w][s] = [...weekLaneMap[w][s]].sort((a, b) => a - b); row[s] = weekLaneMap[w][s].length; });
             });
             const activeMonth = page;   // [수정 2026-10-08] 보는 달이 아닌 날은 흐리게
 
@@ -18443,13 +18457,23 @@
             const PS_DOT = { on: '#16a34a', hidden: '#dc2626', closed: '#ca8a04' };
             let html = `<div class="ps-cal-weekhead"><div></div>` + ['일', '월', '화', '수', '목', '금', '토'].map(w => `<div class="ms-cal-head${w === '일' ? ' ps-sun-head' : ''}">${w}</div>`).join('') + `</div>`;   // 일요일은 CSS로 숨김
             html += `<div class="ms-cal-grid">`;
+            /* [신규 2026-10-18] 주 사이 제목 줄 + 구분선 (사장님 요청 — 소싱 달력과 똑같이). w주의 월~토 날짜와 이번 주·다음 주 표시 */
+            const psWkSep = (w) => {
+                const mon = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate() + w * 7 + 1);
+                const sat = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 5);
+                const now = new Date(); const tMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+                const diff = Math.round((mon - tMon) / 604800000);
+                const lab = diff === 0 ? '이번 주' : diff === 1 ? '다음 주' : diff === -1 ? '지난 주' : '';
+                return `<div class="ps-wk-sep${diff === 0 ? ' now' : diff === 1 ? ' next' : ''}"><b>${mon.getMonth() + 1}/${mon.getDate()} ~ ${sat.getMonth() + 1}/${sat.getDate()}</b>${lab ? `<span>${lab}</span>` : ''}</div>`;
+            };
+            html += psWkSep(0);
             html += gutterHtml(0);
             for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty${i === 0 ? ' ps-sun-pad' : ''}"></div>`;   // 첫 빈칸 = 일요일 자리 (숨김)
 
             dateKeys.forEach((key, i) => {
                 const w = Math.floor((lead + i) / 7);
                 const dow = (lead + i) % 7;
-                if (dow === 0 && lead + i > 0) html += gutterHtml(w);
+                if (dow === 0 && lead + i > 0) html += psWkSep(w) + gutterHtml(w);
                 const dNum = parseInt(key.slice(8, 10), 10);
                 const isMonthStart = (dNum === 1);
                 const todays = rangeBars.filter(b => b.start <= key && key <= b.end);
@@ -18464,7 +18488,9 @@
                 const nLanes = (weekLanes[w] || {})[slot] || 0;
                 namesHtml += slot === 'R' ? `<div class="ps-slot ps-slot-rep" title="🔁 반복 일정" style="border-top:1.5px dashed #c4b5fd;">`
                     : slot === 'X' ? `<div class="ps-slot ps-slot-done" title="🔒 마감된 일정" style="border-top:1.5px dashed #fbbf24;">` : `<div class="ps-slot" data-slot="${slot}" title="${psSlotLabel(slot)}" ondragover="event.preventDefault(); this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="this.classList.remove('over'); psHandleDrop(event, '${key}', ${slot})">`;
-                for (let l = 0; l < nLanes; l++) {
+                const laneNos = ((weekLaneMap[w] || {})[slot]) || [];   // [수정 2026-10-18] 이 주에 쓰인 줄 번호만
+                for (let j = 0; j < nLanes; j++) {
+                    const l = laneNos[j];
                     const b = todays.find(x => x.slot === slot && x.lane === l);
                     if (!b) { namesHtml += `<div class="ps-bar ps-bar-empty"></div>`; continue; }
                     const isStart = b.start === key, isEnd = b.end === key;
