@@ -12055,9 +12055,39 @@
                 _errUnseenShown = n;
             }, err => console.warn('손님 오류 기록 받기 실패 (규칙 게시 전이면 막힌다):', err && err.message));
         }
+        /* [신규 2026-10-19] 오류 기록의 손님 이름은 우리 손님 정보에서 번호로 찾는다 (사장님 요청 — 같은 사람이 '이름 없음'과 회원 이름으로 갈려 보였다).
+           차례: 손님 정보(customers) 이름 → 그 번호 주문에 적힌 이름 → 예전 기록에 같이 남은 이름.
+           손님 정보를 아직 안 받았으면 그 번호 이름만 서버에서 받아 와서 다시 그린다 */
+        const _errNameCache = {};
+        function gErrNameOf(e) {
+            const d = String((e && e.phone) || '').replace(/\D/g, '');
+            if (d) {
+                const s = (window.__caSaved || {})[d];
+                if (s && String(s.name || '').trim()) return String(s.name).trim();
+                if (_errNameCache[d]) return _errNameCache[d];
+                try {
+                    const src = typeof getSalesSourceOrders === 'function' ? getSalesSourceOrders() : [];
+                    const o = src.find(o => String(o.firebasePhoneKey || '').replace(/\D/g, '') === d) || src.find(o => salesNormPhone(o) === d);
+                    if (o && String(o.name || '').trim()) return String(o.name).trim();
+                } catch (x) { }
+            }
+            return String((e && e.name) || '').trim();
+        }
+        let _errNameAsked = false;
+        async function gErrFetchNames() {
+            if (_errNameAsked || window.__caSaved) return;
+            _errNameAsked = true;
+            const ds = [...new Set(_errLogs.map(e => String(e.phone || '').replace(/\D/g, '')).filter(Boolean))];
+            let got = 0;
+            await Promise.all(ds.map(async d => {
+                try { const r = await fetch(`${FIREBASE_DB_URL}customers/${encodeURIComponent(d)}/name.json`); if (r.ok) { const v = await r.json(); if (v && String(v).trim()) { _errNameCache[d] = String(v).trim(); got++; } } } catch (x) { }
+            }));
+            if (got) renderErrorAdmin();
+        }
         function renderErrorAdmin() {
             const box = document.getElementById('err-admin-body');
             if (!box) return;
+            gErrFetchNames();
             const seenBefore = gErrSeenAt();
             localStorage.setItem('moket_errlog_seen_at', String(Date.now()));
             _errUnseenShown = 0;
@@ -12094,8 +12124,8 @@
                         </div>
                         <div style="margin-top:5px; font-size:14px; font-weight:800; color:var(--text-main); word-break:break-all;">${E(e.msg || '')}</div>
                         <div style="margin-top:6px; display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:12.5px; color:var(--text-sub); font-weight:700;">
-                            <span style="color:var(--text-main);">${E(e.name || '이름 없음')} · …${E(tail)}</span>
-                            ${phone ? `<button type="button" onclick="showCustomerCardModal('${encodeURIComponent(phone)}','${encodeURIComponent(e.name || '')}')" style="border:1.5px solid var(--border); background:#fff; border-radius:7px; padding:3px 9px; font-size:12px; font-weight:800; cursor:pointer;">주문 보기</button>` : ''}
+                            <span style="color:var(--text-main);">${E(gErrNameOf(e) || '이름 없음')} · …${E(tail)}</span>
+                            ${phone ? `<button type="button" onclick="showCustomerCardModal('${encodeURIComponent(phone)}','${encodeURIComponent(gErrNameOf(e))}')" style="border:1.5px solid var(--border); background:#fff; border-radius:7px; padding:3px 9px; font-size:12px; font-weight:800; cursor:pointer;">주문 보기</button>` : ''}
                             <span>${E(e.device || '')}${e.ship ? ' · ' + E(e.ship) : ''}${ver ? ' · ' + E(ver) + ' 판' : ''}</span>
                         </div>
                         ${e.cart ? `<div style="margin-top:6px; font-size:12px; color:var(--text-sub); word-break:break-all;">🛒 ${E(e.cart)}</div>` : ''}
