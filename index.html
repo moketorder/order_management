@@ -3500,6 +3500,11 @@
                         #purchase-section-sourcing .src-cal-wkbar.now span { background:#4caf50; }
                         #purchase-section-sourcing .src-cal-wkbar.next { border-top-color:#f59e0b; }
                         #purchase-section-sourcing .src-cal-wkbar.next span { background:#f59e0b; }
+                        /* [신규 2026-10-19] 주 접기·펴기 단추 (사장님 요청) */
+                        #purchase-section-sourcing .src-cal-wkbar .src-wk-fold { margin-left:auto; height:24px; padding:0 10px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; border-radius:999px; font-size:11.5px; font-weight:800; cursor:pointer; font-family:inherit; }
+                        #purchase-section-sourcing .src-cal-wkbar .src-wk-fold:hover { border-color:#64748b; color:#0f172a; }
+                        #purchase-section-sourcing .src-cal-wkbar i { font-style:normal; font-size:11.5px; font-weight:700; color:#94a3b8; }
+                        #purchase-section-sourcing .src-cal-wkbar.folded { margin-bottom:6px; opacity:.85; }
                         #purchase-section-sourcing .src-cal-day.inweek { background:#fff; border-color:#99d4c6; }
                         /* [신규 2026-10-12] 다음 주 칸 · 위 줄 표시 (사장님 요청) */
                         #purchase-section-sourcing .src-cal-day.inweek { border:2px solid #4caf50; }
@@ -5399,7 +5404,13 @@
                             const ws = iso(d), fr = new Date(d); fr.setDate(fr.getDate() + 4);
                             const md2 = x => (x.getMonth() + 1) + '/' + x.getDate();
                             const lab = ws === wk0 ? '이번 주' : ws === wk1 ? '다음 주' : ws === srcAddDays(wk0, -7) ? '지난 주' : '';
-                            html += '<div class="src-cal-wkbar' + (ws === wk0 ? ' now' : ws === wk1 ? ' next' : '') + '"><b>' + md2(d) + ' ~ ' + md2(fr) + '</b>' + (lab ? '<span>' + lab + '</span>' : '') + '</div>';
+                            // [신규 2026-10-19] 주마다 접기·펴기 (사장님 요청) — 접은 주는 날짜 칸을 숨기고 제목 줄에 상품 수만. 이 기기에 기억한다
+                            var _fold = srcWkFolded(ws), _n = 0;
+                            if (_fold) for (let i = 0; i < 5; i++) { const x = new Date(d); x.setDate(x.getDate() + i); const k = iso(x); _n += (byDate[k] || []).filter(t => srcCalPass(t.ref, k)).length; }
+                            html += '<div class="src-cal-wkbar' + (ws === wk0 ? ' now' : ws === wk1 ? ' next' : '') + (_fold ? ' folded' : '') + '"><b>' + md2(d) + ' ~ ' + md2(fr) + '</b>' + (lab ? '<span>' + lab + '</span>' : '') +
+                                (_fold ? '<i>상품 ' + _n + '개 접힘</i>' : '') +
+                                '<button type="button" class="src-wk-fold" onclick="srcWkFoldToggle(\'' + ws + '\')" title="' + (_fold ? '이 주 펴기' : '이 주 접기') + '">' + (_fold ? '▸ 펴기' : '▾ 접기') + '</button></div>';
+                            if (_fold) continue;
                         }
                         for (let i = 0; i < 5; i++) {
                             const x = new Date(d); x.setDate(x.getDate() + i);
@@ -5418,6 +5429,14 @@
                         }
                     }
                     return html + '</div></div>';
+                }
+                /* [신규 2026-10-19] 소싱 달력 주 접기 — 접은 주의 월요일 날짜를 이 기기(localStorage)에 모아 둔다 */
+                function srcWkFoldSet() { try { return new Set(JSON.parse(localStorage.getItem('moket_src_wkfold') || '[]')); } catch (e) { return new Set(); } }
+                function srcWkFolded(ws) { return srcWkFoldSet().has(ws); }
+                function srcWkFoldToggle(ws) {
+                    const s = srcWkFoldSet(); if (s.has(ws)) s.delete(ws); else s.add(ws);
+                    try { localStorage.setItem('moket_src_wkfold', JSON.stringify([...s].sort().slice(-60))); } catch (e) { }
+                    srcRender();
                 }
                 /* [신규 2026-10-07] 달력 날짜 옆 날씨 (사장님 요청)
                    Open-Meteo(무료·열쇠 없음)에서 가게(하남 미사) 지난 7일부터 앞으로 16일까지 하루 날씨를 한 번 받아 둔다.
