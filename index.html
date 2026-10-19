@@ -42020,6 +42020,9 @@ body { font-family:"Pretendard Variable", Pretendard, sans-serif; margin:0; padd
 .reset-btn:hover { background:#2563eb; color:white; }
 .orig-btn { position:absolute; top:0; right:48px; height:22px; padding:0 7px; border:none; font-size:11px; font-weight:800; cursor:pointer; z-index:999; background:rgba(100,116,139,0.12); color:#475569; font-family:inherit; }
 .orig-btn:hover { background:#475569; color:white; }
+.copy-btn { position:absolute; top:0; right:48px; height:22px; padding:0 7px; border:none; font-size:11px; font-weight:800; cursor:pointer; z-index:999; background:rgba(22,163,74,0.12); color:#15803d; font-family:inherit; }
+.copy-btn:hover { background:#16a34a; color:white; }
+.copy-mark { position:absolute; bottom:0; left:0; padding:1px 6px; font-size:10px; font-weight:800; background:rgba(22,163,74,0.12); color:#15803d; z-index:999; }
 .info-side { flex:1; padding:8px 8px 6px 8px; position:relative; display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
 .info-side.full { width:100%; padding:10px; display:flex; flex-direction:column; }
 .info-side.full .p-name { font-size:26px; margin-bottom:10px; }
@@ -42099,6 +42102,9 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                     '<button class="reset-btn no-print" title="고친 것 되돌리기"' + (t.edited ? '' : ' hidden') + '>↺</button>' +
                     // [신규 2026-10-14] 할인 가격표의 정상가 줄을 빼고 넣는다 (사장님 요청)
                     (t.orig ? '<button class="orig-btn no-print" title="정상가 줄 빼기/넣기">' + (t.noOrig ? '정상가 넣기' : '정상가 빼기') + '</button>' : '') +
+                    // [신규 2026-10-19] 복제 — 같은 가격표를 바로 뒤에 한 장 더 (사장님 요청). 복제본에서 고친 것은 이번 인쇄에만 쓰고 저장하지 않는다
+                    '<button class="copy-btn no-print" title="이 가격표를 한 장 더"' + (t.orig ? ' style="right:122px;"' : '') + '>⧉ 복제</button>' +
+                    (t.copy ? '<div class="copy-mark no-print" title="복제본에서 고친 것은 저장되지 않아요">복제본</div>' : '') +
                     '<div class="info-side full">' +
                     '<div class="p-desc" contenteditable="true">' + esc(t.desc) + '</div>' +   // [수정 2026-10-07] 한줄소개가 상품명 위 (사장님 요청)
                     '<div class="p-name" contenteditable="true">' + esc(t.name) + '</div>' +
@@ -42132,6 +42138,7 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                 return t;
             }
             function save(t) {
+                if (t.copy) { st.textContent = '복제본은 이번 인쇄에만 써요'; return; }   // [신규 2026-10-19] 원본의 고친 기록을 덮어쓰지 않게
                 var same = t.head === t.def.head && t.name === t.def.name && t.desc === t.def.desc && t.price === t.def.price && !t.noOrig;
                 var edit = same ? null : { head: t.head, name: t.name, desc: t.desc, price: t.price, basePrice: t.def.price, baseOrig: t.orig || 0, baseDesc: t.def.desc, noOrig: !!t.noOrig };
                 var op = window.opener;
@@ -42148,8 +42155,19 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                 var el = ev.target; if (!el.isContentEditable) return;
                 if (!el.textContent.trim()) el.innerHTML = '';   // 다 지우면 빈칸 (말머리는 인쇄에서 빠진다)
                 var t = read(el.closest('.price-tag'));
-                clearTimeout(timers[t.key]); st.textContent = '';
+                var tk = t.copy ? '' : t.key;   // [신규 2026-10-19] 복제본 고치기가 원본의 저장 대기를 지우지 않게
+                if (!tk) { st.textContent = '복제본은 이번 인쇄에만 써요'; return; }
+                clearTimeout(timers[tk]); st.textContent = '';
                 timers[t.key] = setTimeout(function () { save(t); }, 800);
+            });
+            // [신규 2026-10-19] 가격을 고칠 때 숫자가 작아지던 것 (사장님 지적) — 쉼표는 작은 글씨 조각(.p-comma)이라 커서가 그 안에 들어가면
+            //  새로 친 숫자도 작아졌다. 고치는 동안은 쉼표 조각 없이 평범한 글씨로 두고, 다 고치면(focusout) 다시 작은 쉼표로 그린다
+            area.addEventListener('focusin', function (ev) {
+                var el = ev.target; if (!el.isContentEditable || !el.classList.contains('p-num')) return;
+                if (el.querySelector('.p-comma')) {
+                    el.textContent = el.textContent;
+                    var r = document.createRange(), s = window.getSelection(); r.selectNodeContents(el); r.collapse(false); s.removeAllRanges(); s.addRange(r);   // 커서는 끝으로
+                }
             });
             area.addEventListener('focusout', function (ev) {
                 var el = ev.target; if (!el.isContentEditable) return;
@@ -42169,6 +42187,11 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                 var b = ev.target.closest('button'); if (!b) return;
                 var t = T[+b.closest('.price-tag').dataset.i];
                 if (b.classList.contains('delete-btn')) { T.splice(T.indexOf(t), 1); render(); }
+                else if (b.classList.contains('copy-btn')) {   // [신규 2026-10-19] 바로 뒤에 같은 가격표 (화면에서 고친 글씨까지)
+                    read(b.closest('.price-tag'));
+                    var c = JSON.parse(JSON.stringify(t)); c.copy = true;
+                    T.splice(T.indexOf(t) + 1, 0, c); render(); st.textContent = '한 장 복제했어요';
+                }
                 else if (b.classList.contains('orig-btn')) { t.noOrig = !t.noOrig; render(); save(t); }
                 else if (b.classList.contains('reset-btn')) {
                     t.head = t.def.head; t.name = t.def.name; t.desc = t.def.desc; t.price = t.def.price; t.noOrig = false;
