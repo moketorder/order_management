@@ -23813,11 +23813,13 @@
             const pick = _rva.pick;
             const logs = pick ? Object.values((_rva.logs || {})[pick] || {}).filter(Boolean).sort((a, b) => (b.at || 0) - (a.at || 0)) : [];
             const pickBal = pick ? (Number((_rva.points[pick] || {}).bal) || 0) : 0;
-            box.innerHTML = `<div class="card" style="padding:12px 14px; margin-bottom:10px;">
-                    <input id="pta-q" class="form-control" placeholder="전화번호(뒤 4자리도 됩니다) 또는 별명" value="${E(_rva.q)}" oninput="_rva.q=this.value; renderReviewsAdmin(false); setTimeout(()=>{const i=document.getElementById('pta-q'); if(i){i.focus(); i.setSelectionRange(i.value.length,i.value.length);}},0)" style="height:40px;">
+            /* [수정 2026-10-20] 찾기 칸은 그대로 두고 아래 결과만 다시 그린다 (사장님 지적 — 글자를 칠 때마다 칸까지 새로 만들어
+               한글 조합이 끊겨 글씨가 제대로 안 써지고, 폰에서는 키보드가 내려갔다 올라왔다) */
+            const searchHtml = `<div class="card" style="padding:12px 14px; margin-bottom:10px;">
+                    <input id="pta-q" class="form-control" placeholder="전화번호(뒤 4자리도 됩니다) 또는 별명" value="${E(_rva.q)}" oninput="_rva.q=this.value; renderReviewsAdmin(false);" autocomplete="off" style="height:40px;">
                     <div style="margin-top:6px; font-size:11.5px; font-weight:700; color:#94a3b8;">포인트가 없는 손님도 찾으면 나와요 · 누르면 포인트를 넣거나 쓸 수 있어요</div>
-                </div>`
-                + (pick ? `<div class="card" style="padding:14px; margin-bottom:10px; border:2px solid var(--primary);">
+                </div>`;
+            const bodyHtml = (pick ? `<div class="card" style="padding:14px; margin-bottom:10px; border:2px solid var(--primary);">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                         <div><div style="font-size:12px; font-weight:800; color:#64748b;">${cardBtn(pick, nameOf[pick], true)} · ${E(phone(pick))}</div><div style="font-size:24px; font-weight:900; color:#16a34a;">${pickBal.toLocaleString()}P</div></div>
                         <button type="button" onclick="showCustomerCardModal('${encodeURIComponent(pick)}','${encodeURIComponent(nameOf[pick] || '')}')" style="margin-left:auto; border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; border-radius:8px; height:30px; padding:0 10px; font-weight:800; cursor:pointer;">👤 카드</button>
@@ -23834,6 +23836,9 @@
                 </div>` : '')
                 + (rows.length ? rows.slice(0, 100).map(r => `<div class="card" onclick="_rva.pick='${E(r.ph)}'; renderReviewsAdmin(false); setTimeout(()=>{const i=document.getElementById('pta-amt'); if(i) i.focus();},0)" style="padding:11px 14px; margin-bottom:6px; display:flex; justify-content:space-between; cursor:pointer; ${r.ph === pick ? 'background:#f0fdf4;' : ''}"><span style="font-weight:800; color:#334155; min-width:0;">${cardBtn(r.ph, r.nm)} <span style="color:#94a3b8; font-weight:700;">${E(phone(r.ph))}</span></span><b style="color:${r.bal >= PT_MIN_USE ? '#16a34a' : '#64748b'};">${r.has ? r.bal.toLocaleString() + 'P' : '<span style="color:#cbd5e1;">포인트 없음</span>'}</b></div>`).join('')
                     : `<div class="card" style="padding:24px; text-align:center; color:var(--text-sub); font-weight:700;">${qRaw ? '찾는 손님이 없습니다.' : '포인트가 있는 손님이 없습니다 · 위에서 손님을 찾아 넣어 주세요.'}</div>`);
+            const bodyEl = box.querySelector('#pta-body');
+            if (bodyEl && box.querySelector('#pta-q')) bodyEl.innerHTML = bodyHtml;   // 찾기 칸이 이미 있으면 결과만
+            else box.innerHTML = searchHtml + `<div id="pta-body">${bodyHtml}</div>`;
         }
         /* [신규 2026-10-03] 포인트 번호(카카오 번호) → 손님 별명. 주문 카드에 보이는 이름과 같게 —
            가장 최근 주문에 적힌 이름, 주문이 없으면 손님 정보(가입 때 이름 → 카톡 닉네임) */
