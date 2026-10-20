@@ -42011,6 +42011,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // [신규 2026-10-13] 가격표는 정상가 (사장님 요청) — 할인 중이면 예전대로 정상가를 긋고 할인가, 아니면 정상가를 적어 둔 상품은 정상가
             const lp = parseInt(p && p.listPrice) || 0;
             if (!sale && lp > 0) return { key: gStableKeyOf(p), head, name: rest, desc: lead, storage, price: lp, orig: 0, off: '' };
+            // [신규 2026-10-20] 정상가가 없으면 상시가 (사장님 지적 — 갈비만두가 상시가 8,500원 대신 공구가 7,900원으로 찍혔다). 둘 다 없으면 예전처럼 판매가
+            const op = parseInt(p && p.priceOnsite) || 0;
+            if (!sale && op > 0) return { key: gStableKeyOf(p), head, name: rest, desc: lead, storage, price: op, orig: 0, off: '' };
             return { key: gStableKeyOf(p), head, name: rest, desc: lead, storage, price: now,
                      orig: sale && now < price ? price : 0, off: sale ? gDiscLabel(type, p.discountRate, p.discountAmount) + ' 할인' : '' };
         }
