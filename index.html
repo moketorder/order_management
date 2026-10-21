@@ -3309,6 +3309,8 @@
                         </div>
                         <div class="ps-tools">
                             <!-- [수정 2026-10-03] 차례: ❔ · 오늘 · (폰만 Ctrl) · 되돌리기 (사장님 요청) -->
+                            <!-- [신규 2026-10-21] 끝나면 상시판매로 돌리기를 안 켠 일정만 보기 (사장님 요청) -->
+                            <button type="button" id="ps-noonsite-btn" class="ps-tbtn" onclick="psToggleNoOnsite()" title="끝나면 상시판매로 돌리기를 안 켠 일정만 보기">상시전환X</button>
                             <button type="button" id="ps-help-btn" class="ps-tbtn" onclick="psToggleHelp()" title="쓰는 법">❔</button>
                             <button type="button" class="ps-tbtn" onclick="psSetView('cal'); psCalGoToday()">오늘</button>
                             <!-- [신규 2026-10-03] 폰용 Ctrl — 켜 두면 Ctrl 을 누르고 있는 것과 같다 (막대 누르기=더하기, 끌기=복사). 손가락 화면에서만 보인다 -->
@@ -7545,6 +7547,14 @@
         #ps-cal-box .ps-wk-sep span { font-size: 11px; font-weight: 800; color: #fff; background: #64748b; border-radius: 999px; padding: 1px 8px; }
         #ps-cal-box .ps-wk-sep.now { border-top-color: #4caf50; } #ps-cal-box .ps-wk-sep.now span { background: #4caf50; }
         #ps-cal-box .ps-wk-sep.next { border-top-color: #f59e0b; } #ps-cal-box .ps-wk-sep.next span { background: #f59e0b; }
+        /* [신규 2026-10-21] 주 접기·펴기 */
+        #ps-cal-box .ps-wk-sep .ps-wk-fold { margin-left: auto; height: 24px; padding: 0 10px; border: 1.5px solid #cbd5e1; background: #fff; color: #475569; border-radius: 999px; font-size: 11.5px; font-weight: 800; cursor: pointer; font-family: inherit; }
+        #ps-cal-box .ps-wk-sep .ps-wk-fold:hover { border-color: #64748b; color: #0f172a; }
+        #ps-cal-box .ps-wk-sep i { font-style: normal; font-size: 11.5px; font-weight: 700; color: #94a3b8; }
+        #ps-cal-box .ps-wk-sep.folded { margin-bottom: 4px; opacity: .85; }
+        #ps-cal-box .ps-fold-hide { display: none !important; }
+        /* [신규 2026-10-21] '상시전환X' 켜짐 */
+        #ps-noonsite-btn.on { background: #7c3aed !important; border-color: #7c3aed !important; color: #fff !important; }
         #ps-cal-box .ms-cal-cell.ps-wk-b { background: #eff6ff; border-color: #bfdbfe; }
         #ps-cal-box .ms-cal-cell.ms-cal-open { background: #fffbeb; border-color: #fde68a; }
         .ps-bars { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
@@ -18374,6 +18384,21 @@
         }
         // 창 크기를 바꾸면 다시 맞춘다
         window.addEventListener('resize', () => { const b = document.getElementById('ps-cal-box'); if (b && b.offsetParent) psCalFitHeight(b); });
+        /* [신규 2026-10-21] 노출일정 달력 — 주 접기(이 기기에 기억) · '상시전환X' 거르기 (사장님 요청) */
+        let psNoOnsiteOnly = false;
+        function psWkFoldSet() { try { return new Set(JSON.parse(localStorage.getItem('moket_ps_wkfold') || '[]')); } catch (e) { return new Set(); } }
+        function psWkFolded(wk) { return psWkFoldSet().has(wk); }
+        function psWkFoldToggle(wk) {
+            const s = psWkFoldSet(); if (s.has(wk)) s.delete(wk); else s.add(wk);
+            try { localStorage.setItem('moket_ps_wkfold', JSON.stringify([...s].sort().slice(-60))); } catch (e) { }
+            renderProductScheduleCalendar();
+        }
+        function psToggleNoOnsite() {
+            psNoOnsiteOnly = !psNoOnsiteOnly;
+            const b = document.getElementById('ps-noonsite-btn'); if (b) b.classList.toggle('on', psNoOnsiteOnly);
+            renderProductScheduleCalendar();
+            showToast(psNoOnsiteOnly ? '상시판매 전환을 안 켠 일정만 보여요' : '모든 일정을 보여요');
+        }
         function renderProductScheduleCalendar() {
             const box = document.getElementById('ps-cal-box');
             if (!box || !psCalMonths.length) return;
@@ -18432,6 +18457,8 @@
                 merged.forEach(m => { if (m.group) { m.nm = psGroupName(m.key); m.tip = `상품 ${m.members.length}개 · ` + m.tip; } });
                 bars.length = 0; merged.forEach(m => bars.push(m));
             }
+            // [신규 2026-10-21] '상시전환X' — 끝나면 상시판매로 돌리기를 안 켠 일정만 (묶음은 담긴 상품 중 하나라도 안 켰으면) (사장님 요청)
+            if (psNoOnsiteOnly) { const keep = bars.filter(b => (b.members || [b.key]).some(k => (psItem(k) || {}).toOnsite !== true)); bars.length = 0; keep.forEach(b => bars.push(b)); }
             // [수정 2026-10-10] 마감 시각이 빠른 일정부터 위 줄에 (사장님 요청 — 예전엔 올라가는 날·시각 순). 마감이 없으면 맨 뒤
             // [수정 2026-10-10] 지금 노출(판매) 중인 일정 → 올라갈 일정 → 지난 일정 차례로 위 줄을 준다 (사장님 요청 — 지난 일정 때문에 줄 사이가 벌어졌다)
             const PS_ST_RANK = { on: 0, soon: 1, closed: 2, hidden: 2 };
@@ -18513,21 +18540,29 @@
                 const now = new Date(); const tMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
                 const diff = Math.round((mon - tMon) / 604800000);
                 const lab = diff === 0 ? '이번 주' : diff === 1 ? '다음 주' : diff === -1 ? '지난 주' : '';
-                return `<div class="ps-wk-sep${diff === 0 ? ' now' : diff === 1 ? ' next' : ''}"><b>${mon.getMonth() + 1}/${mon.getDate()} ~ ${sat.getMonth() + 1}/${sat.getDate()}</b>${lab ? `<span>${lab}</span>` : ''}</div>`;
+                // [신규 2026-10-21] 주 접기·펴기 (사장님 요청 — 소싱 달력과 같게). 접은 주는 칸을 숨기고 일정 수만
+                const wk = fMsToDateKey(mon.getTime()), fold = psWkFolded(wk);
+                const n = fold ? rangeBars.filter(b => b.end >= wk && b.start <= fMsToDateKey(sat.getTime())).length : 0;
+                return `<div class="ps-wk-sep${diff === 0 ? ' now' : diff === 1 ? ' next' : ''}${fold ? ' folded' : ''}"><b>${mon.getMonth() + 1}/${mon.getDate()} ~ ${sat.getMonth() + 1}/${sat.getDate()}</b>${lab ? `<span>${lab}</span>` : ''}`
+                    + (fold ? `<i>일정 ${n}개 접힘</i>` : '')
+                    + `<button type="button" class="ps-wk-fold" onclick="event.stopPropagation(); psWkFoldToggle('${wk}')" title="${fold ? '이 주 펴기' : '이 주 접기'}">${fold ? '▸ 펴기' : '▾ 접기'}</button></div>`;
             };
+            const psWkIsFolded = (w) => psWkFolded(fMsToDateKey(new Date(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate() + w * 7 + 1).getTime()));
+            const psGut = (w) => psWkIsFolded(w) ? gutterHtml(w).replace('class="ms-cal-cell ps-gutter', 'class="ms-cal-cell ps-gutter ps-fold-hide') : gutterHtml(w);
             html += psWkSep(0);
-            html += gutterHtml(0);
-            for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty${i === 0 ? ' ps-sun-pad' : ''}"></div>`;   // 첫 빈칸 = 일요일 자리 (숨김)
+            html += psGut(0);
+            for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty${i === 0 ? ' ps-sun-pad' : ''}${psWkIsFolded(0) ? ' ps-fold-hide' : ''}"></div>`;   // 첫 빈칸 = 일요일 자리 (숨김)
 
             dateKeys.forEach((key, i) => {
                 const w = Math.floor((lead + i) / 7);
                 const dow = (lead + i) % 7;
-                if (dow === 0 && lead + i > 0) html += psWkSep(w) + gutterHtml(w);
+                if (dow === 0 && lead + i > 0) html += psWkSep(w) + psGut(w);
                 const dNum = parseInt(key.slice(8, 10), 10);
                 const isMonthStart = (dNum === 1);
                 const todays = rangeBars.filter(b => b.start <= key && key <= b.end);
                 const has = todays.length > 0;
                 const cls = `ms-cal-cell${has ? ' has' : ''}${key === todayISO ? ' today' : ''}`
+                    + (psWkIsFolded(w) ? ' ps-fold-hide' : '')   // [신규 2026-10-21] 접은 주
                     + (key === psCalOpenDay ? ' ms-cal-open' : '')
                     + (key.slice(0, 7) === activeMonth ? '' : ' ps-cal-fade')
                     + (w % 2 ? ' ps-wk-b' : ' ps-wk-a')   // [신규 2026-10-13] 주마다 번갈아 색을 달리해 구분 (사장님 요청)
