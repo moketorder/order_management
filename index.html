@@ -34712,7 +34712,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // [신규 2026-10-21] 상시가는 꼭 적어야 저장된다 (사장님 요청 — 상시판매로 넘어갈 때·가격표에 쓴다)
             {
                 const _onEl = document.getElementById('productPriceOnsite');
-                if (_onEl && !((parseInt(_onEl.value) || 0) > 0)) {
+                if (_onEl && String(_onEl.value).trim() === '') {   // [수정 2026-10-21] 0원도 적은 것으로 (사장님 요청) — 비어 있을 때만 막는다
                     showToast("상시가를 적어 주세요.");
                     try { _onEl.focus(); _onEl.style.borderColor = '#dc2626'; setTimeout(() => { _onEl.style.borderColor = ''; }, 2500); } catch (e) { }
                     return;
@@ -34893,7 +34893,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     productCode: _productCode,
                     price: _priceNow,
                     priceGb: price > 0 ? price : null,
-                    priceOnsite: _pOnsite > 0 ? _pOnsite : null,
+                    priceOnsite: _pOnsite > 0 ? _pOnsite : (String((document.getElementById('productPriceOnsite') || {}).value || '').trim() === '0' ? 0 : null),   // [수정 2026-10-21] 0원이라고 적었으면 0 으로 남긴다 (다시 열 때 0 이 보이게)
 
                     stock: stock,
                     // [신규] 처음 올린 시각 — 언제 올려야 주문이 많은지 보려고 남긴다. 수정할 때는 처음 값을 그대로 둔다.
@@ -36050,7 +36050,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
               const _on = String(prod.displayTab || '').startsWith('onsite');
               if (_on && Number(prod.priceGb) > 0) document.getElementById('productPrice').value = prod.priceGb;
               const _o = document.getElementById('productPriceOnsite'), _s = document.getElementById('productPriceStore');
-              if (_o) _o.value = Number(prod.priceOnsite) > 0 ? prod.priceOnsite : (_on ? (prod.price || '') : '');
+              if (_o) _o.value = Number(prod.priceOnsite) > 0 ? prod.priceOnsite : (prod.priceOnsite === 0 || prod.priceOnsite === '0' ? '0' : (_on ? (prod.price || '') : ''));   // [수정 2026-10-21] 0원으로 저장한 것은 0
               if (_s) _s.value = Number(prod.listPrice) > 0 ? prod.listPrice : '';
               setTimeout(gPriceReqSync, 0); }
             /* [용량절감] 상품 설명은 product_desc 서랍으로 옮기는 중이다.
@@ -42474,6 +42474,10 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
             modal.style.display = 'flex';
 
             await loadPurchaseArchiveIfNeeded();   // 옛 발주까지 세야 정확하다
+            // [신규 2026-10-21] 발주 연결 찾기 칸 — 처음엔 상품 이름 앞 두 낱말로 찾아 둔다
+            { const q = document.getElementById('purchase-link-q');
+              if (q && q.dataset.for !== String(index)) { q.dataset.for = String(index); q.value = String(prod.name || '').replace(/\[[^\]]*\]/g, '').trim().split(/\s+/).slice(0, 2).join(' '); }
+              gPoLinkPaint(); }
 
             const code = String(prod.productCode || '').trim();
             const pos = /^[PFS]\d+$/.test(code)
@@ -42494,6 +42498,58 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
             }
         }
 
+        /* [신규 2026-10-21] 상품 목록 → 발주 창에서 이미 한 발주를 찾아 이 상품에 잇는다 (사장님 요청).
+           잇는다 = 식별번호를 같게. 상품에 번호가 있으면 발주에 그 번호를, 상품에 없고 발주에만 있으면 상품이 물려받고,
+           둘 다 없으면 서버의 최신 번호까지 보고 새 번호를 만들어 둘 다에 붙인다 */
+        function gPoLinkPaint() {
+            const el = document.getElementById('purchase-link-res'); if (!el) return;
+            const prod = uploadProducts[purchaseChoiceIndex]; if (!prod) { el.innerHTML = ''; return; }
+            const code = String(prod.productCode || '').trim();
+            const q0 = (document.getElementById('purchase-link-q') || {}).value || '';
+            const q = q0.trim().toLowerCase().split(/\s+/).filter(Boolean);
+            const all = purchaseOrders.concat(purchaseArchive).filter(p => p && p.id).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+            const hits = all.map(p => { const h = (String(p.itemName || '') + ' ' + String(p.supplier || '') + ' ' + String(p.productCode || '')).replace(/\s/g, '').toLowerCase(); return { p, n: q.filter(w => h.includes(w)).length }; })
+                .filter(x => !q.length || x.n > 0).sort((a, b) => b.n - a.n).slice(0, 40).map(x => x.p);
+            const E = gEscapeHtml;
+            el.innerHTML = hits.length ? hits.map(p => {
+                const pc = String(p.productCode || '').trim(), linked = code && pc === code;
+                return `<button type="button" onclick="gPoLinkDo('${E(p.id)}')" ${linked ? 'disabled' : ''} style="text-align:left; padding:7px 9px; border:1px solid ${linked ? '#86efac' : '#fde68a'}; background:${linked ? '#f0fdf4' : '#fff'}; border-radius:7px; cursor:${linked ? 'default' : 'pointer'}; font-family:inherit;">
+                    <div style="font-size:12.5px; font-weight:800; color:#0f172a;">${E(p.itemName || '')}${linked ? ' <span style="color:#16a34a;">· 연결됨</span>' : ''}</div>
+                    <div style="font-size:11px; font-weight:700; color:#64748b;">${E(String(p.date || '').slice(2, 10).replace(/-/g, '/'))} · ${E(p.supplier || '')} · ${(parseInt(p.totalUnits) || parseInt(p.qty) || 0)}개${pc ? ' · ' + E(pc) : ''}</div></button>`;
+            }).join('') : `<div style="font-size:12px; font-weight:700; color:#a16207; padding:4px 2px;">${all.length ? '찾는 발주가 없어요' : '발주 목록이 비어 있어요'}</div>`;
+        }
+        async function gPoLinkDo(poId) {
+            const idx = purchaseChoiceIndex, prod = uploadProducts[idx];
+            const f = findPurchaseById(poId);
+            if (!prod || !f) return;
+            const po = f.item;
+            let code = String(prod.productCode || '').trim(), poCode = String(po.productCode || '').trim();
+            if (!/^[PFS]\d+$/.test(code)) code = '';
+            if (!/^[PFS]\d+$/.test(poCode)) poCode = '';
+            let newCode = code || poCode;
+            if (!newCode) { await gFreshCodeSources(); newCode = gNextProductCode('P'); }
+            const msg = `'${prod.name}' 상품에\n${String(po.date || '').slice(0, 10)} ${po.supplier || ''} · ${po.itemName || ''} 발주를 이을까요?\n\n` +
+                (code ? (poCode && poCode !== code ? `발주 번호 ${poCode} → ${code} 로 바꿔요` : `발주에 ${code} 를 붙여요`)
+                      : (poCode ? `상품이 발주 번호 ${poCode} 를 물려받아요` : `새 번호 ${newCode} 를 둘 다에 붙여요`));
+            if (!(typeof psConfirm === 'function' ? await psConfirm(msg) : confirm(msg))) return;
+            try {
+                if (poCode !== newCode) {
+                    const r = await fetch(`${FIREBASE_DB_URL}${f.node}/${encodeURIComponent(poId)}/productCode.json`, { method: 'PUT', body: JSON.stringify(newCode) });
+                    if (!r.ok) throw new Error('발주 저장 실패 ' + r.status);
+                    po.productCode = newCode;
+                    if (f.node === 'purchase_orders_archive') { try { await gTouchPurchaseArchiveMark(); await refreshPurchaseArchive(true); } catch (e) { } }
+                }
+                if (code !== newCode) {
+                    const ok = await gPatchProductsRes({ [`${idx}/productCode`]: newCode });
+                    if (!ok || ok.ok === false) throw new Error('상품 저장 실패');
+                    prod.productCode = newCode;
+                    updatePublishedProductsTimestamp();
+                }
+            } catch (e) { showToast('연결하지 못했어요: ' + e.message); return; }
+            showToast('🔗 발주를 이었어요 · ' + newCode);
+            openPurchaseChoice(idx);   // 발주 건수·목록을 새로
+            if (typeof renderProductsList === 'function') renderProductsList();
+        }
         function closePurchaseChoice() {
             const modal = document.getElementById('purchase-choice-modal');
             if (modal) modal.style.display = 'none';
@@ -42582,6 +42638,13 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                     📋 발주목록 보기
                     <div id="purchase-choice-count" style="font-size:11.5px; font-weight:700; color:#64748b; margin-top:3px;"></div>
                 </button>
+                <!-- [신규 2026-10-21] 이미 한 발주를 이 상품에 잇는다 (사장님 요청) — 식별번호를 같게 맞춘다 -->
+                <div style="border:1.5px solid #fde68a; background:#fffbeb; border-radius:11px; padding:10px 12px;">
+                    <div style="font-size:14px; font-weight:800; color:#92400e;">🔗 발주 연결</div>
+                    <div style="font-size:11.5px; font-weight:700; color:#a16207; margin:3px 0 7px;">이미 한 발주를 찾아 이 상품에 이어요 (식별번호를 같게 맞춰요)</div>
+                    <input type="search" id="purchase-link-q" placeholder="발주 품목·업체로 찾기" autocomplete="off" oninput="gPoLinkPaint()" style="width:100%; box-sizing:border-box; height:38px; padding:0 10px; border:1.5px solid #fcd34d; border-radius:8px; font-size:13px; font-family:inherit;">
+                    <div id="purchase-link-res" style="margin-top:6px; display:flex; flex-direction:column; gap:4px; max-height:240px; overflow-y:auto;"></div>
+                </div>
             </div>
         </div>
     </div>
