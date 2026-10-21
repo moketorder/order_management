@@ -3502,6 +3502,17 @@
                         #purchase-section-sourcing .src-cal-wkbar.now span { background:#4caf50; }
                         #purchase-section-sourcing .src-cal-wkbar.next { border-top-color:#f59e0b; }
                         #purchase-section-sourcing .src-cal-wkbar.next span { background:#f59e0b; }
+                        /* [신규 2026-10-21] 소싱 메모 (달력과 찾기 칸 사이) */
+                        #purchase-section-sourcing .src-memo { margin:12px 0; padding:10px 12px; background:#fffbeb; border:1.5px solid #fde68a; border-radius:12px; }
+                        #purchase-section-sourcing .src-memo-in { display:flex; align-items:center; gap:8px; }
+                        #purchase-section-sourcing .src-memo-in b { flex:0 0 auto; font-size:13px; font-weight:900; color:#92400e; }
+                        #purchase-section-sourcing .src-memo input { flex:1 1 auto; min-width:0; height:34px; padding:0 10px; border:1.5px solid #fcd34d; border-radius:8px; font-size:13px; font-family:inherit; background:#fff; }
+                        #purchase-section-sourcing .src-memo-list { margin-top:8px; display:flex; flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; }
+                        #purchase-section-sourcing .src-memo-row { display:flex; align-items:center; gap:8px; padding:5px 8px; background:#fff; border-radius:8px; font-size:13px; }
+                        #purchase-section-sourcing .src-memo-row .d { flex:0 0 auto; font-size:11.5px; font-weight:800; color:#b45309; font-variant-numeric:tabular-nums; white-space:nowrap; }
+                        #purchase-section-sourcing .src-memo-row .t { flex:1 1 auto; min-width:0; color:#0f172a; font-weight:600; overflow-wrap:anywhere; }
+                        #purchase-section-sourcing .src-memo-row > button { flex:0 0 auto; height:26px; padding:0 9px; border:1.5px solid #e2e8f0; background:#fff; border-radius:7px; font-size:11.5px; font-weight:800; color:#475569; cursor:pointer; font-family:inherit; }
+                        #purchase-section-sourcing .src-memo-row > button.del { color:#dc2626; border-color:#fecaca; }
                         /* [신규 2026-10-19] 주 접기·펴기 단추 (사장님 요청) */
                         #purchase-section-sourcing .src-cal-wkbar .src-wk-fold { margin-left:auto; height:24px; padding:0 10px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; border-radius:999px; font-size:11.5px; font-weight:800; cursor:pointer; font-family:inherit; }
                         #purchase-section-sourcing .src-cal-wkbar .src-wk-fold:hover { border-color:#64748b; color:#0f172a; }
@@ -3868,6 +3879,7 @@
                         gSrc.manual = manual || {};
                         try { gSrc.reg = (await srcGet('reg')) || {}; } catch (e) { gSrc.reg = gSrc.reg || {}; }
                         try { gSrc.polink = (await srcGet('polink')) || {}; } catch (e) { gSrc.polink = gSrc.polink || {}; }   // [신규 2026-10-08] 발주 연결   // [신규 2026-10-07] 소싱 → 등록한 상품 이음
+                        try { gSrc.memos = (await srcGet('memos')) || {}; } catch (e) { gSrc.memos = gSrc.memos || {}; }   // [신규 2026-10-21] 소싱 메모
                         gSrc.edits = { band: (edits && edits.band) || {}, kakao: (edits && edits.kakao) || {} };
                         if (force || !gSrc.onsiteProducts) gSrc.onsiteProducts = await srcLoadOnsiteProducts();
                         gSrc.meta = meta || {}; gSrc.lineup = lineup || {}; gSrc.picks = picks || {}; gSrc.direct = direct || {};
@@ -3960,7 +3972,8 @@
                         '<span><b class="src-wk-lg this">이번 주</b> <b class="src-wk-lg next">다음 주</b></span>' +   // [수정 2026-10-12] 주 고르기·상품 수·마진 대신 이번 주·다음 주 표시 (사장님 요청)
                         '<span class="k">아래 카테고리별 추천에서 상품명을 누르면 수정·밴드·건너뜀·추천제외, 달력 날짜에 끌어다 놓으면 그날 판매로 표시돼요. 판매·건너뜀한 상품은 4주 동안 다시 추천하지 않아요.</span></div>';
 
-                    html += srcCalendar() + srcSearchPanel() + srcPlanPanel();   // [신규 2026-10-08] 찾기 칸과 카테고리 추천 사이에 다음 2주 공구 추천   // [수정 2026-10-07] 상시판매·밴드 상품·예전 공구 찾기를 한 칸으로 (왼쪽 켜고 끄기 세 개)
+                    html += srcCalendar() + srcMemoPanel() + srcSearchPanel() + srcPlanPanel();   // [신규 2026-10-21] 달력과 찾기 칸 사이에 메모 (사장님 요청)
+                    //   // [신규 2026-10-08] 찾기 칸과 카테고리 추천 사이에 다음 2주 공구 추천   // [수정 2026-10-07] 상시판매·밴드 상품·예전 공구 찾기를 한 칸으로 (왼쪽 켜고 끄기 세 개)
                     // [수정 2026-10-07] 요일별 칸(주간 구성) 대신 카테고리별 추천 — 사장님이 보고 고른다 (srcCatBoard)
                     html += srcCatBoard();
                     v.innerHTML = html;
@@ -6696,6 +6709,45 @@
                 function srcUniState() {
                     gSrc.uniQ = gSrc.uniQ || { q: '', on: { onsite: true, band: true, hist: true } };   // [수정 2026-10-09] 처음엔 셋 다 켜 둔다 (사장님 요청 — 10/7 엔 다 꺼 뒀었다)
                     return gSrc.uniQ;
+                }
+                /* [신규 2026-10-21] 소싱 메모 — 달력과 찾기 칸 사이, 생각나는 것을 적어 둔다 (사장님 요청).
+                   sourcing/memos/<id> = { t: 글, at: 적은 때, up: 고친 때 } · 새것이 위 · 수정·삭제. 모든 기기에서 같이 보인다 */
+                function srcMemoPanel() {
+                    const M = gSrc.memos || {}, ed = gSrc.memoEdit || '';
+                    const fmt = ms => { const d = new Date(Number(ms) || 0); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+                    const list = Object.entries(M).filter(([, v]) => v && v.t).sort((a, b) => (Number(b[1].at) || 0) - (Number(a[1].at) || 0));
+                    return '<div class="src-memo">' +
+                        '<div class="src-memo-in"><b>📝 메모</b><input type="text" id="src-memo-new" maxlength="300" placeholder="생각나는 것 적어 두기 (엔터로 저장)" autocomplete="off" value="' + srcEsc(gSrc.memoDraft || '') + '" oninput="gSrc.memoDraft=this.value" onkeydown="if(event.key===\'Enter\' && !event.isComposing){event.preventDefault(); srcMemoAdd();}"><button type="button" class="src-btn" onclick="srcMemoAdd()">저장</button></div>' +
+                        (list.length ? '<div class="src-memo-list">' + list.map(([id, v]) => id === ed
+                            ? '<div class="src-memo-row edit"><input type="text" id="src-memo-ed" maxlength="300" value="' + srcEsc(gSrc.memoEdDraft != null ? gSrc.memoEdDraft : v.t) + '" oninput="gSrc.memoEdDraft=this.value" onkeydown="if(event.key===\'Enter\' && !event.isComposing){event.preventDefault(); srcMemoSave(\'' + id + '\');} else if(event.key===\'Escape\'){gSrc.memoEdit=\'\'; gSrc.memoEdDraft=null; srcRender();}"><button type="button" class="src-btn" onclick="srcMemoSave(\'' + id + '\')">저장</button><button type="button" class="src-btn" onclick="gSrc.memoEdit=\'\'; gSrc.memoEdDraft=null; srcRender()">취소</button></div>'
+                            : '<div class="src-memo-row"><span class="d" title="' + (v.up ? '고친 때 ' + fmt(v.up) : '') + '">' + fmt(v.at) + (v.up ? ' ✏️' : '') + '</span><span class="t">' + srcEsc(v.t) + '</span><button type="button" onclick="gSrc.memoEdit=\'' + id + '\'; gSrc.memoEdDraft=null; srcRender(); setTimeout(() => { const i = document.getElementById(\'src-memo-ed\'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0)">수정</button><button type="button" class="del" onclick="srcMemoDel(\'' + id + '\')">삭제</button></div>'
+                        ).join('') + '</div>' : '') + '</div>';
+                }
+                async function srcMemoAdd() {
+                    const i = document.getElementById('src-memo-new'), t = String((i && i.value) || '').trim();
+                    if (!t) { showToast('메모를 적어 주세요'); return; }
+                    const id = 'm' + Date.now().toString(36), v = { t, at: Date.now() };
+                    try { await srcPut('memos/' + id, v); gSrc.memos = gSrc.memos || {}; gSrc.memos[id] = v; gSrc.memoDraft = ''; showToast('📝 메모를 저장했어요'); }
+                    catch (e) { showToast('저장 못 했어요: ' + e.message); return; }
+                    srcRender();
+                    setTimeout(() => { const n = document.getElementById('src-memo-new'); if (n) n.focus(); }, 0);
+                }
+                async function srcMemoSave(id) {
+                    const i = document.getElementById('src-memo-ed'), t = String((i && i.value) || '').trim(), cur = (gSrc.memos || {})[id];
+                    if (!cur) return;
+                    if (!t) { showToast('비우려면 삭제를 눌러 주세요'); return; }
+                    const v = Object.assign({}, cur, { t, up: Date.now() });
+                    try { await srcPut('memos/' + id, v); gSrc.memos[id] = v; gSrc.memoEdit = ''; gSrc.memoEdDraft = null; showToast('메모를 고쳤어요'); }
+                    catch (e) { showToast('저장 못 했어요: ' + e.message); return; }
+                    srcRender();
+                }
+                async function srcMemoDel(id) {
+                    const cur = (gSrc.memos || {})[id]; if (!cur) return;
+                    const ok = typeof psConfirm === 'function' ? await psConfirm('이 메모를 지울까요?\n\n' + cur.t) : confirm('이 메모를 지울까요?\n\n' + cur.t);
+                    if (!ok) return;
+                    try { await srcPut('memos/' + id, null); delete gSrc.memos[id]; showToast('메모를 지웠어요'); }
+                    catch (e) { showToast('지우지 못했어요: ' + e.message); return; }
+                    srcRender();
                 }
                 function srcSearchPanel() {
                     const U = srcUniState(), on = U.on, Q = gSrc.pickQ;
