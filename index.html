@@ -3151,7 +3151,7 @@
                                     <span id="desc-toggle-caret" style="flex:0 0 auto; color:#94a3b8; font-size:11px;">▼</span>
                                 </button>
                                 <div id="desc-box" style="margin-top:8px;">
-                                    <textarea id="productDesc" rows="3" placeholder="상품에 대한 맛, 크기, 원산지 등의 상세 설명을 입력하세요..." oninput="autoResizeTextarea(this)"></textarea>
+                                    <textarea id="productDesc" rows="3" placeholder="상품에 대한 맛, 크기, 원산지 등의 상세 설명을 입력하세요..." oninput="autoResizeTextarea(this); gLeadFromDesc()"></textarea>
                                 </div>
                             </div>
 
@@ -35286,6 +35286,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             return { leads: [a.pre, mid, b.pre].filter(Boolean), main: b.rest };
         }
         // 대괄호·수식어 칸 읽기 — 대괄호는 쉼표로 나누고 [ ] 는 뗀다 (세 개까지, 한 개 12자), 수식어 끝 ! ? 는 뗀다
+        /* [신규 2026-10-21] 상품설명 첫째 줄의 수식어를 상품명 위 수식어 칸에 저절로 (사장님 요청). 앞 이모지·기호는 뺀다.
+           수식어 칸이 비어 있거나 전에 저절로 넣은 글 그대로일 때만 — 손으로 고친 수식어는 덮어쓰지 않는다 */
+        function gLeadFromDesc() {
+            const lead = document.getElementById('pnLead'), desc = document.getElementById('productDesc');
+            if (!lead || !desc) return;
+            const cur = lead.value.trim(), auto = lead.dataset.auto || '';
+            if (cur && cur !== auto) return;
+            const first = (String(desc.value || '').split('\n').find(l => l.trim()) || '');
+            const t = first.replace(/^[^\p{L}\p{N}"'“‘(\[]+/u, '').trim().slice(0, Number(lead.maxLength) > 0 ? lead.maxLength : 40);
+            if (t === cur) return;
+            lead.value = t; lead.dataset.auto = t;
+            if (typeof gLeadLimitInput === 'function') gLeadLimitInput();
+            if (typeof gPaintNamePreview === 'function') gPaintNamePreview();
+        }
         function gNameFieldsRead() {
             const b = String((document.getElementById('pnBracket') || {}).value || '');
             const tags = b.split(/[,，]/).map(x => x.replace(/[\[\]]/g, '').trim().slice(0, 12)).filter(Boolean).slice(0, 3);
@@ -35946,7 +35960,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             gPaintNamePreview();   // [신규] 손님 화면 미리보기
             { const _b = document.getElementById('pnBracket'), _l = document.getElementById('pnLead');
               if (_b) _b.value = (Array.isArray(prod.nameTags) ? prod.nameTags : []).join(', ');
-              if (_l) _l.value = prod.nameLead || ''; gPaintNamePreview(); }
+              if (_l) { _l.value = prod.nameLead || ''; _l.dataset.auto = ''; } gPaintNamePreview(); }
             { const _sc = document.getElementById('productSrcCat'); if (_sc) { gFillSrcCatSelect(_sc, prod.srcCat || ''); _sc.value = prod.srcCat || ''; } }   // [신규 2026-10-08]
             { const _tg = document.getElementById('productTags'); if (_tg) _tg.value = (Array.isArray(prod.tags) ? prod.tags : String(prod.tags || '').split(',')).map(x => String(x).trim()).filter(Boolean).join(', '); }
             // 이전 상품에서 잠겨 있었을 수 있으므로 가격칸을 먼저 깨끗한 숫자칸으로 되돌린 뒤 값을 넣는다
