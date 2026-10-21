@@ -3507,12 +3507,17 @@
                         #purchase-section-sourcing .src-memo-in { display:flex; align-items:center; gap:8px; }
                         #purchase-section-sourcing .src-memo-in b { flex:0 0 auto; font-size:13px; font-weight:900; color:#92400e; }
                         #purchase-section-sourcing .src-memo input { flex:1 1 auto; min-width:0; height:34px; padding:0 10px; border:1.5px solid #fcd34d; border-radius:8px; font-size:13px; font-family:inherit; background:#fff; }
-                        #purchase-section-sourcing .src-memo-list { margin-top:8px; display:flex; flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; }
+                        #purchase-section-sourcing .src-memo-list { margin-top:8px; display:flex; flex-direction:column; gap:4px; }
                         #purchase-section-sourcing .src-memo-row { display:flex; align-items:center; gap:8px; padding:5px 8px; background:#fff; border-radius:8px; font-size:13px; }
                         #purchase-section-sourcing .src-memo-row .d { flex:0 0 auto; font-size:11.5px; font-weight:800; color:#b45309; font-variant-numeric:tabular-nums; white-space:nowrap; }
                         #purchase-section-sourcing .src-memo-row .t { flex:1 1 auto; min-width:0; color:#0f172a; font-weight:600; overflow-wrap:anywhere; }
                         #purchase-section-sourcing .src-memo-row > button { flex:0 0 auto; height:26px; padding:0 9px; border:1.5px solid #e2e8f0; background:#fff; border-radius:7px; font-size:11.5px; font-weight:800; color:#475569; cursor:pointer; font-family:inherit; }
                         #purchase-section-sourcing .src-memo-row > button.del { color:#dc2626; border-color:#fecaca; }
+                        /* [신규 2026-10-21] 메모 쪽 넘기기 · 접기 */
+                        #purchase-section-sourcing .src-memo-fold { flex:0 0 auto; height:26px; padding:0 9px; border:1.5px solid #fcd34d; background:#fff; color:#92400e; border-radius:999px; font-size:11.5px; font-weight:800; cursor:pointer; font-family:inherit; }
+                        #purchase-section-sourcing .src-memo-nav { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:6px; font-size:12px; font-weight:800; color:#92400e; font-variant-numeric:tabular-nums; }
+                        #purchase-section-sourcing .src-memo-nav button { width:30px; height:26px; border:1.5px solid #fcd34d; background:#fff; color:#92400e; border-radius:7px; font-weight:900; cursor:pointer; }
+                        #purchase-section-sourcing .src-memo-nav button:disabled { opacity:.35; cursor:default; }
                         /* [신규 2026-10-19] 주 접기·펴기 단추 (사장님 요청) */
                         #purchase-section-sourcing .src-cal-wkbar .src-wk-fold { margin-left:auto; height:24px; padding:0 10px; border:1.5px solid #cbd5e1; background:#fff; color:#475569; border-radius:999px; font-size:11.5px; font-weight:800; cursor:pointer; font-family:inherit; }
                         #purchase-section-sourcing .src-cal-wkbar .src-wk-fold:hover { border-color:#64748b; color:#0f172a; }
@@ -6715,19 +6720,30 @@
                 function srcMemoPanel() {
                     const M = gSrc.memos || {}, ed = gSrc.memoEdit || '';
                     const fmt = ms => { const d = new Date(Number(ms) || 0); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
-                    const list = Object.entries(M).filter(([, v]) => v && v.t).sort((a, b) => (Number(b[1].at) || 0) - (Number(a[1].at) || 0));
+                    const all = Object.entries(M).filter(([, v]) => v && v.t).sort((a, b) => (Number(b[1].at) || 0) - (Number(a[1].at) || 0));
+                    /* [수정 2026-10-21] 다섯 개씩 쪽으로 나눠 ◀ ▶ 로 넘긴다 · 목록은 접었다 펼 수 있다(이 기기에 기억) (사장님 요청) */
+                    const PER = 5, pages = Math.max(1, Math.ceil(all.length / PER));
+                    let pg = Math.min(Math.max(0, Number(gSrc.memoPage) || 0), pages - 1);
+                    if (ed) { const ei = all.findIndex(([id]) => id === ed); if (ei >= 0) pg = Math.floor(ei / PER); }   // 고치는 메모가 있는 쪽
+                    gSrc.memoPage = pg;
+                    const folded = srcMemoFolded();
+                    const list = folded ? [] : all.slice(pg * PER, pg * PER + PER);
+                    const nav = (!folded && pages > 1) ? '<div class="src-memo-nav"><button type="button" onclick="srcMemoGo(-1)"' + (pg <= 0 ? ' disabled' : '') + '>◀</button><span>' + (pg + 1) + ' / ' + pages + '</span><button type="button" onclick="srcMemoGo(1)"' + (pg >= pages - 1 ? ' disabled' : '') + '>▶</button></div>' : '';
                     return '<div class="src-memo">' +
-                        '<div class="src-memo-in"><b>📝 메모</b><input type="text" id="src-memo-new" maxlength="300" placeholder="생각나는 것 적어 두기 (엔터로 저장)" autocomplete="off" value="' + srcEsc(gSrc.memoDraft || '') + '" oninput="gSrc.memoDraft=this.value" onkeydown="if(event.key===\'Enter\' && !event.isComposing){event.preventDefault(); srcMemoAdd();}"><button type="button" class="src-btn" onclick="srcMemoAdd()">저장</button></div>' +
+                        '<div class="src-memo-in"><b>📝 메모</b><button type="button" class="src-memo-fold" onclick="srcMemoFoldToggle()" title="' + (folded ? '메모 펴기' : '메모 접기') + '">' + (folded ? '▸ 펴기' + (all.length ? ' (' + all.length + ')' : '') : '▾ 접기') + '</button><input type="text" id="src-memo-new" maxlength="300" placeholder="생각나는 것 적어 두기 (엔터로 저장)" autocomplete="off" value="' + srcEsc(gSrc.memoDraft || '') + '" oninput="gSrc.memoDraft=this.value" onkeydown="if(event.key===\'Enter\' && !event.isComposing){event.preventDefault(); srcMemoAdd();}"><button type="button" class="src-btn" onclick="srcMemoAdd()">저장</button></div>' +
                         (list.length ? '<div class="src-memo-list">' + list.map(([id, v]) => id === ed
                             ? '<div class="src-memo-row edit"><input type="text" id="src-memo-ed" maxlength="300" value="' + srcEsc(gSrc.memoEdDraft != null ? gSrc.memoEdDraft : v.t) + '" oninput="gSrc.memoEdDraft=this.value" onkeydown="if(event.key===\'Enter\' && !event.isComposing){event.preventDefault(); srcMemoSave(\'' + id + '\');} else if(event.key===\'Escape\'){gSrc.memoEdit=\'\'; gSrc.memoEdDraft=null; srcRender();}"><button type="button" class="src-btn" onclick="srcMemoSave(\'' + id + '\')">저장</button><button type="button" class="src-btn" onclick="gSrc.memoEdit=\'\'; gSrc.memoEdDraft=null; srcRender()">취소</button></div>'
                             : '<div class="src-memo-row"><span class="d" title="' + (v.up ? '고친 때 ' + fmt(v.up) : '') + '">' + fmt(v.at) + (v.up ? ' ✏️' : '') + '</span><span class="t">' + srcEsc(v.t) + '</span><button type="button" onclick="gSrc.memoEdit=\'' + id + '\'; gSrc.memoEdDraft=null; srcRender(); setTimeout(() => { const i = document.getElementById(\'src-memo-ed\'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0)">수정</button><button type="button" class="del" onclick="srcMemoDel(\'' + id + '\')">삭제</button></div>'
-                        ).join('') + '</div>' : '') + '</div>';
+                        ).join('') + '</div>' : '') + nav + '</div>';
                 }
+                function srcMemoGo(d) { gSrc.memoPage = (Number(gSrc.memoPage) || 0) + d; gSrc.memoEdit = ''; gSrc.memoEdDraft = null; srcRender(); }
+                function srcMemoFolded() { try { return localStorage.getItem('moket_src_memofold') === '1'; } catch (e) { return false; } }
+                function srcMemoFoldToggle() { try { localStorage.setItem('moket_src_memofold', srcMemoFolded() ? '0' : '1'); } catch (e) { } srcRender(); }
                 async function srcMemoAdd() {
                     const i = document.getElementById('src-memo-new'), t = String((i && i.value) || '').trim();
                     if (!t) { showToast('메모를 적어 주세요'); return; }
                     const id = 'm' + Date.now().toString(36), v = { t, at: Date.now() };
-                    try { await srcPut('memos/' + id, v); gSrc.memos = gSrc.memos || {}; gSrc.memos[id] = v; gSrc.memoDraft = ''; showToast('📝 메모를 저장했어요'); }
+                    try { await srcPut('memos/' + id, v); gSrc.memos = gSrc.memos || {}; gSrc.memos[id] = v; gSrc.memoDraft = ''; gSrc.memoPage = 0; showToast('📝 메모를 저장했어요'); }
                     catch (e) { showToast('저장 못 했어요: ' + e.message); return; }
                     srcRender();
                     setTimeout(() => { const n = document.getElementById('src-memo-new'); if (n) n.focus(); }, 0);
