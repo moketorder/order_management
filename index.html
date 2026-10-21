@@ -31917,6 +31917,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const mk = String(prod.matchKey || '').trim();
             const pre = (prod.isSada === true || prod.isSada === 'true') ? 'S'
                 : (mk === '과일') ? 'F' : 'P';
+            await gFreshCodeSources();   // [신규 2026-10-21] 오래 열어 둔 화면이라도 서버의 최신 번호를 보고 고른다
             const code = gNextProductCode(pre);
             try {
                 const r = await gPatchProductsRes({ [`${index}/productCode`]: code });
@@ -34776,6 +34777,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         : 'P');
                     productCodePrefixPick = '';
                     // 이미 쓰는 가장 큰 번호 다음으로 새 번호를 만든다
+                    await gFreshCodeSources();   // [신규 2026-10-21] 서버의 최신 번호까지 보고 고른다 (번호 겹침 막기)
                     _productCode = gNextProductCode(_pre);
                 }
                 /* [신규] 이름 칸에 적어 둔 것이 있으면 저장할 때 함께 걸어 준다.
@@ -38340,7 +38342,22 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             /* [버그수정] 지금 안 파는 옛 물건들은 상품 목록에도 발주에도 없고 주문과 이름표에만 있다.
                그것을 안 세면 이미 쓰는 번호를 새 상품에 또 내주게 된다. 이름표까지 봐야 한다. */
             Object.keys(gCodeLabels || {}).forEach(eat);
+            gFreshCodes.forEach(eat);   // [신규 2026-10-21] 저장 직전에 서버에서 받아 온 최신 번호
             return pre + String(max + 1).padStart(4, '0');
+        }
+        /* [신규 2026-10-21] 새 식별번호를 고르기 직전에 서버의 상품·발주 번호를 다시 받는다 (사장님 지적).
+           10/21 아침 07:40 에 태추단감이 P0984 로 등록됐는데, 그 전부터 열려 있던 화면이 13:10 멸치볶음 발주에 P0984 를 또 줬다
+           (화면 속 상품 목록이 옛것이라 그 번호를 몰랐다). 못 받으면 예전처럼 화면 속 목록만 본다 */
+        const gFreshCodes = new Set();
+        async function gFreshCodeSources() {
+            try {
+                const [pr, po] = await Promise.all([
+                    fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`).then(r => r.ok ? r.json() : null),
+                    fetch(`${FIREBASE_DB_URL}purchase_orders.json?t=${Date.now()}`).then(r => r.ok ? r.json() : null)
+                ]);
+                Object.values(pr || {}).forEach(p => { const c = String((p && p.productCode) || '').trim(); if (/^[PFS]\d+$/.test(c)) gFreshCodes.add(c); });
+                Object.values(po || {}).forEach(o => { const c = String((o && o.productCode) || '').trim(); if (/^[PFS]\d+$/.test(c)) gFreshCodes.add(c); });
+            } catch (e) { console.warn('최신 식별번호를 못 받았어요 (화면 속 목록으로 고릅니다):', e); }
         }
 
         /* [신규] 번호에 걸린 이름표.
@@ -38908,6 +38925,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (_sameName && _sameName[0] === purchaseCodePrefix) _autoCode = _sameName;
                 else {
                     try { await gLoadCodeLabels(); } catch (e) { }
+                    await gFreshCodeSources();   // [신규 2026-10-21] 10/21 멸치볶음 발주가 태추단감 번호(P0984)를 또 받은 일 — 서버 최신 번호까지 본다
                     _autoCode = gNextProductCode(purchaseCodePrefix);
                 }
             }
