@@ -21891,6 +21891,22 @@
             const r = input.getBoundingClientRect();
             pop.style.cssText = 'position:fixed; z-index:10050; left:' + Math.max(8, Math.min(window.innerWidth - 328, r.left - 60)) + 'px; top:' + (r.bottom + 4) + 'px; width:320px; max-width:calc(100vw - 16px); box-sizing:border-box;'
                 + ' background:#fff; border:1.5px solid #cbd5e1; border-radius:10px; box-shadow:0 8px 24px rgba(15,23,42,.18); padding:8px 10px; font-size:12px; font-weight:800; color:#334155;';
+            /* [신규 2026-10-21] 스크롤하면 창이 가격 칸을 따라가고, 칸이 화면 밖으로 나가면 숨는다 (사장님 지적 — 폰에서 스크롤해도 그 자리에 떠 있었다) */
+            if (!window.__gPriceCostFollow) {
+                window.__gPriceCostFollow = true;
+                const follow = () => {
+                    const p = document.getElementById('price-cost-pop'), el = gPriceTarget;
+                    if (!p || !el || !p.isConnected) return;
+                    const rr = el.getBoundingClientRect();
+                    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+                    const out = rr.bottom < 0 || rr.top > vh || !el.offsetParent;
+                    p.style.visibility = out ? 'hidden' : '';
+                    if (!out) { p.style.top = (rr.bottom + 4) + 'px'; p.style.left = Math.max(8, Math.min(window.innerWidth - 328, rr.left - 60)) + 'px'; }
+                };
+                window.addEventListener('scroll', follow, { passive: true, capture: true });
+                window.addEventListener('resize', follow, { passive: true });
+                if (window.visualViewport) window.visualViewport.addEventListener('resize', follow, { passive: true });
+            }
             if (!again) {
                 // 기준은 누른 칸이 아닌 칸 중 값이 있는 것 먼저 (공구가 → 상시가 → 정상가)
                 const others = PRICE_FIELDS.map(x => x[0]).filter(id => id !== input.id);
