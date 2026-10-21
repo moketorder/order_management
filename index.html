@@ -3108,7 +3108,7 @@
                                 <div class="price-row6" style="display:grid; grid-template-columns:minmax(0,0.55fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,0.75fr) minmax(0,0.9fr); gap:5px; align-items:stretch;">
                                     <button type="button" id="btn-tax-type" onclick="toggleFormTaxFree()" title="눌러서 과세·면세 바꾸기" style="width:100%; min-width:0; height:45px; box-sizing:border-box; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; background:#f1f5f9; color:#64748b; border:1.5px solid #e2e8f0;">과세</button>
                                     <input type="number" id="productPrice" class="form-control" placeholder="공구가" min="0" required onfocus="gPriceCostShow(this)" onkeydown="gPriceEnter(event, this)" onblur="gPriceCostHide()" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
-                                    <input type="number" id="productPriceOnsite" class="form-control" placeholder="상시가" min="0" oninput="gPriceReqSync()" onfocus="gPriceCostShow(this)" onkeydown="gPriceEnter(event, this)" onblur="gPriceCostHide()" title="상시판매로 팔 때 가격 — 상시판매로 넘어가면 이 값으로" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
+                                    <input type="number" id="productPriceOnsite" class="form-control" placeholder="상시가 (필수)" min="0" oninput="gPriceReqSync()" onfocus="gPriceCostShow(this)" onkeydown="gPriceEnter(event, this)" onblur="gPriceCostHide()" title="상시판매로 팔 때 가격 — 상시판매로 넘어가면 이 값으로" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <input type="number" id="productPriceStore" class="form-control" placeholder="정상가" min="0" oninput="gListPriceFieldSync()" onfocus="gPriceCostShow(this)" onkeydown="gPriceEnter(event, this)" onblur="gPriceCostHide()" title="정상가 — 매장 가격표에 찍는 가격 (할인 설정의 정상가와 같은 값)" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <input type="number" id="productStock" class="form-control" placeholder="재고" title="999를 넣으면 무제한" min="0" required onchange="gStock999ToUnlimited(this)" style="width:100%; min-width:0; height:45px; box-sizing:border-box;">
                                     <button type="button" id="btn-detail-option" class="price-option-btn" onclick="openDetailOptionSetting()" style="width:100%; min-width:0; height:45px; box-sizing:border-box; padding:0 8px; overflow:hidden; text-overflow:ellipsis;">상세옵션</button>
@@ -34692,6 +34692,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!name) {
                 showToast("상품명을 입력해주세요.");
                 return;
+            }
+            // [신규 2026-10-21] 상시가는 꼭 적어야 저장된다 (사장님 요청 — 상시판매로 넘어갈 때·가격표에 쓴다)
+            {
+                const _onEl = document.getElementById('productPriceOnsite');
+                if (_onEl && !((parseInt(_onEl.value) || 0) > 0)) {
+                    showToast("상시가를 적어 주세요.");
+                    try { _onEl.focus(); _onEl.style.borderColor = '#dc2626'; setTimeout(() => { _onEl.style.borderColor = ''; }, 2500); } catch (e) { }
+                    return;
+                }
             }
 
             // [수정] 사다드림 여부를 이름 말머리뿐 아니라 별도 값(isSada)으로도 저장한다.
