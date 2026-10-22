@@ -4698,6 +4698,8 @@
                 }
                 function srcVendorOf(r, p) { return (p && p.vendor) || (r[0] === 'onsite' ? '상시판매' : r[0] === 'manual' ? ((p && p.memo) || '') : ''); }
                 const srcNormName = s => String(s || '').replace(/\[[^\]]*\]/g, '').replace(/\s/g, '').toLowerCase();
+                /* [신규 2026-10-22] 찾기에서 ㅅ 받침(사이시옷)은 없는 것으로 본다 — '고춧가루'로 쳐도 '고추가루'가 나오게 (사장님: 고추가루가 왜 검색이 안 돼?) */
+                const srcSiot = c => { const k = c.charCodeAt(0) - 0xAC00; return k >= 0 && k < 11172 && k % 28 === 19 ? String.fromCharCode(c.charCodeAt(0) - 19) : c; };
                 function srcProdIndex() {
                     const list = (typeof uploadProducts !== 'undefined' && uploadProducts) || [];
                     const ix = { list, byName: {}, byCode: {}, bySid: {} };
@@ -6080,9 +6082,9 @@
                         '<div class="chips" id="src-onsite-chips">' + srcOnsiteChipsHtml() + '</div></details>';
                 }
                 function srcOnsiteChipsHtml() {
-                    const q = gSrc.onsiteQ.q.trim().replace(/\s/g, '').toLowerCase();
+                    const q = gSrc.onsiteQ.q.trim().replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
                     if (!q) return '<span class="k">상품 이름을 치면 여기에 나와요</span>';
-                    const list = (gSrc.onsiteProducts || []).filter(p => p.name.replace(/\s/g, '').toLowerCase().includes(q));
+                    const list = (gSrc.onsiteProducts || []).filter(p => p.name.replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q));
                     if (!list.length) return '<span class="k">찾는 상품이 없어요</span>';
                     return list.map(p => {
                         const done = gSrc.onsite[p.code];
@@ -6590,17 +6592,17 @@
                         $('src-day-now').innerHTML = names.length ? '<span style="background:none;padding:0">이 날짜:</span>' + names.map(n => '<span>' + srcEsc(n) + '</span>').join('') : '';
                     };
                     const onsiteRes = () => {
-                        const q = $('src-day-onsite').value.trim().replace(/\s/g, '').toLowerCase();
+                        const q = $('src-day-onsite').value.trim().replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
                         if (!q) { $('src-day-onsite-res').innerHTML = '<span class="k">이름을 치면 나와요</span>'; return; }
-                        const list = (gSrc.onsiteProducts || []).filter(p => p.name.replace(/\s/g, '').toLowerCase().includes(q)).slice(0, 30);
+                        const list = (gSrc.onsiteProducts || []).filter(p => p.name.replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q)).slice(0, 30);
                         $('src-day-onsite-res').innerHTML = list.length ? list.map(p => '<button type="button" data-onsite="' + srcEsc(p.code) + '">' + srcEsc(p.name) + '</button>').join('') : '<span class="k">찾는 상품이 없어요</span>';
                     };
                     const bandRes = async () => {
-                        const q = $('src-day-band').value.trim().replace(/\s/g, '').toLowerCase();
+                        const q = $('src-day-band').value.trim().replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
                         if (!q) { $('src-day-band-res').innerHTML = '<span class="k">이름을 치면 나와요 (점수 높은 순 30개)</span>'; return; }
                         if (!gSrc.band) { $('src-day-band-res').innerHTML = '<span class="k">불러오는 중…</span>'; try { gSrc.band = (await srcGet('band')) || {}; } catch (e) { $('src-day-band-res').innerHTML = '<span class="k">못 불러왔어요</span>'; return; } }
                         const from = gSrc.dayQ.days ? srcDaysAgo(gSrc.dayQ.days) : '';
-                        const list = srcBandRows().filter(r => String(r.n).replace(/\s/g, '').toLowerCase().includes(q) && srcInPeriod(r.d, from, '')).sort((a, b) => (+b.s || 0) - (+a.s || 0)).slice(0, 30);
+                        const list = srcBandRows().filter(r => String(r.n).replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q) && srcInPeriod(r.d, from, '')).sort((a, b) => (+b.s || 0) - (+a.s || 0)).slice(0, 30);
                         if (!$('src-day-band-res')) return;
                         $('src-day-band-res').innerHTML = list.length ? list.map(r => '<button type="button" data-band="' + srcEsc(r.no) + '">' + srcEsc(r.n) + '<small>' + srcEsc(r.v) + (r.sp ? ' ' + Number(r.sp).toLocaleString() : '') + (r.s ? ' · ' + r.s + '점' : '') + '</small></button>').join('') : '<span class="k">찾는 상품이 없어요</span>';
                     };
@@ -6649,11 +6651,11 @@
                         '<div class="chips" id="src-pick-chips">' + srcBandPickHtml() + '</div></details>';
                 }
                 function srcBandPickHtml() {
-                    const Q = gSrc.pickQ, q = Q.q.trim().replace(/\s/g, '').toLowerCase();
+                    const Q = gSrc.pickQ, q = Q.q.trim().replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
                     if (!q && !Q.vendor) return '<span class="k">상품 이름을 치면 여기에 나와요 (점수 높은 순 40개)</span>';
                     if (!gSrc.band) return '<span class="k">밴드 상품을 불러오는 중…</span>';
                     const from = Q.days ? srcDaysAgo(Q.days) : '';
-                    const list = srcBandRows().filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().includes(q)) && (!Q.vendor || String(r.v || '').trim() === Q.vendor) && srcInPeriod(r.d, from, ''))
+                    const list = srcBandRows().filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q)) && (!Q.vendor || String(r.v || '').trim() === Q.vendor) && srcInPeriod(r.d, from, ''))
                         .sort((a, b) => (+b.s || 0) - (+a.s || 0)).slice(0, 40);
                     if (!list.length) return '<span class="k">찾는 상품이 없어요</span>';
                     const sold = srcSoldMap();
@@ -6679,13 +6681,13 @@
                         '<div class="chips" id="src-hist-chips">' + srcHistHtml() + '</div></details>';
                 }
                 function srcHistHtml() {
-                    const q = String(gSrc.histQ || '').trim().replace(/\s/g, '').toLowerCase();
+                    const q = String(gSrc.histQ || '').trim().replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
                     if (!q) return '<span class="k">상품 이름을 치면 여기에 나와요 (최근에 한 순 40개)</span>';
                     if (!gSrc.hist) return '<span class="k">판매 기록을 불러오는 중…</span>';
                     const md = d => { const [y, m, dd] = String(d).split('-'); return (y === String(new Date().getFullYear()) ? '' : y.slice(2) + '.') + parseInt(m) + '/' + parseInt(dd); };
                     const list = gSrc.hist.filter(h => {
                         const names = [h.name].concat(h.names && h.names.keys ? [...h.names.keys()] : []);
-                        return names.some(n => String(n || '').replace(/\s/g, '').toLowerCase().includes(q));
+                        return names.some(n => String(n || '').replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q));
                     }).map(h => {
                         const pks = (h.rounds || []).map(r => r.pk).filter(Boolean).sort();
                         return { h, last: pks[pks.length - 1] || '', n: (h.rounds || []).length };
@@ -6837,10 +6839,10 @@
                     const vendors = [...new Set(rows.map(r => r.v))].sort();
                     const cats = [...new Set(rows.map(r => r.c).filter(Boolean))].sort();
                     const from = Q.days ? srcDaysAgo(Q.days) : Q.from, to = Q.days ? '' : Q.to;
-                    const q = Q.q.trim().replace(/\s/g, '').toLowerCase();
+                    const q = Q.q.trim().replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
                     const cut = new Date(); cut.setDate(cut.getDate() - 28);
                     const cutIso = cut.toISOString().slice(0, 10);
-                    let list = rows.filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().includes(q) || String(r.kw || '').toLowerCase().includes(q))
+                    let list = rows.filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q) || String(r.kw || '').replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q))
                         && (!Q.vendor || r.v === Q.vendor) && (!Q.cat || r.c === Q.cat) && srcInPeriod(r.d, from, to));
                     list.forEach(r => { r.sold = sold[r.v + '|' + r.n] || (r.kw && sold['#' + r.kw]) || ''; });
                     if (Q.soldOnly) list = list.filter(r => r.sold);
@@ -7052,8 +7054,8 @@
                     else if (!gSrcCat.loading) { gSrcCat.loading = true; srcGet('band').then(b => { gSrc.band = b || {}; gSrcCat.loading = false; if (gSrc.tab === 'kakao') srcRender(); }).catch(() => { gSrcCat.loading = false; }); }
                     const cats = [...new Set(rows.map(r => r.c).filter(Boolean))].sort();
                     const from = Q.days ? srcDaysAgo(Q.days) : Q.from, to = Q.days ? '' : Q.to;
-                    const q = Q.q.trim().replace(/\s/g, '').toLowerCase();
-                    let list = rows.filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().includes(q) || String(r.raw || '').replace(/\s/g, '').toLowerCase().includes(q)) && (!Q.vendor || r.v === Q.vendor)
+                    const q = Q.q.trim().replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
+                    let list = rows.filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q) || String(r.raw || '').replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q)) && (!Q.vendor || r.v === Q.vendor)
                         && (!Q.cat || r.c === Q.cat) && srcInPeriod(String(r.d || '').slice(0, 10), from, to));
                     const num = { cnt: 1, p: 1 };
                     list.sort((a, b) => {
