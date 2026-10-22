@@ -21290,7 +21290,7 @@
             const dk = t => { const d = new Date(t); return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`; };
             const s = uploadFormSched;
             const rel0 = s ? s.releaseAt : new Date(`${dk(Date.now())}T${p2(PS_DEFAULT_SLOT)}:00`).getTime();   // [수정 2026-10-09] 노출일 기본 = 오늘 (시각은 PS_DEFAULT_SLOT — 2026-10-10부터 00시) (사장님 요청, 예전 내일)
-            const stub = (uploadIsEditMode && uploadEditProductKey !== null && uploadProducts[uploadEditProductKey]) || {};
+            const stub = gFormSchedStub();   // [수정 2026-10-22] 화면 날짜 칸에 적은 날짜를 기준으로 (사장님 지적 — 10/26 으로 적었는데 마감이 10/24 로 나왔다)
             const def = s ? { expireAt: s.expireAt, pickup: s.pickup } : psDefaultSchedule(stub, rel0);
             const relH = new Date(rel0).getHours();
             // [신규 2026-10-10] 반복 기본값 — 정해 둔 값, 아니면 상품의 반복, 매주 노출 상품이면 '매주'
@@ -21342,9 +21342,17 @@
             return d ? new Date(`${d}T${String(h).padStart(2, '0')}:00`).getTime() : null;
         }
         // 노출일을 바꾸면 마감·픽업 기본값도 따라 바꾼다 (손으로 고친 마감은 그대로)
+        /* [신규 2026-10-22] 일정 창 기본값의 기준 상품 — 수정 중인 상품(없으면 빈 것)에, 화면 날짜 칸에 적은 공동구매 날짜를 얹는다.
+           새로 등록하는 상품은 저장 전이라 날짜가 없어 '노출일 + 2일'(10/24)이 나왔다 — 날짜 칸(10/26)을 보게 */
+        function gFormSchedStub() {
+            const base = (uploadIsEditMode && uploadEditProductKey !== null && uploadProducts[uploadEditProductKey]) || {};
+            const dv = (document.getElementById('categoryValue') || {}).value || '';
+            const d = (typeof uploadCurrentTab === 'undefined' || uploadCurrentTab === 'reserve') ? toISODate(dv) : '';
+            return d ? Object.assign({}, base, { matchKey: d, date: d }) : base;
+        }
         function fspFillDefaults() {
             const rel = fspRelMs(); if (!rel) return;
-            const stub = (uploadIsEditMode && uploadEditProductKey !== null && uploadProducts[uploadEditProductKey]) || {};
+            const stub = gFormSchedStub();   // [수정 2026-10-22] 화면 날짜 칸에 적은 날짜를 기준으로 (사장님 지적 — 10/26 으로 적었는데 마감이 10/24 로 나왔다)
             const def = psDefaultSchedule(stub, rel);
             const p2 = x => String(x).padStart(2, '0');
             const ed = document.getElementById('fsp-exp-date'), eh = document.getElementById('fsp-exp-hour');
