@@ -8581,6 +8581,8 @@
                     <button type="button" id="rank-tab-product" onclick="setSalesRankTab('product')" class="sales-toggle-btn" style="flex:1; white-space:nowrap; padding:7px 8px;">🏆 상품 순위</button>
                     <button type="button" id="rank-tab-customer" onclick="setSalesRankTab('customer')" class="sales-toggle-btn" style="flex:1; white-space:nowrap; padding:7px 8px;">👑 손님 순위</button>
                 </div>
+                <!-- [신규 2026-10-23] 상품 순위 거르기 — 판매 종류 · 픽업/배달 · 이름 찾기 · 보여 줄 개수 (상품 순위 표에만 걸린다) -->
+                <div id="sales-rank-filters" style="display:none; margin:0 0 8px;"></div>
                 <div id="sales-ranking-table-wrap" style="overflow-x:auto;">
                     <table style="width:100%; border-collapse:collapse; font-size:13px;">
                         <thead id="sales-ranking-thead"></thead>
@@ -28252,6 +28254,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 //  [추가] 금액뿐 아니라 건수·수량도 함께 센다 (아래 카테고리 표에서 쓴다)
                 const _cat = salesProductCategory(_prodByName[rawNm], rawNm, o.category);
                 const _bk = (_cat === 'fruit') ? 'fruit' : (_cat === 'sada') ? 'sada' : (_cat === 'group') ? 'group' : 'other';
+                // [신규 2026-10-23] 상품 순위 거르기용 — 상품마다 판매 종류와 픽업·배달별 수량·금액
+                if (!im.cat) im.cat = _bk;
+                if (isDeliveryO) { im.dq = (im.dq || 0) + q; im.da = (im.da || 0) + amt; } else { im.pq = (im.pq || 0) + q; im.pa = (im.pa || 0) + amt; }
                 catAmt[_bk] += amt;
                 catCnt[_bk] += 1;
                 catQty[_bk] += q;
@@ -29149,6 +29154,28 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 </div>`;
         }
 
+        /* [신규 2026-10-23] 상품 순위 거르기 (사장님 요청) — 판매 종류 · 픽업/배달 · 이름 찾기 · 보여 줄 개수.
+           위쪽 통계 전체 거르기(분류·픽업/배달)와 따로, 상품 순위 표에만 걸린다. 찾기 칸은 다시 그리지 않아 한글이 끊기지 않는다 */
+        let salesRankF = { cat: 'all', m: 'all', q: '', n: 50 };
+        function salesRankPaintFilters() {
+            const fb = document.getElementById('sales-rank-filters'); if (!fb) return;
+            const F = salesRankF;
+            const chip = (grp, v, label) => `<button type="button" onclick="salesRankSet('${grp}', ${typeof v === 'number' ? v : `'${v}'`})" class="sales-toggle-btn${F[grp] === v ? ' active' : ''}" style="padding:5px 9px; font-size:11.5px; white-space:nowrap;">${label}</button>`;
+            const row = (lab, html) => `<div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:5px;"><span style="flex:0 0 auto; width:44px; font-size:11px; font-weight:800; color:var(--text-sub);">${lab}</span>${html}</div>`;
+            const q = document.getElementById('sales-rank-q');
+            if (!q) {
+                fb.innerHTML = `<div id="sales-rank-chips"></div>`
+                    + `<div style="display:flex; align-items:center; gap:6px;"><span style="flex:0 0 auto; width:44px; font-size:11px; font-weight:800; color:var(--text-sub);">찾기</span>`
+                    + `<input type="search" id="sales-rank-q" placeholder="상품 이름으로 찾기" autocomplete="off" oninput="salesRankF.q=this.value; renderSalesRanking();" style="flex:1 1 auto; min-width:0; height:32px; padding:0 10px; border:1.5px solid var(--border); border-radius:8px; font-size:12.5px; font-family:inherit;">`
+                    + `<span id="sales-rank-count" style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:var(--text-sub);"></span></div>`;
+            }
+            const chips = document.getElementById('sales-rank-chips');
+            if (chips) chips.innerHTML =
+                row('종류', chip('cat', 'all', '전체') + chip('cat', 'group', '공동구매') + chip('cat', 'other', '상시판매') + chip('cat', 'sada', '사다드림') + chip('cat', 'fruit', '과일'))
+                + row('받기', chip('m', 'all', '전체') + chip('m', 'pickup', '🏠 픽업') + chip('m', 'delivery', '🛵 배달'))
+                + row('개수', chip('n', 10, '10개') + chip('n', 30, '30개') + chip('n', 50, '50개') + chip('n', 0, '전체'));
+        }
+        function salesRankSet(grp, v) { salesRankF[grp] = v; salesRankPaintFilters(); renderSalesRanking(); }
         // 상품별 / 재주문 고객 판매 순위(정렬 가능) + 고객 통계
         function renderSalesRanking(){
             const rthead = document.getElementById('sales-ranking-thead');
@@ -29163,6 +29190,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             }
             if (tableWrap) tableWrap.style.display = 'block';
             if (statsBox) statsBox.style.display = 'none';
+            { const fb = document.getElementById('sales-rank-filters'); if (fb) { fb.style.display = (salesRankTab === 'product') ? 'block' : 'none'; if (salesRankTab === 'product') salesRankPaintFilters(); } }   // [신규 2026-10-23]
             if (!rtbody) return;
 
             if (salesRankTab === 'customer') {
@@ -29194,11 +29222,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 { key:'amount', label:'판매액', align:'right' }
             ];
             if (rthead) rthead.innerHTML = salesSortHeader(cols, salesRankSort, 'sortSalesRanking');
-            const list = (_salesRankingCache || []).map(([k, v]) => ({ name: v.name || k, qty: v.qty, amount: v.amount }));
+            // [수정 2026-10-23] 상품 순위 거르기 — 판매 종류 · 픽업/배달(그쪽 수량·금액으로) · 이름 · 보여 줄 개수
+            const F = salesRankF, fq = String(F.q || '').replace(/\s/g, '').toLowerCase();
+            const list = (_salesRankingCache || []).map(([k, v]) => ({ name: v.name || k, cat: v.cat || 'other',
+                    qty: F.m === 'pickup' ? (v.pq || 0) : F.m === 'delivery' ? (v.dq || 0) : v.qty,
+                    amount: F.m === 'pickup' ? (v.pa || 0) : F.m === 'delivery' ? (v.da || 0) : v.amount }))
+                .filter(r => (F.cat === 'all' || r.cat === F.cat) && (F.m === 'all' || r.qty > 0 || r.amount !== 0) && (!fq || String(r.name).replace(/\s/g, '').toLowerCase().includes(fq)));
             const s = salesRankSort;
             list.sort((a, b) => s.key === 'name' ? salesCmpStr(a.name, b.name, s.dir) : salesCmpNum(a[s.key], b[s.key], s.dir));
-            if (list.length === 0){ rtbody.innerHTML = `<tr><td colspan="4" style="padding:16px; text-align:center; color:var(--text-sub);">해당 기간 판매 내역이 없습니다.</td></tr>`; return; }
-            rtbody.innerHTML = list.slice(0, 50).map((r, i) => `
+            { const c = document.getElementById('sales-rank-count'); if (c) c.textContent = list.length + '개 상품'; }
+            if (list.length === 0){ rtbody.innerHTML = `<tr><td colspan="4" style="padding:16px; text-align:center; color:var(--text-sub);">${(F.cat !== 'all' || F.m !== 'all' || fq) ? '조건에 맞는 상품이 없습니다.' : '해당 기간 판매 내역이 없습니다.'}</td></tr>`; return; }
+            rtbody.innerHTML = list.slice(0, F.n > 0 ? F.n : list.length).map((r, i) => `
                 <tr>
                     <td style="padding:8px; font-weight:800; color:${i < 3 ? '#d97706' : '#94a3b8'};">${i + 1}</td>
                     <td style="padding:8px;">${gEscapeHtml(r.name)}</td>
