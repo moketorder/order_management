@@ -8245,6 +8245,8 @@
         /* [신규 2026-10-23] 폰 화면 (사장님 지적) — 손님 관리 거르기 단추는 글씨가 넘치지 않게 제 크기로 두고 한 줄에서 좌우로 밀어 보며,
            소싱 일정 머리(판매 일정·밴드 상품·카톡 취합·판매 동향 + 새로고침)는 한 줄로 */
         @media (max-width:760px) {
+            .fl-ed-btns { flex:1 1 100%; } .fl-ed-btns button { flex:1 1 0; height:36px !important; }   /* [신규 2026-10-23] 전단지 라인 고칠 때 저장·삭제·취소는 아랫줄 */
+            .fl-ago { display:none; }   /* 전단지 라인 — 며칠 전 숨김 */
             .ca-frow { flex-wrap:nowrap !important; overflow-x:auto !important; -webkit-overflow-scrolling:touch; }   /* [수정 2026-10-23] 폰도 한 줄 — 좌우로 밀어 본다 (사장님 요청) */
             .ca-frow .ca-fchip { flex:0 0 auto !important; min-width:auto !important; padding:0 10px !important; font-size:12px !important; }
             #purchase-section-sourcing .src-top { flex-wrap:nowrap !important; gap:4px !important; }
@@ -11410,10 +11412,12 @@
                 <input id="fl-ed-ho" value="${E(ho)}" placeholder="전체" title="호수 (예: 1~2, 비우면 전체)" onkeydown="${enter}" style="${_fIn} flex:0 0 62px; width:62px; text-align:center;">
                 <span style="font-size:11.5px; font-weight:800; color:#64748b;">호</span>
                 <input id="fl-ed-pwd" value="${E(pwd)}" placeholder="🔑 공동현관 비번" onkeydown="${enter}" style="${_fIn} flex:1 1 120px; color:#4338ca;">
+                <div class="fl-ed-btns" style="display:flex; gap:5px;">
                 <button type="button" onclick="flyerLineSave('${aptEnc}','${keyEnc}')" style="${_fBtn} border:none; background:#16a34a; color:#fff;">저장</button>
                 <button type="button" onclick="${armed ? `window.__flyerLineEdit=''; flyerInlineDelLine('${aptEnc}','${keyEnc}')` : `armFlyerDelete('iline|${E(apt)}|${E(s.key)}')`}" title="이 라인과 그 기록을 지워요 (한 번 더 누르면 지워져요)"
                     style="${_fBtn} border:1.5px solid ${armed ? '#dc2626' : '#fecaca'}; background:${armed ? '#dc2626' : '#fff'}; color:${armed ? '#fff' : '#dc2626'};">${armed ? '한 번 더 → 삭제' : '삭제'}</button>
                 <button type="button" onclick="window.__flyerLineEdit=''; renderFlyerBoard()" style="${_fBtn} border:1.5px solid var(--border); background:#fff; color:#64748b;">취소</button>
+                </div>
             </div>`;
         }
         async function flyerLineSave(aptEnc, keyEnc) {
@@ -11600,7 +11604,7 @@
                         : 오래 ? { 선: '#c4b5fd', 칸선: '#ddd6fe', 칸바탕: '#f5f3ff', 바탕: '#faf9ff', 글: '#7c3aed', 마크: '🟣' }
                         : last ? { 선: '#e2e8f0', 칸선: '#e2e8f0', 칸바탕: '#fff', 바탕: '#fff', 글: '#64748b', 마크: '☑️' }
                         : { 선: '#f1f5f9', 칸선: '#eef2f7', 칸바탕: '#f8fafc', 바탕: '#fff', 글: '#cbd5e1', 마크: '⬜' };
-                    const face = last ? `${fmtMD(last)} · ${gDaysAgoText(last)}` : '안 돌림';
+                    const face = last ? `${fmtMD(last)}<span class="fl-ago"> · ${gDaysAgoText(last)}</span>` : '안 돌림';   // [수정 2026-10-23] 폰에서는 '며칠 전'을 숨겨 한 줄에 (사장님 요청)
                     const lineArmed = (_flyerDelArmed === 'line|' + apt + '|' + s.key);
                     // [신규] 그 칸의 공동현관 비번. 전단지를 돌리려면 어차피 문을 열어야 해서 옆에 같이 둔다.
                     const pwd = _flyerEdit ? String(s.pwd || '') : String(((entrancePasswords[apt] || {})[s.key]) || '').trim();
@@ -11622,11 +11626,11 @@
                     return `<div style="display:flex; gap:5px; align-items:stretch; margin-bottom:5px;">
                         <button type="button" ${_flyerEdit ? '' : `onclick="toggleFlyer('${aptEnc}','${encodeURIComponent(s.key)}')"`}
                             title="${dates.length ? '지난 기록: ' + dates.map(d => fmtMD(d)).join(', ') : '눌러서 오늘 돌린 것으로 기록'}"
-                            style="flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between; gap:6px 8px; flex-wrap:wrap; padding:9px 11px;
+                            style="flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between; gap:6px 8px; flex-wrap:nowrap; padding:9px 11px;
                                    border:1.5px solid ${색.선};
                                    background:${색.바탕}; border-radius:9px; cursor:${_flyerEdit ? 'default' : 'pointer'}; text-align:left;">
                             <span style="flex:0 0 auto; font-size:12.5px; font-weight:800; color:#334155;">${gEscapeHtml(gFlyerSlotLabel(s))}</span>
-                            ${pwd ? `<span title="공동현관 비번" style="flex:0 1 auto; min-width:0; font-size:11.5px; font-weight:800; color:#4338ca; background:#eef2ff; border-radius:6px; padding:2px 7px; word-break:break-all;">🔑 ${gEscapeHtml(pwd)}</span>` : ''}
+                            ${pwd ? `<span title="공동현관 비번" style="flex:0 1 auto; min-width:0; font-size:11.5px; font-weight:800; color:#4338ca; background:#eef2ff; border-radius:6px; padding:2px 7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🔑 ${gEscapeHtml(pwd)}</span>` : ''}
                             <span style="margin-left:auto; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border-radius:8px;
                                    border:1px solid ${색.칸선};
                                    background:${색.칸바탕};">
