@@ -3408,10 +3408,11 @@
                 
                 <!-- 하위 카테고리 탭 (발주 등록 / 발주 목록) -->
                 <div class="sub-tabs-container no-print" style="margin-bottom: 3px; padding: 0;">
-                    <div class="segment-control four-cols" id="purchase-subtab-bar" style="display: grid; grid-template-columns: repeat(3, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
+                    <div class="segment-control four-cols" id="purchase-subtab-bar" style="display: grid; grid-template-columns: repeat(4, 1fr); background: #e2e8f0; padding: 4px; border-radius: 12px; gap: 4px; width: 100%; box-sizing: border-box;">
                         <!-- [수정 2026-10-07] 소싱은 일정 관리 > 소싱 일정으로 옮겼다 (사장님 요청) -->
                         <div class="segment-btn purchase-sub-btn active" id="btn-purchase-subtab-list" onclick="switchPurchaseSubTab('list')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📊 발주 목록</div>
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-register" onclick="switchPurchaseSubTab('register')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">✏️ 발주 등록</div>
+                        <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-stock" onclick="switchPurchaseSubTab('stock')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">📦 재고 관리</div>   <!-- [신규 2026-10-23] 옛 품목 분석의 재고 점검 (사장님 요청) -->
                         <div class="segment-btn purchase-sub-btn" id="btn-purchase-subtab-link" onclick="switchPurchaseSubTab('link')" style="text-align:center; padding:12px 8px; font-weight:800; cursor:pointer; border-radius:10px; font-size:14px; user-select:none;">🔗 코드 관리</div>
                     </div>
                 </div>
@@ -7509,7 +7510,10 @@
                     </div>
                 </div>
 
-                <!-- [수정 2026-10-23] 품목 분석은 지웠다 — 판매 순위는 통계 › 상품 통계의 상품 순위에, 재고 점검은 그 아래로 합쳤다 (사장님 요청) -->
+                <!-- [수정 2026-10-23] 품목 분석은 지웠다 — 판매 순위는 통계 › 상품 통계로 합쳤고, 재고 점검은 이름을 '재고 관리'로 바꿔 여기 하위 탭으로 (사장님 요청) -->
+                <div id="purchase-section-stock" class="purchase-sub-section" style="display: none;">
+                    <div id="stock-check-body"><!-- 동적 삽입 --></div>
+                </div>
 
             </div>
         </div>
@@ -8208,8 +8212,6 @@
         .data-sub-btn { color:var(--text-sub); }
         .data-sub-btn.active, .sst-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
         /* [신규 2026-10-23] 고객 통계 숫자 칸 — 한 줄에 똑같은 너비로 (좁으면 글씨를 줄이고 이름은 말줄임) */
-        /* [신규 2026-10-23] 발주 하위 탭이 품목 분석을 빼고 셋이 됐다 */
-        #tab-admin-purchase-history #purchase-subtab-bar.segment-control.four-cols { grid-template-columns:repeat(3, 1fr) !important; }
         /* [신규 2026-10-23] 손님 관리 거르기 단추 — 한 줄에 창 넓이만큼 나눠 늘였다 줄였다 */
         .ca-frow::-webkit-scrollbar { display:none; }
         .ca-frow .ca-fchip { flex:1 1 auto; min-width:0; padding:0 6px !important; font-size:clamp(10.5px, 1.45vw, 12px) !important; }
@@ -8601,9 +8603,6 @@
                     </table>
                 </div>
                 <div id="sst-prod-extra" style="display:none;">
-                    <!-- [수정 2026-10-23] 발주 › 품목 분석을 지우고 재고 점검을 여기로 옮겼다 (판매 순위는 위 상품 순위에 합쳤다) -->
-                    <div class="card-title" style="margin:20px 0 8px; font-size:14px;">📦 재고 점검 <span style="font-size:11px; font-weight:700; color:var(--text-sub);">(지금 재고 기준 · 위 기간과 상관없어요)</span></div>
-                    <div id="stock-check-body"><!-- 동적 삽입 --></div>
                 </div>
                 </div><!-- /sst-rank -->
                 <div id="sales-archive-status" style="margin-top:14px; text-align:right; font-size:10.5px; color:#94a3b8; font-weight:700;"></div>   <!-- [수정 2026-10-23] 맨 위에서 맨 아래로 -->
@@ -29320,9 +29319,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 spCodeLabels = await gLoadCodeLabels();
                 spPoCache = null;
             } catch (e) { console.warn('상품 통계 준비 실패:', e); }
+            /* [신규 2026-10-23] 공동구매 올린 날 — 노출일정 '판매기록'과 같은 회차 기록(psHistBuild)에서 회차마다 접수 시작(openAt) */
+            try {
+                if (!psRoundLog) await psRoundLogLoad();
+                const m = new Map();
+                (psHistBuild() || []).forEach(h => { const ts = (h.rounds || []).map(r => Number(r.openAt) || 0).filter(Boolean); if (ts.length) m.set(String(h.code), ts); });
+                window.__sstPosts = m;
+            } catch (e) { console.warn('공구 올린 날을 못 셌어요:', e); }
             window.__sstSpRows = null;
             if (salesStatCat === 'prod') renderSalesRanking();
-            try { await initStockCheckTab(); } catch (e) { console.warn('재고 점검 실패:', e); }
         }
         /* 품목별 주별 판매·마지막 판 날·발주 텀 (옛 품목 분석의 줄) — 상품 순위 줄과 같은 열쇠(식별번호)로 찾는다 */
         function sstSpRows() {
@@ -29420,7 +29425,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${idleCol};" title="${sp ? '마지막 판 날 ' + sp.lastEnd : ''}">${idleTxt}</td>
                 </tr>` + (!open ? '' : `
                 <tr style="background:#f8fafc;"><td></td><td colspan="4" style="padding:0 8px 10px;">
-                    ${sp ? `<div style="font-size:11.5px; margin-bottom:4px;">${spPoTermChip(r.k)} <span style="color:#94a3b8; font-weight:700;">· 마지막 판 날 ${sp.lastEnd} · 판 날 ${sp.soldDays}일 (최근 ${spMonths}개월)</span></div>${spPoTimeline(r.k)}${spWeeklyChart(sp)}`
+                    ${sp ? `<div style="font-size:11.5px; margin-bottom:4px;">${spPoTermChip(r.k)} <span style="color:#94a3b8; font-weight:700;">· 마지막 판 날 ${sp.lastEnd} · 판 날 ${sp.soldDays}일 (최근 ${spMonths}개월)</span></div>${spPoTimeline(r.k)}${spWeeklyChart(sp, (r.cat === 'group' || r.cat === 'sada') && window.__sstPosts ? (window.__sstPosts.get(String(psSafeId(r.k))) || window.__sstPosts.get(String(r.k)) || []) : [])}`
                           : `<div style="padding:8px 0; font-size:12px; color:#94a3b8; font-weight:700;">식별번호가 없는 상품이라 주별 그래프와 발주 텀을 못 셉니다.</div>`}
                 </td></tr>`);
             }).join('');
@@ -37223,12 +37228,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const listSec = document.getElementById('purchase-section-list');
             const linkSec = document.getElementById('purchase-section-link');
             const checkSec = document.getElementById('purchase-section-check');
+            const stockSec = document.getElementById('purchase-section-stock');   // [신규 2026-10-23] 재고 관리
             const sourcingSec = document.getElementById('purchase-section-sourcing');   // [신규] 소싱
 
             if (registerSec) registerSec.style.display = subTabName === 'register' ? 'block' : 'none';
             if (listSec) listSec.style.display = subTabName === 'list' ? 'block' : 'none';
             if (linkSec) linkSec.style.display = subTabName === 'link' ? 'block' : 'none';
             if (checkSec) checkSec.style.display = subTabName === 'check' ? 'block' : 'none';
+            if (stockSec) stockSec.style.display = subTabName === 'stock' ? 'block' : 'none';
             if (sourcingSec) sourcingSec.style.display = subTabName === 'sourcing' ? 'block' : 'none';
 
             if (subTabName === 'list') {
@@ -37236,6 +37243,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             } else if (subTabName === 'link') {
                 // [수정] 코드 관리는 두 갈래(코드 목록 / 코드 연결). 이름표를 받아 둔 뒤 보던 쪽으로 연다.
                 gLoadCodeLabels().then(() => switchCodeSubTab(codeSubTab));
+            } else if (subTabName === 'stock') {
+                initStockCheckTab();   // [신규 2026-10-23] 재고 관리 (옛 품목 분석의 재고 점검)
             } else if (subTabName === 'sourcing') {
                 srcLoad();   // [신규] 소싱: 처음 열 때 DB에서 받아 온다
             }
@@ -37563,7 +37572,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             const head = `
                 <div class="card" style="background:#fff; border-radius:16px; padding:16px; box-shadow:var(--shadow); margin-bottom:12px; border:1px solid var(--border);">
-                    <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:6px;">📦 재고 점검</div>
+                    <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:6px;">📦 재고 관리</div>
                     <div style="font-size:12.5px; font-weight:700; color:#64748b; line-height:1.6;">
                         재고가 남은 상품을 <b>마지막 발주</b>와 견줍니다.
                         늘 시키던 간격보다 오래 비었으면 왼쪽에 🟡 🟠 🔴 로 표시합니다.<br>
@@ -37963,7 +37972,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
         }
 
-        function spWeeklyChart(r) {
+        function spWeeklyChart(r, posts) {   // [수정 2026-10-23] posts = 공구 올린 때(ms) 목록 — 있으면 그 주 막대 위에 ▼ 표시 (사장님 요청)
             const rows = r.rows || [];
             if (!rows.length) return '';
 
@@ -37993,6 +38002,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             // 막대 색은 바로 앞 주와 견준 결과 — 늘면 빨강, 줄면 파랑
             const amts = weeks.map(w => w.amt);
+            const postWk = new Map();   // 주 차례 → 그 주에 공구 올린 날들
+            (posts || []).forEach(ms => {
+                const t = new Date(Number(ms)); if (isNaN(t.getTime())) return;
+                const iso = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+                const i = idx.get(spWeekStart(iso)); if (i === undefined) return;
+                if (!postWk.has(i)) postWk.set(i, []);
+                postWk.get(i).push(`${t.getMonth() + 1}/${t.getDate()}`);
+            });
+            const postRow = !postWk.size ? '' : weeks.map((w, i) => `<div style="flex:1; min-width:0; text-align:center; font-size:10px; line-height:11px; color:#7c3aed; font-weight:900;"${postWk.has(i) ? ` title="공구 올린 날 ${postWk.get(i).join(', ')}"` : ''}>${postWk.has(i) ? '▼' : ''}</div>`).join('');
+            const postN = [...postWk.values()].reduce((a, v) => a + v.length, 0);
             const bars = weeks.map((w, i) => {
                 const h = w.amt ? Math.max(8, Math.round((w.amt / maxAmt) * 100)) : 0;
                 const md = `${w.d.getMonth() + 1}/${w.d.getDate()}`;
@@ -38019,8 +38038,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:6px;">
                         <span style="font-size:11px; font-weight:900; color:#475569;">주별 매출</span>
                         <span style="font-size:10.5px; font-weight:700; color:#cbd5e1;">${term} · ${nWeeks}주 중 ${sold}주 판매</span>
+                        ${postN ? `<span style="font-size:10.5px; font-weight:800; color:#7c3aed;">▼ 공구 올린 날 ${postN}번</span>` : ''}
                         <b style="margin-left:auto; font-size:12px; font-weight:900; color:#059669;">${sumAmt.toLocaleString()}원</b>
                     </div>
+                    ${postRow ? `<div style="display:flex; gap:${gap}px; height:11px; margin-bottom:1px;">${postRow}</div>` : ''}
                     <div style="display:flex; align-items:flex-end; gap:${gap}px; height:46px;">${bars}</div>
                     <div style="display:flex; gap:${gap}px; margin-top:3px;">${ticks}</div>
                 </div>`;
