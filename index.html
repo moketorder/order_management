@@ -14486,7 +14486,83 @@
            지금은 아래 함수가 '있어야 할 배달비'와 '붙어 있는 배달비'를 견줘
            모자란 만큼만 새 줄로 적으므로 그대로 맡겨도 된다. */
         async function checkAndApplyDeliveryFeeAfterCancellation(phone, pickupDate) {
-            return await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, pickupDate);
+            const r = await checkAndRemoveDeliveryFeeIfThresholdExceeded(phone, pickupDate);
+            try { await gPointAfterStoreCancel(phone, pickupDate); } catch (e) { console.warn('포인트 확인 실패:', e); }   // [신규 2026-10-23]
+            return r;
+        }
+
+        /* ===== [신규 2026-10-23] 가게에서 취소할 때 쓴 포인트를 어떻게 할지 묻는다 (사장님 요청) =====
+           주문서는 손님이 취소하면 같은 주문(같은 주문 시각)에 상품이 안 남을 때 포인트를 저절로 돌려준다(gRefundPointUse).
+           주문관리에서 취소하면 아무 일도 없어서 포인트 줄이 그대로 남았다. 이제 취소 뒤(모든 취소 길이 지나는 이 자리에서)
+           그 손님·그 날짜에 '포인트 사용' 줄이 있고, 같은 주문의 상품 중 새로 취소된 것이 있으면 묻는다:
+             · 전부 돌려주기 · 취소한 금액만큼 돌려주기 · 그대로 두기
+           돌려주면 주문서와 똑같이 적는다 — 포인트 줄 [취소](전부) 또는 금액 줄이기(일부), point_logs 에 'refund', points 잔액 더하기.
+           한 번 답한 뒤 같은 취소로 또 묻지 않게 포인트 줄에 ptAsked(그때 취소된 상품 줄 수)를 남긴다 */
+        function gPtAskDialog(msg, opts) {
+            return new Promise(resolve => {
+                let box = document.getElementById('ps-confirm-box'); if (box) box.remove();
+                box = document.createElement('div'); box.id = 'ps-confirm-box';
+                box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px;';
+                box.innerHTML = `<div style="background:#fff; border-radius:14px; padding:18px; max-width:380px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                    <div style="font-size:13.5px; font-weight:800; color:#0f172a; line-height:1.6; white-space:pre-line; margin-bottom:14px;">${gEscapeHtml(String(msg || ''))}</div>
+                    <div style="display:flex; flex-direction:column; gap:7px;">${opts.map(o => `<button type="button" data-v="${o.v}" style="height:42px; border-radius:9px; font-size:13.5px; font-weight:800; cursor:pointer; ${o.primary ? 'border:none; background:#16a34a; color:#fff;' : o.quiet ? 'border:1.5px solid var(--border); background:#f8fafc; color:#64748b;' : 'border:1.5px solid #16a34a; background:#f0fdf4; color:#15803d;'}">${gEscapeHtml(o.label)}</button>`).join('')}</div></div>`;
+                box.addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; box.remove(); resolve(b.dataset.v); });
+                document.body.appendChild(box);
+            });
+        }
+        async function gPointAfterStoreCancel(phone, pickupDate) {
+            const key = gCustomerKey(phone), pDate = String(pickupDate || '').trim();
+            if (!key || !pDate) return;
+            const same = o => String(o.firebasePhoneKey || o.phone || '').replace(/\D/g, '') === key;
+            const amt = o => parseInt(String(o.total || 0).replace(/,/g, '')) || 0;
+            const ptRows = (rawOrders || []).filter(o => same(o) && String(o.pickupDate || '').trim() === pDate && gFeeRowName(o) === '포인트 사용' && !isSalesCanceled(o) && amt(o) < 0);
+            for (const pt of ptRows) {
+                const ts = String(pt.timestamp || '');
+                const group = (rawOrders || []).filter(o => same(o) && String(o.timestamp || '') === ts && o !== pt);
+                const goods = group.filter(o => !gIsFeeRow(o));
+                const canceledGoods = goods.filter(o => isSalesCanceled(o));
+                if (!canceledGoods.length || canceledGoods.length <= (Number(pt.ptAsked) || 0)) continue;   // 새로 취소된 상품이 없으면 안 묻는다
+                const used = -amt(pt);
+                const liveGoods = goods.filter(o => !isSalesCanceled(o));
+                const remain = group.filter(o => !isSalesCanceled(o)).reduce((s, o) => s + amt(o), 0);   // 남은 상품 + 배달비
+                const canceledAmt = canceledGoods.reduce((s, o) => s + Math.abs(amt(o)), 0);
+                const part = Math.min(used, canceledAmt);
+                const nm = pt.name || (group[0] && group[0].name) || '';
+                const msg = `${nm} 손님이 이 주문에 포인트 ${used.toLocaleString()}P를 썼어요.\n`
+                    + (liveGoods.length ? `취소한 상품 ${canceledAmt.toLocaleString()}원 · 남은 주문 ${remain.toLocaleString()}원` : '이 주문 상품이 모두 취소됐어요.')
+                    + `\n\n포인트를 어떻게 할까요?`;
+                const opts = [{ v: 'all', label: `전부 돌려주기 (${used.toLocaleString()}P)`, primary: !liveGoods.length }];
+                if (liveGoods.length && part > 0 && part < used) opts.push({ v: 'part', label: `취소한 금액만큼 돌려주기 (${part.toLocaleString()}P)`, primary: true });
+                opts.push({ v: 'keep', label: '그대로 두기', quiet: true });
+                const pick = await gPtAskDialog(msg, opts);
+                const give = pick === 'all' ? used : pick === 'part' ? part : 0;
+                try {
+                    const now = Date.now();
+                    const up = {};
+                    const base = `orders/${key}/${pt.orderKey}`;
+                    up[`${base}/ptAsked`] = canceledGoods.length;
+                    if (give > 0) {
+                        const pr = await fetch(`${FIREBASE_DB_URL}points/${key}.json?t=${now}`);
+                        const d = pr.ok ? await pr.json() : null;
+                        const bal = d ? Number(d.bal) || 0 : 0;
+                        const lid = give >= used ? `f_${pt.orderKey}` : `f_${pt.orderKey}_${now.toString(36)}`;
+                        if (give >= used) { up[`${base}/item`] = '[취소] 포인트 사용'; up[`${base}/received`] = '취소완료'; up[`${base}/canceled`] = true; }
+                        else { const left = used - give; up[`${base}/total`] = -left; up[`${base}/price`] = -left; }
+                        up[`point_logs/${key}/${lid}`] = { amt: give, why: 'refund', at: now, ref: pt.orderKey, memo: '가게에서 취소' };
+                        up[`points/${key}`] = { bal: bal + give, last: lid, at: now };
+                    }
+                    const res = await fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(up) });
+                    if (!res.ok) throw new Error('서버 응답 ' + res.status);
+                    pt.ptAsked = canceledGoods.length;
+                    if (give >= used) { pt.item = '[취소] 포인트 사용'; pt.received = '취소완료'; pt.canceled = true; }
+                    else if (give > 0) { pt.total = -(used - give); pt.price = -(used - give); }
+                    if (give > 0) {
+                        try { gLogOrderChange([{ phone: key, name: nm, item: '포인트 사용', what: '포인트', from: `-${used}`, to: give >= used ? '취소' : `-${used - give}`, note: `가게 취소로 ${give.toLocaleString()}P 돌려줌` }]); } catch (e) { }
+                        showToast(`포인트 ${give.toLocaleString()}P를 돌려줬어요.`);
+                    }
+                    renderFilteredOrders();
+                } catch (e) { console.error('포인트 돌려주기 실패:', e); showToast('포인트를 반영하지 못했어요: ' + (e.message || e)); }
+            }
         }
 
         // [신규] 그 고객·그 날짜의 배달비를 다시 맞춘다. (주문서의 주문·취소 때와 똑같은 규칙)
