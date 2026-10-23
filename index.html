@@ -3310,6 +3310,8 @@
                         <div class="ps-tools">
                             <!-- [수정 2026-10-03] 차례: ❔ · 오늘 · (폰만 Ctrl) · 되돌리기 (사장님 요청) -->
                             <!-- [신규 2026-10-21] 끝나면 상시판매로 돌리기를 안 켠 일정만 보기 (사장님 요청) -->
+                            <!-- [신규 2026-10-23] 마감된 일정은 기본으로 접어 두고 이 단추로 펼친다 (사장님 요청) -->
+                            <button type="button" id="ps-closed-btn" class="ps-tbtn" onclick="psToggleClosed()" title="마감된 일정 펼치기·접기">🔒 마감 펼치기</button>
                             <button type="button" id="ps-noonsite-btn" class="ps-tbtn" onclick="psToggleNoOnsite()" title="끝나면 상시판매로 돌리기를 안 켠 일정만 보기">상시전환X</button>
                             <button type="button" id="ps-help-btn" class="ps-tbtn" onclick="psToggleHelp()" title="쓰는 법">❔</button>
                             <button type="button" class="ps-tbtn" onclick="psSetView('cal'); psCalGoToday()">오늘</button>
@@ -7619,6 +7621,7 @@
         #ps-cal-box .ps-fold-hide { display: none !important; }
         /* [신규 2026-10-21] '상시전환X' 켜짐 */
         #ps-noonsite-btn.on { background: #7c3aed !important; border-color: #7c3aed !important; color: #fff !important; }
+        #ps-closed-btn.on { background: #ca8a04 !important; border-color: #ca8a04 !important; color: #fff !important; }   /* [신규 2026-10-23] 마감 펼침 */
         #ps-cal-box .ms-cal-cell.ps-wk-b { background: #eff6ff; border-color: #bfdbfe; }
         #ps-cal-box .ms-cal-cell.ms-cal-open { background: #fffbeb; border-color: #fde68a; }
         .ps-bars { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
@@ -18777,6 +18780,19 @@
             try { localStorage.setItem('moket_ps_wkfold', JSON.stringify([...s].sort().slice(-60))); } catch (e) { }
             renderProductScheduleCalendar();
         }
+        /* [신규 2026-10-23] 마감된 일정은 기본으로 접는다 (사장님 요청) — 달력의 🔒 줄과 목록·날짜 보기의 '마감된 일정' 묶음.
+           위 '🔒 마감 펼치기' 단추나 목록의 '마감된 일정' 줄을 누르면 펼친다. 이 기기에 기억 */
+        var psClosedOpen = (() => { try { return localStorage.getItem('moket_ps_closed_open') === '1'; } catch (e) { return false; } })();
+        function psToggleClosed() {
+            psClosedOpen = !psClosedOpen;
+            try { localStorage.setItem('moket_ps_closed_open', psClosedOpen ? '1' : '0'); } catch (e) { }
+            renderProductScheduleCalendar();
+        }
+        function psClosedBtnPaint(n) {
+            const b = document.getElementById('ps-closed-btn'); if (!b) return;
+            b.classList.toggle('on', psClosedOpen);
+            b.textContent = (psClosedOpen ? '🔒 마감 접기' : '🔒 마감 펼치기') + (n ? ` ${n}` : '');
+        }
         function psToggleNoOnsite() {
             psNoOnsiteOnly = !psNoOnsiteOnly;
             const b = document.getElementById('ps-noonsite-btn'); if (b) b.classList.toggle('on', psNoOnsiteOnly);
@@ -18880,7 +18896,9 @@
                 dateKeys.push(`${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`);
             }
             const rangeFirstKey = dateKeys[0], rangeLastKey = dateKeys[dateKeys.length - 1];
-            const rangeBars = bars.filter(b => b.end >= rangeFirstKey && b.start <= rangeLastKey);
+            const _rangeAll = bars.filter(b => b.end >= rangeFirstKey && b.start <= rangeLastKey);
+            psClosedBtnPaint(_rangeAll.filter(b => b.slot === 'X').length);
+            const rangeBars = psClosedOpen ? _rangeAll : _rangeAll.filter(b => b.slot !== 'X');   // [신규 2026-10-23] 마감된 일정 줄은 기본으로 접는다
             // [신규 2026-10-10] 시간 줄은 이 달에 실제로 쓰인 마감 시각만 (0~23시 아무 때나라 다 그리면 빈 줄투성이). 하나도 없으면 15시 한 줄
             const calSlots = [...new Set(rangeBars.map(b => b.slot))].filter(x => x !== 'R' && x !== 'X').sort((a, b) => a - b);
             if (!calSlots.length) calSlots.push('T');
@@ -19769,9 +19787,10 @@
             const open = units.filter(u => !psUnitClosed(u)), closed = units.filter(u => psUnitClosed(u));
             let html = open.map(u => psUnitCardHtml(u, false)).join('');
             if (closed.length) {
-                html += `<div style="display:flex; align-items:center; gap:8px; margin-top:${onlyClosed ? 0 : 8}px; font-size:11.5px; font-weight:900; color:#a16207;">
-                    <span style="flex:1; height:1px; background:#fde68a;"></span>🔒 마감된 일정 ${closed.length}개<span style="flex:1; height:1px; background:#fde68a;"></span></div>`;
-                html += `<div style="display:flex; flex-direction:column; gap:10px; opacity:.6;">${closed.map(u => psUnitCardHtml(u, false)).join('')}</div>`;
+                // [수정 2026-10-23] 기본으로 접고, 이 줄을 누르면 펼친다 (사장님 요청)
+                html += `<div onclick="psToggleClosed()" title="${psClosedOpen ? '마감된 일정 접기' : '마감된 일정 펼치기'}" style="display:flex; align-items:center; gap:8px; margin-top:${onlyClosed ? 0 : 8}px; font-size:11.5px; font-weight:900; color:#a16207; cursor:pointer; user-select:none;">
+                    <span style="flex:1; height:1px; background:#fde68a;"></span>🔒 마감된 일정 ${closed.length}개 <span style="padding:2px 9px; border:1.5px solid #fde68a; border-radius:999px; background:#fffbeb;">${psClosedOpen ? '▾ 접기' : '▸ 펼치기'}</span><span style="flex:1; height:1px; background:#fde68a;"></span></div>`;
+                if (psClosedOpen) html += `<div style="display:flex; flex-direction:column; gap:10px; opacity:.6;">${closed.map(u => psUnitCardHtml(u, false)).join('')}</div>`;
             }
             return html;
         }
