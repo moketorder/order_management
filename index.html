@@ -6651,11 +6651,11 @@
                 }
                 function srcBandPickHtml() {
                     const Q = gSrc.pickQ, q = Q.q.trim().replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
-                    if (!q && !Q.vendor) return '<span class="k">상품 이름을 치면 여기에 나와요 (점수 높은 순 40개)</span>';
+                    if (!q && !Q.vendor) return '<span class="k">상품 이름을 치면 여기에 나와요 (최근 게시한 순 40개)</span>';
                     if (!gSrc.band) return '<span class="k">밴드 상품을 불러오는 중…</span>';
                     const from = Q.days ? srcDaysAgo(Q.days) : '';
                     const list = srcBandRows().filter(r => (!q || String(r.n).replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q)) && (!Q.vendor || String(r.v || '').trim() === Q.vendor) && srcInPeriod(r.d, from, ''))
-                        .sort((a, b) => (+b.s || 0) - (+a.s || 0)).slice(0, 40);
+                        .sort((a, b) => String(b.d || '').localeCompare(String(a.d || '')) || (+b.s || 0) - (+a.s || 0)).slice(0, 40);   // [수정 2026-10-23] 최근 게시한 순 (같은 날이면 점수 순, 날짜 없는 것은 뒤로) (사장님 요청)
                     if (!list.length) return '<span class="k">찾는 상품이 없어요</span>';
                     const sold = srcSoldMap();
                     return list.map(r => {
