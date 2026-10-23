@@ -7514,8 +7514,9 @@
                 <!-- 하위 섹션 4: 품목 분석 — 재고 점검(무엇이 남았나)과 잘 나가는 품목(무엇이 나가나)을 나란히 둔다 -->
                 <div id="purchase-section-check" class="purchase-sub-section" style="display: none;">
                     <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin:0 0 10px;">
-                        <div class="segment-btn pchk-sub-btn active" id="btn-pchk-stock" onclick="switchCheckSubTab('stock')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">📦 재고 점검</div>
-                        <div class="segment-btn pchk-sub-btn" id="btn-pchk-sales" onclick="switchCheckSubTab('sales')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">🔥 잘 나가는 품목</div>
+                        <div class="segment-btn pchk-sub-btn active" id="btn-pchk-sales" onclick="switchCheckSubTab('sales')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">🔥 판매 순위</div>   <!-- [수정 2026-10-23] 이름 바꾸고 앞으로 · 품목 분석을 열면 늘 이쪽부터 (사장님 요청) -->
+                        <div class="segment-btn pchk-sub-btn" id="btn-pchk-stock" onclick="switchCheckSubTab('stock')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">📦 재고 점검</div>
+
                     </div>
                     <div id="stock-check-body"><!-- 동적 삽입 --></div>
                     <div id="sales-pattern-body" style="display:none;"><!-- 동적 삽입 --></div>
@@ -24170,50 +24171,63 @@
             if (!_rva.memos) ptaMemoLoad();
         }
         /* [신규 2026-10-23] 적립 문구 (사장님 요청) — 자주 쓰는 메모를 여러 개 적어 두고 눌러서 넣는다. 적기 · 고치기 · 지우기.
-           settings/point_memos = ['이벤트 당첨', ...] (두 PC가 같이 쓴다) */
+           [수정 2026-10-23] 포인트 금액도 같이 적어 두고, 누르면 메모와 포인트 칸에 함께 들어간다 (금액은 비워도 된다)
+           settings/point_memos = [{ t:'이벤트 당첨', p:1000 }, ...] (두 PC가 같이 쓴다 · 예전 글씨만 있던 것도 읽는다) */
+        function ptaMemoNorm(v) { if (v && typeof v === 'object') return { t: String(v.t || '').trim(), p: Math.max(0, parseInt(v.p, 10) || 0) }; return { t: String(v || '').trim(), p: 0 }; }
         async function ptaMemoLoad() {
-            try { const r = await fetch(`${FIREBASE_DB_URL}settings/point_memos.json?t=${Date.now()}`); const v = r.ok ? await r.json() : null; _rva.memos = Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === 'object' ? Object.values(v).filter(Boolean) : []); }
+            try { const r = await fetch(`${FIREBASE_DB_URL}settings/point_memos.json?t=${Date.now()}`); const v = r.ok ? await r.json() : null; _rva.memos = (Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : [])).map(ptaMemoNorm).filter(m => m.t); }
             catch (e) { _rva.memos = _rva.memos || []; }
             ptaMemoPaint();
         }
         async function ptaMemoPut(list) {
-            const r = await fetch(`${FIREBASE_DB_URL}settings/point_memos.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(list.length ? list : null) });
+            const out = list.map(m => m.p ? { t: m.t, p: m.p } : { t: m.t });
+            const r = await fetch(`${FIREBASE_DB_URL}settings/point_memos.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(out.length ? out : null) });
             if (!r.ok) throw new Error('서버 응답 ' + r.status);
-            _rva.memos = list.slice();
+            _rva.memos = list.map(m => ({ t: m.t, p: m.p || 0 }));
         }
         function ptaMemoBoxHtml() {
             const E = gEscapeHtml, M = _rva.memos || [], ed = _rva.memoEdit;
-            const chips = M.map((t, i) => `<button type="button" onclick="ptaMemoUse(${i})" style="height:28px; padding:0 10px; border:1px solid #bbf7d0; background:#f0fdf4; color:#166534; border-radius:999px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">${E(t)}</button>`).join('');
+            const pTxt = p => p ? `<b style="color:#16a34a; margin-left:4px;">${Number(p).toLocaleString()}P</b>` : '';
+            const chips = M.map((m, i) => `<button type="button" onclick="ptaMemoUse(${i})" style="height:28px; padding:0 10px; border:1px solid #bbf7d0; background:#f0fdf4; color:#166534; border-radius:999px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">${E(m.t)}${pTxt(m.p)}</button>`).join('');
             const head = `<div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center; margin-top:8px;"><span style="font-size:11.5px; font-weight:800; color:#64748b;">문구</span>${chips || '<span style="font-size:11.5px; color:#94a3b8; font-weight:700;">적어 둔 문구가 없어요</span>'}<button type="button" onclick="_rva.memoOpen=!_rva.memoOpen; _rva.memoEdit=null; ptaMemoPaint();" style="margin-left:auto; height:28px; padding:0 10px; border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">${_rva.memoOpen ? '닫기' : '✏️ 문구 관리'}</button></div>`;
             if (!_rva.memoOpen) return head;
             const btn = (on, label, bg, fg) => `<button type="button" onclick="${on}" style="height:30px; padding:0 10px; border:none; border-radius:7px; background:${bg}; color:${fg}; font-size:12px; font-weight:800; cursor:pointer; flex-shrink:0;">${label}</button>`;
-            const rows = M.map((t, i) => ed === i
-                ? `<div style="display:flex; gap:5px; margin-top:5px;"><input id="pta-memo-ed" class="form-control" maxlength="60" value="${E(t)}" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); ptaMemoSave(${i});} else if(event.key==='Escape'){_rva.memoEdit=null; ptaMemoPaint();}" style="flex:1; height:30px;">${btn(`ptaMemoSave(${i})`, '저장', '#2563eb', '#fff')}${btn('_rva.memoEdit=null; ptaMemoPaint();', '취소', '#e2e8f0', '#475569')}</div>`
-                : `<div style="display:flex; gap:5px; align-items:center; margin-top:5px; padding:4px 0; border-top:1px solid #f1f5f9;"><span style="flex:1; min-width:0; font-size:13px; font-weight:700; color:#334155; word-break:keep-all;">${E(t)}</span>${btn(`_rva.memoEdit=${i}; ptaMemoPaint(); setTimeout(()=>{const x=document.getElementById('pta-memo-ed'); if(x) x.focus();},0)`, '수정', '#e2e8f0', '#334155')}${btn(`ptaMemoDel(${i})`, '삭제', '#fee2e2', '#b91c1c')}</div>`).join('');
+            const pIn = (id, v, enter) => `<input id="${id}" type="number" inputmode="numeric" min="0" class="form-control" placeholder="포인트" value="${v ? Number(v) : ''}" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); ${enter}}" style="flex:0 0 84px; width:84px; height:30px;">`;
+            const rows = M.map((m, i) => ed === i
+                ? `<div style="display:flex; gap:5px; margin-top:5px; flex-wrap:wrap;"><input id="pta-memo-ed" class="form-control" maxlength="60" value="${E(m.t)}" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); ptaMemoSave(${i});} else if(event.key==='Escape'){_rva.memoEdit=null; ptaMemoPaint();}" style="flex:1 1 120px; min-width:0; height:30px;">${pIn('pta-memo-ed-p', m.p, `ptaMemoSave(${i});`)}${btn(`ptaMemoSave(${i})`, '저장', '#2563eb', '#fff')}${btn('_rva.memoEdit=null; ptaMemoPaint();', '취소', '#e2e8f0', '#475569')}</div>`
+                : `<div style="display:flex; gap:5px; align-items:center; margin-top:5px; padding:4px 0; border-top:1px solid #f1f5f9;"><span style="flex:1; min-width:0; font-size:13px; font-weight:700; color:#334155; word-break:keep-all;">${E(m.t)}${m.p ? pTxt(m.p) : '<span style="color:#94a3b8; font-size:11.5px; margin-left:4px;">금액 없음</span>'}</span>${btn(`_rva.memoEdit=${i}; ptaMemoPaint(); setTimeout(()=>{const x=document.getElementById('pta-memo-ed'); if(x) x.focus();},0)`, '수정', '#e2e8f0', '#334155')}${btn(`ptaMemoDel(${i})`, '삭제', '#fee2e2', '#b91c1c')}</div>`).join('');
             return head + `<div style="margin-top:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 10px;">
-                    <div style="display:flex; gap:5px;"><input id="pta-memo-new" class="form-control" maxlength="60" placeholder="새 문구 (예: 이벤트 당첨)" autocomplete="off" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); ptaMemoAdd();}" style="flex:1; height:32px;">${btn('ptaMemoAdd()', '저장', '#16a34a', '#fff')}</div>
+                    <div style="display:flex; gap:5px; flex-wrap:wrap;"><input id="pta-memo-new" class="form-control" maxlength="60" placeholder="새 문구 (예: 이벤트 당첨)" autocomplete="off" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); ptaMemoAdd();}" style="flex:1 1 120px; min-width:0; height:32px;">${pIn('pta-memo-new-p', 0, 'ptaMemoAdd();')}${btn('ptaMemoAdd()', '저장', '#16a34a', '#fff')}</div>
+                    <div style="margin-top:4px; font-size:11px; font-weight:700; color:#94a3b8;">포인트는 비워도 돼요 · 문구를 누르면 메모와 포인트가 같이 들어가요</div>
                     ${rows}
                 </div>`;
         }
         function ptaMemoPaint() { const b = document.getElementById('pta-memo-box'); if (b) b.innerHTML = ptaMemoBoxHtml(); }
-        function ptaMemoUse(i) { const m = document.getElementById('pta-memo'), t = (_rva.memos || [])[i]; if (m && t) { m.value = t; const a = document.getElementById('pta-amt'); if (a && !a.value) a.focus(); } }
+        function ptaMemoUse(i) {
+            const m = document.getElementById('pta-memo'), a = document.getElementById('pta-amt'), x = (_rva.memos || [])[i];
+            if (!x) return;
+            if (m) m.value = x.t;
+            if (a && x.p) a.value = x.p;
+            else if (a && !a.value) a.focus();
+        }
+        function ptaMemoP(id) { return Math.max(0, parseInt((document.getElementById(id) || {}).value, 10) || 0); }
         async function ptaMemoAdd() {
-            const i = document.getElementById('pta-memo-new'), t = String((i && i.value) || '').trim().slice(0, 60);
+            const i = document.getElementById('pta-memo-new'), t = String((i && i.value) || '').trim().slice(0, 60), p = ptaMemoP('pta-memo-new-p');
             if (!t) return showToast('문구를 적어 주세요');
-            const M = (_rva.memos || []).slice(); if (M.includes(t)) return showToast('이미 있는 문구예요');
-            try { await ptaMemoPut(M.concat(t)); showToast('문구를 저장했어요'); } catch (e) { return showToast('저장하지 못했습니다: ' + gErrKo(e)); }
+            const M = (_rva.memos || []).slice(); if (M.some(m => m.t === t && m.p === p)) return showToast('이미 있는 문구예요');
+            try { await ptaMemoPut(M.concat({ t, p })); showToast('문구를 저장했어요'); } catch (e) { return showToast('저장하지 못했습니다: ' + gErrKo(e)); }
             ptaMemoPaint(); setTimeout(() => { const n = document.getElementById('pta-memo-new'); if (n) n.focus(); }, 0);
         }
         async function ptaMemoSave(idx) {
-            const i = document.getElementById('pta-memo-ed'), t = String((i && i.value) || '').trim().slice(0, 60);
+            const i = document.getElementById('pta-memo-ed'), t = String((i && i.value) || '').trim().slice(0, 60), p = ptaMemoP('pta-memo-ed-p');
             if (!t) return showToast('비우려면 삭제를 눌러 주세요');
-            const M = (_rva.memos || []).slice(); M[idx] = t;
+            const M = (_rva.memos || []).slice(); M[idx] = { t, p };
             try { await ptaMemoPut(M); _rva.memoEdit = null; showToast('문구를 고쳤어요'); } catch (e) { return showToast('저장하지 못했습니다: ' + gErrKo(e)); }
             ptaMemoPaint();
         }
         async function ptaMemoDel(idx) {
-            const M = (_rva.memos || []).slice(), t = M[idx]; if (t == null) return;
-            if (!await psConfirm('이 문구를 지울까요?\n\n' + t)) return;
+            const M = (_rva.memos || []).slice(), x = M[idx]; if (!x) return;
+            if (!await psConfirm('이 문구를 지울까요?\n\n' + x.t + (x.p ? ' · ' + x.p.toLocaleString() + 'P' : ''))) return;
             M.splice(idx, 1);
             try { await ptaMemoPut(M); _rva.memoEdit = null; showToast('문구를 지웠어요'); } catch (e) { return showToast('지우지 못했습니다: ' + gErrKo(e)); }
             ptaMemoPaint();
@@ -37129,7 +37143,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 // [수정] 코드 관리는 두 갈래(코드 목록 / 코드 연결). 이름표를 받아 둔 뒤 보던 쪽으로 연다.
                 gLoadCodeLabels().then(() => switchCodeSubTab(codeSubTab));
             } else if (subTabName === 'check') {
-                switchCheckSubTab(pchkSubTab);   // 지난번에 보던 쪽(재고 점검 / 잘 나가는 품목)으로 연다
+                switchCheckSubTab('sales');   // [수정 2026-10-23] 품목 분석을 누르면 늘 판매 순위부터 (사장님 요청)
             } else if (subTabName === 'sourcing') {
                 srcLoad();   // [신규] 소싱: 처음 열 때 DB에서 받아 온다
             }
@@ -37964,7 +37978,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const head = `
                 <div class="card" style="background:#fff; border-radius:14px; padding:12px 14px; box-shadow:var(--shadow); margin-bottom:10px; border:1px solid var(--border);">
                     <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
-                        <b style="font-size:14px; font-weight:900; color:#0f172a;">🔥 잘 나가는 품목</b>
+                        <b style="font-size:14px; font-weight:900; color:#0f172a;">🔥 판매 순위</b>
                         <span style="font-size:11.5px; font-weight:700; color:#94a3b8;">
                             눌러서 주별 매출을 봅니다. 앞 주보다 늘면 <b style="color:#dc2626;">빨강</b>, 줄면 <b style="color:#2563eb;">파랑</b>.
                         </span>
@@ -38030,7 +38044,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
 
         /* 품목 분석 안에서 재고 점검 / 잘 나가는 품목을 오간다 */
-        let pchkSubTab = 'stock';
+        let pchkSubTab = 'sales';
         function switchCheckSubTab(which) {
             pchkSubTab = which;
             document.querySelectorAll('.pchk-sub-btn').forEach(b =>
