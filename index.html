@@ -22050,6 +22050,14 @@
                 saleBadge: uploadSaleBadge,
                 saleBadgeText: uploadSaleBadgeText
             };
+            /* [수정 2026-10-23] 수량 칸에는 '지금 남은 수량'을 보여 준다 (사장님 지적 — 기본 수량이 보여서, 주문이 있는 옵션은 고칠 때 주문 수만큼 또 빠졌다).
+               처음 값(_rem0 남은 수량 · _base0 기본 수량)을 적어 두었다가 저장할 때 손댄 항목만 '넣은 값 - 주문으로 빠진 수'로 기본 수량을 맞춘다 */
+            { const _ep = (uploadIsEditMode && uploadEditProductKey !== null) ? uploadProducts[uploadEditProductKey] : null;
+              if (_ep) (optionModalDraft.groups || []).forEach(g => (g.items || []).forEach(it => {
+                  const b = gOptBaseStock(it); if (b === null) return;
+                  const rem = gOptRemain(_ep, g.name, it);
+                  it._base0 = b; it._rem0 = rem; it.stock = rem;
+              })); }
 
             const old = document.getElementById('product-option-modal');
             if (old) old.remove();
@@ -22105,7 +22113,17 @@
                         // [신규] 항목별 수량. 비워 두면 제한 없음이므로 아예 저장하지 않는다.
                         //  (0은 '품절'이라는 뜻이라 반드시 저장해야 한다)
                         const raw = String(it.stock === undefined || it.stock === null ? "" : it.stock).trim();
-                        if (raw !== "") row.stock = Math.max(0, parseInt(raw) || 0);
+                        if (raw !== "") {
+                            /* [수정 2026-10-23] 칸의 숫자는 '남은 수량' — 손대지 않았으면 원래 기본 수량 그대로,
+                               고쳤으면 기본 수량 = 넣은 값 - 주문으로 빠진 수(조정값). 주문 집계의 수량 고치기와 같다 */
+                            const entered = Math.max(0, parseInt(raw) || 0);
+                            const _ep = (uploadIsEditMode && uploadEditProductKey !== null) ? uploadProducts[uploadEditProductKey] : null;
+                            if (it._rem0 !== undefined && it._rem0 !== null && entered === Number(it._rem0)) row.stock = Number(it._base0);
+                            else {
+                                const adj = _ep ? (parseInt(optionAdjustments[gOptStockKey(_ep, String(g.name || '').trim(), row.name)] || 0) || 0) : 0;
+                                row.stock = Math.max(0, entered - adj);
+                            }
+                        }
                         return row;
                     })
             })).filter(g => g.name !== "" || g.items.length > 0);
@@ -27780,18 +27798,19 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         /* [신규 2026-10-14] 옵션 항목 남은 수량 고치기. 넣은 숫자는 '지금 남은 수량'이다.
            주문으로 빠진 수(옵션 조정값)는 그대로 두고 기본 수량 = 넣은 값 - 조정값 으로 저장한다 (상품 재고 칸과 같은 방식 —
            화면을 연 뒤 들어온 주문의 차감이 지워지지 않게). 999·무제한·∞ 는 수량 제한 없음(기본 수량 비움). */
-        async function salesUpdateOptStock(idx, gi, ii, value) {
+        async function salesUpdateOptStock(idx, gi, ii, value, after) {   // [수정 2026-10-23] after — 다 한 뒤 다시 그릴 것 (없으면 주문 집계)
+            const _redraw = (typeof after === 'function') ? after : renderSalesUpcoming;
             const prod = uploadProducts[idx];
             const grp = prod && prod.options && prod.options[gi];
             const it = grp && grp.items && grp.items[ii];
-            if (!it) { showToast('옵션을 찾지 못했습니다. 화면을 새로 연 뒤 다시 해 주세요.'); renderSalesUpcoming(); return; }
+            if (!it) { showToast('옵션을 찾지 못했습니다. 화면을 새로 연 뒤 다시 해 주세요.'); _redraw(); return; }
             const raw = String(value == null ? '' : value).trim();
-            if (raw === '') { renderSalesUpcoming(); return; }   // 빈 값이면 그대로
+            if (raw === '') { _redraw(); return; }   // 빈 값이면 그대로
             let base;
             if (raw === '무제한' || raw === '∞' || raw.toLowerCase() === 'unlimited' || raw === '999') base = '';
             else {
                 const n = parseInt(raw.replace(/[^\d-]/g, ''));
-                if (isNaN(n) || n < 0) { showToast('0 이상 숫자 또는 "무제한"을 입력하세요.'); renderSalesUpcoming(); return; }
+                if (isNaN(n) || n < 0) { showToast('0 이상 숫자 또는 "무제한"을 입력하세요.'); _redraw(); return; }
                 const adj = parseInt(optionAdjustments[gOptStockKey(prod, grp.name, it.name)] || 0) || 0;
                 base = Math.max(0, n - adj);
             }
@@ -27809,7 +27828,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const left = gOptRemain(prod, grp.name, it);
                 showToast(`'${it.name}' 남은 수량 → ${left === null ? '무제한' : left + '개'}`);
             }
-            renderSalesUpcoming();
+            _redraw();
         }
 
         // A. 오늘 이후 주문 집계
@@ -33419,15 +33438,25 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const useAll = (p.useOptions === undefined || p.useOptions === null) ? true : (p.useOptions === true || p.useOptions === 'true');
             const useChoice = (p.useChoiceOptions === true || p.useChoiceOptions === 'true');
             if (!useAll || !useChoice) return out;
-            ((p.options) || []).forEach(g => {
-                ((g && g.items) || []).forEach(it => {
+            ((p.options) || []).forEach((g, gi) => {
+                ((g && g.items) || []).forEach((it, ii) => {
                     if (!it || !String(it.name || '').trim()) return;
-                    out.push({ group: g.name || '옵션', name: it.name, base: gOptBaseStock(it), remain: gOptRemain(p, g.name, it), price: parseInt(it.price) || 0 });   // [신규 2026-10-21] 옵션 금액도
+                    out.push({ group: g.name || '옵션', name: it.name, base: gOptBaseStock(it), remain: gOptRemain(p, g.name, it), price: parseInt(it.price) || 0, gi, ii });   // [신규 2026-10-21] 옵션 금액도 · [신규 2026-10-23] 자리(gi·ii) — 목록에서 수량 고치기
                 });
             });
             return out;
         }
 
+        /* [신규 2026-10-23] 상품 목록 옵션 줄에서 남은 수량 고치기 — 주문 집계와 같은 함수(salesUpdateOptStock)를 쓰고,
+           다 한 뒤 목록을 다시 그리면서 이 상품의 옵션 줄은 펼친 채로 둔다. 빈칸이면 무제한 */
+        function gListOptStock(idx, gi, ii) {
+            const el = document.getElementById(`lopt-${idx}-${gi}-${ii}`);
+            const v = el ? String(el.value).trim() : '';
+            salesUpdateOptStock(idx, gi, ii, v === '' ? '무제한' : v, () => {
+                if (typeof renderProductsList === 'function') renderProductsList();
+                const box = document.getElementById('opt-stock-' + idx); if (box) box.style.display = 'block';
+            });
+        }
         // 목록에서 옵션 줄을 폈다 접었다 한다 (다시 그리지 않고 그 줄만 여닫는다)
         function toggleOptionStockRow(idx, ev) {
             if (ev && ev.stopPropagation) ev.stopPropagation();
@@ -33966,7 +33995,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                                         + `<span style="flex:1; min-width:0; color:#475569; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${gEscapeHtml(r.name)}</span>`
                                         // [신규 2026-10-21] 옵션 가격 (사장님 요청) — 기본 가격이 0원이면 옵션 가격 그대로, 있으면 추가금(+)
                                         + (() => { const bp = parseInt(prod.price) || 0, op = r.price || 0; const t = bp > 0 ? (op ? (op > 0 ? '+' : '') + op.toLocaleString() + '원' : '') : op.toLocaleString() + '원'; return t ? `<span style="flex:0 0 auto; font-weight:800; color:#2563eb;">${t}</span>` : ''; })()
-                                        + `<span style="flex:0 0 auto; font-weight:800;">${right}</span></div>`;
+                                        + `<span style="flex:0 0 auto; font-weight:800;">${right}</span>`
+                                        // [신규 2026-10-23] 목록에서 옵션 남은 수량 고치기 (사장님 요청) — 넣은 숫자 = 지금 남은 수량, 999·빈칸 = 무제한
+                                        + `<span onclick="event.stopPropagation();" style="flex:0 0 auto; display:flex; gap:3px; align-items:center;">`
+                                        + `<input type="text" inputmode="numeric" id="lopt-${index}-${r.gi}-${r.ii}" value="${limited ? r.remain : ''}" placeholder="${limited ? r.remain : '무제한'}" onfocus="this.select()" onkeydown="if(event.key==='Enter'){event.preventDefault(); gListOptStock(${index}, ${r.gi}, ${r.ii});}" title="남은 수량 (999=무제한)" style="width:46px; padding:3px 2px; border:1.5px solid ${out ? '#fca5a5' : 'var(--border)'}; border-radius:6px; font-size:11.5px; font-weight:700; text-align:center; box-sizing:border-box;">`
+                                        + `<button type="button" onclick="gListOptStock(${index}, ${r.gi}, ${r.ii})" style="padding:3px 7px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button></span></div>`;
                                 }).join('')
                             ).join('')
                             + `</div>`;
@@ -35182,7 +35215,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         const now = sv(it.stock), before = oldStockOf(g.name, it.name);
                         const changed = (before === undefined) ? now !== '' : before !== now;
                         if (!changed) return;
-                        resets.push(gOptStockKey(saved, g.name, it.name));   // 화면이 조정값을 아직 안 받았을 수 있어 바뀐 항목은 늘 비운다
+                        /* [수정 2026-10-23] 이제 상세옵션 창에서 넣은 숫자를 '남은 수량'으로 보고 기본 수량을 (넣은 값 - 조정값)으로 맞춰 저장한다.
+                           조정값(주문으로 빠진 수)을 지우면 그만큼 남은 수량이 늘어나 버리므로 더는 비우지 않는다 */
+                        // resets.push(gOptStockKey(saved, g.name, it.name));
                     }));
                     for (const k of resets) {
                         await fetch(`${FIREBASE_DB_URL}option_stock/${encodeURIComponent(k)}.json`, { method: 'DELETE' }).catch(e => console.warn('옵션 조정값 비우기 실패:', k, e));
