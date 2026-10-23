@@ -29253,19 +29253,21 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const fb = document.getElementById('sales-rank-filters'); if (!fb) return;
             const F = salesRankF;
             const chip = (grp, v, label) => `<button type="button" onclick="salesRankSet('${grp}', ${typeof v === 'number' ? v : `'${v}'`})" class="sales-toggle-btn${F[grp] === v ? ' active' : ''}" style="padding:5px 9px; font-size:11.5px; white-space:nowrap;">${label}</button>`;
-            const row = (lab, html) => `<div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:5px;"><span style="flex:0 0 auto; width:44px; font-size:11px; font-weight:800; color:var(--text-sub);">${lab}</span>${html}</div>`;
+            const lab = (t, ml) => `<span style="flex:0 0 auto; font-size:11px; font-weight:800; color:var(--text-sub); margin:0 2px 0 ${ml || 0}px;">${t}</span>`;
+            // [수정 2026-10-23] 종류와 받기는 한 줄, 개수는 찾기 칸 옆으로 (사장님 요청)
             const q = document.getElementById('sales-rank-q');
             if (!q) {
-                fb.innerHTML = `<div id="sales-rank-chips"></div>`
-                    + `<div style="display:flex; align-items:center; gap:6px;"><span style="flex:0 0 auto; width:44px; font-size:11px; font-weight:800; color:var(--text-sub);">찾기</span>`
-                    + `<input type="search" id="sales-rank-q" placeholder="상품 이름으로 찾기" autocomplete="off" oninput="salesRankF.q=this.value; renderSalesRanking();" style="flex:1 1 auto; min-width:0; height:32px; padding:0 10px; border:1.5px solid var(--border); border-radius:8px; font-size:12.5px; font-family:inherit;">`
-                    + `<span id="sales-rank-count" style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:var(--text-sub);"></span></div>`;
+                fb.innerHTML = `<div id="sales-rank-chips" style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:6px;"></div>`
+                    + `<div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">${lab('찾기')}`
+                    + `<input type="search" id="sales-rank-q" placeholder="상품 이름으로 찾기" autocomplete="off" oninput="salesRankF.q=this.value; renderSalesRanking();" style="flex:1 1 160px; min-width:0; height:32px; padding:0 10px; border:1.5px solid var(--border); border-radius:8px; font-size:12.5px; font-family:inherit;">`
+                    + `<span id="sales-rank-nchips" style="display:flex; align-items:center; gap:4px; flex:0 0 auto;"></span>`
+                    + `<span id="sales-rank-count" style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:var(--text-sub); margin-left:2px;"></span></div>`;
             }
             const chips = document.getElementById('sales-rank-chips');
-            if (chips) chips.innerHTML =
-                row('종류', chip('cat', 'all', '전체') + chip('cat', 'group', '공동구매') + chip('cat', 'other', '상시판매') + chip('cat', 'sada', '사다드림') + chip('cat', 'fruit', '과일'))
-                + row('받기', chip('m', 'all', '전체') + chip('m', 'pickup', '🏠 픽업') + chip('m', 'delivery', '🛵 배달'))
-                + row('개수', chip('n', 10, '10개') + chip('n', 30, '30개') + chip('n', 50, '50개') + chip('n', 0, '전체'));
+            if (chips) chips.innerHTML = lab('종류') + chip('cat', 'all', '전체') + chip('cat', 'group', '공동구매') + chip('cat', 'other', '상시판매') + chip('cat', 'sada', '사다드림') + chip('cat', 'fruit', '과일')
+                + lab('받기', 10) + chip('m', 'all', '전체') + chip('m', 'pickup', '🏠 픽업') + chip('m', 'delivery', '🛵 배달');
+            const nc = document.getElementById('sales-rank-nchips');
+            if (nc) nc.innerHTML = chip('n', 10, '10개') + chip('n', 30, '30개') + chip('n', 50, '50개') + chip('n', 0, '전체');
         }
         function salesRankSet(grp, v) { salesRankF[grp] = v; salesRankPaintFilters(); renderSalesRanking(); }
         // 상품별 / 재주문 고객 판매 순위(정렬 가능) + 고객 통계
