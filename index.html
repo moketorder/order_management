@@ -18174,12 +18174,15 @@
            저절로 만든 일정엔 autoRepeat 표시를 남겨, 반복을 끌 때 아직 안 올라간 것만 골라 지울 수 있게 한다. */
         const PS_REPEAT_AHEAD_MS = 28 * 86400000;   // 4주 앞까지
         let psRepeatBusy = false;
+        let psRepeatBusyAt = 0;
         async function psEnsureRepeats() {
-            if (psRepeatBusy) return 0;
-            psRepeatBusy = true;
+            if (psRepeatBusy && Date.now() - psRepeatBusyAt < 120000) return 0;   // [수정 2026-10-23] 2분 넘게 묶여 있으면 풀고 다시 한다
+            psRepeatBusy = true; psRepeatBusyAt = Date.now();
             let made = 0;
+            const fails = [];   // [신규 2026-10-23] 못 만든 상품과 이유 — 알림으로 보여 준다
             try {
                 for (const p of (uploadProducts || [])) {
+                  try {
                     const w = Number(p && p.repeatWeeks) || 0;
                     if (!w || !p.sid || p.showWeekly === true) continue;
                     const idx = psIdxOfSid(p.sid);
@@ -18195,16 +18198,18 @@
                         const data = { releaseAt: rel, expireAt: exp, pickup: pk ? psAddDays(pk, step) : null, autoRepeat: true,
                             group: last.group ? (String(last.group).split('@')[0] + '@' + rel) : null, groupLabel: last.groupLabel || null,
                             stock: 999 };   // [수정 2026-10-18] 반복으로 새로 잡는 차례는 재고 무제한으로 시작 (사장님 요청 — 예전엔 앞 차례 재고를 물려받았다)
-                        if (!(await psItemAdd(idx, data, 'R' + rel.toString(36)))) break;
+                        if (!(await psItemAdd(idx, data, 'R' + rel.toString(36)))) { fails.push((p.name || p.sid) + ' (일정 저장 실패·겹침)'); break; }
                         made++;
                     }
                     // [신규 2026-10-18] 이미 만들어 둔 반복 차례 중 아직 안 올라간 것도 무제한으로 맞춘다
                     const _fix = {};
                     psItemsOfSid(p.sid).forEach(it => { if (it.autoRepeat && Number(it.releaseAt) > Date.now() && Number(it.stock) !== 999 && it.stockApplied !== true) _fix[`${it.sid}/${it.rid}/stock`] = 999; });
                     if (Object.keys(_fix).length && await psSchedPatch(_fix)) Object.keys(_fix).forEach(k => { const [s, r] = k.split('/'); if (psSched[s] && psSched[s][r]) psSched[s][r].stock = 999; });
+                  } catch (e) { console.error('반복 일정 만들기 실패 (' + ((p && p.name) || '') + '):', e); fails.push(((p && p.name) || '?') + ' (' + ((e && e.message) || e) + ')'); }   // [신규 2026-10-23] 한 상품이 실패해도 다음 상품은 계속
                 }
-            } catch (e) { console.error('반복 일정 만들기 실패:', e); }
+            } catch (e) { console.error('반복 일정 만들기 실패:', e); fails.push(String((e && e.message) || e)); }
             finally { psRepeatBusy = false; }
+            if (fails.length) showToast('⚠️ 반복 일정을 못 만든 상품: ' + fails.slice(0, 3).join(' · ') + (fails.length > 3 ? ` 외 ${fails.length - 3}개` : ''));
             return made;
         }
         // 일정 카드의 '반복' 고르기 — 한 일정에 담긴 상품 전부에 같이 건다 (반복은 상품마다 적어 둔다)
@@ -33522,12 +33527,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     // [신규 2026-10-03] 픽업일이 지난 차례 중 '끝나면 상시판매'를 켠 상품을 상시판매로 돌린다.
                     //  다음 차례를 올리기(psPromoteDue) 전에 돌려야 끝난 차례를 알아본다.
                     try { await window._gPastHideP; } catch (e) {}
-                    await psConvertEndedToOnsite();
-                    await psPromoteDue();
-                    autoApplyScheduledVisibility();   // [신규] 상품 자료를 받을 때마다 예약 공개·종료 시각에 맞춰 노출도 같이 맞춘다
-                    const n = await psEnsureRepeats();
+                    /* [수정 2026-10-23] 하나가 실패해도 다음 일은 하도록 따로 감싼다 (사장님 지적 — 10/13 뒤로 열 때 반복 차례가 안 늘어났다.
+                       앞 단계에서 멈추면 반복 만들기까지 못 갔다) */
+                    const _step = async (nm, f) => { try { return await f(); } catch (e) { console.error('[열 때 할 일 실패] ' + nm + ':', e); return null; } };
+                    await _step('상시판매로 돌리기', psConvertEndedToOnsite);
+                    await _step('다음 차례 올리기', psPromoteDue);
+                    await _step('예약 노출 맞추기', () => autoApplyScheduledVisibility());   // [신규] 상품 자료를 받을 때마다 예약 공개·종료 시각에 맞춰 노출도 같이 맞춘다
+                    const n = await _step('반복 일정 만들기', psEnsureRepeats);
                     if (n > 0) showToast(`🔁 반복 일정 ${n}개를 만들었어요`);
-                    await gMigratePriceGb();   // [신규 2026-10-13] 공구가가 비어 있는 상품은 지금 판매가를 공구가로
+                    await _step('공구가 채우기', gMigratePriceGb);   // [신규 2026-10-13] 공구가가 비어 있는 상품은 지금 판매가를 공구가로
+                    // [신규 2026-10-23] 오래 켜 두어도 1시간마다 반복 차례를 다시 맞춘다
+                    if (!window.__psRepeatTimer) window.__psRepeatTimer = setInterval(async () => {
+                        const m = await _step('반복 일정 만들기(1시간마다)', psEnsureRepeats);
+                        if (m > 0) { showToast(`🔁 반복 일정 ${m}개를 만들었어요`); const b = document.getElementById('ps-cal-box'); if (b && b.offsetParent) renderProductScheduleCalendar(); }
+                    }, 3600000);
                     renderProductsList();
                     { const b = document.getElementById('ps-cal-box'); if (b && b.offsetParent) renderProductScheduleCalendar(); }
                     gLoadMyDismissed().then(checkPendingAnnouncements);   // [수정] 내가 닫은 목록부터 받아온 뒤에 🔔 알림을 맞춘다
