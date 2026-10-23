@@ -28468,6 +28468,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            위에 얹힌 쪽은 시작점이 들쭉날쭉해 비교가 어렵기 때문이다. */
         let custTrendBase = 'all';
 
+        // [신규 2026-10-23] 손님 추이 칸 크기는 위 기간 단위를 따른다 — 일·주 → 주, 월·분기 → 월, 년 → 년
+        function custTrendUnitNow(){ return salesUnit === 'year' ? 'year' : (salesUnit === 'month' || salesUnit === 'quarter') ? 'month' : 'week'; }
         function setCustTrendUnit(u){
             custTrendUnit = u;
             renderSalesRanking();      // 손님 통계 탭을 다시 그린다
@@ -29237,17 +29239,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
                 <!-- [신규] 위 숫자들이 늘고 있는지 줄고 있는지 선으로 본다 -->
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:12px 0 6px; flex-wrap:wrap;">
-                    <div style="font-size:13px; font-weight:800; color:#334155;">📉 손님 추이</div>
-                    <div style="display:flex; gap:4px;">
-                        ${['week','month','year'].map(u => {   // [수정] '일' 단위는 뺐다 — 칸이 촘촘해 읽기 어렵다
-                            const on = custTrendUnit === u;
-                            const nm = { week:'주', month:'월', year:'년' }[u];
-                            return `<button type="button" onclick="setCustTrendUnit('${u}')" style="padding:5px 12px; border:1.5px solid ${on?'var(--primary)':'var(--border)'}; background:${on?'var(--primary-light)':'#fff'}; color:${on?'var(--primary)':'var(--text-sub)'}; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">${nm}</button>`;
-                        }).join('')}
-                    </div>
+                    <!-- [수정 2026-10-23] 주·월·년 단추는 뺐다 — 위 기간 단위를 따른다 (사장님 요청) -->
+                    <div style="font-size:13px; font-weight:800; color:#334155;">📉 손님 추이 <span style="font-size:11px; font-weight:700; color:var(--text-sub);">${ { week: '주', month: '월', year: '년' }[custTrendUnitNow()] }별 · 위 기간 단위를 따라요</span></div>
                 </div>
                 <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px 6px 6px;">
-                    ${customerTrendSvg(buildCustomerTrend(custTrendUnit))}
+                    ${customerTrendSvg(buildCustomerTrend(custTrendUnitNow()))}
                 </div>
 
                 ${sec('👩 성별 분포')}
