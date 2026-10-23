@@ -28276,7 +28276,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             row1.innerHTML = units.map(([u,l]) => ubtn(u, l)).join('');
             const cr = document.getElementById('sales-custom-range'); if (cr) cr.style.display = 'none';
             // 2줄: 인스턴스 버튼 (오늘은 비움, 나머지는 가로 스크롤)
-            row2.innerHTML = buildSalesInstanceButtons();
+            row2.innerHTML = buildSalesInstanceButtons()
+                // [신규 2026-10-23] 고객 통계에서만 — 줄 끝 '전체': 손님 추이를 처음부터 다 본다 (위 숫자 칸은 고른 기간 그대로)
+                + ((typeof salesStatCat !== 'undefined' && salesStatCat === 'cust') ? `<button type="button" onclick="setCustTrendAll()" class="sales-toggle-btn${custTrendAll ? ' active' : ''}" title="손님 추이를 처음부터 전체로 보기" style="flex:0 0 auto; margin-left:auto; padding:6px 12px; font-size:12px; white-space:nowrap; position:sticky; right:0; box-shadow:-6px 0 6px -4px rgba(0,0,0,.12);">전체</button>` : '');
         }
         // [신규] 선택 단위의 인스턴스 버튼 목록 생성 (idx 0=가장 최근)
         function buildSalesInstanceButtons(){
@@ -28471,6 +28473,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         // [신규 2026-10-23] 손님 추이 칸 크기는 위 기간 단위를 따른다 — 일·주 → 주, 월·분기 → 월, 년 → 년
         function custTrendUnitNow(){ return salesUnit === 'year' ? 'year' : (salesUnit === 'month' || salesUnit === 'quarter') ? 'month' : 'week'; }
+        // [신규 2026-10-23] 손님 추이 — 기본은 고른 기간 안을 쪼개 보고, 하위 단추 줄 끝 '전체'를 누르면 처음부터 여러 칸
+        var custTrendAll = false;
+        function setCustTrendAll() { custTrendAll = !custTrendAll; buildSalesPeriodTabs(); renderSalesRanking(); }
+        function custTrendLabel() {
+            if (custTrendAll) return ({ week: '주', month: '월', year: '년' })[custTrendUnitNow()] + '별 · 처음부터 전체';
+            return ({ today: '그날', day: '그날', week: '그 주 하루씩', month: '그 달 주별', quarter: '그 분기 달별', year: '그 해 달별' })[salesUnit] || '';
+        }
         function setCustTrendUnit(u){
             custTrendUnit = u;
             renderSalesRanking();      // 손님 통계 탭을 다시 그린다
@@ -28502,45 +28511,68 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             });
             person.forEach(list => list.sort((a,b)=>a-b));
 
-            // 구간 만들기 — 자료가 있는 첫 달부터 마지막 달까지
-            const allTimes = [];
-            person.forEach(list => { allTimes.push(list[0], list[list.length-1]); });
-            if (allTimes.length === 0) return [];
-            let minT = Math.min.apply(null, allTimes), maxT = Math.max.apply(null, allTimes);
-
-            /* [수정] 위쪽 날짜 탭(기간)을 따르지 않아, 기간을 바꿔도 그래프가 그대로였다.
-               사람별 구매 이력(person)은 전체를 그대로 두어야 한다 — 이탈위험은
-               '그 구간 전에 산 적이 있는가'를 봐야 하므로 과거가 필요하다.
-               그리는 구간만 고른 기간 안으로 좁힌다. */
-            {
-                /* [수정 2026-10-23] 위 단위 단추를 따르게 바꾸니 '월'을 고르면 그 달 막대 하나만 남았다 (사장님 지적).
-                   이제 고른 기간에서 끝나도록만 자르고, 앞쪽은 그 단위로 여러 칸(아래 _cap)을 보여 준다 */
-                const { to } = getSalesPeriodRange();
-                if (to)   maxT = Math.min(maxT, to.getTime());
-                if (minT > maxT) return [];
-            }
-
-            const buckets = [];
-            const push = (start, end, label) => buckets.push({ label, start: start.getTime(), end: end.getTime() });
-            if (unit === 'year') {
-                for (let y = new Date(minT).getFullYear(); y <= new Date(maxT).getFullYear(); y++)
-                    push(new Date(y,0,1), new Date(y,11,31,23,59,59), `${y}년`);
-            } else if (unit === 'week') {
-                const s = new Date(minT); s.setHours(0,0,0,0); s.setDate(s.getDate() - ((s.getDay()+6)%7));
-                for (let d = new Date(s); d.getTime() <= maxT; d.setDate(d.getDate()+7)) {
-                    const e = new Date(d); e.setDate(e.getDate()+6); e.setHours(23,59,59,999);
-                    push(new Date(d), e, `${d.getMonth()+1}/${d.getDate()}`);
+            /* [신규 2026-10-23] 'sub' = 고른 기간 안을 쪼개 본다 (사장님 요청 — 매출 추이와 같은 방식)
+               일 → 그날 하나 · 주 → 그 주 7일 · 월 → 그 달에 걸친 주(월~일) · 분기 → 석 달 · 년 → 열두 달.
+               하위 단추 줄 끝 '전체'를 누르면(custTrendAll) 예전처럼 처음부터 그 단위로 여러 칸 */
+            if (unit === 'sub') {
+                const { from, to } = getSalesPeriodRange();
+                if (!from || !to) return [];
+                const subB = [];
+                const pushS = (s, e, label) => s.getTime() > Date.now() ? 0 : subB.push({ label, start: s.getTime(), end: e.getTime() });
+                const dEnd = d => { const e = new Date(d); e.setHours(23,59,59,999); return e; };
+                const w = ['일','월','화','수','목','금','토'];
+                if (salesUnit === 'today' || salesUnit === 'day') {
+                    pushS(from, dEnd(from), `${from.getMonth()+1}/${from.getDate()}(${w[from.getDay()]})`);
+                } else if (salesUnit === 'week') {
+                    for (let i = 0; i < 7; i++) { const d = new Date(from); d.setDate(d.getDate()+i); pushS(d, dEnd(d), `${d.getMonth()+1}/${d.getDate()}(${w[d.getDay()]})`); }
+                } else if (salesUnit === 'month') {
+                    const s = new Date(from); s.setDate(s.getDate() - ((s.getDay()+6)%7));
+                    for (let d = new Date(s); d <= to; d.setDate(d.getDate()+7)) { const e = new Date(d); e.setDate(e.getDate()+6); pushS(new Date(d), dEnd(e), `${d.getMonth()+1}/${d.getDate()}~`); }
+                } else {   // 분기·년 → 달마다
+                    for (let d = new Date(from.getFullYear(), from.getMonth(), 1); d <= to; d.setMonth(d.getMonth()+1)) pushS(new Date(d), new Date(d.getFullYear(), d.getMonth()+1, 0, 23,59,59,999), `${_p2(d.getMonth()+1)}월`);
                 }
+                var buckets = subB;
             } else {
-                const s = new Date(new Date(minT).getFullYear(), new Date(minT).getMonth(), 1);
-                for (let d = new Date(s); d.getTime() <= maxT; d.setMonth(d.getMonth()+1)) {
-                    const e = new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59);
-                    push(new Date(d), e, `${_p2(d.getMonth()+1)}월`);
+                // 구간 만들기 — 자료가 있는 첫 달부터 마지막 달까지
+                const allTimes = [];
+                person.forEach(list => { allTimes.push(list[0], list[list.length-1]); });
+                if (allTimes.length === 0) return [];
+                let minT = Math.min.apply(null, allTimes), maxT = Math.max.apply(null, allTimes);
+    
+                /* [수정] 위쪽 날짜 탭(기간)을 따르지 않아, 기간을 바꿔도 그래프가 그대로였다.
+                   사람별 구매 이력(person)은 전체를 그대로 두어야 한다 — 이탈위험은
+                   '그 구간 전에 산 적이 있는가'를 봐야 하므로 과거가 필요하다.
+                   그리는 구간만 고른 기간 안으로 좁힌다. */
+                {
+                    /* [수정 2026-10-23] 위 단위 단추를 따르게 바꾸니 '월'을 고르면 그 달 막대 하나만 남았다 (사장님 지적).
+                       이제 고른 기간에서 끝나도록만 자르고, 앞쪽은 그 단위로 여러 칸(아래 _cap)을 보여 준다 */
+                    const { to } = getSalesPeriodRange();
+                    if (to)   maxT = Math.min(maxT, to.getTime());
+                    if (minT > maxT) return [];
                 }
+    
+                var buckets = [];
+                const push = (start, end, label) => buckets.push({ label, start: start.getTime(), end: end.getTime() });
+                if (unit === 'year') {
+                    for (let y = new Date(minT).getFullYear(); y <= new Date(maxT).getFullYear(); y++)
+                        push(new Date(y,0,1), new Date(y,11,31,23,59,59), `${y}년`);
+                } else if (unit === 'week') {
+                    const s = new Date(minT); s.setHours(0,0,0,0); s.setDate(s.getDate() - ((s.getDay()+6)%7));
+                    for (let d = new Date(s); d.getTime() <= maxT; d.setDate(d.getDate()+7)) {
+                        const e = new Date(d); e.setDate(e.getDate()+6); e.setHours(23,59,59,999);
+                        push(new Date(d), e, `${d.getMonth()+1}/${d.getDate()}`);
+                    }
+                } else {
+                    const s = new Date(new Date(minT).getFullYear(), new Date(minT).getMonth(), 1);
+                    for (let d = new Date(s); d.getTime() <= maxT; d.setMonth(d.getMonth()+1)) {
+                        const e = new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59);
+                        push(new Date(d), e, `${_p2(d.getMonth()+1)}월`);
+                    }
+                }
+                // 너무 길면 최근 구간만 남긴다. 휴대폰에서는 막대가 붙어 버려 더 적게 둔다.
+                const _cap = (typeof window !== 'undefined' && window.innerWidth < 640) ? 12 : 24;
+                if (buckets.length > _cap) buckets.splice(0, buckets.length - _cap);
             }
-            // 너무 길면 최근 구간만 남긴다. 휴대폰에서는 막대가 붙어 버려 더 적게 둔다.
-            const _cap = (typeof window !== 'undefined' && window.innerWidth < 640) ? 12 : 24;
-            if (buckets.length > _cap) buckets.splice(0, buckets.length - _cap);
 
             /* [수정] 아직 끝나지 않은 구간(이번 주·이번 달)의 끝을 미래 날짜로 잡고 있었다.
                8월인데 8월 31일을 기준으로 세는 바람에, 7월 하순에 사신 분까지
@@ -29242,10 +29274,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 <!-- [신규] 위 숫자들이 늘고 있는지 줄고 있는지 선으로 본다 -->
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:12px 0 6px; flex-wrap:wrap;">
                     <!-- [수정 2026-10-23] 주·월·년 단추는 뺐다 — 위 기간 단위를 따른다 (사장님 요청) -->
-                    <div style="font-size:13px; font-weight:800; color:#334155;">📉 손님 추이 <span style="font-size:11px; font-weight:700; color:var(--text-sub);">${ { week: '주', month: '월', year: '년' }[custTrendUnitNow()] }별 · 위 기간 단위를 따라요</span></div>
+                    <div style="font-size:13px; font-weight:800; color:#334155;">📉 손님 추이 <span style="font-size:11px; font-weight:700; color:var(--text-sub);">${custTrendLabel()}</span></div>
                 </div>
                 <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px 6px 6px;">
-                    ${customerTrendSvg(buildCustomerTrend(custTrendUnitNow()))}
+                    ${customerTrendSvg(buildCustomerTrend(custTrendAll ? custTrendUnitNow() : 'sub'))}
                 </div>
 
                 ${sec('👩 성별 분포')}
@@ -30051,6 +30083,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         // [신규] 단위 선택(상단): 인덱스는 최근(0)으로 초기화
         function setSalesUnit(u){
+            custTrendAll = false;   // [신규 2026-10-23] 기간을 새로 고르면 손님 추이도 그 기간 안으로
             salesUnit = u; salesUnitIdx = 0; salesPeriod = u;
             salesTrendUnitOverride = null;
             buildSalesPeriodTabs();
@@ -30058,6 +30091,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
         // [신규] 인스턴스 선택(하단)
         function setSalesUnitIdx(i){
+            custTrendAll = false;
             salesUnitIdx = parseInt(i) || 0;
             buildSalesPeriodTabs();
             renderSalesStatus();
