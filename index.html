@@ -23951,7 +23951,27 @@
                 const who = x => x._ph
                     ? `<span onclick="showCustomerCardModal('${encodeURIComponent(x._ph)}','${encodeURIComponent(rvName[x._ph] || '')}')" title="손님 카드 보기" style="cursor:pointer; font-weight:900; color:#2563eb; text-decoration:underline; text-underline-offset:3px;">${E(rvName[x._ph] || '이름 없음')}</span> · ${E(phone(x._ph))}`
                     : '쓴 사람 모름';
-                box.innerHTML = _rva.reviews.map(x => {
+                /* [신규 2026-10-23] 기간 거르기 (사장님 요청) — 전체 · 오늘 · 7일 · 30일 · 이번 달 · 지난 달 · 날짜 고르기 */
+                const P = _rva.rvP || 'all';
+                const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+                let from = 0, to = Infinity;
+                if (P === 'today') from = +d0;
+                else if (P === '7') from = +d0 - 6 * 864e5;
+                else if (P === '30') from = +d0 - 29 * 864e5;
+                else if (P === 'month') from = +new Date(d0.getFullYear(), d0.getMonth(), 1);
+                else if (P === 'last') { from = +new Date(d0.getFullYear(), d0.getMonth() - 1, 1); to = +new Date(d0.getFullYear(), d0.getMonth(), 1); }
+                else if (P === 'pick') { if (_rva.rvFrom) from = +new Date(_rva.rvFrom + 'T00:00:00'); if (_rva.rvTo) to = +new Date(_rva.rvTo + 'T00:00:00') + 864e5; }
+                const shown = _rva.reviews.filter(x => (x.at || 0) >= from && (x.at || 0) < to);
+                const avg = shown.length ? (shown.reduce((s, x) => s + (Number(x.stars) || 0), 0) / shown.length).toFixed(1) : '-';
+                const pc = (v, l) => `<button type="button" onclick="_rva.rvP='${v}'; renderReviewsAdmin(false);" class="sub-tab-btn${P === v ? ' active' : ''}" style="padding:6px 10px; font-size:12px;">${l}</button>`;
+                const today = d0.getFullYear() + '-' + String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0');
+                const bar = `<div class="card" style="padding:10px 12px; margin-bottom:10px;">
+                        <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">${pc('all', '전체')}${pc('today', '오늘')}${pc('7', '7일')}${pc('30', '30일')}${pc('month', '이번 달')}${pc('last', '지난 달')}${pc('pick', '📅 날짜 고르기')}</div>
+                        ${P === 'pick' ? `<div style="display:flex; gap:6px; align-items:center; margin-top:8px; flex-wrap:wrap;"><input type="date" value="${E(_rva.rvFrom || '')}" max="${today}" onchange="_rva.rvFrom=this.value; renderReviewsAdmin(false);" class="form-control" style="flex:1 1 130px; height:36px;"><span style="font-weight:800; color:#64748b;">~</span><input type="date" value="${E(_rva.rvTo || '')}" max="${today}" onchange="_rva.rvTo=this.value; renderReviewsAdmin(false);" class="form-control" style="flex:1 1 130px; height:36px;"></div>` : ''}
+                        <div style="margin-top:7px; font-size:12px; font-weight:800; color:#64748b;">후기 ${shown.length.toLocaleString()}개 · 평균 <span style="color:#f5b301;">★ ${avg}</span></div>
+                    </div>`;
+                if (!shown.length) { box.innerHTML = bar + `<div class="card" style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">이 기간에 받은 후기가 없습니다.</div>`; return; }
+                box.innerHTML = bar + shown.map(x => {
                     const isNew = (x.at || 0) > seen;
                     return `<div class="card" style="background:#fff; border-radius:14px; padding:13px 15px; margin-bottom:10px; border:1px solid var(--border); ${x.hidden ? 'opacity:.55;' : ''}">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
@@ -24008,14 +24028,17 @@
                         <button type="button" onclick="ptaAdjust(-1)" style="height:38px; padding:0 12px; border:none; border-radius:8px; background:#dc2626; color:#fff; font-weight:800; cursor:pointer;">사용</button>
                         <button type="button" onclick="ptaAdjust(1)" style="height:38px; padding:0 12px; border:none; border-radius:8px; background:#16a34a; color:#fff; font-weight:800; cursor:pointer;">넣기</button>
                     </div>
+                    <div id="pta-memo-box">${ptaMemoBoxHtml()}</div>
                     <div style="margin-top:6px; font-size:11.5px; font-weight:700; color:#94a3b8;">${PT_MIN_USE.toLocaleString()}P부터 쓸 수 있습니다 · 1P = 1원</div>
                     <div style="margin-top:10px;">${logs.map(l => `<div style="display:flex; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px solid #f1f5f9; font-size:13px;"><span style="font-weight:700; color:#334155;">${PT_WHY[l.why] || l.why}<span style="color:#94a3b8; font-size:11.5px; margin-left:6px;">${when(l.at)}${l.memo ? ' · ' + E(l.memo) : ''}</span></span><b style="color:${(l.amt || 0) >= 0 ? '#16a34a' : '#dc2626'};">${(l.amt || 0) >= 0 ? '+' : ''}${(Number(l.amt) || 0).toLocaleString()}</b></div>`).join('') || '<div style="color:#94a3b8; font-size:13px;">기록이 없습니다.</div>'}</div>
                 </div>` : '')
-                + (rows.length ? rows.slice(0, 100).map(r => `<div class="card" onclick="_rva.pick='${E(r.ph)}'; renderReviewsAdmin(false); setTimeout(()=>{const i=document.getElementById('pta-amt'); if(i) i.focus();},0)" style="padding:11px 14px; margin-bottom:6px; display:flex; justify-content:space-between; cursor:pointer; ${r.ph === pick ? 'background:#f0fdf4;' : ''}"><span style="font-weight:800; color:#334155; min-width:0;">${cardBtn(r.ph, r.nm)} <span style="color:#94a3b8; font-weight:700;">${E(phone(r.ph))}</span></span><b style="color:${r.bal >= PT_MIN_USE ? '#16a34a' : '#64748b'};">${r.has ? r.bal.toLocaleString() + 'P' : '<span style="color:#cbd5e1;">포인트 없음</span>'}</b></div>`).join('')
+                // [수정 2026-10-23] 줄의 손님 이름을 누르면 손님 카드 대신 위 포인트 적립 창을 연다 (사장님 요청 — 카드는 적립 창의 '👤 카드')
+                + (rows.length ? rows.slice(0, 100).map(r => `<div class="card" onclick="ptaPick('${E(r.ph)}')" style="padding:11px 14px; margin-bottom:6px; display:flex; justify-content:space-between; cursor:pointer; ${r.ph === pick ? 'background:#f0fdf4;' : ''}"><span style="font-weight:800; color:#334155; min-width:0;"><span title="포인트 적립 창 열기" style="font-weight:900; color:#2563eb; text-decoration:underline; text-underline-offset:3px;">${E(r.nm || '이름 없음')}</span> <span style="color:#94a3b8; font-weight:700;">${E(phone(r.ph))}</span></span><b style="color:${r.bal >= PT_MIN_USE ? '#16a34a' : '#64748b'};">${r.has ? r.bal.toLocaleString() + 'P' : '<span style="color:#cbd5e1;">포인트 없음</span>'}</b></div>`).join('')
                     : `<div class="card" style="padding:24px; text-align:center; color:var(--text-sub); font-weight:700;">${qRaw ? '찾는 손님이 없습니다.' : '포인트가 있는 손님이 없습니다 · 위에서 손님을 찾아 넣어 주세요.'}</div>`);
             const bodyEl = box.querySelector('#pta-body');
             if (bodyEl && box.querySelector('#pta-q')) bodyEl.innerHTML = bodyHtml;   // 찾기 칸이 이미 있으면 결과만
             else box.innerHTML = searchHtml + `<div id="pta-body">${bodyHtml}</div>`;
+            if (pick && !_rva.memos) ptaMemoLoad();   // [신규 2026-10-23] 적립 문구
         }
         /* [신규 2026-10-03] 포인트 번호(카카오 번호) → 손님 별명. 주문 카드에 보이는 이름과 같게 —
            가장 최근 주문에 적힌 이름, 주문이 없으면 손님 정보(가입 때 이름 → 카톡 닉네임) */
@@ -24140,6 +24163,61 @@
             } catch (e) { showToast('저장하지 못했습니다: ' + gErrKo(e)); }
         }
         function phone_(p) { return String(p || '').replace(/^(\d{3})(\d{4})(\d{4})$/, '$1-$2-$3'); }
+        // [신규 2026-10-23] 손님 줄을 누르면 위 적립 창을 열고 그 자리로 올린다
+        function ptaPick(ph) {
+            _rva.pick = ph; renderReviewsAdmin(false);
+            setTimeout(() => { const i = document.getElementById('pta-amt'); if (i) { i.scrollIntoView({ block: 'center', behavior: 'smooth' }); i.focus({ preventScroll: true }); } }, 0);
+            if (!_rva.memos) ptaMemoLoad();
+        }
+        /* [신규 2026-10-23] 적립 문구 (사장님 요청) — 자주 쓰는 메모를 여러 개 적어 두고 눌러서 넣는다. 적기 · 고치기 · 지우기.
+           settings/point_memos = ['이벤트 당첨', ...] (두 PC가 같이 쓴다) */
+        async function ptaMemoLoad() {
+            try { const r = await fetch(`${FIREBASE_DB_URL}settings/point_memos.json?t=${Date.now()}`); const v = r.ok ? await r.json() : null; _rva.memos = Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === 'object' ? Object.values(v).filter(Boolean) : []); }
+            catch (e) { _rva.memos = _rva.memos || []; }
+            ptaMemoPaint();
+        }
+        async function ptaMemoPut(list) {
+            const r = await fetch(`${FIREBASE_DB_URL}settings/point_memos.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(list.length ? list : null) });
+            if (!r.ok) throw new Error('서버 응답 ' + r.status);
+            _rva.memos = list.slice();
+        }
+        function ptaMemoBoxHtml() {
+            const E = gEscapeHtml, M = _rva.memos || [], ed = _rva.memoEdit;
+            const chips = M.map((t, i) => `<button type="button" onclick="ptaMemoUse(${i})" style="height:28px; padding:0 10px; border:1px solid #bbf7d0; background:#f0fdf4; color:#166534; border-radius:999px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">${E(t)}</button>`).join('');
+            const head = `<div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center; margin-top:8px;"><span style="font-size:11.5px; font-weight:800; color:#64748b;">문구</span>${chips || '<span style="font-size:11.5px; color:#94a3b8; font-weight:700;">적어 둔 문구가 없어요</span>'}<button type="button" onclick="_rva.memoOpen=!_rva.memoOpen; _rva.memoEdit=null; ptaMemoPaint();" style="margin-left:auto; height:28px; padding:0 10px; border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">${_rva.memoOpen ? '닫기' : '✏️ 문구 관리'}</button></div>`;
+            if (!_rva.memoOpen) return head;
+            const btn = (on, label, bg, fg) => `<button type="button" onclick="${on}" style="height:30px; padding:0 10px; border:none; border-radius:7px; background:${bg}; color:${fg}; font-size:12px; font-weight:800; cursor:pointer; flex-shrink:0;">${label}</button>`;
+            const rows = M.map((t, i) => ed === i
+                ? `<div style="display:flex; gap:5px; margin-top:5px;"><input id="pta-memo-ed" class="form-control" maxlength="60" value="${E(t)}" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); ptaMemoSave(${i});} else if(event.key==='Escape'){_rva.memoEdit=null; ptaMemoPaint();}" style="flex:1; height:30px;">${btn(`ptaMemoSave(${i})`, '저장', '#2563eb', '#fff')}${btn('_rva.memoEdit=null; ptaMemoPaint();', '취소', '#e2e8f0', '#475569')}</div>`
+                : `<div style="display:flex; gap:5px; align-items:center; margin-top:5px; padding:4px 0; border-top:1px solid #f1f5f9;"><span style="flex:1; min-width:0; font-size:13px; font-weight:700; color:#334155; word-break:keep-all;">${E(t)}</span>${btn(`_rva.memoEdit=${i}; ptaMemoPaint(); setTimeout(()=>{const x=document.getElementById('pta-memo-ed'); if(x) x.focus();},0)`, '수정', '#e2e8f0', '#334155')}${btn(`ptaMemoDel(${i})`, '삭제', '#fee2e2', '#b91c1c')}</div>`).join('');
+            return head + `<div style="margin-top:6px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 10px;">
+                    <div style="display:flex; gap:5px;"><input id="pta-memo-new" class="form-control" maxlength="60" placeholder="새 문구 (예: 이벤트 당첨)" autocomplete="off" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); ptaMemoAdd();}" style="flex:1; height:32px;">${btn('ptaMemoAdd()', '저장', '#16a34a', '#fff')}</div>
+                    ${rows}
+                </div>`;
+        }
+        function ptaMemoPaint() { const b = document.getElementById('pta-memo-box'); if (b) b.innerHTML = ptaMemoBoxHtml(); }
+        function ptaMemoUse(i) { const m = document.getElementById('pta-memo'), t = (_rva.memos || [])[i]; if (m && t) { m.value = t; const a = document.getElementById('pta-amt'); if (a && !a.value) a.focus(); } }
+        async function ptaMemoAdd() {
+            const i = document.getElementById('pta-memo-new'), t = String((i && i.value) || '').trim().slice(0, 60);
+            if (!t) return showToast('문구를 적어 주세요');
+            const M = (_rva.memos || []).slice(); if (M.includes(t)) return showToast('이미 있는 문구예요');
+            try { await ptaMemoPut(M.concat(t)); showToast('문구를 저장했어요'); } catch (e) { return showToast('저장하지 못했습니다: ' + gErrKo(e)); }
+            ptaMemoPaint(); setTimeout(() => { const n = document.getElementById('pta-memo-new'); if (n) n.focus(); }, 0);
+        }
+        async function ptaMemoSave(idx) {
+            const i = document.getElementById('pta-memo-ed'), t = String((i && i.value) || '').trim().slice(0, 60);
+            if (!t) return showToast('비우려면 삭제를 눌러 주세요');
+            const M = (_rva.memos || []).slice(); M[idx] = t;
+            try { await ptaMemoPut(M); _rva.memoEdit = null; showToast('문구를 고쳤어요'); } catch (e) { return showToast('저장하지 못했습니다: ' + gErrKo(e)); }
+            ptaMemoPaint();
+        }
+        async function ptaMemoDel(idx) {
+            const M = (_rva.memos || []).slice(), t = M[idx]; if (t == null) return;
+            if (!await psConfirm('이 문구를 지울까요?\n\n' + t)) return;
+            M.splice(idx, 1);
+            try { await ptaMemoPut(M); _rva.memoEdit = null; showToast('문구를 지웠어요'); } catch (e) { return showToast('지우지 못했습니다: ' + gErrKo(e)); }
+            ptaMemoPaint();
+        }
         // 받은 지 1년 지난 포인트 빼기 — 하루 한 번 (먼저 받은 것부터 쓴 것으로 본다). 기록 id 를 날짜로 정해 두 기기가 같이 돌려도 한 번만 남는다
         async function ptaExpireDaily() {
             try {
