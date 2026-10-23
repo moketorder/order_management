@@ -22091,9 +22091,29 @@
             setTimeout(() => modal.remove(), 250);
         }
 
-        function saveDetailOptionSetting() {
+        async function saveDetailOptionSetting() {
             syncDetailOptionDraft();
             if (!optionModalDraft) return;
+            /* [신규 2026-10-23] 주문이 이미 있는 옵션의 수량을 바꿨으면 한 번 물어본다 (사장님 요청)
+               그대로 저장 = 넣은 값이 남은 수량 / 주문건 반영 = 넣은 값에서 주문 수를 뺀 것이 남은 수량 */
+            let _optMode = 'keep';
+            {
+                const _ep = (uploadIsEditMode && uploadEditProductKey !== null) ? uploadProducts[uploadEditProductKey] : null;
+                const lines = [];
+                if (_ep) (optionModalDraft.groups || []).forEach(g => (g.items || []).forEach(it => {
+                    const raw = String(it.stock === undefined || it.stock === null ? '' : it.stock).trim();
+                    if (raw === '' || !String(it.name || '').trim()) return;
+                    const n = Math.max(0, parseInt(raw) || 0);
+                    if (it._rem0 !== undefined && it._rem0 !== null && n === Number(it._rem0)) return;   // 손대지 않음
+                    const adj = parseInt(optionAdjustments[gOptStockKey(_ep, String(g.name || '').trim(), String(it.name).trim())] || 0) || 0;
+                    if (adj < 0) lines.push(`· ${String(it.name).trim()} — ${n}개 넣음 · 주문 ${-adj}개 (반영하면 ${Math.max(0, n + adj)}개)`);
+                }));
+                if (lines.length) {
+                    const pick = await gFreshMissDialog(`주문이 이미 있는 옵션의 수량을 바꿨어요.\n\n${lines.join('\n')}\n\n그대로 저장하면 넣은 숫자가 남은 수량이 되고, 주문건 반영을 고르면 주문 수만큼 빠져요.`, '주문건 반영', '그대로 저장');
+                    if (!pick) return;
+                    _optMode = (pick === 'all') ? 'orders' : 'keep';
+                }
+            }
             // [수정 2026-10-05] '상세옵션 사용' 칸 대신 — 아래 항목 중 하나라도 켜져 있으면 켠 것으로 본다 (사장님 요청)
             const d0 = optionModalDraft;
             d0.useOptions = !!(d0.useChoiceOptions || d0.usePersonLimit || d0.useAmountLimit || d0.useAgencyFee || d0.useDiscount);
@@ -22121,7 +22141,7 @@
                             if (it._rem0 !== undefined && it._rem0 !== null && entered === Number(it._rem0)) row.stock = Number(it._base0);
                             else {
                                 const adj = _ep ? (parseInt(optionAdjustments[gOptStockKey(_ep, String(g.name || '').trim(), row.name)] || 0) || 0) : 0;
-                                row.stock = Math.max(0, entered - adj);
+                                row.stock = (_optMode === 'orders') ? entered : Math.max(0, entered - adj);   // [수정 2026-10-23] 주문건 반영이면 넣은 값이 전체 수량
                             }
                         }
                         return row;
@@ -27813,6 +27833,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (isNaN(n) || n < 0) { showToast('0 이상 숫자 또는 "무제한"을 입력하세요.'); _redraw(); return; }
                 const adj = parseInt(optionAdjustments[gOptStockKey(prod, grp.name, it.name)] || 0) || 0;
                 base = Math.max(0, n - adj);
+                /* [신규 2026-10-23] 이미 주문이 있으면 물어본다 (사장님 요청) — 그대로 저장(넣은 값 = 남은 수량) / 주문건 반영(넣은 값에서 주문 수를 뺀 것이 남은 수량) */
+                if (adj < 0) {
+                    const ord = -adj;
+                    const pick = await gFreshMissDialog(`'${it.name}' 주문이 이미 ${ord}개 있어요.\n\n· 그대로 저장 — 남은 수량 ${n}개\n· 주문건 반영 — ${n}개에서 주문 ${ord}개를 빼 남은 수량 ${Math.max(0, n - ord)}개`, '주문건 반영', '그대로 저장');
+                    if (!pick) { _redraw(); return; }
+                    if (pick === 'all') base = n;   // 넣은 값이 전체 수량 → 주문으로 빠진 만큼 줄어든다
+                }
             }
             const prev = it.stock, prevAt = prod.updatedAt;
             it.stock = base; prod.updatedAt = Date.now();
