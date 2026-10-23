@@ -28560,6 +28560,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 else if (r.shortage < 0) shortText = `<b style="color:#dc2626; font-weight:900;">${r.shortage}개</b>`; // 부족(음수)만 표시
                 else shortText = '<b style="color:#64748b; font-weight:900;">0개</b>'; // 0 이상(여유·무제한)은 0개
                 const dateHint = [...r.dates].sort().map(fmtMD).join(', ');
+                // [신규 2026-10-23] 날짜별 수량을 카드 밑에 바로 (사장님 요청) — 예전처럼 펼치지 않아도 보인다
+                const dateQtyHtml = [...r.dateQty.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1)
+                    .map(([ds, q]) => `<span style="display:inline-flex; align-items:baseline; gap:4px; padding:2px 8px; border-radius:999px; background:#f1f5f9; font-size:11.5px; font-weight:700; color:#475569; white-space:nowrap;">${fmtMD(ds)} <b style="color:#2563eb; font-weight:900;">${q}개</b></span>`).join('');
                 // 재고 변경칸용 인덱스/현재값 (상품이 매칭된 경우만)
                 const idx = r.prod ? uploadProducts.indexOf(r.prod) : -1;
                 const stockInputVal = (r.stock === Infinity) ? '무제한' : (r.stock === null ? '' : r.stock);
@@ -28640,6 +28643,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                             <button type="button" onclick="event.stopPropagation(); salesUpdateStock(${idx}, document.getElementById('sales-stock-input-${idx}').value)" style="padding:5px 11px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button>
                         </div>` : ''}
                     </div>
+                    ${dateQtyHtml ? `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">${dateQtyHtml}</div>` : ''}
                     ${optionItemRows ? `<div style="margin-top:6px; padding:6px 9px 7px; background:#fff8f0; border:1px solid #ffe0bf; border-radius:6px;">
                         <div style="font-size:10.5px; font-weight:800; color:#c2610a;">옵션별 사올 개수</div>
                         ${optionItemRows}
