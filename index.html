@@ -8578,10 +8578,14 @@
                     <div style="display:flex; gap:4px; flex-shrink:0;">
                         <button type="button" data-sales-metric="amount" onclick="setSalesTrendMetric('amount')" class="sales-toggle-btn active" style="padding:5px 10px; font-size:11.5px;">금액</button>
                         <button type="button" data-sales-metric="count" onclick="setSalesTrendMetric('count')" class="sales-toggle-btn" style="padding:5px 10px; font-size:11.5px;">건수</button>
+                        <!-- [신규 2026-10-23] 보기 방식 — 가로 막대(목록) / 세로 막대 그래프 (사장님 요청) -->
+                        <span style="width:1px; background:var(--border); margin:2px 2px;"></span>
+                        <button type="button" data-trend-view="list" onclick="setSalesTrendView('list')" class="sales-toggle-btn" title="가로 막대로 보기" style="padding:5px 10px; font-size:11.5px;">☰ 목록</button>
+                        <button type="button" data-trend-view="col" onclick="setSalesTrendView('col')" class="sales-toggle-btn" title="세로 막대 그래프로 보기" style="padding:5px 10px; font-size:11.5px;">📊 그래프</button>
                     </div>
                 </div>
                 <!-- [신규] 그래프를 어떤 단위로 볼지 직접 고른다 (자동 = 고른 기간에 맞춰 알아서) -->
-                <div id="trend-unit-tabs" style="display:flex; gap:4px; margin-bottom:8px; flex-wrap:nowrap; overflow-x:auto;"></div>
+                <div id="trend-unit-tabs" style="display:none;"></div>   <!-- [수정 2026-10-23] 단위 단추는 뺐다 — 위 기간 단위를 따른다 (사장님 요청) -->
                 <div id="sales-daily-trend" style="margin-bottom:16px;"></div>
                 </div><!-- /sst-sales -->
 
@@ -29464,6 +29468,45 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
 
         // [신규] 매출 추이 단위: null=기간에 맞는 기본(자동), 'day'|'week'|'month'=탭으로 직접 선택 (상태 변수는 상단 선언)
+        /* [신규 2026-10-23] 매출 추이 보기 방식 (사장님 요청) — 'list' 가로 막대(예전) | 'col' 세로 막대 그래프.
+           갈래(시간·요일·일·주·월·년)마다 그리는 길이 달라도 줄 모양은 같다(줄 onclick · 이름 칸 · 막대 width% · 값 글씨).
+           그래서 가로로 그린 뒤 그 줄들을 읽어 세로 막대로 다시 그린다 — 누르면 같은 내역 창이 뜬다. 이 기기에 기억 */
+        var salesTrendView = (() => { try { return localStorage.getItem('moket_trend_view') === 'col' ? 'col' : 'list'; } catch (e) { return 'list'; } })();
+        function setSalesTrendView(v) {
+            salesTrendView = v === 'col' ? 'col' : 'list';
+            try { localStorage.setItem('moket_trend_view', salesTrendView); } catch (e) { }
+            renderSalesDailyTrend(_salesDayCache || new Map());
+        }
+        function salesTrendApplyView() {
+            document.querySelectorAll('[data-trend-view]').forEach(b => b.classList.toggle('active', b.dataset.trendView === salesTrendView));
+            if (salesTrendView !== 'col') return;
+            const box = document.getElementById('sales-trend-daily') || document.getElementById('sales-daily-trend');
+            const wrap = box && box.firstElementChild;
+            if (!wrap || !wrap.children.length) return;
+            const items = [...wrap.children].map(row => {
+                const fill = row.querySelector('div[style*="width:"][style*="%"]');
+                const pct = fill ? (parseFloat((fill.getAttribute('style').match(/width:\s*([\d.]+)%/) || [])[1]) || 0) : null;
+                const lab = row.children[0] ? row.children[0].textContent.trim() : '';
+                const val = (row.querySelector('span') || {}).textContent || '';
+                return { row, pct, lab, val, on: row.getAttribute('onclick') || '', tip: row.getAttribute('title') || '' };
+            });
+            if (items.some(x => x.pct === null)) return;   // 모르는 모양이면 가로 그대로 둔다
+            const n = items.length, every = n > 16 ? Math.ceil(n / 12) : 1, showVal = n <= 14;
+            const short = s => { const m = String(s).match(/^([\d,]+)(원|건)/); if (!m) return s; const v = Number(m[1].replace(/,/g, '')); return m[2] === '원' && v >= 10000 ? (Math.round(v / 1000) / 10).toLocaleString() + '만' : v.toLocaleString() + (m[2] === '건' ? '건' : ''); };
+            const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            box.innerHTML = `<div style="display:flex; align-items:flex-end; gap:${n > 20 ? 2 : 6}px; height:210px; padding:4px 2px 0; box-sizing:border-box;">` + items.map((x, i) => `
+                <div ${x.on ? `onclick="${esc(x.on)}"` : ''} title="${esc(x.lab + ' · ' + x.val + (x.tip ? ' · ' + x.tip : ''))}" style="flex:1 1 0; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; cursor:${x.on ? 'pointer' : 'default'};">
+                    <div style="font-size:10.5px; font-weight:800; color:#1e293b; white-space:nowrap; margin-bottom:2px; ${showVal ? '' : 'visibility:hidden;'}">${esc(short(x.val))}</div>
+                    <div style="width:100%; max-width:46px; height:${Math.max(x.pct, x.pct > 0 ? 2 : 0) * 0.82}%; background:var(--primary); border-radius:4px 4px 0 0; ${x.pct > 0 ? '' : 'height:2px; background:#e2e8f0;'}"></div>
+                    <div style="font-size:10.5px; color:var(--text-sub); white-space:nowrap; margin-top:4px; height:14px; overflow:visible;">${(i % every === 0) ? esc(x.lab) : ''}</div>
+                </div>`).join('') + `</div>`;
+        }
+        /* 매출 추이를 그릴 때마다 보기 방식을 입힌다. [수정 2026-10-23] 자동·시간·요일·일·주·월·년 단추는 뺐다 (사장님 요청 — 위 기간 단위와 겹친다).
+           늘 위 기간 단위를 따른다: 일 → 시간대 · 주 → 하루씩 · 월 → 주별 · 분기 → 달별 · 년 → 분기별 */
+        (function () {
+            const orig = renderSalesDailyTrend;
+            renderSalesDailyTrend = function (m) { salesTrendUnitOverride = null; orig(m); try { salesTrendApplyView(); } catch (e) { console.warn('추이 그래프 보기 실패:', e); } };
+        })();
         function setSalesTrendUnit(u){
             salesTrendUnitOverride = u;
             renderSalesDailyTrend(_salesDayCache || new Map());
