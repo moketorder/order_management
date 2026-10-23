@@ -11210,6 +11210,184 @@
         const _fIn = 'height:32px; padding:5px 8px; border:1.5px solid #cbd5e1; border-radius:7px; font-size:12px; font-weight:700; box-sizing:border-box; min-width:0;';
         const _fBtn = 'height:32px; padding:0 11px; border-radius:7px; font-size:11.5px; font-weight:800; cursor:pointer; white-space:nowrap;';
 
+        /* ===== [신규 2026-10-23] 동·호수·현관 비번을 표처럼 바로 고친다 (사장님 요청 — 추가·수정이 불편했다) =====
+           '✏️ 고치기'를 누르면 동마다 한 줄, 라인마다 [호수 | 비번] 칸. 칸에 적고 다른 곳을 누르면 그 자리에서 저장된다
+           ('저장하기'를 따로 안 누른다). 호수를 바꾸면 칸 이름이 바뀌므로 비번·전단지 기록을 새 이름으로 옮긴 뒤 옛 이름을 지운다.
+           ＋동은 번호를 쳐서 여러 개를 한꺼번에 (예: 101~108 · 1~8 · 3, 5) — 라인은 '1~2, 3~4'처럼 같이 적은 대로 만든다.
+           칸 이름 모양은 예전 그대로({동}_{앞}-{뒤}라인, 전체는 {동}) — 배달기사 비번과 그대로 이어진다 */
+        const gFlyerKeyOf = (dong, from, to) => (from == null) ? dong : `${dong}_${from}-${to}라인`;
+        function gFlyerParseHo(v) {   // '1~2' · '1-2' · '3' · '' · '전체' → { from, to } (못 읽으면 null)
+            const s = String(v || '').replace(/\s|호/g, '');
+            if (!s || s === '전체') return { from: null, to: null };
+            const m = s.match(/^(\d{1,2})(?:[~\-](\d{1,2}))?$/);
+            if (!m) return null;
+            const a = parseInt(m[1]), b = m[2] ? parseInt(m[2]) : a;
+            if (!a || !b || a > b || b > 99) return null;
+            return { from: a, to: b };
+        }
+        function gFlyerDongName(v) {   // '8' → '08동', '101' → '101동', '101동' 그대로
+            const s = String(v || '').trim().replace(/\s/g, '');
+            if (!s) return '';
+            const m = s.match(/^(\d+)동?$/);
+            if (m) { const n = parseInt(m[1]); return (n < 100 ? String(n).padStart(2, '0') : String(n)) + '동'; }
+            return /동$/.test(s) ? s : s + '동';
+        }
+        function gFlyerOverlap(slots, from, to, exceptKey) {
+            return (slots || []).find(s => s.key !== exceptKey && (from == null || s.from == null || (from <= s.to && s.from <= to)));
+        }
+        async function gFlyerMoveSlot(apt, oldKey, newKey) {   // 비번·전단지 기록을 새 칸 이름으로 옮긴다
+            const pwd = String(((entrancePasswords[apt] || {})[oldKey]) || '');
+            const dates = gFlyerDates(apt, oldKey);
+            await gPwdWrite(apt, newKey, pwd);
+            if (dates.length) await gFlyerWrite(apt, newKey, dates);
+            await flyerRemoveSlot(apt, oldKey);
+        }
+
+        function gFlyerInlineEditorHtml(apt) {
+            const E = gEscapeHtml, aptEnc = encodeURIComponent(apt);
+            const groups = gFlyerSlotsOf(apt), map = entrancePasswords[apt] || {};
+            const aptDelArmed = (_flyerDelArmed === 'apt|' + apt);
+            let html = `<div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
+                <b style="font-size:13.5px; color:#0f172a;">✏️ ${E(gFlyerShortName(apt))}</b>
+                <button type="button" onclick="askDeleteApt('${aptEnc}')" title="이 아파트의 모든 동·라인과 기록을 지웁니다"
+                    style="${_fBtn} margin-left:auto; border:1.5px solid ${aptDelArmed ? '#dc2626' : '#fecaca'}; background:${aptDelArmed ? '#dc2626' : '#fff'}; color:${aptDelArmed ? '#fff' : '#dc2626'};">🗑 아파트 삭제</button>
+                <button type="button" onclick="toggleFlyerEdit()" style="${_fBtn} border:none; background:#16a34a; color:#fff;">✅ 다 했어요</button>
+            </div>
+            <div style="font-size:11px; font-weight:700; color:#94a3b8; margin-bottom:8px;">칸에 적고 다른 곳을 누르면 바로 저장돼요 · 호수는 1~2 처럼 · 비우면 '전체'</div>
+            <div style="display:flex; gap:5px; align-items:center; margin-bottom:10px; padding:7px 9px; border:1.5px solid #e0e7ff; background:#f8fafc; border-radius:9px;">
+                <span style="flex:0 0 auto; font-size:11.5px; font-weight:900; color:#4338ca;">🔑 공용 비번</span>
+                <input value="${E(gCommonPwdOf(apt))}" onchange="flyerInlineCommon('${aptEnc}', this.value)" placeholder="단지 전체가 한 비번일 때만" style="${_fIn} flex:1 1 0;">
+            </div>`;
+            if (!groups.length) html += `<div style="padding:10px 0; font-size:12.5px; font-weight:700; color:#cbd5e1;">아직 동이 없어요. 아래에서 만들어 주세요.</div>`;
+            html += groups.map(g => {
+                const dongEnc = encodeURIComponent(g.dong);
+                const dongArmed = (_flyerDelArmed === 'idong|' + apt + '|' + g.dong);
+                const cells = g.slots.map(s => {
+                    const keyEnc = encodeURIComponent(s.key);
+                    const armed = (_flyerDelArmed === 'iline|' + apt + '|' + s.key);
+                    const ho = s.from == null ? '' : (s.from === s.to ? String(s.from) : `${s.from}~${s.to}`);
+                    return `<div style="display:flex; align-items:center; gap:3px; padding:3px; border:1.5px solid #e2e8f0; border-radius:8px; background:#fff; flex:1 1 210px; min-width:0;">
+                        <input value="${E(ho)}" onchange="flyerInlineHo('${aptEnc}','${keyEnc}', this.value)" placeholder="전체" title="호수 (예: 1~2)"
+                            style="${_fIn} flex:0 0 58px; width:58px; text-align:center;"><span style="font-size:11px; font-weight:800; color:#94a3b8;">호</span>
+                        <input value="${E(String(map[s.key] || ''))}" onchange="flyerInlinePwd('${aptEnc}','${keyEnc}', this)" placeholder="🔑 비번" title="공동현관 비번"
+                            style="${_fIn} flex:1 1 0; color:#4338ca;">
+                        <button type="button" onclick="${armed ? `flyerInlineDelLine('${aptEnc}','${keyEnc}')` : `armFlyerDelete('iline|${E(apt)}|${E(s.key)}')`}" title="이 라인 지우기 (한 번 더 누르면 지워져요)"
+                            style="${_fBtn} flex:0 0 auto; padding:0 7px; border:1.5px solid ${armed ? '#dc2626' : '#fecaca'}; background:${armed ? '#dc2626' : '#fef2f2'}; color:${armed ? '#fff' : '#ef4444'};">${armed ? '지우기' : '✕'}</button>
+                    </div>`;
+                }).join('');
+                return `<div style="display:flex; gap:6px; align-items:flex-start; padding:8px 0; border-top:1px solid #f1f5f9;">
+                    <input value="${E(g.dong)}" onchange="flyerInlineRenameDong('${aptEnc}','${dongEnc}', this.value)" title="동 이름 (고치면 이 동 라인이 모두 옮겨져요)"
+                        style="${_fIn} flex:0 0 66px; width:66px; font-weight:900; color:#0f172a; text-align:center;">
+                    <div style="flex:1; min-width:0; display:flex; flex-wrap:wrap; gap:5px;">${cells}
+                        <button type="button" onclick="flyerInlineAddLine('${aptEnc}','${dongEnc}')" style="${_fBtn} flex:0 0 auto; border:1.5px dashed #c7d2fe; background:#eef2ff; color:#4338ca;">＋ 라인</button>
+                        <button type="button" onclick="${dongArmed ? `flyerInlineDelDong('${aptEnc}','${dongEnc}')` : `armFlyerDelete('idong|${E(apt)}|${E(g.dong)}')`}" title="이 동 지우기 (한 번 더 누르면 지워져요)"
+                            style="${_fBtn} flex:0 0 auto; border:1.5px solid ${dongArmed ? '#dc2626' : '#fecaca'}; background:${dongArmed ? '#dc2626' : '#fff'}; color:${dongArmed ? '#fff' : '#dc2626'};">${dongArmed ? '한 번 더 → 동 지우기' : '🗑 동'}</button>
+                    </div>
+                </div>`;
+            }).join('');
+            html += `<div style="margin-top:6px; padding:9px; border:1.5px solid #bbf7d0; background:#f0fdf4; border-radius:9px;">
+                <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
+                    <span style="flex:0 0 auto; font-size:12px; font-weight:900; color:#15803d;">＋ 동</span>
+                    <input id="flyer-add-dongs" placeholder="예: 101~108 · 1~8 · 3, 5" style="${_fIn} flex:1 1 140px;">
+                    <span style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:#64748b;">라인</span>
+                    <input id="flyer-add-lines" value="${E(window.__flyerLinesTpl || '1~2, 3~4')}" placeholder="1~2, 3~4" title="새 동마다 만들 라인 (비우면 '전체' 한 칸)" style="${_fIn} flex:0 1 110px;">
+                    <button type="button" onclick="flyerInlineAddDongs('${aptEnc}')" style="${_fBtn} flex:0 0 auto; border:none; background:#16a34a; color:#fff;">만들기</button>
+                </div>
+                <div style="margin-top:5px; font-size:10.5px; font-weight:700; color:#94a3b8;">이미 있는 동은 건너뛰어요 · 100보다 작은 번호는 08동처럼 두 자리로</div>
+            </div>`;
+            return html;
+        }
+
+        async function flyerInlineCommon(aptEnc, v) {
+            const apt = decodeURIComponent(aptEnc);
+            try { await gCommonPwdWrite(apt, v); showToast('공용 비번을 저장했어요.'); } catch (e) { showToast('저장 실패: ' + gErrKo(e)); }
+        }
+        async function flyerInlinePwd(aptEnc, keyEnc, el) {
+            const apt = decodeURIComponent(aptEnc), key = decodeURIComponent(keyEnc);
+            try { await gPwdWrite(apt, key, String(el.value || '').trim()); el.style.borderColor = '#86efac'; setTimeout(() => { el.style.borderColor = ''; }, 1200); showToast('비번을 저장했어요.'); }
+            catch (e) { showToast('저장 실패: ' + gErrKo(e)); }
+        }
+        async function flyerInlineHo(aptEnc, keyEnc, v) {
+            const apt = decodeURIComponent(aptEnc), key = decodeURIComponent(keyEnc);
+            const g = gFlyerSlotsOf(apt).find(x => x.slots.some(s => s.key === key)); if (!g) return;
+            const r = gFlyerParseHo(v);
+            if (!r) { showToast('호수는 1~2 처럼 적어 주세요 (비우면 전체).'); renderFlyerBoard(); return; }
+            const nk = gFlyerKeyOf(g.dong, r.from, r.to);
+            if (nk === key) return;
+            const o = gFlyerOverlap(g.slots, r.from, r.to, key);
+            if (o) { showToast(`${g.dong} — ${gFlyerSlotLabel(o)}와 겹쳐요.`); renderFlyerBoard(); return; }
+            showLoader('옮기는 중...');
+            try { await gFlyerMoveSlot(apt, key, nk); showToast(`${g.dong} ${gFlyerSlotLabel(r)}로 바꿨어요.`); }
+            catch (e) { showToast('저장 실패: ' + gErrKo(e)); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+        async function flyerInlineAddLine(aptEnc, dongEnc) {
+            const apt = decodeURIComponent(aptEnc), dong = decodeURIComponent(dongEnc);
+            const g = gFlyerSlotsOf(apt).find(x => x.dong === dong);
+            if (g && g.slots.some(s => s.from == null)) { showToast(`${dong}은 '전체' 칸이 있어 라인을 더할 수 없어요. 전체 칸의 호수를 먼저 적어 주세요.`); return; }
+            const free = gFreeHoRange(g ? g.slots : []);
+            if (!free) { showToast(`${dong}은 넣을 자리가 다 찼어요.`); return; }
+            try { await gPwdWrite(apt, gFlyerKeyOf(dong, free[0], free[1]), ''); } catch (e) { showToast('저장 실패: ' + gErrKo(e)); }
+            renderFlyerBoard();
+        }
+        async function flyerInlineDelLine(aptEnc, keyEnc) {
+            const apt = decodeURIComponent(aptEnc), key = decodeURIComponent(keyEnc);
+            _flyerDelArmed = '';
+            try { await flyerRemoveSlot(apt, key); showToast('라인을 지웠어요.'); } catch (e) { showToast('삭제 실패: ' + gErrKo(e)); }
+            renderFlyerBoard();
+        }
+        async function flyerInlineDelDong(aptEnc, dongEnc) {
+            const apt = decodeURIComponent(aptEnc), dong = decodeURIComponent(dongEnc);
+            _flyerDelArmed = '';
+            const g = gFlyerSlotsOf(apt).find(x => x.dong === dong); if (!g) return;
+            showLoader('지우는 중...');
+            try { for (const s of g.slots) await flyerRemoveSlot(apt, s.key); showToast(`${dong}을 지웠어요.`); }
+            catch (e) { showToast('삭제 실패: ' + gErrKo(e)); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+        async function flyerInlineRenameDong(aptEnc, dongEnc, v) {
+            const apt = decodeURIComponent(aptEnc), dong = decodeURIComponent(dongEnc), nd = gFlyerDongName(v);
+            if (!nd || nd === dong) { renderFlyerBoard(); return; }
+            const all = gFlyerSlotsOf(apt);
+            if (all.some(x => x.dong === nd)) { showToast(`${nd}은 이미 있어요.`); renderFlyerBoard(); return; }
+            const g = all.find(x => x.dong === dong); if (!g) return;
+            showLoader('옮기는 중...');
+            try { for (const s of g.slots) await gFlyerMoveSlot(apt, s.key, gFlyerKeyOf(nd, s.from, s.to)); showToast(`${dong} → ${nd}`); }
+            catch (e) { showToast('저장 실패: ' + gErrKo(e)); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+        async function flyerInlineAddDongs(aptEnc) {
+            const apt = decodeURIComponent(aptEnc);
+            const raw = String((document.getElementById('flyer-add-dongs') || {}).value || '');
+            const lineRaw = String((document.getElementById('flyer-add-lines') || {}).value || '');
+            window.__flyerLinesTpl = lineRaw;
+            const nums = [];
+            raw.split(/[,\s]+/).filter(Boolean).forEach(t => {
+                const m = t.replace(/동/g, '').match(/^(\d+)(?:[~\-](\d+))?$/);
+                if (!m) return;
+                const a = parseInt(m[1]), b = m[2] ? parseInt(m[2]) : a;
+                for (let i = Math.min(a, b); i <= Math.max(a, b) && nums.length < 200; i++) nums.push(i);
+            });
+            if (!nums.length) { showToast('동 번호를 적어 주세요 (예: 101~108).'); return; }
+            const lines = lineRaw.split(/[,\s]+/).filter(Boolean).map(gFlyerParseHo);
+            if (lines.some(x => !x)) { showToast('라인은 1~2, 3~4 처럼 적어 주세요.'); return; }
+            const ranges = lines.length ? lines : [{ from: null, to: null }];
+            for (let i = 0; i < ranges.length; i++) for (let j = i + 1; j < ranges.length; j++) {
+                const p = ranges[i], q = ranges[j];
+                if (p.from == null || q.from == null || (p.from <= q.to && q.from <= p.to)) { showToast('라인 호수가 서로 겹쳐요.'); return; }
+            }
+            const have = new Set(gFlyerSlotsOf(apt).map(x => x.dong));
+            const dongs = [...new Set(nums.map(gFlyerDongName))].filter(d => !have.has(d));
+            if (!dongs.length) { showToast('적은 동은 이미 다 있어요.'); return; }
+            if (dongs.length > 30 && !await psConfirm(`${dongs.length}개 동을 만들어요. 맞나요?`)) return;
+            showLoader('만드는 중...');
+            try {
+                for (const d of dongs) for (const r of ranges) await gPwdWrite(apt, gFlyerKeyOf(d, r.from, r.to), '');
+                showToast(`${dongs[0]}${dongs.length > 1 ? '~' + dongs[dongs.length - 1] : ''} ${dongs.length}개 동을 만들었어요.`);
+            } catch (e) { showToast('저장 실패: ' + gErrKo(e)); }
+            finally { hideLoader(); renderFlyerBoard(); }
+        }
+
         function renderFlyerBoard() {
             const box = document.getElementById('flyer-wrap');
             if (!box) return;
@@ -11291,6 +11469,7 @@
 
             // ── 고른 아파트의 동·라인 ──
             const apt = _flyerApt;
+            if (_flyerEdit) { box.innerHTML = gFlyerInlineEditorHtml(apt); return; }   // [신규 2026-10-23] 고치기는 표처럼 바로 고치는 화면으로
             // 고치는 중에는 서버 자료가 아니라 화면에만 있는 '초안'을 그린다
             const groups = _flyerEdit ? gDraftGroups() : gFlyerSlotsOf(apt);
             const today = gTodayKey();
