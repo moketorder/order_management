@@ -7512,6 +7512,7 @@
                 </div>
 
                 <!-- 하위 섹션 4: 품목 분석 — 재고 점검(무엇이 남았나)과 잘 나가는 품목(무엇이 나가나)을 나란히 둔다 -->
+                <div id="purchase-check-home" style="display:none;"></div>   <!-- [신규 2026-10-23] 품목 분석이 통계 > 상품 통계로 옮겨 갔다가 돌아올 자리 -->
                 <div id="purchase-section-check" class="purchase-sub-section" style="display: none;">
                     <div class="segment-control" style="display:grid; grid-template-columns:1fr 1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin:0 0 10px;">
                         <div class="segment-btn pchk-sub-btn active" id="btn-pchk-sales" onclick="switchCheckSubTab('sales')" style="text-align:center; padding:10px 0; font-size:13px; font-weight:800; cursor:pointer; border-radius:10px;">🔥 판매 순위</div>   <!-- [수정 2026-10-23] 이름 바꾸고 앞으로 · 품목 분석을 열면 늘 이쪽부터 (사장님 요청) -->
@@ -8541,6 +8542,13 @@
                     <button type="button" onclick="exportSalesCSV()" title="판매 리포트 CSV 내보내기" style="flex-shrink:0; padding:6px 10px; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:8px; font-size:14px; font-weight:800; cursor:pointer; white-space:nowrap; line-height:1;">📤</button>
                 </div>
 
+                <!-- [신규 2026-10-23] 통계를 세 갈래로 (사장님 요청) — 매출 통계 / 고객 통계 / 상품 통계. 기간·분류는 갈래마다 따로 기억한다 -->
+                <div class="segment-control" style="display:grid; grid-template-columns:repeat(3,1fr); background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:10px;">
+                    <div class="segment-btn sst-btn" id="sst-btn-sales" onclick="setSalesStatCat('sales')" style="text-align:center; padding:10px 0; font-size:12.5px; font-weight:800; cursor:pointer; border-radius:10px;">💰 매출 통계</div>
+                    <div class="segment-btn sst-btn" id="sst-btn-cust" onclick="setSalesStatCat('cust')" style="text-align:center; padding:10px 0; font-size:12.5px; font-weight:800; cursor:pointer; border-radius:10px;">👥 고객 통계</div>
+                    <div class="segment-btn sst-btn" id="sst-btn-prod" onclick="setSalesStatCat('prod')" style="text-align:center; padding:10px 0; font-size:12.5px; font-weight:800; cursor:pointer; border-radius:10px;">📦 상품 통계</div>
+                </div>
+
                 <!-- 컨트롤 패널: 집계기준 / 배송유형 / 기간 — 주문 내역 날짜필터 박스와 동일 디자인 -->
                 <div style="background:white; border:1px solid var(--border); border-radius:var(--radius-main); box-shadow:var(--shadow); padding:10px 8px; margin-bottom:14px;">
                     <div id="sales-period-row1" style="display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; align-items:center; margin-bottom:8px;"></div>
@@ -8561,6 +8569,7 @@
                     </div>
                 </div>
 
+                <div id="sst-sales">   <!-- [신규 2026-10-23] 매출 통계에서만 보인다 -->
                 <div id="sales-metrics" style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; margin-bottom:14px;"></div>
 
                 <div id="sales-paid-summary" style="margin-bottom:14px;"></div>
@@ -8576,8 +8585,13 @@
                 <!-- [신규] 그래프를 어떤 단위로 볼지 직접 고른다 (자동 = 고른 기간에 맞춰 알아서) -->
                 <div id="trend-unit-tabs" style="display:flex; gap:4px; margin-bottom:8px; flex-wrap:nowrap; overflow-x:auto;"></div>
                 <div id="sales-daily-trend" style="margin-bottom:16px;"></div>
+                </div><!-- /sst-sales -->
 
-                <div style="display:flex; gap:5px; margin:6px 0 8px 0; flex-wrap:nowrap; overflow-x:auto;">
+                <div id="sst-rank">   <!-- [신규 2026-10-23] 고객 통계(추이·분포 → 구매 순위) · 상품 통계(상품 순위 → 품목 분석) -->
+                <div id="sales-customer-stats" style="display:none;"></div>
+                <div id="sst-rank-title" class="card-title" style="margin:14px 0 8px; font-size:14px;"></div>
+                <!-- [수정 2026-10-23] 손님 통계 / 상품 순위 / 손님 순위 단추는 위 세 갈래로 바뀌어 숨긴다 -->
+                <div style="display:none; gap:5px; margin:6px 0 8px 0; flex-wrap:nowrap; overflow-x:auto;">
                     <button type="button" id="rank-tab-stats" onclick="setSalesRankTab('stats')" class="sales-toggle-btn active" style="flex:1; white-space:nowrap; padding:7px 8px;">👥 손님 통계</button>
                     <button type="button" id="rank-tab-product" onclick="setSalesRankTab('product')" class="sales-toggle-btn" style="flex:1; white-space:nowrap; padding:7px 8px;">🏆 상품 순위</button>
                     <button type="button" id="rank-tab-customer" onclick="setSalesRankTab('customer')" class="sales-toggle-btn" style="flex:1; white-space:nowrap; padding:7px 8px;">👑 손님 순위</button>
@@ -8590,7 +8604,11 @@
                         <tbody id="sales-ranking-tbody"></tbody>
                     </table>
                 </div>
-                <div id="sales-customer-stats" style="display:none;"></div>
+                <div id="sst-prod-extra" style="display:none;">
+                    <div class="card-title" style="margin:18px 0 8px; font-size:14px;">📦 품목 분석 <span style="font-size:11px; font-weight:700; color:var(--text-sub);">(발주 › 품목 분석과 같은 화면 · 기간은 안에서 따로 골라요)</span></div>
+                    <div id="sst-check-slot"></div>
+                </div>
+                </div><!-- /sst-rank -->
             </div>
             </div><!-- /sales-sub-status -->
 
@@ -27207,6 +27225,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         let salesRankSort = { key: 'amount', dir: 'desc' };     // 판매 순위 정렬(기본: 판매액 많은 순)
         // [이동] 아래 상태들은 함수보다 먼저 선언되어야 초기 렌더 시 TDZ 에러가 안 남
         let salesRankTab = 'stats';                             // 순위 탭 기본: 손님 통계(stats) | product | customer
+        // [신규 2026-10-23] 통계 세 갈래(매출·고객·상품)와 갈래별 기간 · 상품 순위 거르기 — 첫 그리기 전에 있어야 해서 여기 둔다
+        let salesStatCat = (() => { try { const v = localStorage.getItem('moket_stat_cat'); return ['sales', 'cust', 'prod'].includes(v) ? v : 'sales'; } catch (e) { return 'sales'; } })();
+        const _salesStatPer = {};
+        let salesRankF = { cat: 'all', m: 'all', q: '', n: 50 };
         let _salesCustRankCache = [];                           // 재주문 손님 순위 캐시
         let salesCustRankSort = { key: 'count', dir: 'desc' };  // 손님 순위 정렬(기본: 주문횟수 많은 순)
         let salesTrendUnitOverride = null;                      // 매출 추이 단위 직접선택(null=기간 기본)
@@ -29248,7 +29270,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         /* [신규 2026-10-23] 상품 순위 거르기 (사장님 요청) — 판매 종류 · 픽업/배달 · 이름 찾기 · 보여 줄 개수.
            위쪽 통계 전체 거르기(분류·픽업/배달)와 따로, 상품 순위 표에만 걸린다. 찾기 칸은 다시 그리지 않아 한글이 끊기지 않는다 */
-        let salesRankF = { cat: 'all', m: 'all', q: '', n: 50 };
         function salesRankPaintFilters() {
             const fb = document.getElementById('sales-rank-filters'); if (!fb) return;
             const F = salesRankF;
@@ -29270,12 +29291,44 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (nc) nc.innerHTML = chip('n', 10, '10개') + chip('n', 30, '30개') + chip('n', 50, '50개') + chip('n', 0, '전체');
         }
         function salesRankSet(grp, v) { salesRankF[grp] = v; salesRankPaintFilters(); renderSalesRanking(); }
+        /* [신규 2026-10-23] 통계 세 갈래 (사장님 요청) — 'sales' 매출 통계 | 'cust' 고객 통계 | 'prod' 상품 통계.
+           기간(단위·고른 칸)과 분류 거르기는 갈래마다 따로 기억한다 — 갈래를 바꾸면 지금 값을 넣어 두고 그 갈래 값을 꺼낸다 */
+        function setSalesStatCat(c) {
+            if (c === salesStatCat) return;
+            _salesStatPer[salesStatCat] = { u: salesUnit, i: salesUnitIdx, p: salesPeriod, c: salesCategoryFilter, m: salesMethodFilter, o: salesTrendUnitOverride };
+            const s = _salesStatPer[c] || { u: 'month', i: 0, p: 'month', c: 'all', m: 'all', o: null };
+            salesUnit = s.u; salesUnitIdx = s.i; salesPeriod = s.p; salesCategoryFilter = s.c; salesMethodFilter = s.m; salesTrendUnitOverride = s.o;
+            document.querySelectorAll('[data-sales-cat]').forEach(b => b.classList.toggle('active', b.dataset.salesCat === salesCategoryFilter));
+            salesStatCat = c;
+            try { localStorage.setItem('moket_stat_cat', c); } catch (e) { }
+            renderSalesStatus();
+        }
+        function salesStatPaint() {
+            const c = salesStatCat;
+            document.querySelectorAll('.sst-btn').forEach(b => b.classList.toggle('active', b.id === 'sst-btn-' + c));
+            const a = document.getElementById('sst-sales'), r = document.getElementById('sst-rank'), x = document.getElementById('sst-prod-extra');
+            if (a) a.style.display = c === 'sales' ? '' : 'none';
+            if (r) r.style.display = c === 'sales' ? 'none' : '';
+            if (x) x.style.display = c === 'prod' ? '' : 'none';
+            const sec = document.getElementById('purchase-section-check'), slot = document.getElementById('sst-check-slot');
+            if (c === 'prod' && sec && slot && sec.parentElement !== slot) {   // 발주 › 품목 분석 화면을 이리로 데려온다 (발주 쪽을 열면 돌아간다)
+                slot.appendChild(sec); sec.style.display = 'block';
+                setTimeout(() => { try { switchCheckSubTab(pchkSubTab || 'sales'); } catch (e) { console.warn('품목 분석 열기 실패:', e); } }, 0);   // 처음 읽는 중이면 아래 변수가 아직 없다
+            }
+        }
         // 상품별 / 재주문 고객 판매 순위(정렬 가능) + 고객 통계
         function renderSalesRanking(){
             const rthead = document.getElementById('sales-ranking-thead');
             const rtbody = document.getElementById('sales-ranking-tbody');
             const tableWrap = document.getElementById('sales-ranking-table-wrap');
             const statsBox = document.getElementById('sales-customer-stats');
+            /* [신규 2026-10-23] 세 갈래 통계 — 고객 통계는 추이·분포(손님 통계) 밑에 구매 순위를 함께,
+               상품 통계는 상품 순위 밑에 품목 분석을 함께 보인다. 매출 통계에서는 이 아래를 통째로 숨긴다 */
+            salesStatPaint();
+            if (salesStatCat === 'sales') return;
+            salesRankTab = salesStatCat === 'prod' ? 'product' : 'customer';
+            if (statsBox) { statsBox.style.display = salesStatCat === 'cust' ? 'block' : 'none'; if (salesStatCat === 'cust') renderCustomerStats(statsBox); }
+            { const t = document.getElementById('sst-rank-title'); if (t) t.textContent = salesStatCat === 'cust' ? '👑 구매 순위' : '🏆 상품 순위'; }
             // 통계 탭이면 표 숨기고 통계 렌더
             if (salesRankTab === 'stats'){
                 if (tableWrap) tableWrap.style.display = 'none';
@@ -29283,7 +29336,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 return;
             }
             if (tableWrap) tableWrap.style.display = 'block';
-            if (statsBox) statsBox.style.display = 'none';
             { const fb = document.getElementById('sales-rank-filters'); if (fb) { fb.style.display = (salesRankTab === 'product') ? 'block' : 'none'; if (salesRankTab === 'product') salesRankPaintFilters(); } }   // [신규 2026-10-23]
             if (!rtbody) return;
 
@@ -37131,6 +37183,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const listSec = document.getElementById('purchase-section-list');
             const linkSec = document.getElementById('purchase-section-link');
             const checkSec = document.getElementById('purchase-section-check');
+            { const home = document.getElementById('purchase-check-home'); if (checkSec && home && checkSec.previousElementSibling !== home) home.after(checkSec); }   // [신규 2026-10-23] 통계 > 상품 통계에 가 있던 품목 분석을 제자리로
             const sourcingSec = document.getElementById('purchase-section-sourcing');   // [신규] 소싱
 
             if (registerSec) registerSec.style.display = subTabName === 'register' ? 'block' : 'none';
