@@ -5989,7 +5989,8 @@
                     };
                     const plans = []; for (let C = 1; C <= Math.min(5, n); C++) plans.push(plan(C));
                     const okP = plans.filter(p => p.phH >= Math.min(p.cw * .5, 220) && p.phH <= p.cw * 1.35 && p.phH > 60), poolP = okP.length ? okP : plans;   // 사진이 너무 납작하거나 너무 길쭉하지 않게
-                    const P = poolP.reduce((b, x) => (x.nf > b.nf || (x.nf === b.nf && Math.min(x.cw, x.phH) > Math.min(b.cw, b.phH))) ? x : b);
+                    const P = (n === 2 && plans[1]) ? plans[1] : poolP.reduce(   // [수정 2026-10-24] 두 개면 늘 나란히 두 칸 — 세로로 긴 카드 (사장님 요청)
+                        (b, x) => (x.nf > b.nf || (x.nf === b.nf && Math.min(x.cw, x.phH) > Math.min(b.cw, b.phH))) ? x : b);
                     const rowsAll = [];   // { sec, its: [...] } — 묶음마다 C개씩, 마지막 줄은 가운데로
                     const MERGE = mergeOf(P.C);
                     if (MERGE) { const all = secs[0].its.concat(secs[1].its); for (let k = 0; k * P.C < all.length; k++) rowsAll.push({ sec: null, its: all.slice(k * P.C, k * P.C + P.C) }); }
