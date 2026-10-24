@@ -5879,10 +5879,11 @@
                         const avail = it => { c.font = '900 ' + priceF + 'px ' + F; const pw = it.closed ? 110 : c.measureText(String(it.price || '')).width + priceF * .9; return cellW - 8 - imgS - 12 - 12 - pw - 12 - (it.vendor === '사다드림' ? 90 : 0); };
                         const cutN = () => { c.font = '600 ' + nameF + 'px ' + F; return items.filter(it => c.measureText(String(it.name || '')).width > avail(it)).length; };
                         while (nameF > 19 && cutN() > Math.max(1, items.length * .2)) nameF--;
-                        return { k, R, rh, rhRaw, cellW, imgS, priceF, nameF };
+                        return { k, R, rh, rhRaw, cellW, imgS, priceF, nameF, cut: cutN() };
                     };
-                    const plans = [1, 2, 3].map(plan), okP = plans.filter(p => p.rh >= 50), poolP = okP.length ? okP : plans;
-                    const P = poolP.reduce((b, x) => (x.nameF > b.nameF || (x.nameF === b.nameF && x.rh > b.rh)) ? x : b);
+                    const plans = [1, 2, 3].map(plan), okP = plans.filter(p => p.rh >= 40), poolP = okP.length ? okP : plans;
+                    // [수정 2026-10-24] 잘리는 이름이 적은 배치를 먼저 (같으면 글씨 큰 쪽, 그다음 줄 높이 큰 쪽)
+                    const P = poolP.reduce((b, x) => (x.cut < b.cut || (x.cut === b.cut && (x.nameF > b.nameF || (x.nameF === b.nameF && x.rh > b.rh)))) ? x : b);
                     const { k, rh, cellW, imgS, priceF, nameF } = P;
                     const pad = Math.max(0, (P.rhRaw - rh) * P.R / nb);   // 줄 높이를 다 못 쓰면(상품이 아주 적으면) 띠마다 여백으로
                     let y = top;
