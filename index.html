@@ -5878,11 +5878,11 @@
                     const plan = k => {
                         const R = bands.reduce((a, b) => a + mseg(b.segs, k).reduce((x, s) => x + Math.ceil(s.its.length / k), 0), 0);
                         const Hh = bands.reduce((a, b) => a + mseg(b.segs, k).filter(s => s.s).length, 0);
-                        const rhRaw = (H - gap * (nb - 1) - 12 * nb - HEAD * Hh) / R, rh = Math.min(118, rhRaw);
+                        const rhRaw = (H - gap * (nb - 1) - 12 * nb - HEAD * Hh) / R, rh = rhRaw;   // [수정 2026-10-24] 줄 높이 제한을 없앴다 — 상품이 적어도 요일 칸을 꽉 채운다 (사장님 요청)
                         const cellW = (W - LAB - 8) / k;
-                        const imgS = Math.round(Math.max(40, Math.min(72, rh - 16)));
-                        const priceF = Math.round(Math.max(21, Math.min(26, rh * .33)));
-                        let nameF = Math.round(Math.max(19, Math.min(30, rh * .42)));
+                        const imgS = Math.round(Math.max(40, Math.min(130, rh - 16)));
+                        const priceF = Math.round(Math.max(21, Math.min(34, rh * .33)));
+                        let nameF = Math.round(Math.max(19, Math.min(38, rh * .42)));
                         const avail = it => { c.font = '900 ' + priceF + 'px ' + F; const pw = it.closed ? 110 : c.measureText(String(it.price || '')).width + priceF * .9; return cellW - 8 - imgS - 12 - 12 - pw - 12 - (it.vendor === '사다드림' ? 90 : 0); };
                         const cutN = () => { c.font = '600 ' + nameF + 'px ' + F; return items.filter(it => c.measureText(String(it.name || '')).width > avail(it)).length; };
                         while (nameF > 19 && cutN() > Math.max(1, items.length * .2)) nameF--;
