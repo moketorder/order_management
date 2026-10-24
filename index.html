@@ -5966,8 +5966,11 @@
                     items.forEach(it => { const s = (!it.closed && it.sun && it.sunOn) ? it.sun : ''; const last = secs[secs.length - 1]; if (last && last.s === s) last.its.push(it); else secs.push({ s, its: [it] }); });
                     const gap = 18, top = 188, H = 862, HB = 46, EX = HB + 4, AW = 1020;
                     const nHead = secs.filter(sc => sc.s).length;
+                    /* [신규 2026-10-24] 일요일 마감 묶음이 한 줄을 다 못 채우면(묶음 수 < 칸 수) 묶음 판을 그 카드만큼 좁히고
+                       같은 줄 오른쪽에 다른 상품을 이어 넣는다 (사장님 요청 — 줄 하나를 묶음 둘이 다 차지해 줄 수가 늘었다) */
+                    const mergeOf = C => secs.length === 2 && !!secs[0].s && !secs[1].s && secs[0].its.length < C;
                     const plan = C => {
-                        const Rn = secs.reduce((a, sc) => a + Math.ceil(sc.its.length / C), 0);
+                        const Rn = mergeOf(C) ? Math.ceil(n / C) : secs.reduce((a, sc) => a + Math.ceil(sc.its.length / C), 0);
                         const rowH = (H - gap * (Rn - 1) - EX * nHead) / Rn, cw = (AW - gap * (C - 1)) / C;
                         let nf = Math.round(Math.max(19, Math.min(36, cw * .068, rowH * .1)));
                         const fit = () => { c.font = '700 ' + nf + 'px ' + F; return items.filter(it => c.measureText(String(it.name || '')).width > cw - 36).length; };
@@ -5979,12 +5982,24 @@
                     const okP = plans.filter(p => p.phH >= Math.min(p.cw * .5, 220) && p.phH <= p.cw * 1.35 && p.phH > 60), poolP = okP.length ? okP : plans;   // 사진이 너무 납작하거나 너무 길쭉하지 않게
                     const P = poolP.reduce((b, x) => (x.nf > b.nf || (x.nf === b.nf && Math.min(x.cw, x.phH) > Math.min(b.cw, b.phH))) ? x : b);
                     const rowsAll = [];   // { sec, its: [...] } — 묶음마다 C개씩, 마지막 줄은 가운데로
-                    secs.forEach(sc => { sc.r = Math.ceil(sc.its.length / P.C); for (let k = 0; k < sc.r; k++) rowsAll.push({ sec: sc, its: sc.its.slice(k * P.C, k * P.C + P.C) }); });
+                    const MERGE = mergeOf(P.C);
+                    if (MERGE) { const all = secs[0].its.concat(secs[1].its); for (let k = 0; k * P.C < all.length; k++) rowsAll.push({ sec: null, its: all.slice(k * P.C, k * P.C + P.C) }); }
+                    else secs.forEach(sc => { sc.r = Math.ceil(sc.its.length / P.C); for (let k = 0; k < sc.r; k++) rowsAll.push({ sec: sc, its: sc.its.slice(k * P.C, k * P.C + P.C) }); });
                     const rowH = P.rowH;
                     const imgs = await Promise.all(items.map(it => srcThImg(it.imgs[it.imgAt])));
                     // 묶음 판과 머리말 먼저 · 줄마다 윗변 위치
                     let yy = top; const rowYs = [];
-                    secs.forEach(sc => {
+                    if (MERGE) {   // 첫 줄 왼쪽 묶음 카드만 감싸는 좁은 판 + 머리말, 줄은 머리말 아래부터
+                        const sN = secs[0].its.length, k0 = rowsAll[0].its.length, rw0 = k0 * P.cw + (k0 - 1) * gap, x0 = 30 + (AW - rw0) / 2;
+                        const px = x0 - 8, pw = sN * P.cw + (sN - 1) * gap + 16, py = top - 6, ph = EX + rowH + 14;
+                        c.fillStyle = '#ffe3e3'; srcThRR(c, px, py, pw, ph, 26); c.fill();
+                        c.save(); srcThRR(c, px, py, pw, ph, 26); c.clip(); c.fillStyle = '#e03131'; c.fillRect(px, py, pw, HB); c.restore();
+                        c.save(); c.strokeStyle = '#e03131'; c.lineWidth = 4; srcThRR(c, px, py, pw, ph, 26); c.stroke(); c.restore();
+                        let hf = 28; c.font = '900 ' + hf + 'px ' + F; while (hf > 14 && c.measureText(secs[0].s).width > pw - 24) { hf--; c.font = '900 ' + hf + 'px ' + F; }
+                        c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(secs[0].s, px + pw / 2, py + HB / 2 + hf * .36); c.textAlign = 'left';
+                        rowsAll.forEach((r, i) => rowYs.push(top + EX + i * (rowH + gap)));
+                    }
+                    if (!MERGE) secs.forEach(sc => {
                         const h = sc.r * rowH + (sc.r - 1) * gap, ry0 = yy + (sc.s ? EX : 0);
                         if (sc.s) {
                             const px = 22, pw = 1036, py = yy - 6, ph = EX + h + 14;
