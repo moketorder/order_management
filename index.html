@@ -8598,8 +8598,9 @@
                         <input type="date" id="sales-custom-to" class="form-control" style="width:auto; height:36px;" onchange="onSalesCustomRangeChange()">
                     </div>
 
-                    <!-- [신규] 분류 골라 보기 — 고른 분류만 남겨 지표·매출 추이·순위를 다시 센다 -->
-                    <div style="display:flex; gap:4px; margin-top:8px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+                    <!-- [신규] 분류 골라 보기 — 고른 분류만 남겨 지표·매출 추이·순위를 다시 센다
+                         [수정 2026-10-24] 상품 통계도 이 단추로 거른다 — 순위 표의 '종류' 단추는 겹쳐서 지웠다 (사장님 요청) -->
+                    <div id="sales-cat-row" style="display:flex; gap:4px; margin-top:8px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch;">
                         <button type="button" data-sales-cat="all" onclick="setSalesCategory('all')" class="sales-toggle-btn active" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">전체</button>
                         <button type="button" data-sales-cat="fruit" onclick="setSalesCategory('fruit')" class="sales-toggle-btn up-cat-fruit" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">과일</button>
                         <button type="button" data-sales-cat="group" onclick="setSalesCategory('group')" class="sales-toggle-btn up-cat-group" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">공동구매</button>
@@ -8614,7 +8615,19 @@
                 <div id="sales-paid-summary" style="margin-bottom:14px;"></div>
 
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 0 8px 0; flex-wrap:wrap;">
-                    <div class="card-title" id="sales-trend-title" style="margin:0; font-size:14px;">📈 매출 추이</div>
+                    <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                        <div class="card-title" id="sales-trend-title" style="margin:0; font-size:14px;">📈 매출 추이</div>
+                        <!-- [신규 2026-10-24] 그래프 단위 고르기 (사장님 요청) — 자동은 위 기간 단위를 따른다 -->
+                        <select id="trend-unit-select" onchange="setSalesTrendUnit(this.value || null)" title="그래프를 어떤 단위로 나눠 볼지"
+                            style="height:28px; padding:0 6px; border:1.5px solid var(--border); border-radius:7px; font-size:12px; font-weight:800; color:var(--text-main); background:#fff; cursor:pointer;">
+                            <option value="">자동</option>
+                            <option value="dow">요일</option>
+                            <option value="week">주</option>
+                            <option value="month">월</option>
+                            <option value="quarter">분기</option>
+                            <option value="year">년</option>
+                        </select>
+                    </div>
                     <!-- [신규] 그래프를 금액으로 볼지 건수로 볼지 (건수 = 상품 줄 하나가 1건) -->
                     <div style="display:flex; gap:4px; flex-shrink:0;">
                         <button type="button" data-sales-metric="amount" onclick="setSalesTrendMetric('amount')" class="sales-toggle-btn active" style="padding:5px 10px; font-size:11.5px;">금액</button>
@@ -28690,6 +28703,19 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             gHighlightSearchMatches(list, _kw);
         }
 
+        /* [신규 2026-10-24] 년 단위만 여러 해를 함께 고른다 (사장님 요청 — 세 통계 모두 같게. 다른 단위는 하나만)
+           salesYearIdxs = 고른 해의 올해로부터 거리들 (null 이면 salesUnitIdx 하나). 기간은 가장 이른 해 1/1 ~ 가장 늦은 해 12/31 */
+        var salesYearIdxs = null;
+        function salesYearSel() { return (salesYearIdxs && salesYearIdxs.length) ? salesYearIdxs : [salesUnitIdx || 0]; }
+        function setSalesYearToggle(i) {
+            i = parseInt(i) || 0;
+            const cur = new Set(salesYearSel());
+            if (cur.has(i)) { if (cur.size > 1) cur.delete(i); } else cur.add(i);   // 하나는 늘 남긴다
+            salesYearIdxs = [...cur].sort((a, b) => a - b);
+            salesUnitIdx = salesYearIdxs[0];
+            buildSalesPeriodTabs();
+            renderSalesStatus();
+        }
         // [신규] 선택 단위(salesUnit)+인덱스(salesUnitIdx, 0=최근)로 기간 계산
         function getSalesPeriodRange(){
             const today = salesTodayMidnight();
@@ -28700,7 +28726,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (salesUnit === 'week'){ const mon = new Date(today); mon.setDate(mon.getDate()-((mon.getDay()+6)%7)-i*7); const to = new Date(mon); to.setDate(to.getDate()+6); to.setHours(23,59,59,999); return { from: mon, to }; }
             if (salesUnit === 'month'){ const from = new Date(today.getFullYear(), today.getMonth()-i, 1, 0,0,0,0); const to = new Date(from.getFullYear(), from.getMonth()+1, 0, 23,59,59,999); return { from, to }; }
             if (salesUnit === 'quarter'){ const cq = Math.floor(today.getMonth()/3); const qi = cq-i; const y = today.getFullYear()+Math.floor(qi/4); const q = ((qi%4)+4)%4; const from = new Date(y, q*3, 1, 0,0,0,0); const to = new Date(y, q*3+3, 0, 23,59,59,999); return { from, to }; }
-            if (salesUnit === 'year'){ const y = today.getFullYear()-i; return { from: new Date(y,0,1,0,0,0,0), to: new Date(y,11,31,23,59,59,999) }; }
+            if (salesUnit === 'year'){ const ys = salesYearSel().map(k => today.getFullYear() - k); return { from: new Date(Math.min(...ys),0,1,0,0,0,0), to: new Date(Math.max(...ys),11,31,23,59,59,999) }; }   // [수정 2026-10-24] 여러 해
             return { from: null, to: null };
         }
         function onSalesCustomRangeChange(){ if (salesPeriod === 'custom') renderSalesStatus(); }
@@ -28716,9 +28742,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             row1.innerHTML = units.map(([u,l]) => ubtn(u, l)).join('');
             const cr = document.getElementById('sales-custom-range'); if (cr) cr.style.display = 'none';
             // 2줄: 인스턴스 버튼 (오늘은 비움, 나머지는 가로 스크롤)
-            row2.innerHTML = buildSalesInstanceButtons()
-                // [신규 2026-10-23] 고객 통계에서만 — 줄 끝 '전체': 손님 추이를 처음부터 다 본다 (위 숫자 칸은 고른 기간 그대로)
-                + ((typeof salesStatCat !== 'undefined' && salesStatCat === 'cust') ? `<button type="button" onclick="setCustTrendAll()" class="sales-toggle-btn${custTrendAll ? ' active' : ''}" title="손님 추이를 처음부터 전체로 보기" style="flex:0 0 auto; margin-left:auto; padding:6px 12px; font-size:12px; white-space:nowrap; position:sticky; right:0; box-shadow:-6px 0 6px -4px rgba(0,0,0,.12);">전체</button>` : '');
+            // [수정 2026-10-24] 고객 통계에만 있던 줄 끝 '전체'는 뺐다 — 세 통계를 같게, 넓게 보려면 년에서 여러 해를 고른다 (사장님 요청)
+            row2.innerHTML = buildSalesInstanceButtons();
         }
         // [신규] 선택 단위의 인스턴스 버튼 목록 생성 (idx 0=가장 최근)
         function buildSalesInstanceButtons(){
@@ -28743,7 +28768,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 try { getSalesSourceOrders().forEach(o => { const d = salesOrderDate(o); if (d && !isNaN(d.getTime()) && d.getFullYear() >= 2000) yset.add(d.getFullYear()); }); } catch(e){}
                 [...yset].sort((a,b)=>b-a).forEach(y => items.push({ idx: ty - y, label: `${y}년` }));
             }
-            const ibtn = (it) => `<button type="button" onclick="setSalesUnitIdx(${it.idx})" class="sales-toggle-btn${salesUnitIdx===it.idx?' active':''}" style="flex:1 0 auto; padding:6px 10px; font-size:12px; white-space:nowrap;${it.isToday ? ' border:2.5px solid #f59e0b;' : ''}"${it.isToday ? ' title="오늘"' : ''}>${it.label}</button>`;
+            const _yrs = salesUnit === 'year' ? new Set(salesYearSel()) : null;   // [신규 2026-10-24] 년은 여러 개
+            const ibtn = (it) => `<button type="button" onclick="${_yrs ? 'setSalesYearToggle' : 'setSalesUnitIdx'}(${it.idx})" class="sales-toggle-btn${(_yrs ? _yrs.has(it.idx) : salesUnitIdx===it.idx)?' active':''}" style="flex:1 0 auto; padding:6px 10px; font-size:12px; white-space:nowrap;${it.isToday ? ' border:2.5px solid #f59e0b;' : ''}"${it.isToday ? ' title="오늘"' : ''}>${it.label}</button>`;
             return items.map(ibtn).join('');
         }
 
@@ -29757,8 +29783,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     + `<span id="sales-rank-count" style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:var(--text-sub); margin-left:2px;"></span></div>`;
             }
             const chips = document.getElementById('sales-rank-chips');
-            if (chips) chips.innerHTML = lab('종류') + chipW('cat', 'all', '전체') + chipW('cat', 'group', '공동구매') + chipW('cat', 'other', '상시판매') + chipW('cat', 'sada', '사다드림') + chipW('cat', 'fruit', '과일')
-                + lab('받기', 10) + chipW('m', 'all', '전체') + chipW('m', 'pickup', '🏠 픽업') + chipW('m', 'delivery', '🛵 배달');
+            // [수정 2026-10-24] '종류' 단추는 지웠다 — 위 분류 단추(전체·과일·공동구매·사다드림·상시판매)와 겹친다 (사장님 요청). 받기는 그대로
+            salesRankF.cat = salesCategoryFilter || 'all';   // 순위 표는 위 분류를 따른다
+            if (chips) chips.innerHTML = lab('받기') + chipW('m', 'all', '전체') + chipW('m', 'pickup', '🏠 픽업') + chipW('m', 'delivery', '🛵 배달');
             const nc = document.getElementById('sales-rank-nchips');
             if (nc) nc.innerHTML = chip('n', 10, '10개') + chip('n', 30, '30개') + chip('n', 50, '50개') + chip('n', 0, '전체');
         }
@@ -29767,9 +29794,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            기간(단위·고른 칸)과 분류 거르기는 갈래마다 따로 기억한다 — 갈래를 바꾸면 지금 값을 넣어 두고 그 갈래 값을 꺼낸다 */
         function setSalesStatCat(c) {
             if (c === salesStatCat) return;
-            _salesStatPer[salesStatCat] = { u: salesUnit, i: salesUnitIdx, p: salesPeriod, c: salesCategoryFilter, m: salesMethodFilter, o: salesTrendUnitOverride };
+            _salesStatPer[salesStatCat] = { u: salesUnit, i: salesUnitIdx, p: salesPeriod, c: salesCategoryFilter, m: salesMethodFilter, o: salesTrendUnitOverride, y: salesYearIdxs ? salesYearIdxs.slice() : null };
             const s = _salesStatPer[c] || { u: 'month', i: 0, p: 'month', c: 'all', m: 'all', o: null };
-            salesUnit = s.u; salesUnitIdx = s.i; salesPeriod = s.p; salesCategoryFilter = s.c; salesMethodFilter = s.m; salesTrendUnitOverride = s.o;
+            salesUnit = s.u; salesUnitIdx = s.i; salesPeriod = s.p; salesCategoryFilter = s.c; salesMethodFilter = s.m; salesTrendUnitOverride = s.o; salesYearIdxs = s.y ? s.y.slice() : null; custTrendAll = false;
             document.querySelectorAll('[data-sales-cat]').forEach(b => b.classList.toggle('active', b.dataset.salesCat === salesCategoryFilter));
             salesStatCat = c;
             if (c === 'prod') window.__sstProdReady = false;   // 상품 통계를 열 때마다 재고·발주를 새로
@@ -29943,10 +29970,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            늘 위 기간 단위를 따른다: 일 → 시간대 · 주 → 하루씩 · 월 → 주별 · 분기 → 달별 · 년 → 분기별 */
         (function () {
             const orig = renderSalesDailyTrend;
-            renderSalesDailyTrend = function (m) { salesTrendUnitOverride = null; orig(m); try { salesTrendApplyView(); } catch (e) { console.warn('추이 그래프 보기 실패:', e); } };
+            // [수정 2026-10-24] 목록 창에서 고른 단위는 그대로 둔다 (예전엔 그릴 때마다 자동으로 되돌렸다). '자동'이면 위 기간 단위를 따른다
+            renderSalesDailyTrend = function (m) { orig(m); try { salesTrendApplyView(); } catch (e) { console.warn('추이 그래프 보기 실패:', e); } };
         })();
+        try { const _u = localStorage.getItem('moket_trend_unit'); if (['dow', 'week', 'month', 'quarter', 'year'].includes(_u)) salesTrendUnitOverride = _u; } catch (e) { }
         function setSalesTrendUnit(u){
-            salesTrendUnitOverride = u;
+            salesTrendUnitOverride = u || null;
+            try { localStorage.setItem('moket_trend_unit', salesTrendUnitOverride || ''); } catch (e) { }   // 이 기기에 기억
             renderSalesDailyTrend(_salesDayCache || new Map());
         }
 
@@ -29956,6 +29986,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         const TREND_UNITS = [[null, '자동'], ['hour', '시간'], ['dow', '요일'], ['day', '일'], ['week', '주'], ['month', '월'], ['year', '년']];
 
         function buildTrendUnitTabs() {
+            const sel = document.getElementById('trend-unit-select');   // [신규 2026-10-24] 목록 창
+            if (sel) sel.value = salesTrendUnitOverride || '';
             const box = document.getElementById('trend-unit-tabs');
             if (!box) return;
             box.innerHTML = TREND_UNITS.map(([u, label]) => {
@@ -29969,7 +30001,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const box = document.getElementById('sales-daily-trend');
             const titleEl = document.getElementById('sales-trend-title');
             const _pad = n => String(n).padStart(2, '0');
-            const nameMap = { hour: '시간대별', dow: '요일별', day: '일자별', week: '주별', month: '월별', year: '연도별' };
+            const nameMap = { hour: '시간대별', dow: '요일별', day: '일자별', week: '주별', month: '월별', quarter: '분기별', year: '연도별' };
             if (titleEl) titleEl.innerText = `📈 ${nameMap[unit] || ''} ${salesMetricName()} 추이`;
 
             /* [신규] 요일별 — 고른 기간의 날짜를 월~일 일곱 칸으로 모은다.
@@ -30055,6 +30087,26 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     srcMap = gSalesDayAmounts(wFrom, wTo);
                 }
             }
+            /* [신규 2026-10-24] 월·분기·년은 위 기간 안만 나누면 막대가 하나뿐이라, 위 기간이 끝나는 달을 기준으로 넓혀 본다 (사장님 정함)
+               월 = 최근 12달 · 분기 = 최근 8분기 · 년 = 자료가 있는 모든 해 */
+            let _wideNote = '';
+            if (unit === 'month' || unit === 'quarter' || unit === 'year') {
+                const pr = getSalesPeriodRange() || {};
+                const end = pr.to ? new Date(pr.to) : new Date();
+                const wTo = new Date(end.getFullYear(), end.getMonth() + 1, 0, 23, 59, 59, 999);   // 그 달 마지막 날
+                let wFrom;
+                if (unit === 'month') { wFrom = new Date(end.getFullYear(), end.getMonth() - 11, 1); _wideNote = '최근 12달'; }
+                else if (unit === 'quarter') { const qStart = end.getMonth() - (end.getMonth() % 3); wFrom = new Date(end.getFullYear(), qStart - 21, 1); _wideNote = '최근 8분기'; }
+                else { wFrom = new Date(2000, 0, 1); _wideNote = '전체'; }
+                srcMap = gSalesDayAmounts(wFrom, wTo);
+                if (titleEl) titleEl.innerText = `📈 ${nameMap[unit] || ''} ${salesMetricName()} 추이 · ${_wideNote}`;
+                // 옛 주문(보관함)을 아직 안 받은 기기면 받아서 다시 그린다 (앞쪽 달이 비어 보이지 않게)
+                if (typeof salesArchiveLoaded !== 'undefined' && !salesArchiveLoaded && typeof loadArchiveOrdersIfNeeded === 'function' && !renderTrendByUnit._loading) {
+                    renderTrendByUnit._loading = true;
+                    loadArchiveOrdersIfNeeded().then(() => { renderTrendByUnit._loading = false; if (salesArchiveLoaded && salesTrendUnitOverride === unit) renderSalesDailyTrend(_salesDayCache || new Map()); })
+                        .catch(() => { renderTrendByUnit._loading = false; });
+                }
+            }
 
             const buckets = new Map();
             srcMap.forEach((amt, ds) => {
@@ -30075,6 +30127,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     label = `${p[0].slice(2)}/${m}월`;
                     startISO = `${p[0]}-${p[1]}-01`;
                     endISO = `${p[0]}-${p[1]}-${_pad(new Date(y, m, 0).getDate())}`;
+                } else if (unit === 'quarter') {   // [신규 2026-10-24] 분기 — 1~3월 1분기 …
+                    const q = Math.floor((m - 1) / 3) + 1, qs = (q - 1) * 3 + 1, qe = qs + 2;
+                    key = `${p[0]}-Q${q}`;
+                    label = `${p[0].slice(2)}년 ${q}분기`;
+                    startISO = `${p[0]}-${_pad(qs)}-01`;
+                    endISO = `${p[0]}-${_pad(qe)}-${_pad(new Date(y, qe, 0).getDate())}`;
                 } else if (unit === 'year') {
                     key = `${p[0]}`;
                     label = `${p[0]}년`;
@@ -30093,7 +30151,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                앞쪽 아홉 달이 통째로 빠진 채 그려졌다 (잘렸다는 안내도 없었다).
                한 해를 통째로 볼 수 있게 넉넉히 잡고, 그래도 넘치면 아래에 알려 준다.
                  일=92(약 3달) · 주=53(한 해) · 월=36(3년) · 년=20 */
-            const cap = { day: 92, week: 53, month: 36, year: 20 }[unit] || 92;
+            const cap = { day: 92, week: 53, month: 36, quarter: 20, year: 20 }[unit] || 92;
             const _all = [...buckets.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(x => x[1]);
             const _cut = Math.max(0, _all.length - cap);
             const list = _all.slice(-cap);
@@ -30104,7 +30162,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             }
 
             const max = Math.max.apply(null, list.map(v => v.amount).concat([1]));
-            const lblW = (unit === 'week') ? 86 : (unit === 'month') ? 58 : (unit === 'year') ? 52 : 44;
+            const lblW = (unit === 'week') ? 86 : (unit === 'month') ? 58 : (unit === 'quarter') ? 72 : (unit === 'year') ? 52 : 44;
             const rowH = Math.max(16, Math.min(28, Math.floor(300 / list.length)));
             box.innerHTML = `<div style="display:flex; flex-direction:column; gap:4px;">` + list.map(v => {
                 const pct = Math.round(v.amount / max * 100);
@@ -30195,10 +30253,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 return { buckets: out, keyOf: ds => ds.slice(0,7) };
             }
             if (salesUnit === 'year'){
-                // 그 해의 4분기 (1분기→4분기)
-                const y=from.getFullYear();
-                for (let q=0; q<4; q++){ const d=new Date(y,q*3,1); const last=new Date(y,q*3+3,0); out.push({ key:`Q${q+1}`, label:`${q+1}분기(${q*3+1}~${q*3+3}월)`, startISO:iso(d), endISO:iso(last), amount:0 }); }
-                const keyOf = ds => { const m=+ds.split('-')[1]; return `Q${Math.floor((m-1)/3)+1}`; };
+                // 그 해의 4분기 (1분기→4분기). [수정 2026-10-24] 여러 해를 고르면 해마다 4분기씩 (열쇠에 해를 넣어 섞이지 않게)
+                const { to: _yTo } = getSalesPeriodRange();
+                const y0 = from.getFullYear(), y1 = _yTo ? _yTo.getFullYear() : y0, multi = y1 > y0;
+                for (let y = y0; y <= y1; y++) for (let q=0; q<4; q++){ const d=new Date(y,q*3,1); const last=new Date(y,q*3+3,0); out.push({ key:`${y}-Q${q+1}`, label: multi ? `${String(y).slice(2)}년 ${q+1}분기` : `${q+1}분기(${q*3+1}~${q*3+3}월)`, startISO:iso(d), endISO:iso(last), amount:0 }); }
+                const keyOf = ds => { const p = ds.split('-'); return `${p[0]}-Q${Math.floor((+p[1]-1)/3)+1}`; };
                 return { buckets: out, keyOf };
             }
             return { buckets: [], keyOf: ds => ds };
@@ -30565,7 +30624,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // [신규] 단위 선택(상단): 인덱스는 최근(0)으로 초기화
         function setSalesUnit(u){
             custTrendAll = false;   // [신규 2026-10-23] 기간을 새로 고르면 손님 추이도 그 기간 안으로
-            salesUnit = u; salesUnitIdx = 0; salesPeriod = u;
+            salesUnit = u; salesUnitIdx = 0; salesPeriod = u; salesYearIdxs = null;
             salesTrendUnitOverride = null;
             buildSalesPeriodTabs();
             renderSalesStatus();
@@ -30573,7 +30632,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // [신규] 인스턴스 선택(하단)
         function setSalesUnitIdx(i){
             custTrendAll = false;
-            salesUnitIdx = parseInt(i) || 0;
+            salesUnitIdx = parseInt(i) || 0; salesYearIdxs = null;
             buildSalesPeriodTabs();
             renderSalesStatus();
         }
