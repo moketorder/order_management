@@ -13333,7 +13333,7 @@
                                              오늘 물건을 건네면서 지난 것도 함께 챙겨 줄 수 있다.
                                              오른쪽 끝으로 밀어 두어 이름·연락처와 섞이지 않게 한다. -->
                                         <span style="margin-left:auto; display:inline-flex; gap:5px; align-items:center; flex-shrink:0;">
-                                            ${noShowCount > 0 ? `<span title="노쇼 기록" style="flex-shrink:0; font-size:11px; font-weight:800; padding:3px 8px; border-radius:5px; border:1.5px solid #fdba74; background:#fff7ed; color:#c2410c; white-space:nowrap;">⛔ 노쇼 ${noShowCount}회</span>` : ''}
+                                            ${noShowCount > 0 ? `<span title="눌러서 노쇼 주문 보기" onclick="event.stopPropagation(); gShowNoShowList('${encodeURIComponent(_pairPhone)}','')" style="cursor:pointer; flex-shrink:0; font-size:11px; font-weight:800; padding:3px 8px; border-radius:5px; border:1.5px solid #fdba74; background:#fff7ed; color:#c2410c; white-space:nowrap;">⛔ 노쇼 ${noShowCount}회</span>` : ''}
                                             ${unpickedCount > 0 ? `
                                                 <button type="button" class="no-print"
                                                     onclick="openUnpickedModal('${encodeURIComponent(customer.phone || '')}','${encodeURIComponent(customer.name || '')}')"
@@ -16506,7 +16506,7 @@
                             ${idSubHtml}
                             ${addrHtml}
                             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:5px 8px; margin-top:6px;">
-                                ${_noShowN ? `<span style="font-size:12px; font-weight:800; color:#c2410c;">⛔ 노쇼 ${_noShowN}회</span>` : ''}
+                                ${_noShowN ? `<span title="눌러서 노쇼 주문 보기" onclick="event.stopPropagation(); gShowNoShowList('${encodeURIComponent(phone)}','${encodeURIComponent(name)}')" style="cursor:pointer; font-size:12px; font-weight:800; color:#c2410c; text-decoration:underline; text-underline-offset:2px;">⛔ 노쇼 ${_noShowN}회</span>` : ''}
                                 ${gender ? `<span style="font-size:12px; font-weight:700; color:#334155;">${genderIcon} ${gender}</span>` : ''}
                                 ${ageGroup ? `<span style="font-size:12px; font-weight:700; color:#334155;">🎂 ${ageGroup}</span>` : ''}
                             </div>
@@ -26636,7 +26636,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 <div class="ca-card" onclick="showCustomerCardModal('${encodeURIComponent(r.phone)}','${encodeURIComponent(r.name)}')">
                     <div class="ca-r1">
                         ${_custNewMap[String(r.phone || '').replace(/\D/g, '')] ? `<span style="flex:0 0 auto; font-size:11px; font-weight:900; color:#fff; background:#16a34a; padding:1px 6px; border-radius:6px; margin-right:5px;">${_custNewMap[String(r.phone || '').replace(/\D/g, '')] === '재가입' ? '재가입' : '신규'}</span>` : ''}<span class="ca-name">${gEscapeHtml(r.name)}${r.realName && r.realName !== r.name ? `<span style="font-weight:700; color:#94a3b8;"> (${gEscapeHtml(r.realName)})</span>` : ''}</span>
-                        ${r.noShow ? `<span style="flex:0 0 auto; font-size:11px; font-weight:800; color:#c2410c;" title="마지막 노쇼 ${gEscapeHtml(r.noShowLast)}">⛔ 노쇼 ${r.noShow}회</span>` : ''}
+                        ${r.noShow ? `<span onclick="event.stopPropagation(); gShowNoShowList('${encodeURIComponent(r.phone)}','${encodeURIComponent(r.name)}')" style="cursor:pointer; flex:0 0 auto; font-size:11px; font-weight:800; color:#c2410c; text-decoration:underline; text-underline-offset:2px;" title="마지막 노쇼 ${gEscapeHtml(r.noShowLast)} · 눌러서 노쇼 주문 보기">⛔ 노쇼 ${r.noShow}회</span>` : ''}
                         <span class="ca-cnt">${r.orders}회</span>
                         <span class="ca-amt" title="${r.amt.toLocaleString()}원">${won(r.amt)}</span>
                     </div>
@@ -27854,6 +27854,57 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function gIsNoShow(o){ return !!(o && o.noShow) && isSalesCanceled(o); }
         // 손님의 노쇼 횟수 — 같은 날짜는 한 번으로 센다
         function gNoShowDays(rows){ const s = new Set(); (rows || []).forEach(o => { if (gIsNoShow(o)) s.add(getOrderDateInfo(o).dateStr || String(o.timestamp || '')); }); return s; }
+        /* [신규 2026-10-24] 노쇼 표시를 누르면 그 손님의 노쇼 주문을 날짜별로 보여 준다 (사장님 요청)
+           주문 내역 머리줄 · 손님 카드 · 손님 관리 목록 세 곳의 '노쇼 N회'가 같은 창을 연다. 보기만 한다. */
+        function gShowNoShowList(phoneEnc, nameEnc){
+            const phone = decodeURIComponent(phoneEnc || ''), name = decodeURIComponent(nameEnc || '');
+            const src = getSalesSourceOrders();
+            const digits = String(phone).replace(/\D/g, '');
+            const hit = digits ? (src.find(o => String(o.firebasePhoneKey || '').replace(/\D/g, '') === digits)
+                                 || src.find(o => salesNormPhone(o) === digits)) : null;
+            const key = hit ? salesPersonKey(hit) : salesPersonKey({ phone, name });
+            const rows = src.filter(o => salesPersonKey(o) === key && gIsNoShow(o));
+            const who = (hit && hit.name) || name || phone;
+            const groups = new Map();
+            rows.forEach(o => {
+                const d = getOrderDateInfo(o).dateStr || String(o.timestamp || '');
+                if (!groups.has(d)) groups.set(d, []);
+                groups.get(d).push(o);
+            });
+            const days = [...groups.keys()].sort((a, b) => String(b).localeCompare(String(a)));
+            const won = n => (Number(n) || 0).toLocaleString() + '원';
+            const E = gEscapeHtml;
+            const body = days.length ? days.map(d => {
+                const list = groups.get(d);
+                const sum = list.reduce((t, o) => t + (parseInt(String(o.total || 0).replace(/,/g, '')) || 0), 0);
+                const how = list.some(o => isSalesDelivery(o)) ? '배달' : '픽업';
+                return `<div style="padding:11px 0; border-top:1px solid #f1f5f9;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+                        <b style="font-size:14px; color:#0f172a;">${E(d)}</b>
+                        <span style="font-size:11.5px; font-weight:800; color:#c2410c; background:#fff7ed; border:1px solid #fdba74; border-radius:5px; padding:0 6px;">${how}</span>
+                        <span style="margin-left:auto; font-size:13px; font-weight:900; color:#0f172a;">${won(sum)}</span>
+                    </div>
+                    ${list.map(o => `<div style="display:flex; gap:8px; font-size:13px; font-weight:700; color:#334155; line-height:1.55;">
+                        <span style="flex:1; min-width:0; word-break:keep-all; overflow-wrap:break-word;">${E(String(o.item || ''))}${o.optionText ? ` <span style="color:#94a3b8;">(${E(String(o.optionText))})</span>` : ''}</span>
+                        <span style="flex:0 0 auto; color:#64748b;">${E(String(o.quantity ?? o.qty ?? 1))}개</span>
+                        <span style="flex:0 0 auto; min-width:64px; text-align:right;">${won(parseInt(String(o.total || 0).replace(/,/g, '')) || 0)}</span>
+                    </div>`).join('')}
+                </div>`;
+            }).join('') : `<div style="padding:24px 0; text-align:center; font-size:13px; font-weight:700; color:#94a3b8;">노쇼 주문을 찾지 못했어요.</div>`;
+            const old = document.getElementById('noshow-modal'); if (old) old.remove();
+            const m = document.createElement('div');
+            m.id = 'noshow-modal';
+            m.style.cssText = 'position:fixed; inset:0; z-index:2147482000; background:rgba(15,23,42,0.5); display:flex; align-items:center; justify-content:center; padding:14px; box-sizing:border-box;';
+            m.onclick = e => { if (e.target === m) m.remove(); };
+            m.innerHTML = `<div style="background:#fff; border-radius:14px; width:100%; max-width:440px; max-height:80vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                <div style="display:flex; align-items:center; gap:8px; padding:13px 16px; border-bottom:1px solid #e2e8f0;">
+                    <div style="flex:1; min-width:0; font-size:15px; font-weight:900; color:#0f172a;">노쇼 기록 · ${E(who)} <span style="color:#c2410c;">${days.length}회</span></div>
+                    <span onclick="document.getElementById('noshow-modal').remove()" style="font-size:24px; font-weight:800; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+                </div>
+                <div style="overflow-y:auto; padding:2px 16px 12px;">${body}</div>
+            </div>`;
+            document.body.appendChild(m);
+        }
         function isSalesPaid(o){ return (o && (o.paid === true || o.paid === "true" || o.paid === "True" || o.isPaid === true || o.isPaid === "true")); }
         // 배달 판별 — 주문현황(showTodaySummary)과 동일: shippingMethod가 '배달주문'이거나, '매장픽업'이 아니고 주소가 있으면 배달
         function isSalesDelivery(o){ return (o.shippingMethod === '배달주문' || (o.shippingMethod !== '매장픽업' && o.address && String(o.address).trim() !== '')); }
