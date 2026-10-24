@@ -5868,9 +5868,11 @@
                     const segsOf = g => { const segs = []; g.its.forEach(it => { const s = sunOf(it); const last = segs[segs.length - 1]; if (last && last.s === s) last.its.push(it); else segs.push({ s, its: [it] }); }); return segs; };
                     const bands = byDay.map(g => ({ g, segs: segsOf(g) }));
                     const nb = bands.length;
+                    /* [신규 2026-10-24] 일요일 마감 묶음이 띠의 한 줄을 다 못 채우면(묶음 수 < k) 빨간 판을 그 칸만큼 좁히고 같은 줄 오른쪽에 다른 상품을 이어 넣는다 (사장님 요청 — 요일별과 같게) */
+                    const mseg = (segs, k) => (segs.length >= 2 && segs[0].s && !segs[1].s && segs[0].its.length < k) ? [{ s: segs[0].s, its: segs[0].its.concat(segs[1].its), narrow: segs[0].its.length }].concat(segs.slice(2)) : segs;
                     const plan = k => {
-                        const R = bands.reduce((a, b) => a + b.segs.reduce((x, s) => x + Math.ceil(s.its.length / k), 0), 0);
-                        const Hh = bands.reduce((a, b) => a + b.segs.filter(s => s.s).length, 0);
+                        const R = bands.reduce((a, b) => a + mseg(b.segs, k).reduce((x, s) => x + Math.ceil(s.its.length / k), 0), 0);
+                        const Hh = bands.reduce((a, b) => a + mseg(b.segs, k).filter(s => s.s).length, 0);
                         const rhRaw = (H - gap * (nb - 1) - 12 * nb - HEAD * Hh) / R, rh = Math.min(118, rhRaw);
                         const cellW = (W - LAB - 8) / k;
                         const imgS = Math.round(Math.max(40, Math.min(72, rh - 16)));
@@ -5887,7 +5889,8 @@
                     const { k, rh, cellW, imgS, priceF, nameF } = P;
                     const pad = Math.max(0, (P.rhRaw - rh) * P.R / nb);   // 줄 높이를 다 못 쓰면(상품이 아주 적으면) 띠마다 여백으로
                     let y = top;
-                    bands.forEach(({ g, segs }) => {
+                    bands.forEach(({ g, segs: segs0 }) => {
+                        const segs = mseg(segs0, k);
                         const rows = segs.reduce((x, s) => x + Math.ceil(s.its.length / k), 0), heads = segs.filter(s => s.s).length;
                         const h = 12 + rh * rows + HEAD * heads + pad;
                         c.save(); c.shadowColor = 'rgba(0,0,0,.05)'; c.shadowOffsetY = 2; c.fillStyle = '#fff'; srcThRR(c, X0, y, W, h, 20); c.fill(); c.restore();
@@ -5899,12 +5902,13 @@
                         let yy = y + 6 + pad / 2, firstRow = true;
                         segs.forEach(sg => {
                             const r = Math.ceil(sg.its.length / k);
-                            if (sg.s) {   // 일요일 마감 묶음 — 빨간 머리말 + 옅은 빨강 판
-                                const by = yy, bh = HEAD + rh * r;
-                                c.fillStyle = '#fff1f1'; srcThRR(c, ax, by, aw, bh, 12); c.fill();
-                                c.save(); c.strokeStyle = '#e03131'; c.lineWidth = 3; srcThRR(c, ax, by, aw, bh, 12); c.stroke(); c.restore();
-                                c.save(); srcThRR(c, ax, by, aw, bh, 12); c.clip(); c.fillStyle = '#e03131'; c.fillRect(ax, by, aw, HEAD - 4); c.restore();
-                                c.font = '900 19px ' + F; c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(sg.s, ax + aw / 2, by + (HEAD - 4) / 2 + 7); c.textAlign = 'left';
+                            if (sg.s) {   // 일요일 마감 묶음 — 빨간 머리말 + 옅은 빨강 판 (narrow 면 첫 줄 그 칸만큼만)
+                                const by = yy, bh = HEAD + rh * (sg.narrow ? 1 : r), bw = sg.narrow ? sg.narrow * cellW : aw;
+                                c.fillStyle = '#fff1f1'; srcThRR(c, ax, by, bw, bh, 12); c.fill();
+                                c.save(); c.strokeStyle = '#e03131'; c.lineWidth = 3; srcThRR(c, ax, by, bw, bh, 12); c.stroke(); c.restore();
+                                c.save(); srcThRR(c, ax, by, bw, bh, 12); c.clip(); c.fillStyle = '#e03131'; c.fillRect(ax, by, bw, HEAD - 4); c.restore();
+                                let hf = 19; c.font = '900 ' + hf + 'px ' + F; while (hf > 12 && c.measureText(sg.s).width > bw - 16) { hf--; c.font = '900 ' + hf + 'px ' + F; }
+                                c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(sg.s, ax + bw / 2, by + (HEAD - 4) / 2 + hf * .37); c.textAlign = 'left';
                                 yy += HEAD; firstRow = true;
                             }
                             sg.its.forEach((it, idx) => {
