@@ -5858,31 +5858,50 @@
                     await srcThHeader(c, F, '#47a823', [['다음주 상품을 ', '#fff'], ['한눈에', '#ffe066']],
                         [[srcThMd(d0) + '(' + dw(d0) + ')' + (d1 !== d0 ? ' ~ ' + srcThMd(d1) + '(' + dw(d1) + ')' : '') + ' 픽업/배달 · ', '#2f7a14'], [items.length + '가지', '#f76707']], true);
                     const byDay = used.map(d => ({ i: srcThDi(d), d, its: items.filter(it => it.d === d) }));
-                    // 두 줄로 나눈다 — 위에서부터 채워 상품 수가 반반에 가깝게
-                    const total = items.length; let acc = 0, cut = byDay.length;
-                    for (let k = 0; k < byDay.length; k++) { if (acc + byDay[k].its.length / 2 >= total / 2) { cut = k; break; } acc += byDay[k].its.length; }
-                    if (cut === 0) cut = 1; if (byDay.length > 1 && cut >= byDay.length) cut = byDay.length - 1;
-                    const cols = [byDay.slice(0, cut), byDay.slice(cut)].filter(a => a.length);
-                    const colW = cols.length === 2 ? 501 : 1020, top = 188, H = 862, gap = 14;
                     const imgs = await Promise.all(items.map(it => srcThImg(it.imgs[it.imgAt])));
                     /* [수정 2026-10-16] 일요일 마감은 한 묶음 — 묶음 위에 빨간 머리말 '일요일 오후 6시 마감'을 가로로 한 번, 묶음 줄은 옅은 빨강 바탕 + 빨간 테두리.
                        머리말 높이만큼 그 요일 칸을 위로 늘린다(왼쪽 날짜 칸도 같이). 가격 줄은 다른 요일과 같은 자리 (사장님 요청 — 오른쪽 세로 띠는 줄이 안 맞았다) */
                     const sunOf = it => (!it.closed && it.sun && it.sunOn) ? it.sun : '', HEAD = 36;
                     const runsOf = g => { const runs = []; g.its.forEach((it, k) => { const s = sunOf(it); if (!s) return; const r = runs[runs.length - 1]; if (r && r.s === s && r.b === k - 1) r.b = k; else runs.push({ s, a: k, b: k }); }); return runs; };
-                    cols.forEach((col, ci) => {
-                        const x0 = 30 + ci * (colW + 18), gs = col.map(g => ({ g, runs: runsOf(g) }));
-                        const heads = gs.reduce((a, o) => a + o.runs.length, 0), nRows = col.reduce((a, g) => a + g.its.length, 0);
-                        const rh = (H - gap * (col.length - 1) - 12 * col.length - HEAD * heads) / nRows;   // 줄 높이는 칸마다 같게
+                    /* [수정 2026-10-24] 요일 칸 크기를 상품 수에 맞춰 늘였다 줄였다, 상품명 크기는 모든 줄이 같게 (사장님 요청).
+                       · 두 열로 나누는 자리는 '두 열 중 더 좁은 줄 높이'가 가장 커지는 곳으로 고른다
+                       · 줄 높이(rh)는 두 열이 같게 — 작은 쪽에 맞추고, 남는 높이는 그 열의 요일 칸들에 고르게 나눠 아랫줄을 맞춘다
+                       · 상품명·사진·가격 크기는 줄 높이에 맞춰 키운다 (상품이 적으면 크게). 이름이 너무 많이 잘리면 다 같이 조금 줄인다 */
+                    const top = 188, H = 862, gap = 14;
+                    const colInfo = col => { const gs = col.map(g => ({ g, runs: runsOf(g) })); const heads = gs.reduce((a, o) => a + o.runs.length, 0), nRows = col.reduce((a, g) => a + g.its.length, 0);
+                        return { col, gs, heads, nRows, rh: (H - gap * (col.length - 1) - 12 * col.length - HEAD * heads) / Math.max(1, nRows) }; };
+                    let cols;
+                    if (byDay.length <= 1) cols = [colInfo(byDay)];
+                    else {
+                        let best = null;
+                        for (let k = 1; k < byDay.length; k++) { const a = colInfo(byDay.slice(0, k)), b = colInfo(byDay.slice(k)), m = Math.min(a.rh, b.rh); if (!best || m > best.m) best = { m, cols: [a, b] }; }
+                        cols = best.cols;
+                    }
+                    const colW = cols.length === 2 ? 501 : 1020;
+                    const rh = Math.min(118, ...cols.map(o => o.rh));
+                    const imgS = Math.round(Math.max(40, Math.min(86, rh - 12)));
+                    const priceF = Math.round(Math.max(21, Math.min(31, rh * .42)));
+                    let nameF = Math.round(Math.max(18, Math.min(31, rh * .4)));
+                    { // 이름이 너무 많이 잘리면(15% 넘게) 한 칸씩 줄여 본다 — 모든 줄이 같은 크기
+                        const avail = it => { c.font = '900 ' + priceF + 'px ' + F; const pw = it.closed ? 110 : c.measureText(String(it.price || '')).width + priceF * .9; return colW - 66 - 12 - imgS - 12 - 14 - pw - 12 - (it.vendor === '사다드림' ? 90 : 0); };
+                        const cut = () => { c.font = '600 ' + nameF + 'px ' + F; return items.filter(it => c.measureText(String(it.name || '')).width > avail(it)).length; };
+                        while (nameF > 18 && cut() > Math.max(1, items.length * .15)) nameF--;
+                    }
+                    cols.forEach((info, ci) => {
+                        const { col, gs } = info;
+                        const x0 = 30 + ci * (colW + 18);
+                        const used0 = gap * (col.length - 1) + 12 * col.length + HEAD * info.heads + rh * info.nRows;
+                        const pad = Math.max(0, (H - used0) / col.length);   // 이 열의 요일 칸마다 더 줄 여백 (아랫줄 맞춤)
                         let y = top;
                         gs.forEach(({ g, runs }) => {
-                            const h = 12 + rh * g.its.length + HEAD * runs.length;
+                            const h = 12 + rh * g.its.length + HEAD * runs.length + pad;
                             c.save(); c.shadowColor = 'rgba(0,0,0,.05)'; c.shadowOffsetY = 2; c.fillStyle = '#fff'; srcThRR(c, x0, y, colW, h, 20); c.fill(); c.restore();
                             c.save(); srcThRR(c, x0, y, colW, h, 20); c.clip(); c.fillStyle = SRC_TH_DAYC[g.i][0]; c.fillRect(x0, y, 66, h); c.restore();
                             c.fillStyle = '#fff'; c.textAlign = 'center';
                             c.font = '900 34px ' + F; c.fillText(String(+g.d.slice(8)), x0 + 33, y + h / 2 + 4);
                             c.font = '700 20px ' + F; c.fillText(SRC_TH_W[g.i], x0 + 33, y + h / 2 + 32); c.textAlign = 'left';
-                            // 줄마다 윗변 위치 (머리말 자리를 비운다)
-                            const rowY = []; let yy = y + 6;
+                            // 줄마다 윗변 위치 (머리말 자리를 비운다) — 남는 여백은 위아래 반씩
+                            const rowY = []; let yy = y + 6 + pad / 2;
                             g.its.forEach((it, k) => { const r = runs.find(r2 => r2.a === k); if (r) { r.hy = yy; yy += HEAD; } rowY[k] = yy; yy += rh; });
                             runs.forEach(r => {
                                 const bx = x0 + 66 + 4, bw = colW - 66 - 8, by = r.hy, bh = rowY[r.b] + rh - r.hy;
@@ -5892,19 +5911,19 @@
                                 c.font = '900 19px ' + F; c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(r.s, bx + bw / 2, by + (HEAD - 4) / 2 + 7); c.textAlign = 'left';
                             });
                             g.its.forEach((it, k) => {
-                                const ry = rowY[k], cy = ry + rh / 2, lx = x0 + 66 + 12, rx = x0 + colW - 14;
+                                const ry = rowY[k], cy = ry + rh / 2, lx = x0 + 66 + 12, rx = x0 + colW - 14, hs = imgS / 2;
                                 if (k && !runs.some(r => r.a === k)) { c.save(); c.strokeStyle = '#eadfcd'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(lx, ry); c.lineTo(rx, ry); c.stroke(); c.restore(); }
-                                c.save(); srcThRR(c, lx, cy - 23, 46, 46, 10); c.clip(); srcThCover(c, imgs[items.indexOf(it)], lx, cy - 23, 46, 46, it.closed); if (it.closed) { c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(lx, cy - 23, 46, 46); } c.restore();
+                                c.save(); srcThRR(c, lx, cy - hs, imgS, imgS, 10); c.clip(); srcThCover(c, imgs[items.indexOf(it)], lx, cy - hs, imgS, imgS, it.closed); if (it.closed) { c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(lx, cy - hs, imgS, imgS); } c.restore();
                                 let pw;
                                 if (it.closed) {
                                     c.font = '800 18px ' + F; const t = '주문마감', tw = c.measureText(t).width; pw = tw + 24;
                                     srcThPill(c, rx - pw, cy - 15, pw, 30, '#8f8f8f'); c.fillStyle = '#fff'; c.fillText(t, rx - pw + 12, cy + 6);
-                                } else pw = srcThPrice(c, F, it.price, rx, cy + 8, 23, '#f76707', true);
+                                } else pw = srcThPrice(c, F, it.price, rx, cy + priceF * .35, priceF, '#f76707', true);
                                 // [신규 2026-10-16] 사다드림 표시 — 이름 뒤, 진한 보라 바탕 흰 글씨 (빨간 묶음 바탕에서도 눈에 띄게, 사장님 요청)
-                                const nx = lx + 58, sd = it.vendor === '사다드림';
+                                const nx = lx + imgS + 12, sd = it.vendor === '사다드림';
                                 c.font = '800 15px ' + F; const sdW = sd ? c.measureText('사다드림').width + 16 : 0;
-                                c.font = '600 21px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222';
-                                const nm = srcThFit(c, it.name, rx - pw - 12 - nx - (sd ? sdW + 8 : 0)); c.fillText(nm, nx, cy + 7);
+                                c.font = '600 ' + nameF + 'px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222';
+                                const nm = srcThFit(c, it.name, rx - pw - 12 - nx - (sd ? sdW + 8 : 0)); c.fillText(nm, nx, cy + nameF * .34);
                                 if (sd) {
                                     const px = nx + c.measureText(nm).width + 8;
                                     srcThPill(c, px, cy - 13, sdW, 26, it.closed ? '#bdbdbd' : '#7048e8'); c.font = '800 15px ' + F; c.fillStyle = '#fff'; c.fillText('사다드림', px + 8, cy + 5);
