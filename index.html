@@ -17975,8 +17975,13 @@
         async function psApplyRoundStock(idx, rid) {
             const p = uploadProducts[idx];
             const raw = p && p.sid && psSched[p.sid] && psSched[p.sid][rid];
-            if (!raw || raw.stockApplied === true || raw.stock === undefined || raw.stock === null || raw.stock === '') return false;
-            const n = Math.max(0, parseInt(raw.stock, 10) || 0);
+            if (!raw || raw.stockApplied === true) return false;
+            /* [수정 2026-10-25] 반복(매주·2주·3주) 상품은 차례에 재고를 안 적어 두었어도 새 차례가 시작할 때 무제한으로 (사장님 요청).
+               예전엔 저절로 만든 반복 차례(autoRepeat)에만 무제한을 넣어 두어, 손으로 다시 잡은 차례는 앞 차례 재고를 이어받았다 */
+            const _rep = Number(p.repeatWeeks) > 0 && p.showWeekly !== true;
+            const _empty = raw.stock === undefined || raw.stock === null || raw.stock === '';
+            if (_empty && !_rep) return false;
+            const n = _empty ? 999 : Math.max(0, parseInt(raw.stock, 10) || 0);
             // [신규 2026-10-03] 999 는 무제한 — 상품 재고를 비워(무제한) 시작한다 (사장님 요청, 다른 재고 칸과 같은 규칙)
             const sv = (n === 999) ? '' : n;
             raw.stockApplied = true;   // 화면에서 먼저 막아 두 번 맞추지 않게
