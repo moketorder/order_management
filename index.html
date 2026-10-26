@@ -11323,7 +11323,7 @@
         function gFlyerDongName(v) {   // '8' → '08동', '101' → '101동', '101동' 그대로
             const s = String(v || '').trim().replace(/\s/g, '');
             if (!s) return '';
-            if (/^(동없음|없음|동없이|0+동?)$/.test(s)) return '동없음';   // [신규 2026-10-26] 동이 안 적힌 주소용 칸 (배달기사와 같은 이름)
+            if (/^(동없음|없음|동없이|0+동?)$/.test(s)) return '01동';   // [신규 2026-10-26] 동이 없는 곳은 01동으로 관리 (사장님 정함 — 0·동없음을 적어도 01동)
             const m = s.match(/^(\d+)동?$/);
             if (m) { const n = parseInt(m[1]); return (n < 100 ? String(n).padStart(2, '0') : String(n)) + '동'; }
             return /동$/.test(s) ? s : s + '동';
@@ -11383,7 +11383,7 @@
             html += `<div style="margin-top:6px; padding:9px; border:1.5px solid #bbf7d0; background:#f0fdf4; border-radius:9px;">
                 <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
                     <span style="flex:0 0 auto; font-size:12px; font-weight:900; color:#15803d;">＋ 동</span>
-                    <input id="flyer-add-dongs" placeholder="예: 101~108 · 1~8 · 3, 5 · 동없음" style="${_fIn} flex:1 1 140px;">
+                    <input id="flyer-add-dongs" placeholder="예: 101~108 · 1~8 · 3, 5 · 동 없는 곳은 0(=01동)" style="${_fIn} flex:1 1 140px;">
                     <span style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:#64748b;">라인</span>
                     <input id="flyer-add-lines" value="${E(window.__flyerLinesTpl || '1~2, 3~4')}" placeholder="1~2, 3~4" title="새 동마다 만들 라인 (비우면 '전체' 한 칸)" style="${_fIn} flex:0 1 110px;">
                     <button type="button" onclick="flyerInlineAddDongs('${aptEnc}')" style="${_fBtn} flex:0 0 auto; border:none; background:#16a34a; color:#fff;">만들기</button>
@@ -11457,15 +11457,15 @@
             const lineRaw = String((document.getElementById('flyer-add-lines') || {}).value || '');
             window.__flyerLinesTpl = lineRaw;
             const nums = [];
-            let noDong = false;   // [신규 2026-10-26] '동없음'도 동으로 만들 수 있게 (동이 안 적힌 주소용)
+            let noDong = false;   // [신규 2026-10-26] 0·동없음을 적으면 01동 (동이 없는 곳은 01동으로 관리)
             raw.split(/[,\s]+/).filter(Boolean).forEach(t => {
-                if (gFlyerDongName(t) === '동없음') { noDong = true; return; }
+                if (/^(동없음|없음|동없이|0+동?)$/.test(t)) { noDong = true; return; }   // 0·동없음 → 01동
                 const m = t.replace(/동/g, '').match(/^(\d+)(?:[~\-](\d+))?$/);
                 if (!m) return;
                 const a = parseInt(m[1]), b = m[2] ? parseInt(m[2]) : a;
                 for (let i = Math.min(a, b); i <= Math.max(a, b) && nums.length < 200; i++) nums.push(i);
             });
-            if (!nums.length && !noDong) { showToast('동 번호를 적어 주세요 (예: 101~108 · 동없음).'); return; }
+            if (!nums.length && !noDong) { showToast('동 번호를 적어 주세요 (예: 101~108 · 동 없는 곳은 0).'); return; }
             const lines = lineRaw.split(/[,\s]+/).filter(Boolean).map(gFlyerParseHo);
             if (lines.some(x => !x)) { showToast('라인은 1~2, 3~4 처럼 적어 주세요.'); return; }
             const ranges = lines.length ? lines : [{ from: null, to: null }];
@@ -11474,7 +11474,7 @@
                 if (p.from == null || q.from == null || (p.from <= q.to && q.from <= p.to)) { showToast('라인 호수가 서로 겹쳐요.'); return; }
             }
             const have = new Set(gFlyerSlotsOf(apt).map(x => x.dong));
-            const dongs = [...new Set(nums.map(gFlyerDongName).concat(noDong ? ['동없음'] : []))].filter(d => !have.has(d));
+            const dongs = [...new Set(nums.map(gFlyerDongName).concat(noDong ? ['01동'] : []))].filter(d => !have.has(d));
             if (!dongs.length) { showToast('적은 동은 이미 다 있어요.'); return; }
             if (dongs.length > 30 && !await psConfirm(`${dongs.length}개 동을 만들어요. 맞나요?`)) return;
             showLoader('만드는 중...');
@@ -11646,7 +11646,7 @@
                 <div style="padding:9px; border:1.5px solid #bbf7d0; background:#f0fdf4; border-radius:9px;">
                     <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
                         <span style="flex:0 0 auto; font-size:12px; font-weight:900; color:#15803d;">＋ 동 추가</span>
-                        <input id="flyer-add-dongs" placeholder="예: 101~108 · 1~8 · 3, 5 · 동없음" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); flyerInlineAddDongs('${aptEnc}');}" style="${_fIn} flex:1 1 140px;">
+                        <input id="flyer-add-dongs" placeholder="예: 101~108 · 1~8 · 3, 5 · 동 없는 곳은 0(=01동)" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); flyerInlineAddDongs('${aptEnc}');}" style="${_fIn} flex:1 1 140px;">
                         <span style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:#64748b;">라인</span>
                         <input id="flyer-add-lines" value="${E(window.__flyerLinesTpl || '1~2, 3~4')}" placeholder="1~2, 3~4" title="새 동마다 만들 라인 (비우면 '전체' 한 칸)" style="${_fIn} flex:0 1 100px;">
                         <button type="button" onclick="flyerInlineAddDongs('${aptEnc}')" style="${_fBtn} flex:0 0 auto; border:none; background:#16a34a; color:#fff;">만들기</button>
@@ -26909,7 +26909,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     /* [신규] '자세히'에서 동·호수별로 보여 주려고 함께 모은다.
                        건수는 카드와 같은 규칙(같은 사람이 같은 날 시킨 것은 한 건)으로 센다. */
                     {
-                        const dk = (gDongKeysOf(o.addressDetail) || [])[0] || '동없음';   // [수정 2026-10-26] 배달기사와 같게 '동없음'
+                        const dk = (gDongKeysOf(o.addressDetail) || [])[0] || '01동';   // [수정 2026-10-26] 동이 안 적힌 주소는 01동 (배달기사와 같게)
                         const hoRaw = gHoRawOf(o.addressDetail);
                         const ho = (hoRaw == null) ? '(호수 없음)' : (hoRaw + '호');
                         if (!unitStats[apt.name]) unitStats[apt.name] = {};
