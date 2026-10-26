@@ -11384,9 +11384,9 @@
             html += `<div style="margin-top:6px; padding:9px; border:1.5px solid #bbf7d0; background:#f0fdf4; border-radius:9px;">
                 <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
                     <span style="flex:0 0 auto; font-size:12px; font-weight:900; color:#15803d;">＋ 동</span>
-                    <input id="flyer-add-dongs" placeholder="예: 101~108 · 1~8 · 3, 5 · 동 없는 곳은 0(=01동)" style="${_fIn} flex:1 1 140px;">
+                    <input id="flyer-add-dongs" placeholder="예: 101~108 · 1~8 · 3, 5" style="${_fIn} flex:1 1 140px;">
                     <span style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:#64748b;">라인</span>
-                    <input id="flyer-add-lines" value="${E(window.__flyerLinesTpl || '1~2, 3~4')}" placeholder="1~2, 3~4" title="새 동마다 만들 라인 (비우면 '전체' 한 칸)" style="${_fIn} flex:0 1 110px;">
+                    <input id="flyer-add-lines" value="" placeholder="${E(window.__flyerLinesTpl || '1~2, 3~4')}" title="새 동마다 만들 라인 — 흐린 글씨가 기본값, 누르고 바로 적으면 바뀌어요 (호수 구분 없으면 '전체')" style="${_fIn} flex:0 1 110px;">
                     <button type="button" onclick="flyerInlineAddDongs('${aptEnc}')" style="${_fBtn} flex:0 0 auto; border:none; background:#16a34a; color:#fff;">만들기</button>
                 </div>
                 <div style="margin-top:5px; font-size:10.5px; font-weight:700; color:#94a3b8;">이미 있는 동은 건너뛰어요 · 100보다 작은 번호는 08동처럼 두 자리로</div>
@@ -11455,7 +11455,7 @@
         async function flyerInlineAddDongs(aptEnc) {
             const apt = decodeURIComponent(aptEnc);
             const raw = String((document.getElementById('flyer-add-dongs') || {}).value || '');
-            const lineRaw = String((document.getElementById('flyer-add-lines') || {}).value || '');
+            const _li = document.getElementById('flyer-add-lines'), lineRaw = String((_li && (String(_li.value || '').trim() || _li.placeholder)) || '');   // [수정 2026-10-26] 비우면 흐린 글씨(기본 1~2, 3~4)대로 (사장님 요청 — 지우지 않고 바로 적게)
             window.__flyerLinesTpl = lineRaw;
             const nums = [];
             let noDong = false;   // [신규 2026-10-26] 0·동없음을 적으면 01동 (동이 없는 곳은 01동으로 관리)
@@ -11466,7 +11466,7 @@
                 const a = parseInt(m[1]), b = m[2] ? parseInt(m[2]) : a;
                 for (let i = Math.min(a, b); i <= Math.max(a, b) && nums.length < 200; i++) nums.push(i);
             });
-            if (!nums.length && !noDong) { showToast('동 번호를 적어 주세요 (예: 101~108 · 동 없는 곳은 0).'); return; }
+            if (!nums.length && !noDong) { showToast('동 번호를 적어 주세요 (예: 101~108).'); return; }
             const lines = lineRaw.split(/[,\s]+/).filter(Boolean).map(gFlyerParseHo);
             if (lines.some(x => !x)) { showToast('라인은 1~2, 3~4 처럼 적어 주세요.'); return; }
             const ranges = lines.length ? lines : [{ from: null, to: null }];
@@ -11647,9 +11647,9 @@
                 <div style="padding:9px; border:1.5px solid #bbf7d0; background:#f0fdf4; border-radius:9px;">
                     <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
                         <span style="flex:0 0 auto; font-size:12px; font-weight:900; color:#15803d;">＋ 동 추가</span>
-                        <input id="flyer-add-dongs" placeholder="예: 101~108 · 1~8 · 3, 5 · 동 없는 곳은 0(=01동)" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); flyerInlineAddDongs('${aptEnc}');}" style="${_fIn} flex:1 1 140px;">
+                        <input id="flyer-add-dongs" placeholder="예: 101~108 · 1~8 · 3, 5" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault(); flyerInlineAddDongs('${aptEnc}');}" style="${_fIn} flex:1 1 140px;">
                         <span style="flex:0 0 auto; font-size:11.5px; font-weight:800; color:#64748b;">라인</span>
-                        <input id="flyer-add-lines" value="${E(window.__flyerLinesTpl || '1~2, 3~4')}" placeholder="1~2, 3~4" title="새 동마다 만들 라인 (비우면 '전체' 한 칸)" style="${_fIn} flex:0 1 100px;">
+                        <input id="flyer-add-lines" value="" placeholder="${E(window.__flyerLinesTpl || '1~2, 3~4')}" title="새 동마다 만들 라인 — 흐린 글씨가 기본값, 누르고 바로 적으면 바뀌어요 (호수 구분 없으면 '전체')" style="${_fIn} flex:0 1 100px;">
                         <button type="button" onclick="flyerInlineAddDongs('${aptEnc}')" style="${_fBtn} flex:0 0 auto; border:none; background:#16a34a; color:#fff;">만들기</button>
                     </div>
                     <div style="margin-top:5px; font-size:10.5px; font-weight:700; color:#94a3b8;">이미 있는 동은 건너뛰어요 · 100보다 작은 번호는 08동처럼 두 자리로</div>
