@@ -11820,7 +11820,7 @@
                 + (_flyerEdit ? '' : `<button type="button" onclick="backFlyerApt()" style="${_fBtn} border:1.5px solid var(--border); background:#fff; color:#475569;">‹ 아파트</button>`)
                 + `<b style="font-size:13.5px; color:#0f172a;">${gEscapeHtml(gFlyerShortName(apt))}</b>`
                 + (!_flyerEdit
-                    ? `<button type="button" onclick="toggleFlyerEdit()" title="동 추가·호수·비번·공용 비번·아파트 삭제를 한 화면에서" style="${_fBtn} margin-left:auto; border:1.5px solid #a5b4fc; background:#eef2ff; color:#4338ca;">✏️ 수정</button>`   // [수정 2026-10-26] 아파트 이름 오른쪽 ✏️ 수정 하나 — 누르면 전체 수정 화면 (사장님 요청, 동마다 수정·맨 아래 동 추가·공용 비번 칸은 뺐다)
+                    ? ''   // [수정 2026-10-27] 어제 방식으로 되돌림 (사장님 요청) — 아파트 이름 옆 ✏️ 수정 대신 동마다 ✏️ 수정·맨 아래 동 추가·공용 비번
                     : `<button type="button" onclick="askDeleteApt('${aptEnc}')"
                         title="이 아파트의 모든 동·라인과 기록을 지웁니다"
                         style="${_fBtn} margin-left:auto; border:1.5px solid #fecaca; background:#fff; color:#dc2626;">🗑 아파트 삭제</button>
@@ -11851,7 +11851,7 @@
             if (groups.length === 0) {
                 html += _flyerEdit
                     ? `<div style="padding:12px 0; font-size:12.5px; font-weight:700; color:#cbd5e1;">아직 동이 없습니다. 아래에서 하나 만들어 주세요.</div>`
-                    : `<div style="padding:12px 0; font-size:12.5px; font-weight:700; color:#cbd5e1;">아직 동이 없습니다. 위 '✏️ 수정'을 눌러 동을 만들어 주세요.</div>`;
+                    : `<div style="padding:12px 0; font-size:12.5px; font-weight:700; color:#cbd5e1;">아직 동이 없습니다. 맨 아래 '＋ 동 추가'에서 만들어 주세요.</div>`;
             }
 
             html += groups.map((g, gi) => {
@@ -11919,7 +11919,7 @@
                     <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
                         <span style="font-size:12.5px; font-weight:900; color:#0f172a;">🏢 ${gEscapeHtml(g.dong)}</span>`
                         + (_dgEdit ? `<span style="margin-left:auto; font-size:11.5px; font-weight:900; color:#4338ca;">✏️ 수정 중</span>` : '')   // [수정 2026-10-24] 동 제목 옆 ＋ 라인은 없앰 — 라인 더하기는 ✏️ 수정을 누르면 호수 맨 밑에 나온다
-                        + (true ? '' : `<button type="button" onclick="flyerDongEditOpen('${aptEnc}','${dongEnc}')" title="이 동의 호수·비번 고치기 (라인 더하기도 여기서)" style="${_fBtn} margin-left:auto; height:26px; padding:0 10px; border:1.5px solid var(--border); background:#fff; color:#475569;">✏️ 수정</button>`)   // [신규 2026-10-23] 동마다 수정 하나
+                        + ((_flyerEdit || _dgEdit) ? '' : `<button type="button" onclick="flyerDongEditOpen('${aptEnc}','${dongEnc}')" title="이 동의 호수·비번 고치기 (라인 더하기도 여기서)" style="${_fBtn} margin-left:auto; height:26px; padding:0 10px; border:1.5px solid var(--border); background:#fff; color:#475569;">✏️ 수정</button>`)   // [신규 2026-10-23] 동마다 수정 하나
                         + (!_flyerEdit ? '' : `<button type="button" onclick="${dongArmed ? `flyerDraftDelDong('${dongEnc}')` : `armFlyerDelete('dong|${gEscapeHtml(apt)}|${gEscapeHtml(g.dong)}')`}"
                             title="이 동을 뺍니다 (저장하기를 눌러야 서버에서도 지워집니다)"
                             style="${_fBtn} margin-left:auto; height:26px; padding:0 9px; border:1.5px solid ${dongArmed ? '#dc2626' : '#fecaca'}; background:${dongArmed ? '#dc2626' : '#fff'}; color:${dongArmed ? '#fff' : '#dc2626'};">${dongArmed ? '정말 지울까요?' : '동 삭제'}</button>`)
@@ -11941,7 +11941,7 @@
             </div>`;
 
             // [신규 2026-10-23] 맨 아래 — 동 추가 · 공용 비번 · 아파트 삭제 (사장님 요청)
-            // [수정 2026-10-26] 맨 아래 동 추가·공용 비번·아파트 삭제는 ✏️ 수정 화면으로 옮겼다 (사장님 요청)
+            if (!_flyerEdit) html += gFlyerBottomToolsHtml(apt);   // [수정 2026-10-27] 맨 아래 동 추가·공용 비번·아파트 삭제 다시 (사장님 요청)
             // 목록이 길어 위 단추가 안 보일 수 있어 맨 아래에도 하나 둔다
             if (_flyerEdit) html += `<div style="display:flex; gap:6px; margin-top:12px;">
                 <button type="button" onclick="toggleFlyerEdit()" style="${_fBtn} flex:1; height:42px; border:1.5px solid var(--border); background:#fff; color:#64748b; font-size:13px;">취소</button>
