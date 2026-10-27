@@ -32703,7 +32703,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    누르면 그 밑 줄에 그 묶음의 칸들이 펼쳐진다 (사장님 요청). 묶음은 선반 이름으로 가른다(선반 관리에서 이름을 바꿔도 따라감).
                    지금 보고 있는 칸이 든 묶음은 진하게 칠하고 처음부터 펼쳐 둔다 */
                 const groupOf = ([k, l]) => gShelfGroupOfLabel(l);
-                const GROUPS = [['shelf', '🗄️ 선반'], ['fridge', '❄️ 냉장'], ['freezer', '🧊 냉동']];
+                const GROUPS = [['shelf', '🗄️ 선반'], ['fridge', '❄️ 냉장'], ['freezer', '🧊 냉동'], ['etc', '🧺 기타']];
                 // [수정 2026-10-05] 묶음 단추를 누르면 그 묶음 전체('grp:묶음')를 먼저 보여 준다 (사장님 요청)
                 const curGroup = String(uploadSubTab).startsWith('grp:') ? String(uploadSubTab).slice(4)
                     : ((subs.find(s => s[0] === uploadSubTab) && groupOf(subs.find(s => s[0] === uploadSubTab))) || '');
@@ -32739,7 +32739,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 subContainer.style.display = 'flex';
                 subContainer.innerHTML = top
                     // [신규] 품절된 상품을 '품절' 자리로 실제로 옮기는 버튼. 누를 때에만 자료가 바뀐다.
-                    + `<button type="button" class="sub-tab-btn" onclick="tidySoldOutShelf()" title="품절된 상품을 '품절' 자리로 옮기고, 재고가 다시 들어온 상품은 원래 선반으로 되돌립니다" style="background:#fef2f2; color:#b91c1c;">🧹<span class="ist-long"> 품절 정리</span></button>`
+                    // [삭제 2026-10-27] '품절 정리' 단추 — 이제 품절되면 저절로 품절 칸으로 옮긴다 (gAutoTidySoldOut, 사장님 요청)
                     // [신규] 선반 자체를 더하고·고치고·지우는 창
                     + `<button type="button" class="sub-tab-btn" onclick="openShelfManager()" title="선반을 추가·이름 변경·삭제합니다" style="background:#eef2ff; color:#4338ca;">⚙️<span class="ist-long"> 선반 관리</span></button>`
                     + lower;   // [신규 2026-10-05] 펼친 묶음의 칸들 (맨 밑 한 줄)
@@ -32758,9 +32758,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // [신규 2026-10-05] 상시판매 선반 하위탭 — 펼쳐 둔 묶음('shelf'·'fridge'·'freezer', '' = 닫힘, null = 아직 안 정함)
         let invShelfOpenGroup = null;
         // 칸 이름으로 묶음을 가른다 — '냉동'·'냉장'·'선반'이 들어간 이름 (선반 관리에서 이름을 바꿔도 따라감)
+        // [수정 2026-10-27] 가운데→선반, 아이스크림→냉동, 과일·신선→냉장, 기타·미지정·품절→기타 묶음 (사장님 요청)
         function gShelfGroupOfLabel(l) {
             l = String(l || '');
-            return /냉동/.test(l) ? 'freezer' : /냉장/.test(l) ? 'fridge' : /선반/.test(l) ? 'shelf' : '';
+            return /냉동|아이스크림/.test(l) ? 'freezer' : /냉장|과일|신선/.test(l) ? 'fridge' : /선반|가운데/.test(l) ? 'shelf' : /기타|미지정|품절/.test(l) ? 'etc' : '';
         }
         // [수정 2026-10-05] 묶음 단추 — 처음 누르면 펼치면서 그 묶음 전체를 보여 주고, 펼쳐 둔 것을 다시 누르면 접기만 한다
         function invShelfToggleGroup(g) {
@@ -34751,6 +34752,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function renderProductsList() {
             { const s = document.getElementById('inv-sort-sel'); if (s) { s.style.display = uploadManageDeliveryType === 'inventory' ? '' : 'none'; s.value = gInvSort; } }
             try { psRoundTick(); } catch (e) { }   // [신규 2026-10-05] 상품 목록이 바뀌면 공동구매 회차(노출·숨김·바뀜)를 맞춘다
+            try { gAutoTidySoldOut(); } catch (e) { }   // [신규 2026-10-27] 품절된 상시판매 상품은 저절로 품절 칸으로, 재고가 들어오면 원래 칸으로 (사장님 요청)
             const container = document.getElementById('products-list-container');
             container.innerHTML = '';
 
@@ -34787,7 +34789,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         const prodShelf = String(prod.shelf || "");
                         if (uploadSubTab === SHELF_NONE_SUB) return prodShelf === "";
                         // [신규 2026-10-05] 묶음 전체(냉장·냉동·선반) — 그 묶음에 드는 칸이면 모두
-                        if (String(uploadSubTab).startsWith('grp:')) return !!prodShelf && gShelfGroupOfLabel(gShelfLabel(prodShelf)) === uploadSubTab.slice(4);
+                        if (String(uploadSubTab).startsWith('grp:')) return gShelfGroupOfLabel(gShelfLabel(prodShelf)) === uploadSubTab.slice(4);   // [수정 2026-10-27] 미지정도 '기타' 묶음에 든다
                         return prodShelf === uploadSubTab;
                     }
                     return true;
@@ -36900,10 +36902,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         /* [신규] 재고관리 — '⛔ 품절 정리' 버튼.
            품절된 상품의 선반을 실제로 '품절'로 옮기고, 다시 재고가 들어온 상품은 원래 자리로 되돌린다.
            옮길 때 원래 선반을 shelfPrev 에 적어 두므로 되돌릴 자리를 잃지 않는다.
-           자동으로 돌지 않는다 — 사장님이 이 버튼을 누른 때에만 자료가 바뀐다. */
-        async function tidySoldOutShelf() {
+           [수정 2026-10-27] 단추는 없앴고 상품 목록을 그릴 때 저절로 돈다 (gAutoTidySoldOut, silent — 사장님: 품절되면 자동으로 품절 칸으로) */
+        let _autoTidyBusy = false, _autoTidyAt = 0;
+        function gAutoTidySoldOut() {
+            if (_autoTidyBusy || Date.now() - _autoTidyAt < 15000) return;   // 15초에 한 번만
+            if (!Array.isArray(uploadProducts) || !uploadProducts.length || typeof uploadGlobalAdjustments !== 'object' || !uploadGlobalAdjustments) return;
+            _autoTidyAt = Date.now(); _autoTidyBusy = true;
+            tidySoldOutShelf(true).catch(e => console.warn('품절 자동 이동 실패:', e)).finally(() => { _autoTidyBusy = false; });
+        }
+        async function tidySoldOutShelf(silent) {
             if (!Array.isArray(uploadProducts) || uploadProducts.length === 0) {
-                showToast("상품 목록이 아직 준비되지 않았습니다.");
+                if (!silent) showToast("상품 목록이 아직 준비되지 않았습니다.");
                 return;
             }
 
@@ -36937,11 +36946,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             });
 
             if (moved.length === 0 && restored.length === 0) {
-                showToast("옮길 상품이 없습니다. 이미 정리되어 있습니다.");
+                if (!silent) showToast("옮길 상품이 없습니다. 이미 정리되어 있습니다.");
                 return;
             }
 
-            showLoader(`품절 정리 중... (옮김 ${moved.length}건 · 되돌림 ${restored.length}건)`);
+            if (!silent) showLoader(`품절 정리 중... (옮김 ${moved.length}건 · 되돌림 ${restored.length}건)`);
             try {
                 // [수정] 옮긴 상품의 선반 칸만 저장한다 (전체 PUT은 남의 변경까지 되돌린다)
                 const ok = await fbPatchProducts(shelfPatch);
@@ -36950,15 +36959,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const bits = [];
                 if (moved.length) bits.push(`품절로 ${moved.length}건`);
                 if (restored.length) bits.push(`원래 자리로 ${restored.length}건`);
-                showToast(`⛔ 품절 정리 완료 — ${bits.join(' · ')}`);
+                showToast(`⛔ 품절 칸 자동 정리 — ${bits.join(' · ')}`);
             } catch (e) {
                 // 저장에 실패하면 화면의 값도 되돌린다. 안 그러면 화면과 서버가 어긋난다.
                 moved.forEach(p => { p.shelf = String(p.shelfPrev || ''); delete p.shelfPrev; });
                 restored.forEach(p => { p.shelfPrev = String(p.shelf || ''); p.shelf = SHELF_SOLDOUT; });
                 console.error('품절 정리 실패:', e);
-                showToast("품절 정리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+                if (!silent) showToast("품절 정리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
             } finally {
-                hideLoader();
+                if (!silent) hideLoader();
                 buildSubTabs();
                 renderProductsList();
             }
