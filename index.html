@@ -23789,7 +23789,7 @@
                 const list = Array.isArray(data) ? data : [];
                 shelfList = list
                     .filter(s => s && String(s.key || '') !== '' && String(s.key) !== SHELF_SOLDOUT)
-                    .map(s => ({ key: String(s.key), label: String(s.label || s.key) }));
+                    .map(s => ({ key: String(s.key), label: String(s.label || s.key), group: String(s.group || '') }));   // [신규 2026-10-27] group = 상위 묶음 (선반 관리에서 고름)
                 if (shelfList.length === 0) shelfList = SHELF_DEFAULTS.map(s => ({ ...s }));
                 shelvesLoaded = true;
             } catch (e) {
@@ -32702,7 +32702,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 /* [수정 2026-10-05] 선반·냉장·냉동은 칸이 많아 단추가 너무 많았다 — 묶음 단추 하나씩만 두고,
                    누르면 그 밑 줄에 그 묶음의 칸들이 펼쳐진다 (사장님 요청). 묶음은 선반 이름으로 가른다(선반 관리에서 이름을 바꿔도 따라감).
                    지금 보고 있는 칸이 든 묶음은 진하게 칠하고 처음부터 펼쳐 둔다 */
-                const groupOf = ([k, l]) => gShelfGroupOfLabel(l);
+                const groupOf = ([k, l]) => k === 'all' ? '' : gShelfGroupOf(k, l);   // [수정 2026-10-27] 선반 관리에서 고른 묶음
                 const GROUPS = [['shelf', '🗄️ 선반'], ['fridge', '❄️ 냉장'], ['freezer', '🧊 냉동'], ['etc', '🧺 기타']];
                 // [수정 2026-10-05] 묶음 단추를 누르면 그 묶음 전체('grp:묶음')를 먼저 보여 준다 (사장님 요청)
                 const curGroup = String(uploadSubTab).startsWith('grp:') ? String(uploadSubTab).slice(4)
@@ -32754,6 +32754,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function gShelfGroupOfLabel(l) {
             l = String(l || '');
             return /냉동|아이스크림/.test(l) ? 'freezer' : /냉장|과일|신선/.test(l) ? 'fridge' : /선반|가운데/.test(l) ? 'shelf' : /기타|미지정|품절/.test(l) ? 'etc' : '';
+        }
+        /* [신규 2026-10-27] 칸 → 상위 묶음. 선반 관리에서 고른 묶음(group)이 먼저, 없으면 이름으로 짐작, 그래도 없으면 기타.
+           미지정·품절은 늘 기타 (사장님 요청 — 선반 관리에서 상위 카테고리를 고칠 수 있게) */
+        const SHELF_GROUP_OPTS = [['shelf', '🗄️ 선반'], ['fridge', '❄️ 냉장'], ['freezer', '🧊 냉동'], ['etc', '🧺 기타']];
+        function gShelfGroupOf(key, label) {
+            const k = String(key == null ? '' : key);
+            if (k === '' || k === '_none' || k === SHELF_SOLDOUT) return 'etc';
+            const s = shelfList.find(x => x.key === k);
+            if (s && s.group) return s.group;
+            return gShelfGroupOfLabel(label != null ? label : (s ? s.label : k)) || 'etc';
         }
         // [수정 2026-10-05] 묶음 단추 — 처음 누르면 펼치면서 그 묶음 전체를 보여 주고, 펼쳐 둔 것을 다시 누르면 접기만 한다
         function invShelfToggleGroup(g) {
@@ -34781,7 +34791,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         const prodShelf = String(prod.shelf || "");
                         if (uploadSubTab === SHELF_NONE_SUB) return prodShelf === "";
                         // [신규 2026-10-05] 묶음 전체(냉장·냉동·선반) — 그 묶음에 드는 칸이면 모두
-                        if (String(uploadSubTab).startsWith('grp:')) return gShelfGroupOfLabel(gShelfLabel(prodShelf)) === uploadSubTab.slice(4);   // [수정 2026-10-27] 미지정도 '기타' 묶음에 든다
+                        if (String(uploadSubTab).startsWith('grp:')) return gShelfGroupOf(prodShelf) === uploadSubTab.slice(4);   // [수정 2026-10-27] 미지정도 '기타' 묶음에 든다 · 선반 관리에서 고른 묶음
                         return prodShelf === uploadSubTab;
                     }
                     return true;
@@ -36744,7 +36754,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         async function openShelfManager() {
             await loadShelves();
-            shelfDraft = shelfList.map(s => ({ ...s }));
+            shelfDraft = shelfList.map(s => ({ ...s, group: s.group || gShelfGroupOf(s.key) }));   // [신규 2026-10-27] 묶음을 안 골랐던 칸은 지금 보이는 묶음으로 채워 둔다
             shelfDraftRemoved = [];
             renderShelfManager();
             const m = document.getElementById('shelf-manager-modal');
@@ -36781,6 +36791,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 <div style="display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid #f1f5f9;">
                     <input type="text" value="${gEscapeHtml(s.label)}" oninput="onShelfLabelInput(${i}, this.value)" placeholder="선반 이름"
                         style="flex:1 1 0; min-width:0; padding:9px 10px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:13px; font-weight:800; box-sizing:border-box; background:#fff;">
+                    <select onchange="onShelfGroupInput(${i}, this.value)" title="상위 묶음 — 목록 위 묶음 단추(선반·냉장·냉동·기타) 중 어디에 들어갈지"
+                        style="flex:0 0 auto; width:84px; padding:8px 2px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:12px; font-weight:800; background:#fff;">${SHELF_GROUP_OPTS.map(([g, gl]) => `<option value="${g}" ${(s.group || 'etc') === g ? 'selected' : ''}>${gl}</option>`).join('')}</select>
                     <span style="flex:0 0 auto; font-size:11px; font-weight:800; color:${n ? '#475569' : '#cbd5e1'}; min-width:32px; text-align:right;">${n}개</span>
                     <button type="button" onclick="moveShelfRow(${i}, -1)" title="위로"
                         style="flex:0 0 auto; width:28px; height:32px; border:1.5px solid #e2e8f0; background:#fff; color:${upOff ? '#e2e8f0' : '#475569'}; border-radius:8px; font-size:12px; font-weight:800; cursor:${upOff ? 'default' : 'pointer'};">▲</button>
@@ -36795,6 +36807,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // 이름은 입력할 때마다 사본에만 적어 둔다 (다시 그리면 글자 치던 자리를 잃으므로 렌더하지 않는다)
         function onShelfLabelInput(i, value) {
             if (shelfDraft[i]) shelfDraft[i].label = String(value || '');
+        }
+        // [신규 2026-10-27] 상위 묶음(선반·냉장·냉동·기타) 고르기 — 저장을 눌러야 반영
+        function onShelfGroupInput(i, value) {
+            if (shelfDraft[i]) shelfDraft[i].group = String(value || 'etc');
         }
 
         function moveShelfRow(i, dir) {
@@ -36823,7 +36839,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const used = new Set(shelfDraft.map(s => s.key).concat(shelfDraftRemoved).concat(shelfList.map(s => s.key)));
             let n = 1;
             while (used.has(`sh-${n}`)) n++;
-            shelfDraft.push({ key: `sh-${n}`, label: `🗄️ 새 선반${n}` });
+            shelfDraft.push({ key: `sh-${n}`, label: `🗄️ 새 선반${n}`, group: 'shelf' });
             renderShelfManager();
             const box = document.getElementById('shelf-manager-list');
             if (box) box.scrollTop = box.scrollHeight;
@@ -36832,7 +36848,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         async function saveShelfManager() {
             // 이름이 빈 줄은 저장하지 않는다 (이름표가 없으면 목록에서 무엇인지 알 수 없다)
             const cleaned = shelfDraft
-                .map(s => ({ key: s.key, label: String(s.label || '').trim() }))
+                .map(s => ({ key: s.key, label: String(s.label || '').trim(), group: String(s.group || 'etc') }))
                 .filter(s => s.label !== '');
             if (cleaned.length !== shelfDraft.length) {
                 showToast("이름이 빈 선반은 저장하지 않습니다.");
