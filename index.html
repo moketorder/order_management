@@ -18050,8 +18050,10 @@
                예전엔 저절로 만든 반복 차례(autoRepeat)에만 무제한을 넣어 두어, 손으로 다시 잡은 차례는 앞 차례 재고를 이어받았다 */
             const _rep = Number(p.repeatWeeks) > 0 && p.showWeekly !== true;
             const _empty = raw.stock === undefined || raw.stock === null || raw.stock === '';
-            if (_empty && !_rep) return false;
-            const n = _empty ? 999 : Math.max(0, parseInt(raw.stock, 10) || 0);
+            if (_empty && (!_rep || raw.stockManual === true)) return false;   // [수정 2026-10-27] 손으로 비운 차례는 이어가기
+            const _t = _empty ? psRepStockTarget(p) : null;   // [신규 2026-10-27] 반복 수량: 무제한(999)·고정(N)·남은 수량(null)
+            if (_empty && _t === null) return false;
+            const n = _empty ? _t : Math.max(0, parseInt(raw.stock, 10) || 0);
             // [신규 2026-10-03] 999 는 무제한 — 상품 재고를 비워(무제한) 시작한다 (사장님 요청, 다른 재고 칸과 같은 규칙)
             const sv = (n === 999) ? '' : n;
             raw.stockApplied = true;   // 화면에서 먼저 막아 두 번 맞추지 않게
@@ -18167,7 +18169,7 @@
             let n = v === '' ? null : Math.max(0, parseInt(v, 10) || 0);
             if (n !== null) { const it0 = psItem(key); n = it0 ? await gAskPendingDeduct(it0.idx, n) : n; if (n === null) { renderProductScheduleCalendar(); return; } }
             psUndoMark('이번 차례 재고');
-            if (await psItemSave(key, { stock: n, stockApplied: null })) showToast(n === null ? '📦 재고를 이어가요' : n === 999 ? '♾️ 이번 차례가 시작하면 재고를 무제한으로 해요' : `📦 이번 차례가 시작하면 재고를 ${n}개로 맞춰요`);
+            if (await psItemSave(key, { stock: n, stockApplied: null, stockManual: true })) showToast(n === null ? '📦 재고를 이어가요' : n === 999 ? '♾️ 이번 차례가 시작하면 재고를 무제한으로 해요' : `📦 이번 차례가 시작하면 재고를 ${n}개로 맞춰요`);
             renderProductScheduleCalendar();
         }
         // 올라갈 시각이 된 다음 차례를 지금 차례로 올린다 (앞 차례가 끝났거나 없을 때만). 마감까지 지나 버린 차례는 건너뛴다.
@@ -18453,7 +18455,7 @@
             if (ov) { psOverlapToast(ov); return false; }
             // [수정 2026-10-03] 끝나면 상시판매 전환 칸(toOnsite…)도 함께 저장한다 — psConvertEndedToOnsite 참고
             const fields = ['releaseAt', 'expireAt', 'pickup', 'group', 'groupLabel', 'autoRepeat', 'stock', 'stockApplied',
-                'toOnsite', 'toOnsiteTab', 'toOnsitePrice', 'toOnsiteDone', 'toOnsiteShelf'];   // [신규 2026-10-12] toOnsiteShelf
+                'toOnsite', 'toOnsiteTab', 'toOnsitePrice', 'toOnsiteDone', 'toOnsiteShelf', 'stockManual'];   // [신규 2026-10-12] toOnsiteShelf
             const patch = {};
             fields.forEach(f => { if (f in changes) patch[`${it.sid}/${it.rid}/${f}`] = (changes[f] === undefined || changes[f] === '' ? null : changes[f]); });
             if (!(await psSchedPatch(patch))) return false;
@@ -18828,6 +18830,83 @@
             renderProductScheduleCalendar();
         }
 
+        /* ===== [신규 2026-10-27] 반복 수량 단추 (사장님 요청) — 반복 차례가 시작할 때 재고를 어떻게 맞출지 상품에 적어 둔다 (repeatStock)
+             · 비움(기본) : 무제한 (예전과 같다)
+             · 숫자       : 고정 수량 — 매 차례 그 개수로 다시 시작
+             · 'carry'    : 남은 수량 — 앞 차례에서 남은 재고를 그대로 이어간다
+           앞으로 올라갈 저절로 만든 차례에 바로 적어 둔다 (차례 재고 칸에 손으로 적은 차례는 그대로) */
+        function psRepStockTarget(p) {   // 차례에 적을 재고 — 999(무제한) · N(고정) · null(남은 수량 이어가기)
+            const v = p && p.repeatStock;
+            if (v === 'carry') return null;
+            const n = parseInt(v, 10);
+            return n >= 0 && n !== 999 ? n : 999;
+        }
+        function psRepStockText(p) {
+            const t = psRepStockTarget(p);
+            return t === null ? '남은 수량' : t === 999 ? '무제한' : `고정 ${t}개`;
+        }
+        function psRepStockBtnHtml(key, p) {
+            return `<button type="button" onclick="psRepStockOpen('${gEscapeHtml(key)}')" title="반복 차례가 시작할 때 재고를 어떻게 맞출지 (고정 수량 · 남은 수량 · 무제한)"
+                style="flex:0 0 auto; height:32px; padding:0 9px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">📦 ${gEscapeHtml(psRepStockText(p))}</button>`;
+        }
+        function psRepStockOpen(key) {
+            const it = psItem(key); if (!it) return;
+            const p = uploadProducts[it.idx] || {};
+            const t = psRepStockTarget(p);
+            let box = document.getElementById('ps-confirm-box'); if (box) box.remove();
+            box = document.createElement('div'); box.id = 'ps-confirm-box';
+            box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px;';
+            const B = 'height:42px; border-radius:9px; font-size:13.5px; font-weight:800; cursor:pointer;';
+            box.innerHTML = `<div style="background:#fff; border-radius:14px; padding:18px; max-width:380px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:4px;">📦 반복 수량</div>
+                <div style="font-size:12px; font-weight:700; color:#64748b; line-height:1.6; margin-bottom:12px;">${gEscapeHtml(p.name || '')}<br>반복 차례가 시작할 때 재고를 이렇게 맞춰요 · 지금: <b style="color:#4338ca;">${gEscapeHtml(psRepStockText(p))}</b></div>
+                <div style="display:flex; gap:6px; margin-bottom:7px;">
+                    <input type="number" min="0" inputmode="numeric" id="ps-rs-n" value="${t !== null && t !== 999 ? t : ''}" placeholder="매주 몇 개" style="flex:1; min-width:0; height:42px; border:1.5px solid #c7d2fe; border-radius:9px; padding:0 10px; font-size:14px; font-weight:800;">
+                    <button type="button" data-v="fixed" style="${B} flex:0 0 auto; padding:0 14px; border:none; background:#4338ca; color:#fff;">고정 수량</button>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:7px;">
+                    <button type="button" data-v="carry" style="${B} border:1.5px solid #16a34a; background:#f0fdf4; color:#15803d;">남은 수량 이어가기</button>
+                    <button type="button" data-v="inf" style="${B} border:1.5px solid #cbd5e1; background:#fff; color:#334155;">♾️ 무제한</button>
+                    <button type="button" data-v="no" style="${B} border:1.5px solid var(--border); background:#f8fafc; color:#64748b;">그만두기</button>
+                </div></div>`;
+            box.addEventListener('click', e => {
+                const b = e.target.closest('button[data-v]'); if (!b) return;
+                const v = b.dataset.v;
+                if (v === 'fixed') {
+                    const raw = String(document.getElementById('ps-rs-n').value || '').trim();
+                    const n = parseInt(raw, 10);
+                    if (raw === '' || !(n >= 0)) { showToast('매주 몇 개로 할지 숫자를 적어 주세요'); return; }
+                    box.remove(); psSetRepeatStock(key, n === 999 ? null : n); return;
+                }
+                box.remove();
+                if (v === 'carry') psSetRepeatStock(key, 'carry');
+                else if (v === 'inf') psSetRepeatStock(key, null);
+            });
+            document.body.appendChild(box);
+            setTimeout(() => { const el = document.getElementById('ps-rs-n'); if (el) el.focus(); }, 0);
+        }
+        async function psSetRepeatStock(key, val) {
+            const it = psItem(key); if (!it) return;
+            psUndoMark('반복 수량');
+            const idxs = [...new Set(psGroupMembers(key).map(k => (psItem(k) || {}).idx).filter(i => i >= 0))];
+            const patch = {};
+            idxs.forEach(i => { patch[`${i}/repeatStock`] = (val === null || val === undefined) ? null : val; });
+            if (!(await fbPatchProducts(patch))) { showToast('저장 실패 — 다시 시도해 주세요'); return; }
+            idxs.forEach(i => { uploadProducts[i].repeatStock = patch[`${i}/repeatStock`]; });
+            // 앞으로 올라갈 저절로 만든 차례에 바로 적어 둔다 (손으로 적은 차례·이미 맞춘 차례는 그대로)
+            const sp = {};
+            idxs.forEach(i => {
+                const p = uploadProducts[i], tg = psRepStockTarget(p);
+                if (!p.sid) return;
+                psItemsOfSid(p.sid).forEach(x => { if (x.autoRepeat && Number(x.releaseAt) > Date.now() && x.stockApplied !== true && x.stockManual !== true) sp[`${x.sid}/${x.rid}/stock`] = tg; });
+            });
+            if (Object.keys(sp).length && await psSchedPatch(sp)) Object.keys(sp).forEach(k => { const [s, r] = k.split('/'); if (psSched[s] && psSched[s][r]) psSched[s][r].stock = sp[k]; });
+            const p0 = uploadProducts[it.idx];
+            showToast(`📦 반복 수량: ${psRepStockText(p0)}${idxs.length > 1 ? ` · 상품 ${idxs.length}개` : ''}${Number(p0.repeatWeeks) > 0 ? '' : ' (반복을 켜면 적용돼요)'}`);
+            renderProductScheduleCalendar();
+            try { psBarPopPaint(); } catch (e) { }
+        }
+
         /* ===== [신규 2026-10-27] 반복 일정 하나를 옮기거나 고칠 때 — 이 일정만 / 앞으로 반복 일정 다 (사장님 요청) =====
            매주 반복은 판매 기간이 거의 한 주라, 하나만 하루 밀면 다음 차례와 겹쳐 '겹쳐요'로 막혔다.
              · 앞으로 다 : 이 차례보다 뒤에 올라가는 차례도 같은 만큼(올라감·마감·픽업일) 옮긴다. 다음에 저절로 만드는 차례도
@@ -18932,7 +19011,8 @@
                         const pk = psItemPickup(last);
                         const data = { releaseAt: rel, expireAt: exp, pickup: pk ? psAddDays(pk, step) : null, autoRepeat: true,
                             group: last.group ? (String(last.group).split('@')[0] + '@' + rel) : null, groupLabel: last.groupLabel || null,
-                            stock: 999 };   // [수정 2026-10-18] 반복으로 새로 잡는 차례는 재고 무제한으로 시작 (사장님 요청 — 예전엔 앞 차례 재고를 물려받았다)
+                            stock: psRepStockTarget(p) };   // [수정 2026-10-27] 반복 수량 단추대로 (무제한·고정·남은 수량)
+                              // [수정 2026-10-18] 반복으로 새로 잡는 차례는 재고 무제한으로 시작 (사장님 요청 — 예전엔 앞 차례 재고를 물려받았다)
                         let _rid = 'R' + rel.toString(36);
                         if (psSched[p.sid] && psSched[p.sid][_rid]) _rid = psNewRid();   // [신규 2026-10-27] 옮긴 차례가 그 번호를 쓰고 있으면 새 번호 (덮어쓰지 않게)
                         if (!(await psItemAdd(idx, data, _rid))) { fails.push((p.name || p.sid) + ' (일정 저장 실패·겹침)'); break; }
@@ -18940,8 +19020,9 @@
                     }
                     // [신규 2026-10-18] 이미 만들어 둔 반복 차례 중 아직 안 올라간 것도 무제한으로 맞춘다
                     const _fix = {};
-                    psItemsOfSid(p.sid).forEach(it => { if (it.autoRepeat && Number(it.releaseAt) > Date.now() && Number(it.stock) !== 999 && it.stockApplied !== true) _fix[`${it.sid}/${it.rid}/stock`] = 999; });
-                    if (Object.keys(_fix).length && await psSchedPatch(_fix)) Object.keys(_fix).forEach(k => { const [s, r] = k.split('/'); if (psSched[s] && psSched[s][r]) psSched[s][r].stock = 999; });
+                    const _tg = psRepStockTarget(p);   // [수정 2026-10-27] 반복 수량 단추대로 맞춘다 — 손으로 적은 차례(stockManual)는 그대로
+                    psItemsOfSid(p.sid).forEach(it => { const cur = (it.stock === undefined || it.stock === null || it.stock === '') ? null : Number(it.stock); if (it.autoRepeat && Number(it.releaseAt) > Date.now() && cur !== _tg && it.stockApplied !== true && it.stockManual !== true) _fix[`${it.sid}/${it.rid}/stock`] = _tg; });
+                    if (Object.keys(_fix).length && await psSchedPatch(_fix)) Object.keys(_fix).forEach(k => { const [s, r] = k.split('/'); if (psSched[s] && psSched[s][r]) psSched[s][r].stock = _tg; });
                   } catch (e) { console.error('반복 일정 만들기 실패 (' + ((p && p.name) || '') + '):', e); fails.push(((p && p.name) || '?') + ' (' + ((e && e.message) || e) + ')'); }   // [신규 2026-10-23] 한 상품이 실패해도 다음 상품은 계속
                 }
             } catch (e) { console.error('반복 일정 만들기 실패:', e); fails.push(String((e && e.message) || e)); }
@@ -20314,7 +20395,7 @@
            일정 전부와 상품의 일정 관련 칸을 기억해 두었다가, 되돌릴 때 '그 뒤로 바뀐 칸만' 다시 쓴다. 최근 20번까지.
            새로고침하면 기억은 지워진다. 그 사이 주문으로 줄어든 재고(조정값)나 다른 기기에서 고친 것은 되돌리지 않는다. */
         const PS_UNDO_F = ['releaseAt', 'expireAt', 'nextDate', 'releaseApplied', 'expireApplied', 'announced', 'hide', 'showToday', 'showReserve',
-            'date', 'matchKey', 'schedRid', 'stock', 'repeatWeeks', 'scheduleLabel', 'announceText', 'schedHold'];
+            'date', 'matchKey', 'schedRid', 'stock', 'repeatWeeks', 'repeatStock', 'scheduleLabel', 'announceText', 'schedHold'];
         let psUndoStack = [];
         let psUndoHold = false;   // 여러 번 이어 부르는 일(일정에 담기 등)은 한 번으로 친다
         function psUndoMark(label) {
@@ -20465,7 +20546,7 @@
             const relVal = fMsToScheduleInputValue(it.releaseAt), expVal = fMsToScheduleInputValue(it.expireAt);
             const kq = gEscapeHtml(key);
             const G = grp ? 'true' : 'false';
-            const repeatSel = `<select class="ps-in" onchange="psSetRepeat('${kq}', this.value)">
+            const repeatSel = `<select class="ps-in" style="flex:1 1 0; min-width:0;" onchange="psSetRepeat('${kq}', this.value)">
                 ${[[0, '끔'], [1, '매주'], [2, '2주마다'], [3, '3주마다']].map(([v, t]) => `<option value="${v}"${(Number(p.repeatWeeks) || 0) === v ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
             return `<div class="ps-sec">
                     <div class="ps-sec-t">일정</div>
@@ -20493,7 +20574,7 @@
                     <div class="ps-g2">
                         ${grp ? '' : `<div class="ps-f"><label>📦 이번 차례 재고${it.stockApplied === true ? ' <span class="ps-ok">맞춤</span>' : ''}</label>
                             <input type="number" min="0" inputmode="numeric" class="ps-in" value="${(it.stock === null || it.stock === undefined) ? '' : it.stock}" placeholder="지금 ${psNowStockText(it.idx)} · 비우면 이어가기" title="누르면 지금 재고가 들어가요. 안 고치면 그대로 이어가요. 999 = 무제한" ${psStockInputEvents(key, it.idx)}></div>`}
-                        <div class="ps-f"><label>🔁 반복</label>${repeatSel}</div>
+                        <div class="ps-f"><label>🔁 반복</label><div style="display:flex; gap:5px; align-items:center;">${repeatSel}${psRepStockBtnHtml(key, p)}</div></div>
                     </div>
                 </div>${grp ? '' : psToOnsiteHtml(key)}`;
         }
@@ -20833,7 +20914,7 @@
                     <div style="display:flex; align-items:center; gap:6px;"><span style="${LAB}">📣 노출일</span><input type="date" id="ps-pop-rd" value="${relV.slice(0, 10)}" style="${IN}"><select id="ps-pop-rh" style="${SEL}">${psTimeOptsHtml(relV)}</select></div>
                     <div style="display:flex; align-items:center; gap:6px;"><span style="${LAB}">⏰ 마감</span><input type="date" id="ps-pop-ed" value="${expV.slice(0, 10)}" style="${IN}"><select id="ps-pop-eh" style="${SEL}">${psExpOptsHtml(expV)}</select></div>
                     <div style="display:flex; align-items:center; gap:6px;"><span style="${LAB}">🚚 픽업</span><input type="date" id="ps-pop-pk" value="${pk}" style="${IN}"></div>
-                    <div style="display:flex; align-items:center; gap:6px;"><span style="${LAB}">🔁 반복</span><select id="ps-pop-rep" style="${IN} font-weight:800;">${[[0, '끔'], [1, '매주'], [2, '2주마다'], [3, '3주마다']].map(([v, l]) => `<option value="${v}"${(Number((uploadProducts[it.idx] || {}).repeatWeeks) || 0) === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+                    <div style="display:flex; align-items:center; gap:6px;"><span style="${LAB}">🔁 반복</span><select id="ps-pop-rep" style="${IN} font-weight:800;">${[[0, '끔'], [1, '매주'], [2, '2주마다'], [3, '3주마다']].map(([v, l]) => `<option value="${v}"${(Number((uploadProducts[it.idx] || {}).repeatWeeks) || 0) === v ? ' selected' : ''}>${l}</option>`).join('')}</select>${psRepStockBtnHtml(psPopKey, uploadProducts[it.idx] || {})}</div>
                     <div style="display:flex; gap:6px;"><button type="button" onclick="psPopSetMode('edit')" style="${B}">취소</button><button type="button" onclick="psPopEditSave()" style="${B} border:none; background:#2563eb; color:#fff;">저장</button></div>
                 </div>`;
             }
