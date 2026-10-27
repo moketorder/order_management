@@ -18799,6 +18799,9 @@
             const keys = (group && group.length > 1) ? group : [key];
             // [신규 2026-10-03] 판매 중인 일정을 옮기면 무조건 묻는다 (복사는 새 일정이라 묻지 않는다)
             if (!isCopy && !(await psConfirmLive(keys, '일정을 옮겨요 — 올라감·마감 시각이 바뀌어요 (픽업일은 그대로).'))) { renderProductScheduleCalendar(); return; }
+            const scope = isCopy ? null : await psAskRepeatScope(keys);   // [신규 2026-10-27] 반복 일정이면 이 일정만/앞으로 다 묻기
+            if (scope === false) { renderProductScheduleCalendar(); return; }
+            const moves = [];
             const newGid = {};
             let done = 0;
             for (const k of keys) {
@@ -18815,13 +18818,88 @@
                 if (isCopy) {
                     if (g.group) { ch.group = newGid[g.group] || (newGid[g.group] = psNewGroupId()); ch.groupLabel = g.groupLabel || null; }
                     if (await psItemAdd(g.idx, ch)) done++;
-                } else if (await psItemSave(k, ch)) done++;
+                } else moves.push({ k, ch });
             }
+            if (moves.length) done += (await psSaveRounds(moves, scope)).size;
             if (done) {
                 showToast(isCopy ? `📄 ${done}개 일정을 복사했어요 · 원래 일정은 그대로예요` : `📅 ${done}개 일정을 옮겼어요`);
                 if (!isCopy) psSelectedIdxs.clear();
             }
             renderProductScheduleCalendar();
+        }
+
+        /* ===== [신규 2026-10-27] 반복 일정 하나를 옮기거나 고칠 때 — 이 일정만 / 앞으로 반복 일정 다 (사장님 요청) =====
+           매주 반복은 판매 기간이 거의 한 주라, 하나만 하루 밀면 다음 차례와 겹쳐 '겹쳐요'로 막혔다.
+             · 앞으로 다 : 이 차례보다 뒤에 올라가는 차례도 같은 만큼(올라감·마감·픽업일) 옮긴다. 다음에 저절로 만드는 차례도
+                          가장 늦은 차례를 따라가므로 같이 밀린다. 미는 것은 늦은 차례부터 저장해 중간에 겹치지 않게 한다.
+             · 이 일정만 : 이것만 옮긴다. 다음 차례와 겹치면 마감을 다음 차례 올라가기 1분 전으로 당길지 한 번 묻는다. */
+        function psLaterRounds(key) {
+            const it = psItem(key);
+            if (!it || !(Number((uploadProducts[it.idx] || {}).repeatWeeks) > 0)) return [];
+            const r0 = Number(it.releaseAt) || 0;
+            if (!r0) return [];
+            return psItemsOfSid(it.sid).filter(x => x.rid !== it.rid && Number(x.releaseAt) > r0).map(x => x.key);
+        }
+        // 돌려주는 값: null(반복 아님) · false(그만두기) · { later: [뒤 차례들], one }
+        async function psAskRepeatScope(keys) {
+            keys = keys || [];
+            const later = [...new Set(keys.flatMap(psLaterRounds))].filter(k => !keys.includes(k));
+            if (!later.length) return null;
+            const v = await gPtAskDialog('🔁 반복되는 일정이에요.\n어디까지 고칠까요?', [
+                { v: 'all', label: `앞으로 반복 일정 다 (뒤 차례 ${later.length}개도 같이)`, primary: true },
+                { v: 'one', label: '이 일정만' },
+                { v: 'no', label: '그만두기', quiet: true }]);
+            if (v === 'no') return false;
+            return v === 'all' ? { later, one: false } : { later: [], one: true };
+        }
+        // moves: [{ k, ch }] — 저장된 일정 key 들을 Set 으로 돌려준다 (scope 의 뒤 차례 포함)
+        async function psSaveRounds(moves, scope) {
+            const list = moves.map(m => ({ k: m.k, ch: m.ch, g: psItem(m.k) })).filter(m => m.g);
+            const inList = new Set(list.map(m => m.k));
+            if (scope && scope.later.length) {
+                const want = new Set(scope.later);
+                for (const m of list.slice()) {
+                    const g = m.g;
+                    const dR = ('releaseAt' in m.ch && g.releaseAt) ? Number(m.ch.releaseAt) - Number(g.releaseAt) : 0;
+                    const dE = ('expireAt' in m.ch && g.expireAt) ? Number(m.ch.expireAt) - Number(g.expireAt) : 0;
+                    const p0 = psItemPickup(g), dP = (m.ch.pickup && p0) ? psDayDiff(p0, m.ch.pickup) : 0;
+                    if (!dR && !dE && !dP) continue;
+                    psLaterRounds(m.k).forEach(k2 => {
+                        if (!want.has(k2) || inList.has(k2)) return;
+                        const x = psItem(k2); if (!x) return;
+                        const ch = {};
+                        if (dR && x.releaseAt) ch.releaseAt = Number(x.releaseAt) + dR;
+                        if (dE && x.expireAt) ch.expireAt = Number(x.expireAt) + dE;
+                        const px = psItemPickup(x);
+                        if (dP && px) ch.pickup = psAddDays(px, dP);
+                        if (Object.keys(ch).length) { list.push({ k: k2, ch, g: x }); inList.add(k2); }
+                    });
+                }
+            }
+            if (scope && scope.one) {
+                const clash = [];
+                list.forEach(m => {
+                    const rel = 'releaseAt' in m.ch ? Number(m.ch.releaseAt) || null : Number(m.g.releaseAt) || null;
+                    const exp = 'expireAt' in m.ch ? Number(m.ch.expireAt) || null : Number(m.g.expireAt) || null;
+                    const ov = psItemOverlap(m.g.sid, rel, exp, m.g.rid);
+                    if (ov && rel && Number(ov.releaseAt) > rel + 60000) clash.push({ m, ov });
+                });
+                if (clash.length) {
+                    const c = clash[0].ov;
+                    const v = await gPtAskDialog(`다음 차례(${fFmtSchedTime(c.releaseAt)} 올라감)와 겹쳐요.\n마감을 그 바로 앞(${fFmtSchedTime(Number(c.releaseAt) - 60000)})으로 당겨서 옮길까요?`, [
+                        { v: 'trim', label: '마감 당겨서 옮기기', primary: true },
+                        { v: 'no', label: '그만두기', quiet: true }]);
+                    if (v !== 'trim') return new Set();
+                    clash.forEach(({ m, ov }) => { m.ch.expireAt = Number(ov.releaseAt) - 60000; });
+                }
+            }
+            // 앞으로 미는 것은 늦은 차례부터, 당기는 것은 이른 차례부터 저장해야 중간에 서로 겹치지 않는다
+            const shift = list.reduce((s, m) => s + (('releaseAt' in m.ch && m.g.releaseAt) ? Number(m.ch.releaseAt) - Number(m.g.releaseAt) : 0), 0);
+            list.sort((a, b) => (Number(a.g.releaseAt) || 0) - (Number(b.g.releaseAt) || 0));
+            if (shift > 0) list.reverse();
+            const ok = new Set();
+            for (const m of list) if (await psItemSave(m.k, m.ch)) ok.add(m.k);
+            return ok;
         }
 
         /* ===== 반복 일정 — 매주·2주마다·3주마다 (사장님 요청) =====
@@ -18855,7 +18933,9 @@
                         const data = { releaseAt: rel, expireAt: exp, pickup: pk ? psAddDays(pk, step) : null, autoRepeat: true,
                             group: last.group ? (String(last.group).split('@')[0] + '@' + rel) : null, groupLabel: last.groupLabel || null,
                             stock: 999 };   // [수정 2026-10-18] 반복으로 새로 잡는 차례는 재고 무제한으로 시작 (사장님 요청 — 예전엔 앞 차례 재고를 물려받았다)
-                        if (!(await psItemAdd(idx, data, 'R' + rel.toString(36)))) { fails.push((p.name || p.sid) + ' (일정 저장 실패·겹침)'); break; }
+                        let _rid = 'R' + rel.toString(36);
+                        if (psSched[p.sid] && psSched[p.sid][_rid]) _rid = psNewRid();   // [신규 2026-10-27] 옮긴 차례가 그 번호를 쓰고 있으면 새 번호 (덮어쓰지 않게)
+                        if (!(await psItemAdd(idx, data, _rid))) { fails.push((p.name || p.sid) + ' (일정 저장 실패·겹침)'); break; }
                         made++;
                     }
                     // [신규 2026-10-18] 이미 만들어 둔 반복 차례 중 아직 안 올라간 것도 무제한으로 맞춘다
@@ -21004,19 +21084,25 @@
             const timeCh = Number(it.releaseAt || 0) !== rel || Number(it.expireAt || 0) !== exp || (psItemPickup(it) || '') !== (pk || '');
             const live = timeCh ? ms.filter(k => { const x = psItem(k); return psIsActive(x) && !psIsUpcoming(uploadProducts[x.idx]); }) : [];
             if (live.length && !(await psConfirm(`판매 중인 일정${ms.length > 1 ? ' ' + live.length + '개' : ''}의 시각이 바뀌어요.\n손님 화면의 마감 시각·픽업일도 바뀔 수 있어요. 바꿀까요?`))) return;
+            const scope = timeCh ? await psAskRepeatScope(ms) : null;   // [신규 2026-10-27] 반복 일정이면 이 일정만/앞으로 다 묻기
+            if (scope === false) return;
             psUndoMark('일정 고치기');
             let n = 0; const bad = [];
             const gid = part ? (ms.length > 1 ? psNewGroupId() : null) : undefined;
-            for (const k of ms) {
+            const moves = ms.map(k => {
                 const ch = { groupLabel: (part && ms.length < 2) ? null : label };
                 if (part) ch.group = gid;
                 if (timeCh) { ch.releaseAt = rel; ch.expireAt = exp; if (pk) ch.pickup = pk; }
-                if (await psItemSave(k, ch)) n++; else bad.push((uploadProducts[psItem(k).idx] || {}).name || '');
-            }
+                return { k, ch };
+            });
+            const okSet = await psSaveRounds(moves, scope);
+            ms.forEach(k => { if (okSet.has(k)) n++; else bad.push((uploadProducts[(psItem(k) || {}).idx] || {}).name || ''); });
+            const moreN = [...okSet].filter(k => !ms.includes(k)).length;
+            const moreTxt = moreN ? ` · 앞으로 반복 일정 ${moreN}개도 같이` : '';
             if (part) { const rest = all.filter(k => !ms.includes(k) && psItem(k)); if (rest.length === 1) await psItemSave(rest[0], { group: null }); }
             if (n && (rep !== rep0 || (part && rep))) await psSetRepeat(ms[0], rep);   // 반복은 상품에 붙는다 — 이 묶음(체크한 것) 상품 모두
             if (!(n && (rep !== rep0 || (part && rep))))
-                showToast(bad.length ? `✏️ ${n}/${ms.length}개만 고쳤어요 · 못 고친 것: ${bad.slice(0, 2).join(', ')}${bad.length > 2 ? ' 외' : ''}` : (part ? `✏️ 체크한 ${n}개만 고쳤어요` : '✏️ 일정을 고쳤어요'));
+                showToast(bad.length ? `✏️ ${n}/${ms.length}개만 고쳤어요 · 못 고친 것: ${bad.slice(0, 2).join(', ')}${bad.length > 2 ? ' 외' : ''}` : (part ? `✏️ 체크한 ${n}개만 고쳤어요` : '✏️ 일정을 고쳤어요') + moreTxt);
             if (part) { psPopKey = ms[0]; psPopChk = new Set(); }
             psPopMode = '';
             renderProductScheduleCalendar();
