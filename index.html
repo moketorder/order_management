@@ -8324,6 +8324,9 @@
             #purchase-section-sourcing .src-meta #src-updated { display:none; }
             #purchase-section-sourcing .src-meta .src-btn { white-space:nowrap; padding:6px 8px !important; font-size:11.5px !important; }
         }
+        /* [신규 2026-10-27] 상시판매 선반 윗줄(전체·선반·냉장·냉동·기타·⚙️)은 한 줄에 똑같이 나눠 (사장님 요청) */
+        #sub-products-list-tabs .inv-top { flex:0 0 100%; display:flex; flex-wrap:nowrap; gap:5px; min-width:0; }
+        #sub-products-list-tabs .inv-top .sub-tab-btn { flex:1 1 auto !important; min-width:0 !important; padding:6px 4px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; }
         .sst-chip-row > div { min-width:0; }
         .sst-chip-row > div > div { min-width:0 !important; height:100%; box-sizing:border-box; padding:7px 9px !important; }
         .sst-chip-row > div > div > div:first-child { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -32718,7 +32721,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     if (!n) return;
                     const has = subs.some(s => groupOf(s) === g);
                     const open = invShelfOpenGroup === g, on = curGroup === g;
-                    top += `<button type="button" class="sub-tab-btn${on ? ' active' : ''}" onclick="invShelfToggleGroup('${g}')"${has ? '' : ' title="이 묶음 칸에는 지금 상품이 없어요"'} style="${has ? '' : 'opacity:.6;'}${open && !on ? ' background:#e2e8f0; color:var(--text-main);' : ''}">${gl} ${n} ${open ? '▴' : '▾'}</button>`;
+                    top += `<button type="button" class="sub-tab-btn${on ? ' active' : ''}" onclick="invShelfToggleGroup('${g}')"${has ? '' : ' title="이 묶음 칸에는 지금 상품이 없어요"'} style="${has ? '' : 'opacity:.6;'}${open && !on ? ' background:#e2e8f0; color:var(--text-main);' : ''}">${gl} ${open ? '▴' : '▾'}</button>`;   // [수정 2026-10-27] 칸 수 숫자는 뺐다 (사장님 요청 — 한 줄에 들어가게)
                 });
                 // 펼친 줄에는 그 묶음의 칸을 다 보여 준다 — 상품이 없는 칸은 흐리게 (눌러서 비어 있는 걸 볼 수 있다)
                 const openSubs = shelves.filter(s => groupOf(s) && groupOf(s) === invShelfOpenGroup);
@@ -32729,11 +32732,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     : '';
 
                 subContainer.style.display = 'flex';
-                subContainer.innerHTML = top
+                // [수정 2026-10-27] 전체·묶음 단추·⚙️ 는 한 줄에 (사장님 요청) — 윗줄 상자로 묶어 줄바꿈하지 않게, 펼친 칸들은 그 아래 줄
+                subContainer.innerHTML = '<div class="inv-top">' + top
                     // [신규] 품절된 상품을 '품절' 자리로 실제로 옮기는 버튼. 누를 때에만 자료가 바뀐다.
                     // [삭제 2026-10-27] '품절 정리' 단추 — 이제 품절되면 저절로 품절 칸으로 옮긴다 (gAutoTidySoldOut, 사장님 요청)
                     // [신규] 선반 자체를 더하고·고치고·지우는 창
                     + `<button type="button" class="sub-tab-btn" onclick="openShelfManager()" title="선반을 추가·이름 변경·삭제합니다" style="background:#eef2ff; color:#4338ca;">⚙️<span class="ist-long"> 선반 관리</span></button>`
+                    + '</div>'   // .inv-top 닫기
                     + lower;   // [신규 2026-10-05] 펼친 묶음의 칸들 (맨 밑 한 줄)
             }
             else {
