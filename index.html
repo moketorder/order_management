@@ -8293,6 +8293,13 @@
         #data-sub-sales #sales-metrics, #data-sub-sales #sales-paid-summary { margin-bottom:10px !important; }
         /* [신규 2026-10-23] 날짜·기간 줄과 상품 목록 갈래 단추도 창 너비만큼 늘어나게 (사장님 요청) */
         #sub-products-list-tabs .sub-tab-btn { flex:1 1 0; min-width:0; text-align:center; white-space:nowrap; }
+        /* [신규 2026-10-27] 폰 — 상시판매(재고관리) 선반 단추가 한 줄에 몰려 구분이 어려웠다 (사장님 지적).
+           제 크기로 두고 줄바꿈해 두세 줄로 다 보이게, 품절 정리·선반 관리는 아이콘만 */
+        @media (max-width:760px) {
+            #sub-products-list-tabs.inv-shelf { flex-wrap:wrap !important; overflow-x:visible !important; gap:5px !important; }
+            #sub-products-list-tabs.inv-shelf .sub-tab-btn { flex:0 0 auto; padding:6px 10px; font-size:12.5px; }
+            #sub-products-list-tabs.inv-shelf .ist-long { display:none; }
+        }
         /* [신규 2026-10-23] 모든 탭의 줄 간격을 8px로 맞춘다 (사장님 요청 — 회색 띠·날짜 줄·찾기 줄 사이가 제각각 넓었다) */
         .admin-tab-content .segment-control { padding:3px !important; margin-bottom:8px !important; }
         .admin-tab-content .sst-row .segment-control { margin-bottom:0 !important; }
@@ -32580,7 +32587,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const subContainer = document.getElementById('sub-products-list-tabs');
             if (!subContainer) return;
             subContainer.innerHTML = '';
-            
+            subContainer.classList.toggle('inv-shelf', uploadManageDeliveryType === 'inventory');   // [신규 2026-10-27] 폰에서 선반 단추를 줄바꿈해 보이게 (CSS)
+
             if (uploadManageDeliveryType === 'today') {
                 subContainer.style.display = 'none';
                 return;
@@ -32731,9 +32739,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 subContainer.style.display = 'flex';
                 subContainer.innerHTML = top
                     // [신규] 품절된 상품을 '품절' 자리로 실제로 옮기는 버튼. 누를 때에만 자료가 바뀐다.
-                    + `<button type="button" class="sub-tab-btn" onclick="tidySoldOutShelf()" title="품절된 상품을 '품절' 자리로 옮기고, 재고가 다시 들어온 상품은 원래 선반으로 되돌립니다" style="background:#fef2f2; color:#b91c1c;">⛔ 품절 정리</button>`
+                    + `<button type="button" class="sub-tab-btn" onclick="tidySoldOutShelf()" title="품절된 상품을 '품절' 자리로 옮기고, 재고가 다시 들어온 상품은 원래 선반으로 되돌립니다" style="background:#fef2f2; color:#b91c1c;">🧹<span class="ist-long"> 품절 정리</span></button>`
                     // [신규] 선반 자체를 더하고·고치고·지우는 창
-                    + `<button type="button" class="sub-tab-btn" onclick="openShelfManager()" title="선반을 추가·이름 변경·삭제합니다" style="background:#eef2ff; color:#4338ca;">⚙️ 선반 관리</button>`
+                    + `<button type="button" class="sub-tab-btn" onclick="openShelfManager()" title="선반을 추가·이름 변경·삭제합니다" style="background:#eef2ff; color:#4338ca;">⚙️<span class="ist-long"> 선반 관리</span></button>`
                     + lower;   // [신규 2026-10-05] 펼친 묶음의 칸들 (맨 밑 한 줄)
             }
             else {
