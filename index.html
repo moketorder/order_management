@@ -32709,24 +32709,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     : ((subs.find(s => s[0] === uploadSubTab) && groupOf(subs.find(s => s[0] === uploadSubTab))) || '');
                 if (invShelfOpenGroup === null) invShelfOpenGroup = curGroup;
                 const btn = ([key, label]) => `<button type="button" class="sub-tab-btn ${uploadSubTab === key ? 'active' : ''}" data-sub-tab="${key}" onclick="invShelfPick('${key}')">${label}</button>`;
-                let top = '', placed = new Set();
-                subs.forEach(s => {
-                    const g = groupOf(s);
-                    if (!g) { top += btn(s); return; }
-                    if (placed.has(g)) return;
-                    placed.add(g);
-                    const n = shelves.filter(x => groupOf(x) === g).length;   // [수정 2026-10-10] 빈 칸까지 센 묶음의 칸 수
-                    const open = invShelfOpenGroup === g, on = curGroup === g;
-                    const gl = GROUPS.find(x => x[0] === g)[1];
-                    top += `<button type="button" class="sub-tab-btn${on ? ' active' : ''}" onclick="invShelfToggleGroup('${g}')" style="${open && !on ? 'background:#e2e8f0; color:var(--text-main);' : ''}">${gl} ${n} ${open ? '▴' : '▾'}</button>`;
-                });
-                /* [수정 2026-10-10] 상품이 하나도 없는 묶음도 단추를 단다 (사장님 요청 — 냉장1이 안 보였다: 그 칸에 상품이 없어서) */
+                let top = '';
+                subs.forEach(s => { if (!groupOf(s)) top += btn(s); });   // 전체 (묶음에 안 드는 칸)
+                /* [수정 2026-10-27] 묶음 단추는 늘 선반 → 냉장 → 냉동 → 기타 차례로 (사장님 요청).
+                   [수정 2026-10-10] 상품이 하나도 없는 묶음도 단추를 단다 (냉장1이 안 보였다: 그 칸에 상품이 없어서) — 그때는 흐리게 */
                 GROUPS.forEach(([g, gl]) => {
-                    if (placed.has(g)) return;
-                    const n = shelves.filter(x => groupOf(x) === g).length;
+                    const n = shelves.filter(x => groupOf(x) === g).length;   // 빈 칸까지 센 묶음의 칸 수
                     if (!n) return;
-                    const open = invShelfOpenGroup === g;
-                    top += `<button type="button" class="sub-tab-btn" onclick="invShelfToggleGroup('${g}')" title="이 묶음 칸에는 지금 상품이 없어요" style="opacity:.6;${open ? ' background:#e2e8f0; color:var(--text-main);' : ''}">${gl} ${n} ${open ? '▴' : '▾'}</button>`;
+                    const has = subs.some(s => groupOf(s) === g);
+                    const open = invShelfOpenGroup === g, on = curGroup === g;
+                    top += `<button type="button" class="sub-tab-btn${on ? ' active' : ''}" onclick="invShelfToggleGroup('${g}')"${has ? '' : ' title="이 묶음 칸에는 지금 상품이 없어요"'} style="${has ? '' : 'opacity:.6;'}${open && !on ? ' background:#e2e8f0; color:var(--text-main);' : ''}">${gl} ${n} ${open ? '▴' : '▾'}</button>`;
                 });
                 // 펼친 줄에는 그 묶음의 칸을 다 보여 준다 — 상품이 없는 칸은 흐리게 (눌러서 비어 있는 걸 볼 수 있다)
                 const openSubs = shelves.filter(s => groupOf(s) && groupOf(s) === invShelfOpenGroup);
