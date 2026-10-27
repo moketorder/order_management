@@ -17843,6 +17843,7 @@
         // [신규 2026-10-01] 올라가는 시각은 이 다섯 칸 중에서만 고른다 (11·13·15·17·19시)
         // [수정 2026-10-03] 올라가는 시각 — 6시부터 2시간마다 20시까지 (사장님 요청. 예전 11·13·15·17·19시는 한 시간씩 당겼다). 달력의 시간 줄도 이것을 따른다
         const PS_SLOTS = [0, 6, 8, 10, 12, 14, 16, 18, 20];   // [수정 2026-10-10] 00시도 고를 수 있게 (사장님 요청)
+        const PS_REL_HOURS = Array.from({ length: 24 }, (_, h) => h);   // [신규 2026-10-27] 노출 시각 고르기는 00시~23시 모두 (사장님 요청)
         const PS_DEFAULT_SLOT = 0;    // 고르지 않았을 때 — [수정 2026-10-10] 00시 (사장님 요청, 예전 06시·그 전 14시)
 
         /* ===== [신규 2026-10-03] 시각 고르기 태엽 (사장님 요청) =====
@@ -20515,7 +20516,7 @@
         const PS_DOTC = { on: '#16a34a', closed: '#ca8a04', hidden: '#dc2626' };
         function psTimeOptsHtml(relVal) {
             const relTime = relVal ? relVal.slice(11, 16) : `${String(PS_DEFAULT_SLOT).padStart(2, '0')}:00`;
-            const slotVals = PS_SLOTS.map(h => `${String(h).padStart(2, '0')}:00`);
+            const slotVals = PS_REL_HOURS.map(h => `${String(h).padStart(2, '0')}:00`);
             return (slotVals.includes(relTime) ? [] : [relTime]).concat(slotVals).map(v => {
                 const [hh, mm] = v.split(':').map(Number);
                 return `<option value="${v}"${v === relTime ? ' selected' : ''}>${psSlotLabel(hh, mm)}${slotVals.includes(v) ? '' : ' (예전 시각)'}</option>`;
@@ -21314,7 +21315,7 @@
             const p = (uploadProducts || [])[idx];
             if (!p) return;
             if (p.showWeekly === true) { showToast("🔁 '매주 노출' 상품은 일정을 걸 수 없어요"); return; }
-            const h = PS_SLOTS.includes(Number(hour)) ? Number(hour) : PS_DEFAULT_SLOT;
+            const h = PS_REL_HOURS.includes(Number(hour)) ? Number(hour) : PS_DEFAULT_SLOT;
             const rel = new Date(`${dateKey}T${String(h).padStart(2, '0')}:00`).getTime();
             const it = await psItemAdd(idx, { releaseAt: rel, ...psDefaultSchedule(p, rel) });
             if (it) { psAddSearchOpenFor = ''; psAddSearchQuery = ''; showToast('📅 일정을 걸었어요 · 마감·픽업일은 끌거나 카드에서 고쳐요'); }
@@ -22158,7 +22159,7 @@
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span style="${LAB}" title="이 시각에 손님 화면에 올라가고 카톡 알림(🔔)도 떠요">📣 노출일</span>
                         <input type="date" id="fsp-date" value="${dk(rel0)}" onchange="fspFillDefaults()" style="${IN}">
-                        <select id="fsp-hour" class="gw-wheel" style="${SEL}">${PS_SLOTS.map(h => `<option value="${h}"${h === relH ? ' selected' : ''}>${psSlotLabel(h)}</option>`).join('')}</select>
+                        <select id="fsp-hour" class="gw-wheel" style="${SEL}">${PS_REL_HOURS.map(h => `<option value="${h}"${h === relH ? ' selected' : ''}>${psSlotLabel(h)}</option>`).join('')}</select>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span style="${LAB}">⏰ 마감</span>
@@ -35414,7 +35415,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span title="이 시각에 손님 화면에 올라가고 카톡 알림(🔔)도 떠요" style="flex:0 0 auto; width:58px; white-space:nowrap; font-size:11.5px; font-weight:800; color:#475569;">📣 노출일</span>
                         <input type="date" id="bsp-date" value="${d0.getFullYear()}-${p2(d0.getMonth() + 1)}-${p2(d0.getDate())}" onchange="psBatchFillDefaults()" style="flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 6px; font-size:12px;">
-                        <select id="bsp-hour" class="gw-wheel" onchange="psBatchFillDefaults()" style="flex:0 0 auto; width:84px; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800;">${PS_SLOTS.map(h => `<option value="${h}"${h === PS_DEFAULT_SLOT ? ' selected' : ''}>${psSlotLabel(h)}</option>`).join('')}</select>
+                        <select id="bsp-hour" class="gw-wheel" onchange="psBatchFillDefaults()" style="flex:0 0 auto; width:84px; height:38px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800;">${PS_REL_HOURS.map(h => `<option value="${h}"${h === PS_DEFAULT_SLOT ? ' selected' : ''}>${psSlotLabel(h)}</option>`).join('')}</select>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
                         <span style="flex:0 0 auto; width:58px; white-space:nowrap; font-size:11.5px; font-weight:800; color:#475569;">⏰ 마감</span>
