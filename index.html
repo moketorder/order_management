@@ -14276,10 +14276,21 @@
                 if (seen.has(id)) return;
                 seen.add(id);
                 const ymd = `${m[1]}-${m[2]}-${m[3]}`;
-                const still = (rawOrders || []).some(o => houseOf(o) === house && getOrderDateInfo(o).dateStr === ymd && gIsDeliveredRow(o));
-                if (still) return;
-                fetch(`${FIREBASE_DB_URL}deliveries/${id}.json`, { method: 'DELETE' })
-                    .catch(e => console.warn('배달 기록 지우기 실패:', e));
+                /* [수정 2026-10-28] 배달기사 앱이 한 집 두 번째 배달을 '집~2' 칸에 따로 적는다 (카드 두 개 — 배정·정산 따로).
+                   두 칸 모두, 그 칸에 적힌 줄(keys) 중 아직 배달완료인 것이 하나도 없으면 지운다.
+                   줄 목록이 없는 옛 기록은 예전처럼 '그 집 그날 배달완료 줄이 하나도 없으면' 지운다. */
+                const stillAny = (rawOrders || []).some(o => houseOf(o) === house && getOrderDateInfo(o).dateStr === ymd && gIsDeliveredRow(o));
+                const stillKeys = keys => keys.some(k => (rawOrders || []).some(o => houseOf(o) === house && o.orderKey === k && gIsDeliveredRow(o)));
+                [id, id + '~2'].forEach(async rid => {
+                    try {
+                        const r = await fetch(`${FIREBASE_DB_URL}deliveries/${rid}.json?t=${Date.now()}`);
+                        const rec = r.ok ? await r.json() : null;
+                        if (!rec) return;
+                        const keys = Array.isArray(rec.keys) ? rec.keys : [];
+                        if (keys.length ? stillKeys(keys) : stillAny) return;
+                        await fetch(`${FIREBASE_DB_URL}deliveries/${rid}.json`, { method: 'DELETE' });
+                    } catch (e) { console.warn('배달 기록 지우기 실패:', e); }
+                });
             });
         }
 
