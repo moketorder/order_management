@@ -25446,6 +25446,11 @@
                 const r = await fetch(`${FIREBASE_DB_URL}withdrawn_logs.json?t=${Date.now()}`);
                 window.__caWLogs = (r.ok ? await r.json() : null) || {};
             } catch (e) { window.__caWLogs = window.__caWLogs || {}; }
+            // [신규 2026-10-28] 과일 무료배송 쿠폰 명단 (welcome_coupon) — 작아서 매번 새로 받는다
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}welcome_coupon.json?t=${Date.now()}`);
+                window.__caWc = (r.ok ? await r.json() : null) || {};
+            } catch (e) { window.__caWc = window.__caWc || {}; }
             await _visitsP;
             await gLoadPrivateSettings();   // [신규 2026-10-03] 뺄 번호를 받은 뒤에 센다
             caApplyJoinSlots();   // [신규] 손님 정보를 받은 뒤 가입 시각을 접속 칸으로 보탠다
@@ -26661,6 +26666,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     // 구경만 — 최근 30일에 3일 넘게 들어왔는데 한 번도 안 샀다
                     browser: !!visit && visit.v30.visitDays >= 3 && visit.v30.browse === visit.v30.visitDays && !days30.some(d => orderDays.has(d)),
                     orders: days.size, qty: paid.reduce((a, o) => a + (parseInt(o.qty || 0) || 0), 0),
+                    noOrder: !v.rows.length,   // [신규 2026-10-28] 주문 줄이 하나도 없다 (취소 포함) — 과일 무료배송 쿠폰 대상
                     amt, last: v.last, idle,
                     /* 주문이 하나도 없는 새 손님은 주소가 있으면 배달, 없으면 픽업으로 본다 */
                     way: v.rows.length ? (wayDel > v.rows.length / 2 ? '배달' : '픽업') : (addr ? '배달' : '픽업')
@@ -26832,6 +26838,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const nBrowse = all.filter(r => r.browser).length;              // [신규]
             const nGone = all.filter(r => r.visit && r.visit.gone).length;   // [신규]
             const nNoShow = all.filter(r => r.noShow).length;   // [신규]
+            const nWc = all.filter(caWcTarget).length;   // [신규 2026-10-28] 과일 무료배송 쿠폰 대상 (발급 + 아직 미발급)
             const WD = caWithdrawnList();   // [수정 2026-10-03] 탈퇴 회원 — 탈퇴 기록(withdrawn_logs)과 지금 탈퇴 상태를 합친다
 
             let list = caFilter === 'delivery' ? all.filter(r => r.way === '배달')
@@ -26843,6 +26850,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                      : caFilter === 'browse' ? all.filter(r => r.browser)
                      : caFilter === 'gone' ? all.filter(r => r.visit && r.visit.gone)
                      : caFilter === 'noshow' ? all.filter(r => r.noShow)
+                     : caFilter === 'coupon' ? all.filter(caWcTarget)
                      : all;
             // '새로 온 손님'을 고르면 늦게 온 순, '고침'을 고르면 최근 고친 순으로 세운다
             if (caFilter === 'new30' && caSort === 'amt') caSort = 'joined';
@@ -26874,6 +26882,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const cmpDir = (caSortDir === 'asc') ? ((a, b) => cmp(b, a)) : cmp;
             list = list.slice().sort(cmpDir);
             if (caFilter === 'noshow') list.sort((a, b) => (b.noShow - a.noShow) || String(b.noShowLast).localeCompare(String(a.noShowLast)));   // [신규] 노쇼 많은 순
+            if (caFilter === 'coupon') list.sort((a, b) => Number((caWcOf(b) || {}).startAt || 0) - Number((caWcOf(a) || {}).startAt || 0));   // [신규 2026-10-28] 최근 발급 순, 미발급은 맨 뒤
 
             const fbtn = (k, label, color) => `<button type="button" onclick="caSetFilter('${k}')" class="ca-fchip"
                 style="height:30px; padding:0 12px; border:1.5px solid ${caFilter === k ? (color || 'var(--primary)') : '#cbd5e1'};
@@ -26903,6 +26912,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         ${(nBrowse || caFilter === 'browse') ? fbtn('browse', `👀 구경만 ${nBrowse}`, '#1d4ed8') : ''}
                         ${(nGone || caFilter === 'gone') ? fbtn('gone', `🚪 발길 끊김 ${nGone}`, '#be123c') : ''}
                         ${(nNoShow || caFilter === 'noshow') ? fbtn('noshow', `⛔ 노쇼 ${nNoShow}`, '#c2410c') : ''}
+                        ${fbtn('coupon', `🎟 쿠폰 ${nWc}`, '#a16207')}${/* [신규 2026-10-28] 과일 무료배송 쿠폰 받은 손님 (사장님 요청) */''}
                         ${fbtn('withdrawn', `🚫 탈퇴 ${WD.length}`, '#64748b')}${/* [수정 2026-10-03] 탈퇴 회원 관리 단추는 0명이어도 늘 보인다 (사장님이 찾지 못했다) */''}
                         ${/* [수정] 늘 0이라 자리만 차지한다. 어긋난 것이 생겼을 때만 내보인다. */
                           (all.length - nSaved > 0 || caFilter === 'nosaved')
@@ -26961,6 +26971,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <div class="ca-r1">
                         ${_custNewMap[String(r.phone || '').replace(/\D/g, '')] ? `<span style="flex:0 0 auto; font-size:11px; font-weight:900; color:#fff; background:#16a34a; padding:1px 6px; border-radius:6px; margin-right:5px;">${_custNewMap[String(r.phone || '').replace(/\D/g, '')] === '재가입' ? '재가입' : '신규'}</span>` : ''}<span class="ca-name">${gEscapeHtml(r.name)}${r.realName && r.realName !== r.name ? `<span style="font-weight:700; color:#94a3b8;"> (${gEscapeHtml(r.realName)})</span>` : ''}</span>
                         ${r.noShow ? `<span onclick="event.stopPropagation(); gShowNoShowList('${encodeURIComponent(r.phone)}','${encodeURIComponent(r.name)}')" style="cursor:pointer; flex:0 0 auto; font-size:11px; font-weight:800; color:#c2410c; text-decoration:underline; text-underline-offset:2px;" title="마지막 노쇼 ${gEscapeHtml(r.noShowLast)} · 눌러서 노쇼 주문 보기">⛔ 노쇼 ${r.noShow}회</span>` : ''}
+                        ${(caWcOf(r) || caFilter === 'coupon') ? caWcChip(r) : ''}
                         <span class="ca-cnt">${r.orders}회</span>
                         <span class="ca-amt" title="${r.amt.toLocaleString()}원">${won(r.amt)}</span>
                     </div>
@@ -27006,7 +27017,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                                font-size:11px; font-weight:${caSort === key ? 900 : 800}; color:${caSort === key ? 'var(--primary)' : '#cbd5e1'};">
                         ${label}${caSort === key ? (caSortDir === 'desc' ? ' ▾' : ' ▴') : ''}</button>`;
                     return `<div style="display:flex; gap:8px; align-items:baseline; font-size:11px; font-weight:800; color:#cbd5e1; margin:0 4px 5px;">
-                       <span style="flex:1;">${list.length}명 · 눌러서 손님 카드 보기</span>
+                       <span style="flex:1;">${caFilter === 'coupon' ? caWcSummary(list) + ' · ' : ''}${list.length}명 · 눌러서 손님 카드 보기</span>
                        ${th('cnt', '주문', 46)}
                        ${th('amt', '구매액', 62)}
                    </div>`;
@@ -28228,6 +28239,59 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 <div style="overflow-y:auto; padding:2px 16px 12px;">${body}</div>
             </div>`;
             document.body.appendChild(m);
+        }
+        /* [신규 2026-10-28] 과일 무료배송 쿠폰(가입 선물) — 손님 관리 '🎟 쿠폰' 탭 (사장님 요청). 보기만 한다.
+           welcome_coupon/<번호> = { startAt(쿠폰을 처음 본 때), usedAt?, usedRef? }. 기간은 startAt 부터 7일 */
+        function caWcOf(r){ const v = (window.__caWc || {})[String((r && r.phone) || '').replace(/\D/g, '')]; return (v && Number(v.startAt)) ? v : null; }
+        // 쿠폰 대상 — 이미 발급됐거나, 손님 정보가 있고 주문이 한 번도 없는 손님 (들어오면 발급된다)
+        function caWcTarget(r){ return !!caWcOf(r) || (!!r.saved && !!r.noOrder); }
+        function caWcState(v){ return !v ? 'none' : v.usedRef ? 'used' : (Date.now() < Number(v.startAt) + 7 * 86400000 ? 'live' : 'gone'); }
+        // 카드 딱지 — 미발급 / 발급 M/D · 미사용 D-n / 발급 M/D · 사용 M/D / 발급 M/D · 쿠폰 지남 (사장님 요청)
+        function caWcChip(r){
+            const v = caWcOf(r), st = caWcState(v);
+            const md = t => { const d = new Date(Number(t)); return `${d.getMonth() + 1}/${d.getDate()}`; };
+            const left = v ? Math.max(0, Math.ceil((Number(v.startAt) + 7 * 86400000 - Date.now()) / 86400000) - 1) : 0;
+            const [txt, fg, bg, bd] = st === 'none' ? ['🎟 미발급', '#64748b', '#f8fafc', '#cbd5e1']
+                : st === 'used' ? [`🎟 발급 ${md(v.startAt)} · 사용 ${md(v.usedAt)}`, '#15803d', '#f0fdf4', '#bbf7d0']
+                : st === 'live' ? [`🎟 발급 ${md(v.startAt)} · 미사용 D-${left}`, '#a16207', '#fff8d6', '#f2dc7a']
+                : [`🎟 발급 ${md(v.startAt)} · 쿠폰 지남`, '#94a3b8', '#f8fafc', '#e2e8f0'];
+            return `<span title="${st === 'none' ? '주문이 없는 손님 — 주문서에 들어오면 쿠폰이 발급돼요' : '발급 = 손님이 쿠폰을 처음 본 날'}" style="flex:0 0 auto; font-size:11px; font-weight:800; color:${fg}; background:${bg}; border:1px solid ${bd}; border-radius:5px; padding:0 6px; white-space:nowrap;">${txt}</span>`;
+        }
+        /* [신규 2026-10-28] 손님 관리 거르기 탭 줄(.ca-frow)을 컴퓨터에서도 좌우로 넘긴다 (사장님 요청).
+           폰은 손가락으로 밀면 되지만, 컴퓨터는 스크롤 막대를 숨겨 둬서 뒤쪽 탭(쿠폰·탈퇴)이 안 보였다.
+             · 휠: 탭 줄 위에서 굴리면 좌우로 넘어간다 (끝에 닿으면 화면이 그대로 내려간다)
+             · 끌기: 마우스로 잡고 좌우로 끈다. 끌고 난 뒤의 클릭은 막아 탭이 잘못 눌리지 않게 한다 */
+        (function caFrowMouse(){
+            document.addEventListener('wheel', e => {
+                const row = e.target.closest && e.target.closest('.ca-frow');
+                if (!row || row.scrollWidth <= row.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+                const max = row.scrollWidth - row.clientWidth;
+                if ((e.deltaY < 0 && row.scrollLeft <= 0) || (e.deltaY > 0 && row.scrollLeft >= max - 1)) return;
+                row.scrollLeft += e.deltaY;
+                e.preventDefault();
+            }, { passive: false });
+            let drag = null;
+            document.addEventListener('pointerdown', e => {
+                if (e.pointerType !== 'mouse' || e.button !== 0) return;
+                const row = e.target.closest && e.target.closest('.ca-frow');
+                if (row && row.scrollWidth > row.clientWidth) drag = { row, x: e.clientX, left: row.scrollLeft, moved: false };
+            });
+            window.addEventListener('pointermove', e => {
+                if (!drag) return;
+                const dx = e.clientX - drag.x;
+                if (!drag.moved && Math.abs(dx) < 6) return;
+                drag.moved = true;
+                drag.row.scrollLeft = drag.left - dx;
+            });
+            window.addEventListener('pointerup', () => {
+                if (!drag) return;
+                const moved = drag.moved; drag = null;
+                if (moved) window.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+            });
+        })();
+        function caWcSummary(list){
+            const st = list.map(r => caWcState(caWcOf(r))), c = k => st.filter(x => x === k).length;
+            return `미발급 ${c('none')} · 미사용 ${c('live')} · 사용 ${c('used')} · 지남 ${c('gone')}`;
         }
         function isSalesPaid(o){ return (o && (o.paid === true || o.paid === "true" || o.paid === "True" || o.isPaid === true || o.isPaid === "true")); }
         // 배달 판별 — 주문현황(showTodaySummary)과 동일: shippingMethod가 '배달주문'이거나, '매장픽업'이 아니고 주소가 있으면 배달
