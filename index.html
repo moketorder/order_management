@@ -6503,6 +6503,25 @@
                 }
                 function srcBandRows() { return Object.entries(gSrc.band || {}).map(([no, r]) => srcOverlay('band', no, r)).filter(Boolean); }
                 function srcKakaoRows() { return Object.entries(gSrc.kakao || {}).map(([no, r]) => srcOverlay('kakao', no, r)).filter(Boolean); }
+                /* [신규 2026-10-28] 카톡 취합 원문 칸을 누르면 원문 전체를 창으로 (사장님 요청).
+                   전체 글은 sourcing/kakaoFull/<번호> 에 따로 있어 누를 때만 받아 온다 (목록은 160자라 가볍게) */
+                async function srcKakaoFull(no) {
+                    const r = (gSrc.kakao || {})[no] || {};
+                    let txt = '';
+                    try { txt = await srcGet('kakaoFull/' + no); } catch (e) { }
+                    if (!txt) txt = String(r.raw || '') + '\n\n(전체 원문은 PC에서 카톡 취합을 다시 올리면 볼 수 있어요)';
+                    let m = document.getElementById('src-kakao-full');
+                    if (!m) {
+                        m = document.createElement('div'); m.id = 'src-kakao-full';
+                        m.style.cssText = 'position:fixed; inset:0; z-index:2147483400; background:rgba(15,23,42,.4); display:flex; align-items:center; justify-content:center; padding:14px; box-sizing:border-box;';
+                        m.onclick = e => { if (e.target === m) m.remove(); };
+                        document.body.appendChild(m);
+                    }
+                    m.innerHTML = '<div style="background:#fff; border-radius:14px; width:100%; max-width:560px; max-height:86vh; display:flex; flex-direction:column; box-shadow:0 18px 40px rgba(15,23,42,.25);">' +
+                        '<div style="display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid #e2e8f0;"><b style="flex:1; font-size:14px;">' + srcEsc(r.n || '원문') + '<small style="display:block; font-size:11.5px; color:#64748b; font-weight:700;">' + srcEsc((r.v || '') + ' · ' + String(r.d || '')) + '</small></b>' +
+                        '<button type="button" onclick="document.getElementById(\'src-kakao-full\').remove()" style="border:1.5px solid #cbd5e1; background:#fff; border-radius:8px; padding:6px 12px; font-weight:800; cursor:pointer;">닫기</button></div>' +
+                        '<div style="padding:12px 14px; overflow:auto; white-space:pre-wrap; word-break:break-word; font-size:13.5px; line-height:1.6; user-select:text;">' + srcEsc(String(txt)) + '</div></div>';
+                }
                 /* ===== [신규 2026-10-07] 카테고리 관리 (사장님 요청) =====
                    sourcing/catdef = { list: [{ id, name, base, words, show }], at }
                      base  : PC 규칙(카테고리규칙.ps1)의 원래 분류 이름 — 새로 만든 분류는 '' (낱말로만 찾는다)
@@ -7140,7 +7159,7 @@
                     let res = '<div class="src-tablewrap"><table><thead><tr>' + cols.map(([k, lab, n]) => '<th' + (n ? ' class="r"' : '') + ' onclick="srcSortKakao(\'' + k + '\')">' + lab + (Q.sort === k ? (Q.dir < 0 ? ' ▼' : ' ▲') : '') + '</th>').join('') + '</tr></thead><tbody>';
                     res += list.slice(0, Q.limit).map(r => '<tr><td>' + srcEsc(String(r.d || '').slice(2)) + '</td><td>' + srcEsc(r.v) + '</td><td>' + srcEsc(r.g) + '</td><td class="nm">' + srcEsc(r.n) + (r._edited ? '<span class="src-mk skip">고침</span>' : '') + '<button type="button" class="src-ed" title="고치기" onclick="srcEdit(\'kakao\',\'' + r.no + '\')">✏️</button></td>' +
                         '<td>' + srcEsc(r.c || '') + '</td><td class="r">' + (r.p ? Number(r.p).toLocaleString() : '') + '</td><td>' + srcEsc(r.set) + '</td><td class="r">' + srcEsc(r.cnt) + '</td><td>' + srcEsc(String(r.first || '').slice(2, 10)) + '</td>' +
-                        '<td class="raw">' + srcEsc(r.raw) + '</td></tr>').join('') + '</tbody></table></div>';
+                        '<td class="raw" onclick="srcKakaoFull(\'' + r.no + '\')" title="누르면 원문 전체" style="cursor:pointer;">' + srcEsc(r.raw) + '</td></tr>').join('') + '</tbody></table></div>';
                     if (list.length > Q.limit) res += '<button type="button" class="src-btn src-more" onclick="gSrc.kakaoQ.limit+=200; srcRender()">더 보기 (' + (list.length - Q.limit).toLocaleString() + '개 남음)</button>';
                     const box = document.getElementById('src-kakao-res');
                     if (onlyRes && box) { box.innerHTML = res; document.getElementById('src-kakao-n').textContent = list.length.toLocaleString() + '개'; return; }
