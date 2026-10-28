@@ -18087,6 +18087,7 @@
             p.stock = sv;
             await fbPutRetry(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`, 0);
             uploadGlobalAdjustments[adjKey] = 0;
+            if (_rep && p.repeatStock === 'opt' && raw.stockManual !== true) { try { await psApplyRepeatOptStock(idx); } catch (e) { console.warn('옵션별 반복 수량 실패:', e); } }   // [신규 2026-10-28]
             await psSchedPatch({ [`${p.sid}/${rid}/stockApplied`]: true });
             updatePublishedProductsTimestamp();
             return true;
@@ -18866,8 +18867,36 @@
             return n >= 0 && n !== 999 ? n : 999;
         }
         function psRepStockText(p) {
+            if (p && p.repeatStock === 'opt') return '옵션별 고정';
             const t = psRepStockTarget(p);
             return t === null ? '남은 수량' : t === 999 ? '무제한' : `고정 ${t}개`;
+        }
+        /* [신규 2026-10-28] 옵션별 고정 수량 (사장님 요청 — 윤가네 김치처럼 옵션마다 수량이 다를 때).
+           상세옵션이 있는 상품은 수량 창에 옵션마다 칸이 나온다. 'opt' 로 저장하면 상품 전체 재고는 무제한,
+           반복 차례가 시작할 때 옵션마다 적어 둔 수량(repeatOptStock — '그룹__항목': 숫자, 빈칸=무제한)으로 다시 시작한다 */
+        const psOptRepKey = (g, it) => fSafeKey(String((g && g.name) || '옵션')) + '__' + fSafeKey(String((it && it.name) || ''));
+        async function psApplyRepeatOptStock(idx) {
+            const p = uploadProducts[idx];
+            if (!p || p.repeatStock !== 'opt' || !Array.isArray(p.options)) return false;
+            const map = p.repeatOptStock || {}, patch = {}, keys = [];
+            p.options.forEach((g, gi) => ((g && g.items) || []).forEach((it, ii) => {
+                if (!it || !String(it.name || '').trim()) return;
+                const k = psOptRepKey(g, it);
+                if (!(k in map)) return;   // 수량을 안 적은 옵션은 그대로
+                const n = parseInt(map[k], 10);
+                const sv = (map[k] === '' || map[k] === null || isNaN(n) || n === 999) ? '' : Math.max(0, n);
+                patch[`${idx}/options/${gi}/items/${ii}/stock`] = sv;
+                it.stock = sv;
+                keys.push(gOptStockKey(p, g.name, it.name));
+            }));
+            if (!Object.keys(patch).length) return false;
+            patch[`${idx}/updatedAt`] = Date.now();
+            if (!(await fbPatchProducts(patch))) return false;
+            for (const k of keys) {   // 지난 차례에 팔린 수(조정값)를 비워 적은 수량 그대로 시작
+                await fetch(`${FIREBASE_DB_URL}option_stock/${encodeURIComponent(k)}.json`, { method: 'DELETE' }).catch(() => { });
+                delete optionAdjustments[k];
+            }
+            return true;
         }
         function psRepStockBtnHtml(key, p) {
             return `<button type="button" onclick="psRepStockOpen('${gEscapeHtml(key)}')" title="반복 차례가 시작할 때 재고를 어떻게 맞출지 (고정 수량 · 남은 수량 · 무제한)"
@@ -18881,10 +18910,23 @@
             box = document.createElement('div'); box.id = 'ps-confirm-box';
             box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px;';
             const B = 'height:42px; border-radius:9px; font-size:13.5px; font-weight:800; cursor:pointer;';
+            // [신규 2026-10-28] 상세옵션이 있으면 옵션마다 수량 칸 (빈칸 = 무제한)
+            const optList = [];
+            (Array.isArray(p.options) && gOptionRowsOf(p).length ? p.options : []).forEach(g => ((g && g.items) || []).forEach(o => { if (o && String(o.name || '').trim()) optList.push({ k: psOptRepKey(g, o), g: g.name || '옵션', n: o.name }); }));
+            const omap = p.repeatOptStock || {};
+            const optHtml = optList.length ? `<div style="border:1.5px solid #c7d2fe; border-radius:10px; padding:8px; margin-bottom:7px; max-height:46vh; overflow:auto;">
+                    <div style="font-size:11.5px; font-weight:800; color:#4338ca; margin-bottom:6px;">옵션마다 매주 수량 (비우면 무제한)</div>
+                    ${optList.map((o, i) => `<div style="display:flex; align-items:center; gap:6px; padding:3px 0;">
+                        <span style="flex:1; min-width:0; font-size:12.5px; font-weight:800; color:#334155; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${gEscapeHtml(o.g + ' · ' + o.n)}">${gEscapeHtml(o.n)}</span>
+                        <input type="number" min="0" inputmode="numeric" class="ps-rs-o" data-k="${gEscapeHtml(o.k)}" value="${(o.k in omap && omap[o.k] !== '' && omap[o.k] !== null) ? gEscapeHtml(String(omap[o.k])) : ''}" placeholder="무제한" style="flex:0 0 84px; width:84px; height:34px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 8px; font-size:13.5px; font-weight:800; text-align:right;">
+                    </div>`).join('')}
+                    <button type="button" data-v="optfixed" style="${B} width:100%; margin-top:6px; border:none; background:#4338ca; color:#fff;">옵션별 고정 수량으로</button>
+                </div>` : '';
             box.innerHTML = `<div style="background:#fff; border-radius:14px; padding:18px; max-width:380px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25);">
                 <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:4px;">📦 반복 수량</div>
                 <div style="font-size:12px; font-weight:700; color:#64748b; line-height:1.6; margin-bottom:12px;">${gEscapeHtml(p.name || '')}<br>반복 차례가 시작할 때 재고를 이렇게 맞춰요 · 지금: <b style="color:#4338ca;">${gEscapeHtml(psRepStockText(p))}</b></div>
-                <div style="display:flex; gap:6px; margin-bottom:7px;">
+                ${optHtml}
+                <div style="display:flex; gap:6px; margin-bottom:7px;${optList.length ? ' display:none;' : ''}">
                     <input type="number" min="0" inputmode="numeric" id="ps-rs-n" value="${t !== null && t !== 999 ? t : ''}" placeholder="매주 몇 개" style="flex:1; min-width:0; height:42px; border:1.5px solid #c7d2fe; border-radius:9px; padding:0 10px; font-size:14px; font-weight:800;">
                     <button type="button" data-v="fixed" style="${B} flex:0 0 auto; padding:0 14px; border:none; background:#4338ca; color:#fff;">고정 수량</button>
                 </div>
@@ -18896,6 +18938,11 @@
             box.addEventListener('click', e => {
                 const b = e.target.closest('button[data-v]'); if (!b) return;
                 const v = b.dataset.v;
+                if (v === 'optfixed') {
+                    const m = {};
+                    box.querySelectorAll('.ps-rs-o').forEach(el => { const s = String(el.value || '').trim(); const n = parseInt(s, 10); m[el.dataset.k] = (s === '' || isNaN(n) || n < 0) ? '' : n; });
+                    box.remove(); psSetRepeatStock(key, 'opt', m); return;
+                }
                 if (v === 'fixed') {
                     const raw = String(document.getElementById('ps-rs-n').value || '').trim();
                     const n = parseInt(raw, 10);
@@ -18909,14 +18956,18 @@
             document.body.appendChild(box);
             setTimeout(() => { const el = document.getElementById('ps-rs-n'); if (el) el.focus(); }, 0);
         }
-        async function psSetRepeatStock(key, val) {
+        async function psSetRepeatStock(key, val, optMap) {
             const it = psItem(key); if (!it) return;
             psUndoMark('반복 수량');
-            const idxs = [...new Set(psGroupMembers(key).map(k => (psItem(k) || {}).idx).filter(i => i >= 0))];
+            // 옵션별 수량은 그 상품에만 (같은 일정 묶음의 다른 상품은 옵션이 다르다)
+            const idxs = val === 'opt' ? [it.idx] : [...new Set(psGroupMembers(key).map(k => (psItem(k) || {}).idx).filter(i => i >= 0))];
             const patch = {};
-            idxs.forEach(i => { patch[`${i}/repeatStock`] = (val === null || val === undefined) ? null : val; });
+            idxs.forEach(i => {
+                patch[`${i}/repeatStock`] = (val === null || val === undefined) ? null : val;
+                patch[`${i}/repeatOptStock`] = val === 'opt' ? (optMap || {}) : null;
+            });
             if (!(await fbPatchProducts(patch))) { showToast('저장 실패 — 다시 시도해 주세요'); return; }
-            idxs.forEach(i => { uploadProducts[i].repeatStock = patch[`${i}/repeatStock`]; });
+            idxs.forEach(i => { uploadProducts[i].repeatStock = patch[`${i}/repeatStock`]; uploadProducts[i].repeatOptStock = patch[`${i}/repeatOptStock`]; });
             // 앞으로 올라갈 저절로 만든 차례에 바로 적어 둔다 (손으로 적은 차례·이미 맞춘 차례는 그대로)
             const sp = {};
             idxs.forEach(i => {
