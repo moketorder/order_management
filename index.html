@@ -12372,13 +12372,24 @@
             const n = gFeeRowName(it);
             return n === "배달비" || n === FEE_REFUND_NAME || n === "포인트 사용";
         }
+        // [신규 2026-10-28] 주문서의 무료배송 쿠폰(가입 선물) 차감 줄 — 이름은 '배달비 차감' 그대로, feeWhy '첫주문'
+        function gIsWcRow(it) { return !!it && it.feeWhy === '첫주문'; }
+        // 주문 줄 이름 — 쿠폰 차감 줄은 '과일 무료배송 쿠폰'으로, 노랑 딱지를 붙여 합배송 차감과 구별한다
+        function gWcNameHtml(it) {
+            if (!gIsWcRow(it)) return gEscapeHtml(it.item);
+            const nm = gEscapeHtml(String(it.item || '').replace(FEE_REFUND_NAME, '과일 무료배송 쿠폰'));
+            return `${nm} <span style="display:inline-block; padding:1px 6px; border-radius:5px; background:#FFE14D; color:#16200f; font-size:11px; font-weight:800; vertical-align:1px;">가입 쿠폰</span>`;
+        }
 
         function gOffsetFeeRows(items) {
             const isCanceled = (it) => isSalesCanceled(it);
             const amountOf = (it) => Math.abs(parseInt(String(it.total !== undefined ? it.total : it.price || 0).replace(/,/g, "")) || 0);
 
             const feeRows = items.filter(it => !isCanceled(it) && gFeeRowName(it) === "배달비");
-            const refundRows = items.filter(it => !isCanceled(it) && gFeeRowName(it) === FEE_REFUND_NAME);
+            // [수정 2026-10-28] 과일 무료배송 쿠폰 줄은 짝지어 지우지 않는다 — 영수증에 배달비와 쿠폰이 함께 찍히게 (사장님 요청)
+            const wcFees = items.filter(it => !isCanceled(it) && gIsWcRow(it)).length;
+            const refundRows = items.filter(it => !isCanceled(it) && gFeeRowName(it) === FEE_REFUND_NAME && !gIsWcRow(it));
+            if (wcFees) feeRows.splice(0, wcFees);   // 쿠폰이 덮은 배달비도 그대로 남긴다
             if (!feeRows.length || !refundRows.length) return items;
 
             const dropped = new Set();
@@ -13344,7 +13355,7 @@
                                         <span class="custom-checkbox"></span>
                                     </label>
                                 </td>
-                                <td class="item-name-cell">${gEscapeHtml(it.item)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${gShopNoteAdm(it)}${gFreshDriftBadge(it)}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</td>
+                                <td class="item-name-cell">${gWcNameHtml(it)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${gShopNoteAdm(it)}${gFreshDriftBadge(it)}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</td>
                                 <td style="width:70px;"><strong class="${qtyClass}">${qtyNum}</strong>개</td>
                                 <td style="width:100px;">${parseInt(it.price || 0).toLocaleString()}원</td>
                                 <td style="width:100px;"><strong>${parseInt(it.total || 0).toLocaleString()}원</strong></td>
@@ -13362,7 +13373,7 @@
                                         <input type="checkbox" class="item-checkbox" data-phone="${customer.phone}" data-key="${it.orderKey}" ${selectedItems.has(customer.phone + "|" + it.orderKey) ? 'checked' : ''} onchange="handleItemSelect(this)">
                                         <span class="custom-checkbox"></span>
                                     </label>
-                                    <span class="mobile-item-name">${gEscapeHtml(it.item)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${gShopNoteAdm(it)}${gFreshDriftBadge(it)}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</span>
+                                    <span class="mobile-item-name">${gWcNameHtml(it)} <span class="order-time-label">${formatOrderTime(it.timestamp)}</span>${gShopNoteAdm(it)}${gFreshDriftBadge(it)}${it.paid === true || it.paid === "true" ? `<span class="paid-badge">💵 입금완료</span>` : ''}${gOptionLines(it.optionText, { cls: 'order-option-text' })}</span>
                                     <span class="status-badge ${badgeClass}" style="cursor:pointer;" onclick="openItemStatusModal('${escapeArg(customer.phone)}', '${escapeArg(it.orderKey)}', '${escapeArg(it.item)}', '${status}', ${isCanceled})" title="클릭하여 상태 변경">${badgeLabel}</span>
                                 </div>
                                 <div class="mobile-item-middle">
@@ -15117,12 +15128,15 @@
             if (live.length === 0) return;
 
             const feeRows = live.filter(o => gFeeRowName(o) === "배달비");
-            const refundRows = live.filter(o => gFeeRowName(o) === FEE_REFUND_NAME);
+            const allRefunds = live.filter(o => gFeeRowName(o) === FEE_REFUND_NAME);
+            // [신규 2026-10-28] 무료배송 쿠폰 줄(feeWhy '첫주문')은 따로 본다 — 과일이 남아 있고 배달비가 남는 동안은 그대로 둔다
+            const wcRows = allRefunds.filter(gIsWcRow);
+            const refundRows = allRefunds.filter(o => !gIsWcRow(o));
             const productRows = live.filter(o => !gIsFeeRow(o));
 
             // 상품이 하나도 안 남았으면 배달비·차감도 같이 취소한다
             if (productRows.length === 0) {
-                for (const o of feeRows.concat(refundRows)) {
+                for (const o of feeRows.concat(allRefunds)) {
                     try {
                         // [신규] 자동으로 지운 배달비도 기록에 남긴다 (왜 사라졌는지 알 수 있게)
                         const res = await gPatchOrder(cleanPhone, o.orderKey, { canceled: true, received: "취소완료" }, [{
@@ -15143,15 +15157,21 @@
                예전에는 모자라면 배달비를, 넘치면 '배달비 차감'을 새 줄로 덧붙였다. 남길 줄은 금액이 맞는 배달비 중 가장 늦게 붙은 것,
                없으면 그날 마지막 주문에 새로 붙인다. */
             const current = feeRows.reduce((a, o) => a + amountOf(o), 0)
-                          - refundRows.reduce((a, o) => a + amountOf(o), 0);
+                          - allRefunds.reduce((a, o) => a + amountOf(o), 0);
             const needed = (base >= 15000) ? 0 : await gGetDeliveryFee();
-            const tidy = refundRows.length === 0 && (needed === 0 ? feeRows.length === 0 : (feeRows.length === 1 && amountOf(feeRows[0]) === needed));
+            /* [신규 2026-10-28] 쿠폰은 그날 과일이 남아 있고 배달비가 붙어 있어야 쓸모가 있다.
+               과일을 모두 취소했거나 배달비가 필요 없어지면 쿠폰 줄도 취소한다 (손님이 주문서를 다시 열면 쿠폰이 돌아간다) */
+            const hasFruit = productRows.some(o => o.category === 'fruit' && !/야채|채소/.test(String(o.item || '')));
+            const wcKeep = (hasFruit && needed > 0) ? wcRows.slice(0, 1) : [];
+            const wcDrop = wcRows.filter(o => !wcKeep.includes(o));
+            const wcOff = wcKeep.reduce((a, o) => a + amountOf(o), 0);
+            const tidy = refundRows.length === 0 && wcDrop.length === 0 && (needed === 0 ? feeRows.length === 0 : (feeRows.length === 1 && amountOf(feeRows[0]) === needed));
             if (tidy) return;
 
             const keep = needed > 0
                 ? feeRows.filter(o => amountOf(o) === needed).sort((a, b) => gOrderTimeNum(b) - gOrderTimeNum(a))[0] || null
                 : null;
-            for (const r of refundRows.concat(feeRows.filter(o => o !== keep))) {
+            for (const r of refundRows.concat(wcDrop, feeRows.filter(o => o !== keep))) {
                 try {
                     const res = await gPatchOrder(cleanPhone, r.orderKey, { canceled: true, received: "취소완료" }, [{
                         phone: cleanPhone, name: r.name || "", item: r.item || "",
@@ -15165,7 +15185,7 @@
                 const baseOrder = gLatestOrder(productRows) || productRows[0];   // 그날 마지막 주문에 붙인다
                 await gAppendFeeRowAdmin(cleanPhone, baseOrder, pDate, needed, false);
             }
-            const diff = needed - current;
+            const diff = (needed - wcOff) - current;
             showToast(diff > 0 ? `배달비 ${diff.toLocaleString()}원이 추가되었습니다.`
                 : diff < 0 ? `배달비 ${(-diff).toLocaleString()}원이 취소되었습니다.`
                 : '배달비를 한 줄로 정리했습니다.');
@@ -17386,7 +17406,7 @@
 
                         printHtml += `
                             <tr style="border-bottom:none;">
-                                <td style="padding:4px 0;">${gEscapeHtml(it.item)}${it.ptNote ? ` <span style="font-size:11px;">(${it.ptNote})</span>` : ''}${statusBadge}${gOptionLines(it.optionText, { cls: 'print-option' })}</td>
+                                <td style="padding:4px 0;">${gIsWcRow(it) ? gEscapeHtml(String(it.item || '').replace(FEE_REFUND_NAME, '과일 무료배송 쿠폰')) : gEscapeHtml(it.item)}${it.ptNote ? ` <span style="font-size:11px;">(${it.ptNote})</span>` : ''}${statusBadge}${gOptionLines(it.optionText, { cls: 'print-option' })}</td>
                                 <td class="text-right" style="padding:4px 0;">${it.qty}</td>
                                 <td class="text-right" style="padding:4px 0;">${(parseInt(String(it.total || 0).replace(/,/g, "")) || 0).toLocaleString()}원</td>
                             </tr>
