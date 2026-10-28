@@ -3312,7 +3312,7 @@
                             <!-- [신규 2026-10-21] 끝나면 상시판매로 돌리기를 안 켠 일정만 보기 (사장님 요청) -->
                             <!-- [신규 2026-10-23] 마감된 일정은 기본으로 접어 두고 이 단추로 펼친다 (사장님 요청) -->
                             <button type="button" id="ps-closed-btn" class="ps-tbtn" onclick="psToggleClosed()" title="마감된 일정 펼치기·접기">🔒 마감 펼치기</button>
-                            <button type="button" id="ps-noonsite-btn" class="ps-tbtn" onclick="psToggleNoOnsite()" title="끝나면 상시판매로 돌리기를 안 켠 일정만 보기">상시전환X</button>
+                            <button type="button" id="ps-noonsite-btn" class="ps-tbtn" onclick="psToggleNoOnsite()" title="켜면 상시판매로 돌리기를 이미 켠 일정은 회색으로">상시전환X</button>
                             <button type="button" id="ps-help-btn" class="ps-tbtn" onclick="psToggleHelp()" title="쓰는 법">❔</button>
                             <button type="button" class="ps-tbtn" onclick="psSetView('cal'); psCalGoToday()">오늘</button>
                             <!-- [신규 2026-10-03] 폰용 Ctrl — 켜 두면 Ctrl 을 누르고 있는 것과 같다 (막대 누르기=더하기, 끌기=복사). 손가락 화면에서만 보인다 -->
@@ -7768,6 +7768,8 @@
         @media (pointer: coarse) { #ps-cal-box .ps-bar { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
         /* [신규 2026-10-02] 지난 차례(이미 끝나고 지금 차례도 아닌 일정)는 흐리게 */
         .ps-bar.ps-past { opacity: .45; }
+        .ps-bar.ps-dim { opacity: .3; filter: grayscale(1); }   /* [신규 2026-10-28] 상시전환X 를 켜면 이미 켠 일정은 지우지 않고 회색 (사장님 요청) */
+        .ps-bar.ps-dim:hover { opacity: .7; }
         .ps-bar.ps-mq-hit { box-shadow: inset 0 0 0 2px #1d4ed8 !important; }
         /* [신규 2026-10-02] 마감선 — 픽업일까지 가는 막대 가운데의 세로선. 끌면 마감 날짜만 옮긴다 */
         .ps-xl { position: absolute; top: 0; bottom: 0; width: 9px; margin-left: -4px; cursor: ew-resize; z-index: 1; }
@@ -19380,7 +19382,7 @@
             psNoOnsiteOnly = !psNoOnsiteOnly;
             const b = document.getElementById('ps-noonsite-btn'); if (b) b.classList.toggle('on', psNoOnsiteOnly);
             renderProductScheduleCalendar();
-            showToast(psNoOnsiteOnly ? '상시판매 전환을 안 켠 일정만 보여요' : '모든 일정을 보여요');
+            showToast(psNoOnsiteOnly ? '상시판매 전환을 켠 일정은 회색으로 보여요' : '모든 일정을 똑같이 보여요');
         }
         function renderProductScheduleCalendar() {
             const box = document.getElementById('ps-cal-box');
@@ -19442,7 +19444,7 @@
                 bars.length = 0; merged.forEach(m => bars.push(m));
             }
             // [신규 2026-10-21] '상시전환X' — 끝나면 상시판매로 돌리기를 안 켠 일정만 (묶음은 담긴 상품 중 하나라도 안 켰으면) (사장님 요청)
-            if (psNoOnsiteOnly) { const keep = bars.filter(b => (b.members || [b.key]).some(k => (psItem(k) || {}).toOnsite !== true)); bars.length = 0; keep.forEach(b => bars.push(b)); }
+            if (psNoOnsiteOnly) bars.forEach(b => { b.dim = !(b.members || [b.key]).some(k => (psItem(k) || {}).toOnsite !== true); });   // [수정 2026-10-28] 지우지 않고 회색 (사장님 요청)
             // [수정 2026-10-10] 마감 시각이 빠른 일정부터 위 줄에 (사장님 요청 — 예전엔 올라가는 날·시각 순). 마감이 없으면 맨 뒤
             // [수정 2026-10-10] 지금 노출(판매) 중인 일정 → 올라갈 일정 → 지난 일정 차례로 위 줄을 준다 (사장님 요청 — 지난 일정 때문에 줄 사이가 벌어졌다)
             const PS_ST_RANK = { on: 0, soon: 1, closed: 2, hidden: 2 };
@@ -19595,7 +19597,7 @@
                             xLine = `<div class="ps-xl" style="left:${b.expPct}%" draggable="${PS_DND}" ondragstart="psResizeDragStart(event, '${kq}', 'end')" title="마감 — 끌어서 마감 날짜 조절"></div>`;
                         }
                     }
-                    namesHtml += `<div class="ps-bar${isStart ? ' s' : ''}${isEnd ? ' e' : ''}${isCut ? ' cut' : ''}${b.past ? ' ps-past' : ''}" data-key="${kq}" data-start="${b.start}" style="${bgCss} color:${fg}; cursor:grab;${selShadow}" title="${gEscapeHtml(b.nm)} · ${b.tip} · 일정 ${word} · 지금 ${ST[b.live][2]} · 끌어서 날짜 옮기기(Ctrl+끌면 복사) · 양 끝을 끌면 시작/${b.pk ? '픽업' : '마감'} 날짜만 조절${b.pk ? ' · 세로선을 끌면 마감 날짜 조절' : ''} · 눌러서 고른 뒤 Delete로 지우기" draggable="${PS_DND}" ondragstart="psDragStart(event, '${kq}', '${b.start}')" onclick="event.stopPropagation(); psSelectBar('${kq}', event)">${lHandle}${label}${xLine}${rHandle}</div>`;
+                    namesHtml += `<div class="ps-bar${isStart ? ' s' : ''}${isEnd ? ' e' : ''}${isCut ? ' cut' : ''}${b.past ? ' ps-past' : ''}${b.dim ? ' ps-dim' : ''}" data-key="${kq}" data-start="${b.start}" style="${bgCss} color:${fg}; cursor:grab;${selShadow}" title="${gEscapeHtml(b.nm)} · ${b.tip} · 일정 ${word} · 지금 ${ST[b.live][2]} · 끌어서 날짜 옮기기(Ctrl+끌면 복사) · 양 끝을 끌면 시작/${b.pk ? '픽업' : '마감'} 날짜만 조절${b.pk ? ' · 세로선을 끌면 마감 날짜 조절' : ''} · 눌러서 고른 뒤 Delete로 지우기" draggable="${PS_DND}" ondragstart="psDragStart(event, '${kq}', '${b.start}')" onclick="event.stopPropagation(); psSelectBar('${kq}', event)">${lHandle}${label}${xLine}${rHandle}</div>`;
                 }
                 namesHtml += `</div>`;   // ps-slot 닫기
                 });
