@@ -3255,6 +3255,8 @@
                         <button type="button" onclick="document.getElementById('product-csv-file').click()" title="CSV로 상품 목록 올리기" style="flex:0 0 auto; width:42px; height:42px; padding:0; display:flex; align-items:center; justify-content:center; border:1.5px solid #059669; background:#ecfdf5; color:#059669; border-radius:var(--radius-sm); font-size:16px; cursor:pointer;">📥</button>
                         <input type="file" id="product-csv-file" accept=".csv,text/csv" style="display:none;" onchange="importProductsFromCSV(this)">
                     </div>
+                    <!-- [신규 2026-10-30] 카톡용 과일·야채 단추 자리 — 공동구매 과일·야채 칸일 때만 보인다 (gFvSlot) -->
+                    <div id="fv-share-slot" style="display:none; margin:-4px 0 12px;"></div>
 
 
                     <div class="card" style="padding: 10px;">
@@ -32966,6 +32968,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             });
             return rows.sort((a, b) => (a.k === b.k ? 0 : a.k === 'fruit' ? -1 : 1) || a.name.localeCompare(b.name, 'ko'));
         }
+        // [신규 2026-10-30] 검색창 밑 자리에 카톡용 과일·야채 단추를 보이거나 숨긴다 (사장님 요청 — 종류 줄에서 옮김)
+        function gFvSlot(on) {
+            const el = document.getElementById('fv-share-slot'); if (!el) return;
+            el.style.display = on ? 'block' : 'none';
+            el.innerHTML = on ? `<button type="button" onclick="gShareFruitVeg()" title="지금 노출 중인 과일·야채 상품 — 카톡에 올릴 글과 그림" style="width:100%; height:42px; border:1.5px solid #fde68a; background:#fef9c3; color:#854d0e; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">📋 카톡용 과일·야채 (글·그림)</button>` : '';
+        }
         function gFruitVegShareBtn() {
             return `<button type="button" class="sub-tab-btn" onclick="gShareFruitVeg()" title="지금 노출 중인 과일·야채 상품 — 카톡에 올릴 글과 그림" style="background:#fef9c3; color:#854d0e;">📋 카톡용 과일·야채</button>`;
         }
@@ -33123,6 +33131,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const subContainer = document.getElementById('sub-products-list-tabs');
             if (!subContainer) return;
             subContainer.innerHTML = '';
+            gFvSlot(false);   // [신규 2026-10-30] 카톡용 과일·야채 단추(검색창 밑)는 과일 칸일 때만 아래에서 다시 켠다
             subContainer.classList.toggle('inv-shelf', uploadManageDeliveryType === 'inventory');   // [신규 2026-10-27] 폰에서 선반 단추를 줄바꿈해 보이게 (CSS)
 
             if (uploadManageDeliveryType === 'today') {
@@ -33134,7 +33143,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (uploadManageDeliveryType === 'reserve' && (uploadManageTab === '_과일' || uploadManageTab === '_사다드림')) {
                 uploadManageKind = 'all';   // 다른 날짜 탭에서 세부탭을 골라 뒀어도, 여기서는 전부 보인다
                 // [신규 2026-10-30] 과일 탭에는 카톡용 과일·야채 이름 복사 단추만
-                if (uploadManageTab === '_과일') { subContainer.style.display = 'flex'; subContainer.innerHTML = gFruitVegShareBtn(); return; }
+                if (uploadManageTab === '_과일') gFvSlot(true);   // [수정 2026-10-30] 과일 탭 — 카톡용 단추는 검색창 밑 (사장님 요청)
                 subContainer.style.display = 'none';
                 return;
             }
@@ -33151,7 +33160,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (uploadManageKind !== 'all' && !has.has(uploadManageKind)) uploadManageKind = 'all';
                 const subs = [['all', '전체']].concat(LIST_KINDS.filter(([k]) => has.has(k)).map(([k, l]) => k === 'fruit' && has.has('_veg') ? [k, '과일·야채'] : [k, l]));
                 const _needFresh = gFruitsNeedingFresh(uploadProducts).length;
-                const _fvBtn = (has.has('fruit') && uploadManageKind === 'fruit') ? gFruitVegShareBtn() : '';   // [신규 2026-10-30] 카톡용 과일·야채 이름 복사 — [수정] 과일·야채 칸을 눌렀을 때만 (사장님 요청)
+                gFvSlot(has.has('fruit') && uploadManageKind === 'fruit'); const _fvBtn = '';   // [신규 2026-10-30] 카톡용 과일·야채 이름 복사 — [수정] 과일·야채 칸을 눌렀을 때만 (사장님 요청)
                 subContainer.style.display = (subs.length > 2 || _needFresh || _fvBtn) ? 'flex' : 'none';
                 subContainer.innerHTML = subs.map(([k, l]) =>
                     `<button type="button" class="sub-tab-btn ${uploadManageKind === k ? 'active' : ''}" data-sub-tab="${k}" onclick="selectManageKind('${k}')">${l}</button>`).join('')
