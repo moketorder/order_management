@@ -5995,7 +5995,7 @@
                     const secs = [];
                     const secC = s => (opt && opt.secColors && opt.secColors[s]) || ['#ffe3e3', '#e03131'];   // [신규 2026-10-30] 묶음 색 (카톡용 과일·야채 묶음)
                     items.forEach(it => { const s = it.sec !== undefined ? it.sec : (!it.closed && it.sun && it.sunOn) ? it.sun : ''; const last = secs[secs.length - 1]; if (last && last.s === s) last.its.push(it); else secs.push({ s, its: [it] }); });   // [신규 2026-10-30] it.sec = 묶음 이름을 직접 줄 때
-                    const gap = 18, top = 188, H = 862, HB = 46, EX = HB + 4, AW = 1020;
+                    let gap = 18, top = 188, H = 862, HB = 46, EX = HB + 4, AW = 1020;   // [수정 2026-10-30] H 는 opt.tall 이면 늘어난다
                     const nHead = secs.filter(sc => sc.s).length;
                     /* [신규 2026-10-24] 일요일 마감 묶음이 한 줄을 다 못 채우면(묶음 수 < 칸 수) 묶음 판을 그 카드만큼 좁히고
                        같은 줄 오른쪽에 다른 상품을 이어 넣는다 (사장님 요청 — 줄 하나를 묶음 둘이 다 차지해 줄 수가 늘었다) */
@@ -6010,8 +6010,21 @@
                         const pf = Math.round(nf * 1.3), mf = Math.round(nf * .72), txH = 12 + (NOMOD ? 0 : (mf * 1.35 + 8)) + nf * 1.3 * NL + pf * 1.15 + 12;
                         return { C, Rn, rowH, cw, nf, pf, mf, txH, phH: rowH - txH };
                     };
-                    const plans = []; for (let C = 1; C <= Math.min(5, n); C++) plans.push(plan(C));
-                    const okP = plans.filter(p => p.phH >= Math.min(p.cw * .5, 220) && p.phH <= p.cw * 1.35 && p.phH > 60), poolP = okP.length ? okP : plans;   // 사진이 너무 납작하거나 너무 길쭉하지 않게
+                    let plans = []; for (let C = 1; C <= Math.min(5, n); C++) plans.push(plan(C));
+                    let okP = plans.filter(p => p.phH >= Math.min(p.cw * .5, 220) && p.phH <= p.cw * 1.35 && p.phH > 60), poolP = okP.length ? okP : plans;   // 사진이 너무 납작하거나 너무 길쭉하지 않게
+                    /* [신규 2026-10-30] opt.tall — 상품이 많아 사진이 납작해지면 그림을 아래로 늘린다 (사장님 요청 — 카톡용 과일·야채).
+                       사진이 알맞은 배치가 나올 때까지 높이를 54씩 늘리고, 캔버스를 그만큼 키워 바탕·머리말을 다시 그린다 */
+                    if (opt && opt.tall && !okP.length && n > 2) {
+                        while (!okP.length && H < 3200) {
+                            H += 54;
+                            plans = []; for (let C = 1; C <= Math.min(5, n); C++) plans.push(plan(C));
+                            okP = plans.filter(p => p.phH >= Math.min(p.cw * .55, 220) && p.phH <= p.cw * 1.2 && p.phH > 60);
+                        }
+                        poolP = okP.length ? okP : plans;
+                        cv.height = top + H + 30;
+                        c.fillStyle = '#fff7ea'; c.fillRect(0, 0, 1080, cv.height);
+                        await srcThHeader(c, F, col, opt.title, opt.pill, false);
+                    }
                     const P = (n === 2 && plans[1]) ? plans[1] : poolP.reduce(   // [수정 2026-10-24] 두 개면 늘 나란히 두 칸 — 세로로 긴 카드 (사장님 요청)
                         (b, x) => (x.nf > b.nf || (x.nf === b.nf && Math.min(x.cw, x.phH) > Math.min(b.cw, b.phH))) ? x : b);
                     const rowsAll = [];   // { sec, its: [...] } — 묶음마다 C개씩, 마지막 줄은 가운데로
@@ -32989,7 +33002,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     title: [[`${d.getMonth() + 1}월 ${d.getDate()}일 `, '#fff'], [`(${wd})`, '#ffe066']],
                     pill: [[`오늘의 ${word} · `, '#2f7a14'], [rows.length + '가지', '#f76707']],
                     secColors: { [SF]: ['#fff4e6', '#f76707'], [SV]: ['#ebfbee', '#37b24d'] },
-                    nameLines: 2 });   // [신규 2026-10-30] 상품명은 두 줄까지 (수식어는 그대로) (사장님 요청)
+                    nameLines: 2, tall: true });   // [신규 2026-10-30] 상품명은 두 줄까지 (수식어는 그대로) · 많으면 세로로 길게 (사장님 요청)
                 blob = await new Promise((res, rej) => cv.toBlob(x => x ? res(x) : rej(new Error('그림 변환 실패')), 'image/png'));
                 const url = URL.createObjectURL(blob);
                 out.innerHTML = `<img src="${url}" style="width:100%; border-radius:10px; border:1px solid #e2e8f0;">
