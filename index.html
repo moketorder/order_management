@@ -3283,6 +3283,8 @@
                         <button id="btn-batch-sharecopy" class="btn-batch" onclick="handleBatchShareCopy()" style="display:none; flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid #ca8a04; background: #FEE500; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #191919; white-space: nowrap; overflow: hidden;">💬 공유&amp;복사</button>
                         <!-- [신규 2026-10-02] 고른 상품으로 가격표 생성기와 같은 모양의 A4 가격표를 만든다 (할인이면 정상가 줄도) -->
                         <button class="btn-batch" onclick="handleBatchPriceTag()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(76, 175, 32, 0.35); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #3f8f1a; white-space: nowrap; overflow: hidden;">🏷️ 가격표</button>
+                        <!-- [신규 2026-10-30] 공동구매에서 여러 개 골랐을 때 단톡방 섬네일 같은 그림 (updateBatchBar 가 보이고 숨긴다) -->
+                        <button id="btn-batch-thumb" class="btn-batch" onclick="handleBatchThumb()" style="display:none; flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(112, 72, 232, 0.35); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #6741d9; white-space: nowrap; overflow: hidden;">🖼 섬네일</button>
                         <button class="btn-batch type-purchase" onclick="handleBatchPurchase()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #10b981; border-color: rgba(16, 185, 129, 0.25); white-space: nowrap; overflow: hidden;">🚚 발주</button>
                         <button class="btn-batch" onclick="handleBatchDeselect()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #64748b; white-space: nowrap; overflow: hidden;">✕ 선택 해제</button>
                         <button class="btn-batch type-delete" onclick="handleBatchDelete()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(220, 38, 38, 0.3); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #dc2626; white-space: nowrap; overflow: hidden;">🗑️ 삭제</button>
@@ -32977,19 +32979,70 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const text = lines.join('\n');
             /* [수정 2026-10-30] 바로 복사하던 것을 창으로 — 글(복사·공유)과 주간 섬네일 같은 그림(공유·받기) (사장님 요청) */
             const word = L.veg.length && L.fruit.length ? '과일·야채' : L.veg.length ? '야채' : '과일';
+            const rows = gFruitVegRows();
+            // [신규 2026-10-30] 과일·야채가 다 있으면 묶음 두 개로 — '🍎 과일'(주황) · '🥬 야채'(초록) (사장님 요청)
+            const SF = '🍎 과일', SV = '🥬 야채', both = rows.some(r => r.k === 'fruit') && rows.some(r => r.k === 'veg');
+            rows.forEach(r => { r.sec = both ? (r.k === 'veg' ? SV : SF) : ''; });
+            gThumbShareDialog({
+                heading: `📋 카톡용 ${word}`, text, rows, day: gTodayISO(),
+                fname: `MOKET_오늘의${word.replace('·', '')}_${d.getMonth() + 1}월${d.getDate()}일.png`,
+                opt: {
+                    title: [[`${d.getMonth() + 1}월 ${d.getDate()}일 `, '#fff'], [`(${wd})`, '#ffe066']],
+                    pill: [[`오늘의 ${word} · `, '#2f7a14'], [rows.length + '가지', '#f76707']],
+                    secColors: { [SF]: ['#fff4e6', '#f76707'], [SV]: ['#ebfbee', '#37b24d'] },
+                    nameLines: 2, tall: true, flow: true, tightMod: true }   // 상품명 두 줄 · 많으면 세로로 길게 · 묶음은 같은 줄에 이어서 · 수식어 여백 반 (사장님 요청)
+            });
+        }
+        // 상품 하나 → 섬네일 카드 한 칸 (이름·수식어·손님 가격·사진·품절)
+        function gThumbRowOf(p) {
+            const name = String(p.name || '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+            return { k: gListKind(p), name, mod: String(p.nameLead || '').replace(/\s+/g, ' ').trim(), price: gFvPrice(p),
+                imgs: (Array.isArray(p.images) ? p.images : []).filter(Boolean), imgAt: 0, closed: gIsProductSoldOut(p), sun: '', vendor: isSadaListProduct(p) ? '사다드림' : '' };
+        }
+        /* [신규 2026-10-30] 공동구매 목록에서 여러 개 고르고 '🖼 섬네일' (사장님 요청) — 고른 상품으로 단톡방 섬네일과 같은 그림.
+           픽업일이 하나면 그 날짜, 여럿이면 첫날~끝날. 글도 같이 (날짜마다 상품명·가격) */
+        function handleBatchThumb() {
+            const prods = [...uploadSelectedProductIndices].sort((a, b) => a - b).map(i => uploadProducts[i]).filter(p => p && p.name !== '배달비');
+            if (prods.length < 1) { showToast('상품을 골라 주세요'); return; }
+            const dOf = p => getReserveGroupDate(p) || '';
+            prods.sort((a, b) => dOf(a).localeCompare(dOf(b)));
+            const days = [...new Set(prods.map(dOf).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x)))].sort();
+            const md = k => { const t = new Date(k + 'T00:00:00'); return { m: t.getMonth() + 1, d: t.getDate(), w: '일월화수목금토'[t.getDay()] }; };
+            const d0 = days[0] || gTodayISO(), a = md(d0), b = md(days[days.length - 1] || d0);
+            const rows = prods.map(gThumbRowOf);
+            const lines = [];
+            (days.length ? days : ['']).forEach(k => {
+                const its = prods.filter(p => (k ? dOf(p) === k : true));
+                if (!its.length) return;
+                if (k) { const x = md(k); lines.push((lines.length ? '\n' : '') + `📦 ${x.m}/${x.d}(${x.w}) 픽업/배달`); }
+                its.forEach(p => { const r = gThumbRowOf(p); lines.push(`· ${r.name}${r.price ? ' ' + r.price + '원' : ''}`); });
+            });
+            const noDate = prods.filter(p => days.length && !days.includes(dOf(p)));
+            if (noDate.length) { lines.push('\n📦 날짜 없음'); noDate.forEach(p => { const r = gThumbRowOf(p); lines.push(`· ${r.name}${r.price ? ' ' + r.price + '원' : ''}`); }); }
+            const one = days.length <= 1;
+            gThumbShareDialog({
+                heading: `🖼 공동구매 섬네일 · ${rows.length}가지`, text: lines.join('\n'), rows, day: d0,
+                fname: `MOKET_공동구매_${a.m}월${a.d}일${one ? '' : '-' + b.m + '월' + b.d + '일'}.png`,
+                opt: {
+                    title: one ? [[`${a.m}월 ${a.d}일 `, '#fff'], [`(${a.w})`, '#ffe066']] : [[`${a.m}/${a.d}(${a.w}) ~ ${b.m}/${b.d}(${b.w})`, '#fff']],
+                    pill: [['픽업/배달 상품 · ', '#2f7a14'], [rows.length + '가지', '#f76707']],
+                    nameLines: 2, tall: true, tightMod: true }
+            });
+        }
+        // 글(고칠 수 있음·복사·공유) + 섬네일 그림(공유·받기) 창 — 카톡용 과일·야채와 공동구매 섬네일이 같이 쓴다
+        async function gThumbShareDialog({ heading, text, rows, day, fname, opt }) {
             const old = document.getElementById('fv-share'); if (old) old.remove();
             const box = document.createElement('div'); box.id = 'fv-share';
             box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:flex-start; justify-content:center; padding:16px; overflow:auto;';
             const B = 'flex:1 1 0; min-width:0; height:42px; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;';
             box.innerHTML = `<div style="background:#fff; border-radius:16px; width:100%; max-width:520px; padding:14px 16px 16px; box-shadow:0 18px 40px rgba(0,0,0,.2);">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;"><b style="font-size:16px;">📋 카톡용 ${word}</b><button type="button" data-a="x" style="border:none; background:none; font-size:20px; cursor:pointer;">✕</button></div>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;"><b style="font-size:16px;">${gEscapeHtml(heading)}</b><button type="button" data-a="x" style="border:none; background:none; font-size:20px; cursor:pointer;">✕</button></div>
                 <textarea id="fv-text" style="width:100%; box-sizing:border-box; height:150px; border:1.5px solid #e2e8f0; border-radius:10px; padding:8px 10px; font-size:13px; font-family:inherit; resize:vertical;">${gEscapeHtml(text)}</textarea>
                 <div style="display:flex; gap:6px; margin:8px 0 12px;"><button type="button" data-a="copy" style="${B} border:1.5px solid #cbd5e1; background:#fff; color:#334155;">📋 글 복사</button>${navigator.share ? `<button type="button" data-a="stext" style="${B} border:1.5px solid #cbd5e1; background:#fff; color:#334155;">📤 글 공유</button>` : ''}</div>
                 <div id="fv-img" style="text-align:center; font-size:12px; font-weight:700; color:#64748b;">그림 만드는 중…</div>
             </div>`;
             document.body.appendChild(box);
             let blob = null;
-            const fname = `MOKET_오늘의${word.replace('·', '')}_${d.getMonth() + 1}월${d.getDate()}일.png`;
             box.addEventListener('click', async e => {
                 if (e.target === box) return box.remove();
                 const b = e.target.closest('[data-a]'); if (!b) return;
@@ -33008,15 +33061,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const out = document.getElementById('fv-img');
             if (typeof window.srcThDrawFv !== 'function') { out.textContent = '그림을 만들 수 없어요 — 새로고침 후 다시 해 주세요'; return; }
             try {
-                const rows = gFruitVegRows(), dk = gTodayISO();
-                // [신규 2026-10-30] 과일·야채가 다 있으면 묶음 두 개로 — 머리띠 '🍎 과일'(주황) · '🥬 야채'(초록) (사장님 요청)
-                const SF = '🍎 과일', SV = '🥬 야채', both = rows.some(r => r.k === 'fruit') && rows.some(r => r.k === 'veg');
-                rows.forEach(r => { r.sec = both ? (r.k === 'veg' ? SV : SF) : ''; });
-                const cv = await window.srcThDrawFv(rows, dk, {
-                    title: [[`${d.getMonth() + 1}월 ${d.getDate()}일 `, '#fff'], [`(${wd})`, '#ffe066']],
-                    pill: [[`오늘의 ${word} · `, '#2f7a14'], [rows.length + '가지', '#f76707']],
-                    secColors: { [SF]: ['#fff4e6', '#f76707'], [SV]: ['#ebfbee', '#37b24d'] },
-                    nameLines: 2, tall: true, flow: true, tightMod: true });   // [신규 2026-10-30] 상품명은 두 줄까지 (수식어는 그대로) · 많으면 세로로 길게 · 묶음은 같은 줄에 이어서 (사장님 요청)
+                const cv = await window.srcThDrawFv(rows, day, opt);
                 blob = await new Promise((res, rej) => cv.toBlob(x => x ? res(x) : rej(new Error('그림 변환 실패')), 'image/png'));
                 const url = URL.createObjectURL(blob);
                 out.innerHTML = `<img src="${url}" style="width:100%; border-radius:10px; border:1px solid #e2e8f0;">
@@ -35847,6 +35892,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const single = uploadSelectedProductIndices.size === 1;
             const shareCopyBtn = document.getElementById('btn-batch-sharecopy');
             if (shareCopyBtn) shareCopyBtn.style.display = single ? 'flex' : 'none';
+            // [신규 2026-10-30] 섬네일 — 공동구매 목록에서 두 개 이상 골랐을 때만
+            const thumbBtn = document.getElementById('btn-batch-thumb');
+            if (thumbBtn) thumbBtn.style.display = (uploadManageDeliveryType === 'reserve' && uploadSelectedProductIndices.size >= 2) ? 'flex' : 'none';
             // [신규 2026-10-02] 노출·숨김 토글 — 고른 상품이 모두 노출 중일 때만 '숨김'
             const visBtn = document.getElementById('btn-batch-vis');
             if (visBtn) visBtn.innerHTML = gBatchAllShown() ? '🙈 숨김' : '👁️ 노출';
