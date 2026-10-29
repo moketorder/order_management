@@ -32949,6 +32949,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function selectManageKind(k) {
             uploadManageKind = k;
             document.querySelectorAll('#sub-products-list-tabs .sub-tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.subTab === k));
+            if (uploadManageDeliveryType === 'reserve') try { buildSubTabs(); } catch (e) { }   // [신규 2026-10-30] 과일·야채 칸일 때만 카톡용 단추가 보이게 다시 그린다
             renderProductsList();
         }
 
@@ -33004,7 +33005,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (uploadManageKind !== 'all' && !has.has(uploadManageKind)) uploadManageKind = 'all';
                 const subs = [['all', '전체']].concat(LIST_KINDS.filter(([k]) => has.has(k)).map(([k, l]) => k === 'fruit' && has.has('_veg') ? [k, '과일·야채'] : [k, l]));
                 const _needFresh = gFruitsNeedingFresh(uploadProducts).length;
-                const _fvBtn = has.has('fruit') ? gFruitVegShareBtn() : '';   // [신규 2026-10-30] 카톡용 과일·야채 이름 복사
+                const _fvBtn = (has.has('fruit') && uploadManageKind === 'fruit') ? gFruitVegShareBtn() : '';   // [신규 2026-10-30] 카톡용 과일·야채 이름 복사 — [수정] 과일·야채 칸을 눌렀을 때만 (사장님 요청)
                 subContainer.style.display = (subs.length > 2 || _needFresh || _fvBtn) ? 'flex' : 'none';
                 subContainer.innerHTML = subs.map(([k, l]) =>
                     `<button type="button" class="sub-tab-btn ${uploadManageKind === k ? 'active' : ''}" data-sub-tab="${k}" onclick="selectManageKind('${k}')">${l}</button>`).join('')
