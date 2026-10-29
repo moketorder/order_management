@@ -18242,9 +18242,20 @@
                 const actEnded = !act || (Number(act.expireAt) && now >= Number(act.expireAt));
                 if (!actEnded) continue;
                 const due = items.filter(it => it.rid !== p.schedRid && Number(it.releaseAt) && now >= psOpenAt(it.releaseAt) && !(Number(it.expireAt) && now >= Number(it.expireAt)));   // [수정 2026-10-03] 그날 0시부터
-                if (!due.length) continue;
-                const pick = due.reduce((a, b) => Number(b.releaseAt) > Number(a.releaseAt) ? b : a);
-                if (await psActivate(pick, true)) n++;
+                /* [신규 2026-10-29] 마감 시각이 이미 지난 묶음에 나중에 넣은 일정도 상품에 붙인다 (사장님 요청 — 다진마늘).
+                   예전엔 끝난 일정이라 안 붙어서, 상품이 마감도 안 되고 다음 날 상시판매 전환도 안 됐다.
+                   마감 뒤에 만든 일정이고 픽업일이 아직 안 지난 것만 — 옛날에 끝난 일정이 다시 붙지 않게 */
+                const today = gTodayISO();
+                const late = due.length ? [] : items.filter(it => it.rid !== p.schedRid && Number(it.releaseAt) && now >= psOpenAt(it.releaseAt)
+                    && Number(it.expireAt) && now >= Number(it.expireAt) && Number(it.createdAt) > Number(it.expireAt) && !it.toOnsiteDone
+                    && (it.pickup || fMsToDateKey(it.expireAt)) >= today);
+                const cand = due.length ? due : late;
+                if (!cand.length) continue;
+                const pick = cand.reduce((a, b) => Number(b.releaseAt) > Number(a.releaseAt) ? b : a);
+                if (await psActivate(pick, true)) {
+                    n++;
+                    if (!due.length) { await fbPatchProducts({ [`${idx}/announced`]: true }); p.announced = true; }   // 이미 마감된 차례라 🔔 공지 알림은 안 띄운다
+                }
                 else gReleaseFailAdd([{ kind: 'release', sid: String(sid), name: String(p.name || '') }]);   // [신규 2026-10-03] 실패 알림
             }
             return n;
