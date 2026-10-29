@@ -43731,9 +43731,26 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         async function handleBatchPriceTag() {
             if (uploadSelectedProductIndices.size === 0) { showToast('상품을 골라 주세요'); return; }
             const prods = [...uploadSelectedProductIndices].sort((a, b) => a - b).map(i => uploadProducts[i]).filter(Boolean);
+            /* [신규 2026-10-29] 열어 둔 가격표 창이 있으면 새 창을 열지 않고 그 창 뒤에 더한다 (사장님 요청).
+               이미 그 창에 있는 상품은 건너뛴다 (한 장 더는 창의 ⧉ 복제로) */
+            const old = window.__gPtWin;
+            if (old && !old.closed && typeof old.__ptAdd === 'function') {
+                const tags = await gPriceTagBuild(prods);
+                const r = old.__ptAdd(JSON.stringify(tags));
+                try { old.focus(); } catch (e) { }
+                showToast(`🏷️ 열린 가격표 창에 ${r.added}장 더했어요${r.skipped ? ` · 이미 있는 ${r.skipped}개는 건너뜀` : ''}`);
+                return;
+            }
             const w = window.open('', '_blank');   // 누른 순간에 열어야 팝업으로 안 막힌다 — 고친 것은 연 다음에 받는다
             if (!w) { showToast('새 창이 막혔어요 · 팝업 허용'); return; }
+            window.__gPtWin = w;
             w.document.write('<p style="font:700 14px sans-serif; padding:20px; color:#64748b;">불러오는 중…</p>');
+            const tags = await gPriceTagBuild(prods);
+            const json = JSON.stringify(tags).replace(/</g, '\\u003c');
+            gPriceTagWrite(w, tags, json);
+        }
+        // 고른 상품 → 가격표 내용 (가게에서 고쳐 둔 글씨·가격을 덧입힌다)
+        async function gPriceTagBuild(prods) {
             let edits = {};
             try {
                 const r = await fetch(`${FIREBASE_DB_URL}${PRICE_TAG_EDITS}.json?t=${Date.now()}`);
@@ -43754,7 +43771,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 }
                 return t;
             });
-            const json = JSON.stringify(tags).replace(/</g, '\\u003c');
+            return tags;
+        }
+        function gPriceTagWrite(w, tags, json) {
             w.document.open();
             w.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>가격표 ${tags.length}장</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
@@ -43959,6 +43978,15 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                     render(); save(t);
                 }
             });
+            // [신규 2026-10-29] 주문관리에서 가격표를 또 만들면 이 창 뒤에 더한다 — 이미 있는 상품(복제본 빼고)은 건너뛴다
+            window.__ptAdd = function (json) {
+                var add = JSON.parse(json), have = {}, n = 0, skip = 0;
+                T.forEach(function (t) { if (!t.copy) have[t.key] = 1; });
+                add.forEach(function (t) { if (have[t.key]) { skip++; return; } have[t.key] = 1; T.push(t); n++; });
+                if (n) { render(); setTimeout(function () { window.scrollTo(0, document.body.scrollHeight); }, 50); }
+                st.textContent = n ? n + '장 더했어요' : '더할 새 상품이 없어요'; document.title = '가격표 ' + T.length + '장';
+                return { added: n, skipped: skip };
+            };
             render();
         }
 
