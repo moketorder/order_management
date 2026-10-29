@@ -5981,7 +5981,8 @@
                        일요일 마감 묶음도 같은 칸 수·같은 카드 크기를 쓴다 (예전엔 묶음마다 칸 수가 달라 글씨 크기가 달랐다) */
                     const n = items.length;
                     const secs = [];
-                    items.forEach(it => { const s = (!it.closed && it.sun && it.sunOn) ? it.sun : ''; const last = secs[secs.length - 1]; if (last && last.s === s) last.its.push(it); else secs.push({ s, its: [it] }); });
+                    const secC = s => (opt && opt.secColors && opt.secColors[s]) || ['#ffe3e3', '#e03131'];   // [신규 2026-10-30] 묶음 색 (카톡용 과일·야채 묶음)
+                    items.forEach(it => { const s = it.sec !== undefined ? it.sec : (!it.closed && it.sun && it.sunOn) ? it.sun : '';   // [신규 2026-10-30] it.sec = 묶음 이름을 직접 줄 때 const last = secs[secs.length - 1]; if (last && last.s === s) last.its.push(it); else secs.push({ s, its: [it] }); });
                     const gap = 18, top = 188, H = 862, HB = 46, EX = HB + 4, AW = 1020;
                     const nHead = secs.filter(sc => sc.s).length;
                     /* [신규 2026-10-24] 일요일 마감 묶음이 한 줄을 다 못 채우면(묶음 수 < 칸 수) 묶음 판을 그 카드만큼 좁히고
@@ -6011,9 +6012,9 @@
                     if (MERGE) {   // 첫 줄 왼쪽 묶음 카드만 감싸는 좁은 판 + 머리말, 줄은 머리말 아래부터
                         const sN = secs[0].its.length, k0 = rowsAll[0].its.length, rw0 = k0 * P.cw + (k0 - 1) * gap, x0 = 30 + (AW - rw0) / 2;
                         const px = x0 - 8, pw = sN * P.cw + (sN - 1) * gap + 16, py = top - 6, ph = EX + rowH + 14;
-                        c.fillStyle = '#ffe3e3'; srcThRR(c, px, py, pw, ph, 26); c.fill();
-                        c.save(); srcThRR(c, px, py, pw, ph, 26); c.clip(); c.fillStyle = '#e03131'; c.fillRect(px, py, pw, HB); c.restore();
-                        c.save(); c.strokeStyle = '#e03131'; c.lineWidth = 4; srcThRR(c, px, py, pw, ph, 26); c.stroke(); c.restore();
+                        c.fillStyle = secC(secs[0].s)[0]; srcThRR(c, px, py, pw, ph, 26); c.fill();
+                        c.save(); srcThRR(c, px, py, pw, ph, 26); c.clip(); c.fillStyle = secC(secs[0].s)[1]; c.fillRect(px, py, pw, HB); c.restore();
+                        c.save(); c.strokeStyle = secC(secs[0].s)[1]; c.lineWidth = 4; srcThRR(c, px, py, pw, ph, 26); c.stroke(); c.restore();
                         let hf = 28; c.font = '900 ' + hf + 'px ' + F; while (hf > 14 && c.measureText(secs[0].s).width > pw - 24) { hf--; c.font = '900 ' + hf + 'px ' + F; }
                         c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(secs[0].s, px + pw / 2, py + HB / 2 + hf * .36); c.textAlign = 'left';
                         rowsAll.forEach((r, i) => rowYs.push(top + EX + i * (rowH + gap)));
@@ -6022,9 +6023,9 @@
                         const h = sc.r * rowH + (sc.r - 1) * gap, ry0 = yy + (sc.s ? EX : 0);
                         if (sc.s) {
                             const px = 22, pw = 1036, py = yy - 6, ph = EX + h + 14;
-                            c.fillStyle = '#ffe3e3'; srcThRR(c, px, py, pw, ph, 26); c.fill();
-                            c.save(); srcThRR(c, px, py, pw, ph, 26); c.clip(); c.fillStyle = '#e03131'; c.fillRect(px, py, pw, HB); c.restore();
-                            c.save(); c.strokeStyle = '#e03131'; c.lineWidth = 4; srcThRR(c, px, py, pw, ph, 26); c.stroke(); c.restore();   // 묶음 빨간 테두리 (사장님 요청)
+                            c.fillStyle = secC(sc.s)[0]; srcThRR(c, px, py, pw, ph, 26); c.fill();
+                            c.save(); srcThRR(c, px, py, pw, ph, 26); c.clip(); c.fillStyle = secC(sc.s)[1]; c.fillRect(px, py, pw, HB); c.restore();
+                            c.save(); c.strokeStyle = secC(sc.s)[1]; c.lineWidth = 4; srcThRR(c, px, py, pw, ph, 26); c.stroke(); c.restore();   // 묶음 빨간 테두리 (사장님 요청)
                             c.font = '900 28px ' + F; c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(sc.s, 540, py + HB / 2 + 10); c.textAlign = 'left';
                         }
                         for (let k = 0; k < sc.r; k++) rowYs.push(ry0 + k * (rowH + gap));
@@ -32968,9 +32969,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (typeof window.srcThDrawFv !== 'function') { out.textContent = '그림을 만들 수 없어요 — 새로고침 후 다시 해 주세요'; return; }
             try {
                 const rows = gFruitVegRows(), dk = gTodayISO();
+                // [신규 2026-10-30] 과일·야채가 다 있으면 묶음 두 개로 — 머리띠 '🍎 과일'(주황) · '🥬 야채'(초록) (사장님 요청)
+                const SF = '🍎 과일', SV = '🥬 야채', both = rows.some(r => r.k === 'fruit') && rows.some(r => r.k === 'veg');
+                rows.forEach(r => { r.sec = both ? (r.k === 'veg' ? SV : SF) : ''; });
                 const cv = await window.srcThDrawFv(rows, dk, {
                     title: [[`${d.getMonth() + 1}월 ${d.getDate()}일 `, '#fff'], [`(${wd})`, '#ffe066']],
-                    pill: [[`오늘의 ${word} · `, '#2f7a14'], [rows.length + '가지', '#f76707']] });
+                    pill: [[`오늘의 ${word} · `, '#2f7a14'], [rows.length + '가지', '#f76707']],
+                    secColors: { [SF]: ['#fff4e6', '#f76707'], [SV]: ['#ebfbee', '#37b24d'] } });
                 blob = await new Promise((res, rej) => cv.toBlob(x => x ? res(x) : rej(new Error('그림 변환 실패')), 'image/png'));
                 const url = URL.createObjectURL(blob);
                 out.innerHTML = `<img src="${url}" style="width:100%; border-radius:10px; border:1px solid #e2e8f0;">
