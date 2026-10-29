@@ -32895,6 +32895,33 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             });
             return out;
         }
+        /* [신규 2026-10-30] 카톡에 올릴 오늘 과일·야채 목록 (사장님 요청) — 지금 노출 중인(숨김 아니고 마감 안 된) 과일·야채 상품 이름을
+           과일 / 야채로 나눠 한 글로 만든다. 폰은 공유 창(카톡 고르기), 컴퓨터는 복사 */
+        function gFruitVegShareList() {
+            const clean = n => String(n || '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+            const live = (uploadProducts || []).filter(p => p && p.name !== '배달비' && ['fruit', 'veg'].includes(gListKind(p))
+                && isGroupBuyListProduct(p) && gProdVisibleNow(p) && !gIsExpiredAdmin(p));
+            const pick = k => [...new Set(live.filter(p => gListKind(p) === k).map(p => clean(p.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+            return { fruit: pick('fruit'), veg: pick('veg') };
+        }
+        function gFruitVegShareBtn() {
+            return `<button type="button" class="sub-tab-btn" onclick="gShareFruitVeg()" title="지금 노출 중인 과일·야채 상품 이름을 카톡에 올릴 글로 (폰은 공유, 컴퓨터는 복사)" style="background:#fef9c3; color:#854d0e;">📋 카톡용 과일·야채</button>`;
+        }
+        async function gShareFruitVeg() {
+            const L = gFruitVegShareList();
+            if (!L.fruit.length && !L.veg.length) { showToast('지금 노출 중인 과일·야채 상품이 없어요'); return; }
+            const d = new Date(), wd = '일월화수목금토'[d.getDay()];
+            const lines = [`🍎 오늘의 ${L.veg.length && L.fruit.length ? '과일·야채' : L.veg.length ? '야채' : '과일'} (${d.getMonth() + 1}/${d.getDate()} ${wd})`];
+            if (L.fruit.length) lines.push('', '[과일]', ...L.fruit.map(n => '· ' + n));
+            if (L.veg.length) lines.push('', '[야채]', ...L.veg.map(n => '· ' + n));
+            const text = lines.join('\n');
+            const touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+            if (touch && navigator.share) {
+                try { await navigator.share({ text }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+            }
+            try { await navigator.clipboard.writeText(text); showToast(`📋 과일 ${L.fruit.length} · 야채 ${L.veg.length}개 이름을 복사했어요 — 카톡에 붙여 넣으세요`); }
+            catch (e) { prompt('아래 글을 복사해 주세요', text); }
+        }
         async function gFreshAllFruits() {
             let data;
             try {
@@ -32959,6 +32986,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // [수정 2026-09-30] '과일'·'사다드림' 탭은 그 자체로 이미 종류가 정해져 있어 — 아래 세부 분류탭은 필요 없다
             if (uploadManageDeliveryType === 'reserve' && (uploadManageTab === '_과일' || uploadManageTab === '_사다드림')) {
                 uploadManageKind = 'all';   // 다른 날짜 탭에서 세부탭을 골라 뒀어도, 여기서는 전부 보인다
+                // [신규 2026-10-30] 과일 탭에는 카톡용 과일·야채 이름 복사 단추만
+                if (uploadManageTab === '_과일') { subContainer.style.display = 'flex'; subContainer.innerHTML = gFruitVegShareBtn(); return; }
                 subContainer.style.display = 'none';
                 return;
             }
@@ -32975,11 +33004,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (uploadManageKind !== 'all' && !has.has(uploadManageKind)) uploadManageKind = 'all';
                 const subs = [['all', '전체']].concat(LIST_KINDS.filter(([k]) => has.has(k)).map(([k, l]) => k === 'fruit' && has.has('_veg') ? [k, '과일·야채'] : [k, l]));
                 const _needFresh = gFruitsNeedingFresh(uploadProducts).length;
-                subContainer.style.display = (subs.length > 2 || _needFresh) ? 'flex' : 'none';
+                const _fvBtn = has.has('fruit') ? gFruitVegShareBtn() : '';   // [신규 2026-10-30] 카톡용 과일·야채 이름 복사
+                subContainer.style.display = (subs.length > 2 || _needFresh || _fvBtn) ? 'flex' : 'none';
                 subContainer.innerHTML = subs.map(([k, l]) =>
                     `<button type="button" class="sub-tab-btn ${uploadManageKind === k ? 'active' : ''}" data-sub-tab="${k}" onclick="selectManageKind('${k}')">${l}</button>`).join('')
                     // [신규 2026-09-30] 과일을 모두 신선식품으로 — 켜야 할 과일이 남아 있을 때만 보인다
-                    + (_needFresh ? `<button type="button" class="sub-tab-btn" onclick="gFreshAllFruits()" title="과일 상품의 '신선'을 모두 켭니다 (받는 날에만 배달)" style="background:#eef7e7; color:#3d8f19;">🍎 과일 ${_needFresh}개 신선 켜기</button>` : '');
+                    + (_needFresh ? `<button type="button" class="sub-tab-btn" onclick="gFreshAllFruits()" title="과일 상품의 '신선'을 모두 켭니다 (받는 날에만 배달)" style="background:#eef7e7; color:#3d8f19;">🍎 과일 ${_needFresh}개 신선 켜기</button>` : '') + _fvBtn;
                 return;
             }
             
