@@ -32826,9 +32826,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 // [신규] 날짜 없이 올라간 옛 당일 과일이 있을 때만 모아보기를 맨 앞에 둔다
                 //  [수정] 이름을 '날짜 없음'으로 — 옛 과일뿐 아니라 날짜 없이 올린 공구도 여기 모인다
                 //  [수정 2026-09-30] 과일·사다드림은 '날짜 없음'/날짜별 탭에 섞이면 찾기 힘드니 각각 따로 앞에 둔다
-                if (uploadProducts.some(p => isLegacyTodayListProduct(p) && gListKind(p) === 'fruit')) cats.push(['_과일', '과일']);
+                { const _fv = uploadProducts.filter(p => isLegacyTodayListProduct(p) && ['fruit', 'veg'].includes(gListKind(p))); if (_fv.length) cats.push(['_과일', _fv.some(p => gListKind(p) === 'veg') ? '과일·야채' : '과일']); }   // [수정 2026-10-30] 야채도 과일 탭에, 있으면 '과일·야채' (사장님 요청)
                 if (uploadProducts.some(isSadaListProduct)) cats.push(['_사다드림', '사다드림']);
-                if (uploadProducts.some(p => isLegacyTodayListProduct(p) && gListKind(p) !== 'fruit')) cats.push(['_예전당일', '날짜 없음']);
+                if (uploadProducts.some(p => isLegacyTodayListProduct(p) && !['fruit', 'veg'].includes(gListKind(p)))) cats.push(['_예전당일', '날짜 없음']);
                 dates.filter(d => d >= _todayStr).forEach(d => cats.push([d, d === _todayStr ? `오늘 ${fmtMD(d)}` : fmtMD(d)])); // 오늘 이후(포함) 날짜별 개별 탭
                 /* [신규] 오늘 이전 날짜는 탭이 끝없이 길어져 목록에서 빼 두었지만, 가끔 지난 상품을
                    확인해야 할 때가 있다. 날짜 끝 오른쪽에 '이전' 버튼 하나로 모아 둔다.
@@ -32874,8 +32874,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const gd = getReserveGroupDate(prod);
             if (uploadManageTab === 'all') return true;
             // [수정 2026-09-30] '날짜 없음'에는 과일·사다드림 말고 다른 것만 — 둘 다 각자 탭으로 따로 뺐다
-            if (uploadManageTab === '_예전당일') return isLegacyTodayListProduct(prod) && gListKind(prod) !== 'fruit';
-            if (uploadManageTab === '_과일') return isLegacyTodayListProduct(prod) && gListKind(prod) === 'fruit';
+            if (uploadManageTab === '_예전당일') return isLegacyTodayListProduct(prod) && !['fruit', 'veg'].includes(gListKind(prod));   // [수정 2026-10-30] 야채는 과일 탭으로
+            if (uploadManageTab === '_과일') return isLegacyTodayListProduct(prod) && ['fruit', 'veg'].includes(gListKind(prod));   // [수정 2026-10-30] 야채도
             if (uploadManageTab === '_사다드림') return isSadaListProduct(prod);
             if (uploadManageTab === '_upcoming') return gd && gd >= _t && !isSadaListProduct(prod);
             if (uploadManageTab === '_이전') return gd && gd < _t && !isSadaListProduct(prod);
@@ -32968,12 +32968,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const has = new Set();
                 (uploadProducts || []).forEach(p => {
                     if (!p || p.name === '배달비' || !gGroupBuyInDateTab(p)) return;
-                    has.add(gListKind(p));
+                    { const _k = gListKind(p); has.add(_k === 'veg' ? 'fruit' : _k); if (_k === 'veg') has.add('_veg'); }   // [수정 2026-10-30] 야채는 과일 칸에 같이 — 있으면 이름이 '과일·야채' (사장님 요청)
                     // 신선식품은 종류와 따로 켜는 표시. [수정 2026-10-03] 사다드림도 신선배송(isFresh)을 켜 두지만 신선식품 줄에는 안 넣는다
                     if ((p.isFresh === true || p.isFresh === 'true') && !isSadaListProduct(p)) has.add('fresh');
                 });
                 if (uploadManageKind !== 'all' && !has.has(uploadManageKind)) uploadManageKind = 'all';
-                const subs = [['all', '전체']].concat(LIST_KINDS.filter(([k]) => has.has(k)));
+                const subs = [['all', '전체']].concat(LIST_KINDS.filter(([k]) => has.has(k)).map(([k, l]) => k === 'fruit' && has.has('_veg') ? [k, '과일·야채'] : [k, l]));
                 const _needFresh = gFruitsNeedingFresh(uploadProducts).length;
                 subContainer.style.display = (subs.length > 2 || _needFresh) ? 'flex' : 'none';
                 subContainer.innerHTML = subs.map(([k, l]) =>
@@ -33320,7 +33320,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    예전에는 사다드림을 isFresh 없이 따로 알아봤는데, 이제 사다드림도 isFresh 를 켜서 저장한다.
                    손님 화면 딱지는 그대로 — [신선식품]은 사다드림이 아닌 신선배송 상품에만, 사다드림은 [사다드림]만.
                    저장 모양: '일반(신선)'은 kind 'group' + isFresh true. */
-                [['group', '일반'], ['groupFresh', '일반(신선)'], ['fruit', '과일'], ['veg', '채소'], ['sada', '사다드림']].forEach(([v, t]) => {
+                [['group', '일반'], ['groupFresh', '일반(신선)'], ['fruit', '과일'], ['veg', '야채'], ['sada', '사다드림']].forEach(([v, t]) => {
                     const o = document.createElement('option');
                     o.value = v; o.innerText = t;
                     kindSel.appendChild(o);
@@ -35167,7 +35167,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     if (prod.name === "배달비") return false;
                     if (!gGroupBuyInDateTab(prod)) return false;
                     if (uploadManageKind === 'fresh') return (prod.isFresh === true || prod.isFresh === 'true') && !isSadaListProduct(prod);   // [수정 2026-10-03] 사다드림 빼고
-                    return uploadManageKind === 'all' || gListKind(prod) === uploadManageKind;
+                    { const _k = gListKind(prod); return uploadManageKind === 'all' || _k === uploadManageKind || (uploadManageKind === 'fruit' && _k === 'veg'); }   // [수정 2026-10-30] 과일 칸에 야채도 (사장님 요청)
                 });
             }
 
