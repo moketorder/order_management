@@ -5967,13 +5967,13 @@
                     }
                     c.textAlign = 'left';
                 }
-                async function srcThDrawDay(items, d, di) {
+                async function srcThDrawDay(items, d, di, opt) {   // [신규 2026-10-30] opt = { title, pill } — 머리말 글을 바꿀 때 (카톡용 과일·야채)
                     const F = await srcThFonts(), cv = document.createElement('canvas'); cv.width = cv.height = 1080;
                     const c = cv.getContext('2d'), [col, colD] = SRC_TH_DAYC[di];
                     c.fillStyle = '#fff7ea'; c.fillRect(0, 0, 1080, 1080);
                     const dt = new Date(d + 'T00:00:00');
-                    await srcThHeader(c, F, col, [[(dt.getMonth() + 1) + '월 ' + dt.getDate() + '일 ', '#fff'], ['(' + SRC_TH_W[di] + ')', '#ffe066']],
-                        [['픽업/배달 상품 · ', colD], [items.length + '가지', '#f76707']], false);
+                    await srcThHeader(c, F, col, (opt && opt.title) || [[(dt.getMonth() + 1) + '월 ' + dt.getDate() + '일 ', '#fff'], ['(' + SRC_TH_W[di] + ')', '#ffe066']],
+                        (opt && opt.pill) || [['픽업/배달 상품 · ', colD], [items.length + '가지', '#f76707']], false);
                     /* [수정 2026-10-16] 일요일 마감 상품은 한 묶음 — 옅은 빨강 판 위에 모으고 왼쪽 세로 빨간 띠에 '일요일 오후 6시 마감' 한 번만 (사장님 요청)
                        묶음(같은 마감 글)마다 줄을 따로 잡는다. 전체 줄 수는 예전과 같게 두고 상품 수에 맞춰 묶음마다 나눈다 */
                     /* [수정 2026-10-24] 한눈에와 같이 — 상품 수에 맞춰 칸 수를 고르고, 모든 카드·글씨 크기를 같게 (사장님 요청).
@@ -6088,6 +6088,7 @@
                     return out;
                 }
                 window.srcThumbOpen = srcThumbOpen;
+                window.srcThDrawFv = (items, d, opt) => srcThDrawDay(items, d, srcThDi(d), opt);   // [신규 2026-10-30] 카톡용 과일·야채 그림
                 async function srcUndirect(no, noAsk) {
                     const p = gSrc.direct[no]; if (!p) return;
                     if (!noAsk && !confirm(p.name + '\n판매 표시(' + p.date + ')를 지울까요?')) return;
@@ -32898,14 +32899,32 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         /* [신규 2026-10-30] 카톡에 올릴 오늘 과일·야채 목록 (사장님 요청) — 지금 노출 중인(숨김 아니고 마감 안 된) 과일·야채 상품 이름을
            과일 / 야채로 나눠 한 글로 만든다. 폰은 공유 창(카톡 고르기), 컴퓨터는 복사 */
         function gFruitVegShareList() {
+            const R = gFruitVegRows();
+            return { fruit: R.filter(r => r.k === 'fruit').map(r => r.name), veg: R.filter(r => r.k === 'veg').map(r => r.name) };
+        }
+        /* [신규 2026-10-30] 그림까지 만들 줄 — 이름·수식어·손님이 내는 가격·사진 (사장님 요청 — 주간 섬네일처럼 그림도 공유) */
+        function gFvPrice(p) {
+            const yes = v => v === true || v === 'true';
+            let price = parseInt(p && p.price) || 0, from = false;
+            if (!price) { (p.options || []).forEach(g => (g && g.items || []).forEach(it => { const v = parseInt(it && it.price) || 0; if (v > 0 && (!price || v < price)) price = v; })); from = price > 0; }
+            const type = p.discountType === 'amount' ? 'amount' : 'rate';
+            if (price && !from && (p.useOptions == null || yes(p.useOptions)) && yes(p.useDiscount) && gDiscHas(type, p.discountRate, p.discountAmount)) price = gDiscApply(price, type, p.discountRate, p.discountAmount);
+            return price ? price.toLocaleString() + (from ? '~' : '') : '';
+        }
+        function gFruitVegRows() {
             const clean = n => String(n || '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
             const live = (uploadProducts || []).filter(p => p && p.name !== '배달비' && ['fruit', 'veg'].includes(gListKind(p))
                 && isGroupBuyListProduct(p) && gProdVisibleNow(p) && !gIsExpiredAdmin(p));
-            const pick = k => [...new Set(live.filter(p => gListKind(p) === k).map(p => clean(p.name)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
-            return { fruit: pick('fruit'), veg: pick('veg') };
+            const seen = new Set(), rows = [];
+            live.forEach(p => {
+                const name = clean(p.name); if (!name || seen.has(name)) return; seen.add(name);
+                rows.push({ k: gListKind(p), name, mod: String(p.nameLead || '').replace(/\s+/g, ' ').trim(), price: gFvPrice(p),
+                    imgs: (Array.isArray(p.images) ? p.images : []).filter(Boolean), imgAt: 0, closed: gIsProductSoldOut(p), sun: '', vendor: '' });
+            });
+            return rows.sort((a, b) => (a.k === b.k ? 0 : a.k === 'fruit' ? -1 : 1) || a.name.localeCompare(b.name, 'ko'));
         }
         function gFruitVegShareBtn() {
-            return `<button type="button" class="sub-tab-btn" onclick="gShareFruitVeg()" title="지금 노출 중인 과일·야채 상품 이름을 카톡에 올릴 글로 (폰은 공유, 컴퓨터는 복사)" style="background:#fef9c3; color:#854d0e;">📋 카톡용 과일·야채</button>`;
+            return `<button type="button" class="sub-tab-btn" onclick="gShareFruitVeg()" title="지금 노출 중인 과일·야채 상품 — 카톡에 올릴 글과 그림" style="background:#fef9c3; color:#854d0e;">📋 카톡용 과일·야채</button>`;
         }
         async function gShareFruitVeg() {
             const L = gFruitVegShareList();
@@ -32915,12 +32934,48 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (L.fruit.length) lines.push('', '[과일]', ...L.fruit.map(n => '· ' + n));
             if (L.veg.length) lines.push('', '[야채]', ...L.veg.map(n => '· ' + n));
             const text = lines.join('\n');
-            const touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-            if (touch && navigator.share) {
-                try { await navigator.share({ text }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
-            }
-            try { await navigator.clipboard.writeText(text); showToast(`📋 과일 ${L.fruit.length} · 야채 ${L.veg.length}개 이름을 복사했어요 — 카톡에 붙여 넣으세요`); }
-            catch (e) { prompt('아래 글을 복사해 주세요', text); }
+            /* [수정 2026-10-30] 바로 복사하던 것을 창으로 — 글(복사·공유)과 주간 섬네일 같은 그림(공유·받기) (사장님 요청) */
+            const word = L.veg.length && L.fruit.length ? '과일·야채' : L.veg.length ? '야채' : '과일';
+            const old = document.getElementById('fv-share'); if (old) old.remove();
+            const box = document.createElement('div'); box.id = 'fv-share';
+            box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:flex-start; justify-content:center; padding:16px; overflow:auto;';
+            const B = 'flex:1 1 0; min-width:0; height:42px; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;';
+            box.innerHTML = `<div style="background:#fff; border-radius:16px; width:100%; max-width:520px; padding:14px 16px 16px; box-shadow:0 18px 40px rgba(0,0,0,.2);">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;"><b style="font-size:16px;">📋 카톡용 ${word}</b><button type="button" data-a="x" style="border:none; background:none; font-size:20px; cursor:pointer;">✕</button></div>
+                <textarea id="fv-text" style="width:100%; box-sizing:border-box; height:150px; border:1.5px solid #e2e8f0; border-radius:10px; padding:8px 10px; font-size:13px; font-family:inherit; resize:vertical;">${gEscapeHtml(text)}</textarea>
+                <div style="display:flex; gap:6px; margin:8px 0 12px;"><button type="button" data-a="copy" style="${B} border:1.5px solid #cbd5e1; background:#fff; color:#334155;">📋 글 복사</button>${navigator.share ? `<button type="button" data-a="stext" style="${B} border:1.5px solid #cbd5e1; background:#fff; color:#334155;">📤 글 공유</button>` : ''}</div>
+                <div id="fv-img" style="text-align:center; font-size:12px; font-weight:700; color:#64748b;">그림 만드는 중…</div>
+            </div>`;
+            document.body.appendChild(box);
+            let blob = null;
+            const fname = `MOKET_오늘의${word.replace('·', '')}_${d.getMonth() + 1}월${d.getDate()}일.png`;
+            box.addEventListener('click', async e => {
+                if (e.target === box) return box.remove();
+                const b = e.target.closest('[data-a]'); if (!b) return;
+                const a = b.dataset.a, t = (document.getElementById('fv-text') || {}).value || text;
+                if (a === 'x') return box.remove();
+                if (a === 'copy') { try { await navigator.clipboard.writeText(t); showToast('📋 글을 복사했어요 — 카톡에 붙여 넣으세요'); } catch (er) { prompt('아래 글을 복사해 주세요', t); } return; }
+                if (a === 'stext') { try { await navigator.share({ text: t }); } catch (er) { } return; }
+                if (!blob) return;
+                if (a === 'simg') {
+                    const files = [new File([blob], fname, { type: 'image/png' })];
+                    try { if (navigator.canShare && navigator.canShare({ files })) await navigator.share({ files }); else showToast('이 기기는 그림 공유가 안 돼요 — 그림 받기를 눌러 주세요'); } catch (er) { }
+                    return;
+                }
+                if (a === 'dl') { const u = URL.createObjectURL(blob), l = document.createElement('a'); l.href = u; l.download = fname; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); }
+            });
+            const out = document.getElementById('fv-img');
+            if (typeof window.srcThDrawFv !== 'function') { out.textContent = '그림을 만들 수 없어요 — 새로고침 후 다시 해 주세요'; return; }
+            try {
+                const rows = gFruitVegRows(), dk = gTodayISO();
+                const cv = await window.srcThDrawFv(rows, dk, {
+                    title: [[`${d.getMonth() + 1}월 ${d.getDate()}일 `, '#fff'], [`(${wd})`, '#ffe066']],
+                    pill: [[`오늘의 ${word} · `, '#2f7a14'], [rows.length + '가지', '#f76707']] });
+                blob = await new Promise((res, rej) => cv.toBlob(x => x ? res(x) : rej(new Error('그림 변환 실패')), 'image/png'));
+                const url = URL.createObjectURL(blob);
+                out.innerHTML = `<img src="${url}" style="width:100%; border-radius:10px; border:1px solid #e2e8f0;">
+                    <div style="display:flex; gap:6px; margin-top:8px;">${navigator.canShare ? `<button type="button" data-a="simg" style="${B} border:none; background:#16a34a; color:#fff;">📤 그림 공유</button>` : ''}<button type="button" data-a="dl" style="${B} border:1.5px solid #cbd5e1; background:#fff; color:#334155;">⬇️ 그림 받기</button></div>`;
+            } catch (er) { out.textContent = '그림을 못 만들었어요: ' + ((er && er.message) || er); }
         }
         async function gFreshAllFruits() {
             let data;
