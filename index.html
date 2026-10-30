@@ -38687,7 +38687,6 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         // 사진 팝업 모달 닫기
         function closePhotoModal() {
-            try { gPhotoZoomReset(); } catch (e) { }   // [신규 2026-10-30] 크게 본 사진은 닫으면 원래대로
             const modal = document.getElementById("photo-modal");
             if (modal) {
                 modal.style.display = "none";
@@ -44739,64 +44738,6 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
             <img id="photo-modal-img" src="" style="width: 100%; max-height: 450px; object-fit: contain; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc;">
         </div>
     </div>
-
-    <script>
-    /* [신규 2026-10-30] 배달 완료 사진 — 두 번 누르면 누른 자리를 중심으로 크게, 크게 본 채로 끌어서 움직이기, 다시 두 번 누르면 원래대로 (사장님 요청)
-       컴퓨터는 더블클릭, 폰은 두 번 톡. 사진 밖으로는 끌려 나가지 않는다. 창을 닫으면 원래 크기로 (gPhotoZoomReset) */
-    (function () {
-        const img = document.getElementById('photo-modal-img');
-        if (!img) return;
-        const box = document.createElement('div');
-        box.style.cssText = 'position:relative; overflow:hidden; border-radius:8px; touch-action:manipulation;';
-        img.parentNode.insertBefore(box, img); box.appendChild(img);
-        img.draggable = false; img.style.userSelect = 'none'; img.style.webkitUserSelect = 'none'; img.style.display = 'block';
-        const S = 2.5;
-        let z = 1, x = 0, y = 0, drag = null, moved = false, lastTap = 0, lastToggle = 0;
-        const apply = () => {
-            img.style.transition = drag ? 'none' : 'transform .2s ease';
-            img.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
-            img.style.cursor = z > 1 ? (drag ? 'grabbing' : 'grab') : 'zoom-in';
-            box.style.touchAction = z > 1 ? 'none' : 'manipulation';
-        };
-        const clamp = () => {
-            const mx = box.clientWidth * (z - 1) / 2, my = box.clientHeight * (z - 1) / 2;
-            x = Math.max(-mx, Math.min(mx, x)); y = Math.max(-my, Math.min(my, y));
-        };
-        const toggle = (cx, cy) => {
-            lastToggle = Date.now();
-            if (z > 1) { z = 1; x = 0; y = 0; }
-            else {
-                const r = box.getBoundingClientRect();
-                z = S; x = -(cx - r.left - r.width / 2) * (S - 1); y = -(cy - r.top - r.height / 2) * (S - 1); clamp();
-            }
-            apply();
-        };
-        window.gPhotoZoomReset = () => { z = 1; x = 0; y = 0; drag = null; apply(); };
-        img.addEventListener('dblclick', e => { e.preventDefault(); if (Date.now() - lastToggle < 500) return; toggle(e.clientX, e.clientY); });
-        img.addEventListener('touchend', e => {
-            if (e.touches.length) return;
-            const p = e.changedTouches[0], now = Date.now();
-            if (!moved && now - lastTap < 300) { e.preventDefault(); toggle(p.clientX, p.clientY); lastTap = 0; }
-            else lastTap = now;
-        }, { passive: false });
-        img.addEventListener('pointerdown', e => {
-            moved = false;
-            if (z <= 1) return;
-            drag = { sx: e.clientX, sy: e.clientY, x, y };
-            try { img.setPointerCapture(e.pointerId); } catch (_) { }
-            apply();
-        });
-        img.addEventListener('pointermove', e => {
-            if (!drag) return;
-            const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
-            if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
-            x = drag.x + dx; y = drag.y + dy; clamp(); apply();
-        });
-        const end = () => { if (drag) { drag = null; apply(); } };
-        img.addEventListener('pointerup', end); img.addEventListener('pointercancel', end);
-        apply();
-    })();
-    </script>
 
     <!-- 인쇄용 숨김 영역 (CSS @media print가 활성화될 때만 나타남) -->
     <div id="print-area" class="print-only"></div>
