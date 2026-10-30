@@ -29147,6 +29147,24 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         /* [신규 2026-10-14] 옵션 항목 남은 수량 고치기. 넣은 숫자는 '지금 남은 수량'이다.
            주문으로 빠진 수(옵션 조정값)는 그대로 두고 기본 수량 = 넣은 값 - 조정값 으로 저장한다 (상품 재고 칸과 같은 방식 —
            화면을 연 뒤 들어온 주문의 차감이 지워지지 않게). 999·무제한·∞ 는 수량 제한 없음(기본 수량 비움). */
+        // [신규 2026-10-31] 오늘(주문 시각 기준) 들어온 이 상품·이 옵션 주문 수 — 취소 뺌. 주문에 남은 optionPicks(그룹·항목·수량)로 센다
+        function gTodayOptOrderQty(prod, grpName, itName) {
+            const norm = s => String(s || '').replace(/\[[^\]]*\]/g, '').replace(/\s/g, '');
+            const pn = norm(prod && prod.name), today = fMsToDateKey(Date.now());
+            if (!pn) return 0;
+            let n = 0;
+            try {
+                (getSalesSourceOrders() || []).forEach(o => {
+                    if (!o || isSalesCanceled(o)) return;
+                    const on = norm(o.item); if (!on || !(on === pn || on.startsWith(pn))) return;
+                    const d = parseTimestampToDate(o.timestamp); if (!d || fMsToDateKey(+d) !== today) return;
+                    (Array.isArray(o.optionPicks) ? o.optionPicks : []).forEach(pk => {
+                        if (pk && String(pk.name || '') === String(itName || '') && String(pk.group || '') === String(grpName || '')) n += (parseInt(pk.qty) || 1) * Math.max(1, parseInt(o.qty) || 1);
+                    });
+                });
+            } catch (e) { console.warn('오늘 옵션 주문 세기 실패:', e); }
+            return n;
+        }
         async function salesUpdateOptStock(idx, gi, ii, value, after) {   // [수정 2026-10-23] after — 다 한 뒤 다시 그릴 것 (없으면 주문 집계)
             const _redraw = (typeof after === 'function') ? after : renderSalesUpcoming;
             const prod = uploadProducts[idx];
@@ -29165,9 +29183,21 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 /* [신규 2026-10-31] 날짜 없는 당일 과일(matchKey '과일' 등)은 옵션 판매 수가 날마다 안 비워져 지난 주문까지 쌓였다 (사장님 지적 — 오늘 주문이 없는데 1/11).
                    이런 상품은 수량을 넣으면 쌓인 판매 수를 비우고 넣은 값을 그대로 전체 수량으로 둔다 (묻지 않는다) */
                 const _legacy = typeof isLegacyTodayListProduct === 'function' && isLegacyTodayListProduct(prod);
-                if (_legacy && adj !== 0) {
-                    const ok0 = await fbPutRetry(`${FIREBASE_DB_URL}option_stock/${encodeURIComponent(gOptStockKey(prod, grp.name, it.name))}.json`, null).then(r => r !== false).catch(() => false);
-                    if (ok0) { optionAdjustments[gOptStockKey(prod, grp.name, it.name)] = 0; base = n; }
+                if (_legacy) {
+                    // [수정 2026-10-31] 오늘 들어온 주문만 세서, 있으면 묻는다 (사장님 요청) — 빼서 저장이면 남은 수량 = 넣은 값 - 오늘 주문
+                    const tq = gTodayOptOrderQty(prod, grp.name, it.name);
+                    let keepAdj = 0;
+                    if (tq > 0) {
+                        const pick = await gFreshMissDialog(`오늘 '${it.name}' 주문이 ${tq}개 있어요.\n\n· 그대로 저장 — 앞으로 ${n}개 더 받아요\n· 오늘 주문 빼기 — 오늘 모두 ${n}개, 남은 수량 ${Math.max(0, n - tq)}개`, '오늘 주문 빼기', '그대로 저장');
+                        if (!pick) { _redraw(); return; }
+                        if (pick === 'all') keepAdj = -tq;
+                    }
+                    if (adj !== keepAdj) {
+                        const ok0 = await fbPutRetry(`${FIREBASE_DB_URL}option_stock/${encodeURIComponent(gOptStockKey(prod, grp.name, it.name))}.json`, keepAdj || null).then(r => r !== false).catch(() => false);
+                        if (!ok0) { showToast('옵션 수량 변경 실패 — 다시 해 주세요.'); _redraw(); return; }
+                        optionAdjustments[gOptStockKey(prod, grp.name, it.name)] = keepAdj;
+                    }
+                    base = n;
                 }
                 /* [신규 2026-10-23] 이미 주문이 있으면 물어본다 (사장님 요청) — 그대로 저장(넣은 값 = 남은 수량) / 주문건 반영(넣은 값에서 주문 수를 뺀 것이 남은 수량) */
                 if (adj < 0 && !(_legacy && base === n)) {
