@@ -25024,6 +25024,7 @@
                             </div>
                             <div style="display:flex; gap:5px; flex-shrink:0;">
                                 <button type="button" onclick="rvaReply('${E(x._code)}','${E(x._rid)}')" style="height:30px; padding:0 10px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; color:#334155;">답글</button>
+                                <button type="button" onclick="rvaMove('${E(x._code)}','${E(x._rid)}')" title="다른 상품에 쓴 후기를 맞는 상품으로 옮기기" style="height:30px; padding:0 10px; border:1px solid #c7d2fe; background:#eef2ff; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; color:#4338ca;">옮기기</button>
                                 <button type="button" onclick="rvaHide('${E(x._code)}','${E(x._rid)}', ${!x.hidden})" style="height:30px; padding:0 10px; border:none; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; background:#e2e8f0; color:#475569;">${x.hidden ? '보이기' : '숨기기'}</button>
                                 <button type="button" onclick="rvaDelete('${E(x._code)}','${E(x._rid)}')" style="height:30px; padding:0 10px; border:none; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; background:#fee2e2; color:#b91c1c;">삭제</button>
                             </div>
@@ -25112,6 +25113,76 @@
             if (t === null) return;
             try { await rvaPatch({ [`product_reviews/${code}/${rid}/reply`]: String(t).trim().slice(0, 300) || null }); if (x) x.reply = String(t).trim(); showToast('답글을 저장했습니다.'); renderReviewsAdmin(false); }
             catch (e) { showToast('저장하지 못했습니다: ' + gErrKo(e)); }
+        }
+        /* [신규 2026-10-30] 후기 옮기기 (사장님 요청 — 손님이 다른 상품에 쓴 후기)
+           product_reviews/<옛 번호>/<id> → product_reviews/<새 번호>/<id>, 별점 합계(review_stats) 두 상품 다 맞추고,
+           누가 쓴 후기인지(review_keys)·상품당 한 번 표시(review_codes)도 새 번호로. 포인트는 그대로 */
+        function rvaPickProduct(x) {
+            return new Promise(res => {
+                const E = gEscapeHtml, seen = new Set();
+                const list = (uploadProducts || []).filter(p => p && /^[A-Z]\d+$/.test(String(p.productCode || '').trim()) && p.name !== '배달비')
+                    .filter(p => { const c = String(p.productCode).trim(); if (seen.has(c)) return false; seen.add(c); return true; });
+                const m = document.createElement('div');
+                m.style.cssText = 'position:fixed; inset:0; z-index:2147483400; background:rgba(15,23,42,.4); display:flex; align-items:flex-start; justify-content:center; padding:16px; box-sizing:border-box; overflow:auto;';
+                m.innerHTML = `<div style="background:#fff; border-radius:14px; padding:16px; width:100%; max-width:440px; display:flex; flex-direction:column; gap:10px; font-family:inherit;">
+                    <div style="font-size:15px; font-weight:900;">후기 옮기기<div style="font-size:12px; color:#64748b; font-weight:700; margin-top:3px;">지금: ${E(x.item || '')} · ${E(x._code)}</div></div>
+                    ${x.text ? `<div style="font-size:12.5px; color:#475569; background:#f8fafc; border-radius:8px; padding:8px 10px; max-height:80px; overflow:auto; white-space:pre-wrap;">${E(x.text)}</div>` : ''}
+                    <input id="rva-mv-q" placeholder="옮길 상품 이름이나 식별번호" autocomplete="off" style="height:40px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 10px; font-size:14px; font-family:inherit;">
+                    <div id="rva-mv-list" style="max-height:46vh; overflow:auto; display:flex; flex-direction:column; gap:4px;"></div>
+                    <button type="button" data-a="no" style="height:40px; border:1.5px solid #cbd5e1; border-radius:9px; background:#fff; font-weight:800; font-size:14px; cursor:pointer;">그만두기</button>
+                </div>`;
+                document.body.appendChild(m);
+                const q = m.querySelector('#rva-mv-q'), box = m.querySelector('#rva-mv-list');
+                const paint = () => {
+                    const s = String(q.value || '').trim().toLowerCase();
+                    const hit = s ? list.filter(p => String(p.name || '').toLowerCase().includes(s) || String(p.productCode).toLowerCase().includes(s)).slice(0, 30) : [];
+                    box.innerHTML = s ? (hit.length ? hit.map(p => `<button type="button" data-c="${E(String(p.productCode).trim())}" style="text-align:left; border:1px solid #e2e8f0; background:#fff; border-radius:8px; padding:8px 10px; font-size:13px; font-weight:700; cursor:pointer; ${String(p.productCode).trim() === x._code ? 'opacity:.4;' : ''}">${E(p.name)} <span style="color:#94a3b8; font-weight:800;">${E(p.productCode)}</span></button>`).join('')
+                        : '<div style="font-size:12.5px; color:#94a3b8; font-weight:700;">찾는 상품이 없어요</div>') : '<div style="font-size:12.5px; color:#94a3b8; font-weight:700;">상품 이름을 적어 주세요</div>';
+                };
+                q.oninput = paint; paint();
+                const done = v => { m.remove(); res(v); };
+                m.onclick = e => {
+                    if (e.target === m) return done(null);
+                    const b = e.target.closest('button'); if (!b) return;
+                    if (b.dataset.a === 'no') return done(null);
+                    if (b.dataset.c) { const p = list.find(z => String(z.productCode).trim() === b.dataset.c); if (p) done(p); }
+                };
+                setTimeout(() => q.focus(), 50);
+            });
+        }
+        async function rvaMove(code, rid) {
+            const x = _rva.reviews.find(v => v._code === code && v._rid === rid);
+            if (!x) return;
+            const p = await rvaPickProduct(x); if (!p) return;
+            const nc = String(p.productCode).trim();
+            if (nc === code) { showToast('같은 상품이에요'); return; }
+            const item = String(p.name || '').replace(/^\s*(\[[^\]]*\]\s*)+/, '').trim() || p.name;
+            if (!await psConfirm(`이 후기를 옮길까요?\n\n${x.item || code} (${code})\n→ ${item} (${nc})`, '옮기기')) return;
+            try {
+                await rvaFetch();   // 옮기기 직전 최신으로
+                const cur = _rva.reviews.find(v => v._code === code && v._rid === rid);
+                if (!cur) { showToast('후기를 찾지 못했어요 — 새로고침해 주세요'); return; }
+                const ph = cur._ph;
+                const get = async path => { const r = await fetch(`${FIREBASE_DB_URL}${path}.json?t=${Date.now()}`); return r.ok ? await r.json() : null; };
+                if (ph) { const had = await get(`review_codes/${ph}/${encodeURIComponent(nc)}`); if (had && had.rid && had.rid !== rid) { showToast('이 손님은 그 상품에 이미 후기가 있어요 — 옮기지 않았어요'); return; } }
+                const keep = {}; ['stars', 'text', 'name', 'item', 'at', 'ref', 'pts', 'reply', 'hidden'].forEach(k => { if (cur[k] !== undefined) keep[k] = cur[k]; });
+                keep.item = item; keep.movedFrom = { code, item: cur.item || '', at: Date.now() };
+                const up = { [`product_reviews/${nc}/${rid}`]: keep, [`product_reviews/${code}/${rid}`]: null };
+                const [s0, s1] = await Promise.all([get(`review_stats/${encodeURIComponent(code)}`), get(`review_stats/${encodeURIComponent(nc)}`)]);
+                const stars = Number(cur.stars) || 0;
+                up[`review_stats/${code}`] = (s0 && Number(s0.n) > 1) ? { n: Number(s0.n) - 1, sum: Math.max(0, (Number(s0.sum) || 0) - stars), last: String(s0.last || '') } : null;
+                up[`review_stats/${nc}`] = { n: (s1 ? Number(s1.n) || 0 : 0) + 1, sum: (s1 ? Number(s1.sum) || 0 : 0) + stars, last: rid };
+                if (ph) {
+                    const ks = (_rva.keys || {})[ph] || {};
+                    Object.keys(ks).forEach(ref => { if (ks[ref] && ks[ref].rid === rid) up[`review_keys/${ph}/${ref}`] = Object.assign({}, ks[ref], { code: nc }); });
+                    const oldCode = await get(`review_codes/${ph}/${encodeURIComponent(code)}`);
+                    up[`review_codes/${ph}/${nc}`] = { rid, ref: (oldCode && oldCode.ref) || cur.ref || null, at: Date.now() };
+                    if (oldCode && oldCode.rid === rid) up[`review_codes/${ph}/${code}`] = null;   // 옛 상품엔 아직 후기를 안 쓴 셈이라 다시 쓸 수 있게
+                }
+                await rvaPatch(up);
+                showToast(`후기를 ${item}(으)로 옮겼어요`);
+                await rvaFetch(); renderReviewsAdmin(false);
+            } catch (e) { showToast('옮기지 못했어요: ' + gErrKo(e)); }
         }
         async function rvaHide(code, rid, hide) {
             const x = _rva.reviews.find(v => v._code === code && v._rid === rid);
@@ -38616,6 +38687,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         // 사진 팝업 모달 닫기
         function closePhotoModal() {
+            try { gPhotoZoomReset(); } catch (e) { }   // [신규 2026-10-30] 크게 본 사진은 닫으면 원래대로
             const modal = document.getElementById("photo-modal");
             if (modal) {
                 modal.style.display = "none";
@@ -44667,6 +44739,64 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
             <img id="photo-modal-img" src="" style="width: 100%; max-height: 450px; object-fit: contain; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc;">
         </div>
     </div>
+
+    <script>
+    /* [신규 2026-10-30] 배달 완료 사진 — 두 번 누르면 누른 자리를 중심으로 크게, 크게 본 채로 끌어서 움직이기, 다시 두 번 누르면 원래대로 (사장님 요청)
+       컴퓨터는 더블클릭, 폰은 두 번 톡. 사진 밖으로는 끌려 나가지 않는다. 창을 닫으면 원래 크기로 (gPhotoZoomReset) */
+    (function () {
+        const img = document.getElementById('photo-modal-img');
+        if (!img) return;
+        const box = document.createElement('div');
+        box.style.cssText = 'position:relative; overflow:hidden; border-radius:8px; touch-action:manipulation;';
+        img.parentNode.insertBefore(box, img); box.appendChild(img);
+        img.draggable = false; img.style.userSelect = 'none'; img.style.webkitUserSelect = 'none'; img.style.display = 'block';
+        const S = 2.5;
+        let z = 1, x = 0, y = 0, drag = null, moved = false, lastTap = 0, lastToggle = 0;
+        const apply = () => {
+            img.style.transition = drag ? 'none' : 'transform .2s ease';
+            img.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
+            img.style.cursor = z > 1 ? (drag ? 'grabbing' : 'grab') : 'zoom-in';
+            box.style.touchAction = z > 1 ? 'none' : 'manipulation';
+        };
+        const clamp = () => {
+            const mx = box.clientWidth * (z - 1) / 2, my = box.clientHeight * (z - 1) / 2;
+            x = Math.max(-mx, Math.min(mx, x)); y = Math.max(-my, Math.min(my, y));
+        };
+        const toggle = (cx, cy) => {
+            lastToggle = Date.now();
+            if (z > 1) { z = 1; x = 0; y = 0; }
+            else {
+                const r = box.getBoundingClientRect();
+                z = S; x = -(cx - r.left - r.width / 2) * (S - 1); y = -(cy - r.top - r.height / 2) * (S - 1); clamp();
+            }
+            apply();
+        };
+        window.gPhotoZoomReset = () => { z = 1; x = 0; y = 0; drag = null; apply(); };
+        img.addEventListener('dblclick', e => { e.preventDefault(); if (Date.now() - lastToggle < 500) return; toggle(e.clientX, e.clientY); });
+        img.addEventListener('touchend', e => {
+            if (e.touches.length) return;
+            const p = e.changedTouches[0], now = Date.now();
+            if (!moved && now - lastTap < 300) { e.preventDefault(); toggle(p.clientX, p.clientY); lastTap = 0; }
+            else lastTap = now;
+        }, { passive: false });
+        img.addEventListener('pointerdown', e => {
+            moved = false;
+            if (z <= 1) return;
+            drag = { sx: e.clientX, sy: e.clientY, x, y };
+            try { img.setPointerCapture(e.pointerId); } catch (_) { }
+            apply();
+        });
+        img.addEventListener('pointermove', e => {
+            if (!drag) return;
+            const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+            if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+            x = drag.x + dx; y = drag.y + dy; clamp(); apply();
+        });
+        const end = () => { if (drag) { drag = null; apply(); } };
+        img.addEventListener('pointerup', end); img.addEventListener('pointercancel', end);
+        apply();
+    })();
+    </script>
 
     <!-- 인쇄용 숨김 영역 (CSS @media print가 활성화될 때만 나타남) -->
     <div id="print-area" class="print-only"></div>
