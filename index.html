@@ -5416,7 +5416,7 @@
                         (byDate[p.date] = byDate[p.date] || []).push({ kind: 'direct', name: p.disp || p.name, del: "srcUndirect('" + no + "')", ref: JSON.stringify(['direct', no]) });
                     });
                     (gSrc.sada || []).forEach(p => {   // 사다드림은 상품등록에서 고친다 (지우기 단추 없음)
-                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'sada', name: '사다 · ' + p.name, del: '' });
+                        (byDate[p.date] = byDate[p.date] || []).push({ kind: 'sada', name: '사다 · ' + p.name, del: '', sadaCode: p.code || '' });   // [수정 2026-10-30] sadaCode — 노출중 판단용 (사장님 지적)
                     });
                     Object.entries(gSrc.manual).forEach(([id, p]) => {
                         if (!p) return;
@@ -5467,7 +5467,7 @@
                             html += '<div class="' + cls.join(' ') + '" data-date="' + k + '"><div class="top"><span class="n">' + x.getDate() + '</span>' +
                                 srcWxHtml(k) + (hol ? '<span class="hn">' + hol + '</span>' : '') + (off ? '<span class="off" title="주문관리에 설정된 가게 휴무일">휴무</span>' : '') +
                                 '<button type="button" class="src-cal-add" title="이 날짜에 상품 넣기" onclick="srcDayAdd(\'' + k + '\')">+</button></div>' +
-                                (byDate[k] || []).slice().sort((a, b) => (SRC_TAG_RANK[a.kind] + (a.hand ? 10 : 0)) - (SRC_TAG_RANK[b.kind] + (b.hand ? 10 : 0)))   /* [수정 2026-10-12] 손으로 쓴 것(✍)은 맨 밑 — 공구 기록에서 끌어온 것보다도 아래 (사장님 요청) */.map(t => { const tv = srcTagView(t, k); /* [수정 2026-10-10] 재공구는 공구 상품 이름으로 */ return '<div class="src-tag ' + t.kind + ' ' + tv.cls + (srcCalPass(t.ref, k) && srcCalLiveOk(t.ref, k) ? '' : ' src-dim') + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(tv.tip || t.name) + '">' + srcRegMark(t.ref, k) + '<span>' + srcEsc(tv.name || t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>'; }).join('') + '</div>';
+                                (byDate[k] || []).slice().sort((a, b) => (SRC_TAG_RANK[a.kind] + (a.hand ? 10 : 0)) - (SRC_TAG_RANK[b.kind] + (b.hand ? 10 : 0)))   /* [수정 2026-10-12] 손으로 쓴 것(✍)은 맨 밑 — 공구 기록에서 끌어온 것보다도 아래 (사장님 요청) */.map(t => { const tv = srcTagView(t, k); /* [수정 2026-10-10] 재공구는 공구 상품 이름으로 */ return '<div class="src-tag ' + t.kind + ' ' + tv.cls + (srcCalPass(t.ref, k) && srcCalLiveOk(t.ref || (t.sadaCode ? JSON.stringify(['sada', t.sadaCode]) : ''), k) ? '' : ' src-dim') + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(tv.tip || t.name) + '">' + srcRegMark(t.ref, k) + '<span>' + srcEsc(tv.name || t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>'; }).join('') + '</div>';
                         }
                     }
                     return html + '</div></div>';
