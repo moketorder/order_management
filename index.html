@@ -4842,7 +4842,9 @@
                 function srcCalLiveToggle() { gSrc.calLive = !gSrc.calLive; srcRender(); }
                 function srcCalLiveOk(rs, date) {
                     if (!gSrc.calLive) return true;
-                    const p = srcRegState(rs, date).prod;
+                    let p = srcRegState(rs, date).prod;
+                    // [수정 2026-10-30] 사다드림 이름표는 ['sada', 식별번호] — 그 번호로 상품을 찾는다 (사장님 지적 — 노출 중인 ㅅㅅㄷ 사다드림이 회색)
+                    if (!p) { try { const r = JSON.parse(rs); if (r[0] === 'sada' && r[1]) p = (uploadProducts || []).find(q => q && (q.productCode === r[1] || q.sid === r[1])) || null; } catch (e) { } }
                     if (!p) return false;
                     return (typeof gProdVisibleNow === 'function' ? gProdVisibleNow(p) : !(p.hide === true || p.hide === 'true'))
                         && !(typeof gIsExpiredAdmin === 'function' && gIsExpiredAdmin(p));
