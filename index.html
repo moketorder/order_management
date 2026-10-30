@@ -22334,7 +22334,7 @@
                         <span style="${LAB}">🚚 픽업</span>
                         <input type="date" id="fsp-pickup" value="${def.pickup || ''}" style="${IN}">
                         <label style="flex:0 0 auto; display:flex; align-items:center; gap:4px; font-size:11.5px; font-weight:800; color:#475569; white-space:nowrap; cursor:pointer; margin:0;">
-                            <input type="checkbox" id="fsp-pick-same" ${(!def.pickup || !def.expireAt || def.pickup === dk(def.expireAt)) ? 'checked' : ''} onchange="fspSyncPickup()" style="width:16px !important; height:16px !important; position:static !important; opacity:1 !important; pointer-events:auto !important; margin:0 !important; accent-color:#2563eb; cursor:pointer;">마감일과 같음</label>
+                            <input type="checkbox" id="fsp-pick-same" ${(!def.pickup || !def.expireAt || def.pickup === dk(def.expireAt)) ? 'checked' : ''} onchange="fspSyncPickup(true)" style="width:16px !important; height:16px !important; position:static !important; opacity:1 !important; pointer-events:auto !important; margin:0 !important; accent-color:#2563eb; cursor:pointer;">마감일과 같음</label>
                     </div>
                     ${/* [신규 2026-10-10] 반복 — 노출일정 카드의 🔁 반복과 같다 (사장님 요청) */''}
                     <div style="display:flex; align-items:center; gap:6px;">
@@ -22378,9 +22378,11 @@
             }
             fspSyncPickup();
         }
-        function fspSyncPickup() {
+        function fspSyncPickup(byUser) {
             const same = document.getElementById('fsp-pick-same'), pk = document.getElementById('fsp-pickup'), ed = document.getElementById('fsp-exp-date');
             if (!same || !pk) return;
+            // [신규 2026-10-30] '마감일과 같음'을 풀면 픽업일을 상품등록 화면의 날짜로 되돌린다 (사장님 요청)
+            if (byUser && !same.checked) { const fd = toISODate((document.getElementById('categoryValue') || {}).value || ''); if (/^\d{4}-\d{2}-\d{2}$/.test(fd || '')) pk.value = fd; }
             pk.disabled = same.checked;
             pk.style.background = same.checked ? '#f1f5f9' : '';
             pk.style.color = same.checked ? '#64748b' : '';
