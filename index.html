@@ -36777,7 +36777,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                             && String(p.matchKey || '') === uploadEditProductRef.matchKey
                             && String(p.date || '') === uploadEditProductRef.date);
                     }
-                    if (editIdx < 0 && uploadEditProductKey < updatedProducts.length) editIdx = uploadEditProductKey; // 폴백(구 방식)
+                    // [수정 2026-10-30] 이름으로 못 찾으면 노출번호(sid)로 — 그래도 없으면 그 자리가 같은 상품(sid·식별번호)일 때만 (사장님 — 깐굴이 홍가리비 자리를 덮어씀)
+                    if (editIdx < 0 && uploadEditProductRef && uploadEditProductRef.sid) editIdx = updatedProducts.findIndex(p => p && p.sid === uploadEditProductRef.sid);
+                    if (editIdx < 0 && uploadEditProductKey < updatedProducts.length) {
+                        const q = updatedProducts[uploadEditProductKey], R = uploadEditProductRef || {};
+                        const same = q && ((R.sid && q.sid === R.sid) || (R.code && q.productCode === R.code) || (!R.sid && !R.code));
+                        if (same) editIdx = uploadEditProductKey; // 폴백(구 방식)
+                    }
                     if (editIdx < 0 || editIdx >= updatedProducts.length) {
                         hideLoader();
                         showToast("수정할 상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
@@ -36843,6 +36849,22 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         updatedProducts.push(productObj);
                         _savedIdx = updatedProducts.length - 1;   // [신규] 맨 뒤에 새로 붙인 자리
                         isStockChanged = true;
+                        /* [신규 2026-10-30] 새 자리가 정말 비어 있는지 서버에 한 번 더 묻는다 (사장님 — 15:25 홍가리비를 15:32 깐굴이 같은 자리에 덮어씀).
+                           최신 목록 받기가 실패하거나 다른 기기가 그 사이 등록하면 이미 찬 자리에 쓰게 된다. 서버의 마지막 번호 다음 칸에 쓴다 */
+                        try {
+                            const _kr = await fetch(`${FIREBASE_DB_URL}published_products.json?shallow=true&t=${Date.now()}`);
+                            if (_kr.ok) {
+                                const _ks = Object.keys((await _kr.json()) || {}).map(Number).filter(n => !isNaN(n));
+                                const _free = _ks.length ? Math.max(..._ks) + 1 : 0;
+                                if (_savedIdx < _free) {
+                                    console.warn('새 상품 자리가 이미 차 있어 뒤로 옮김:', _savedIdx, '→', _free);
+                                    updatedProducts.pop();
+                                    updatedProducts[_free] = productObj;
+                                    _savedIdx = _free;
+                                    window.__gReloadAfterSave = true;   // 목록이 옛것이었다 — 저장 뒤 새로 받는다
+                                }
+                            }
+                        } catch (e) { console.warn('새 상품 자리 확인 실패:', e); }
                     }
                 }
 
@@ -37690,7 +37712,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             uploadEditProductKey = index;
             uploadFormSched = gFormSchedFromProduct(prod); paintFormSchedBtn();   // [수정 2026-10-05] 이미 걸린 일정이 있으면 불러와 보여 준다 (없으면 비움)
             // [하드닝] 순번은 목록 재정렬/새로고침에 취약하므로, 이름+분류+날짜로 실제 대상을 기억해 둠
-            uploadEditProductRef = { name: prod.name, matchKey: String(prod.matchKey || ''), date: String(prod.date || '') };
+            uploadEditProductRef = { name: prod.name, matchKey: String(prod.matchKey || ''), date: String(prod.date || ''), sid: prod.sid || '', code: prod.productCode || '', createdAt: prod.createdAt || null };   // [수정 2026-10-30] 노출번호·식별번호도 (자리로 찾을 때 같은 상품인지 확인)
 
             switchAdminTab('product-upload');
 
