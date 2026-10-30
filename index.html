@@ -4837,6 +4837,16 @@
                     return on.some(k => !(k === 'po' && _onsite) && S[k] === false);
                 }
                 function srcCalFToggle(k) { gSrc.calF = gSrc.calF || {}; gSrc.calF[k] = !gSrc.calF[k]; srcRender(); }
+                /* [신규 2026-10-30] 전체 ↔ 노출중 (사장님 요청) — 노출중이면 주문서에 지금 보이는 상품(이어진 등록 상품이 숨김 아니고 마감 안 됨)만 또렷하게,
+                   숨김·마감·아직 등록 안 한 이름표는 회색 (지우지 않는다) */
+                function srcCalLiveToggle() { gSrc.calLive = !gSrc.calLive; srcRender(); }
+                function srcCalLiveOk(rs, date) {
+                    if (!gSrc.calLive) return true;
+                    const p = srcRegState(rs, date).prod;
+                    if (!p) return false;
+                    return (typeof gProdVisibleNow === 'function' ? gProdVisibleNow(p) : !(p.hide === true || p.hide === 'true'))
+                        && !(typeof gIsExpiredAdmin === 'function' && gIsExpiredAdmin(p));
+                }
                 /* [신규 2026-10-07] 노출일정 표시 — 등록된 상품(노출번호 sid)의 일정 중
                    올라가는 날 ~ 픽업일(없으면 마감일) 사이에 이 달력 날짜가 들면(앞뒤 3일 여유) 일O, 아니면 일X.
                    일정 목록(psSched)을 아직 안 받았으면 한 번 받아 오고 그동안은 안 그린다. */
@@ -5423,7 +5433,7 @@
                         '<button type="button" class="src-btn" onclick="srcUndo()" title="' + (gSrcUndo.length ? '되돌리기: ' + srcEsc(gSrcUndo[gSrcUndo.length - 1].label) + ' (Ctrl+Z)' : '되돌릴 것이 없어요') + '"' + (gSrcUndo.length ? '' : ' disabled style="opacity:.4"') + '>↩</button>' +
                         '<button type="button" class="src-btn src-ctrl-btn' + (gSrcCtrl ? ' on' : '') + '" onclick="srcCtrlToggle()" title="켜면 Ctrl 을 누른 것과 같아요 (여러 개 고르기·복사)">Ctrl</button>' +
                         // [수정 2026-10-07] 'N개 고름 · 지우기 · 풀기' 줄은 뺐다 — Delete 키로 지운다 (사장님 요청)
-                        '<span class="src-calf">' + SRC_CAL_F.map(([k, lab, tip]) => '<button type="button" class="src-btn' + ((gSrc.calF || {})[k] ? ' on' : '') + '" onclick="srcCalFToggle(\'' + k + '\')" title="' + tip + '">' + lab + '</button>').join('') + '</span>' +   // [신규 2026-10-07] 안 된 것만 보기
+                        '<span class="src-calf">' + '<button type="button" class="src-btn' + (gSrc.calLive ? ' on' : '') + '" onclick="srcCalLiveToggle()" title="노출중 — 주문서에 지금 보이는 상품만 또렷하게, 숨김·안 올린 것은 회색">' + (gSrc.calLive ? '노출중' : '전체') + '</button>' + SRC_CAL_F.map(([k, lab, tip]) => '<button type="button" class="src-btn' + ((gSrc.calF || {})[k] ? ' on' : '') + '" onclick="srcCalFToggle(\'' + k + '\')" title="' + tip + '">' + lab + '</button>').join('') + '</span>' +   // [신규 2026-10-07] 안 된 것만 보기
                         '<details class="src-calhelp"><summary>설명</summary>' +   // [수정 2026-10-07] 설명은 기본으로 접어 둔다 (사장님 요청)
                         '<span class="k">초록 = 신규(밴드·추천) · 노랑 = 재공구(전에 공구한 상품에 이어지면 그 공구 상품 이름으로 · 앞 숫자 = 공구 횟수) · 보라 = 상시판매 · 분홍 = 사다드림 · 파랑 = 직접 쓴 것 · × 로 지우기 · 빨간 날짜 = 공휴일 · 휴무 = 가게 휴무일</span>' +
                         '<span class="k">초록 숫자 = 공구 진행한 횟수(마우스를 올리면 마지막 공구·재고) · 오른쪽 위 발주등록X·상품등록X·일정등록X = 켜면 그것이 이미 된 것은 흐리게</span><span class="k">끌기 = 옮기기 · Ctrl+끌기 = 복사 · Ctrl+누르기 = 여러 개 · Delete 지우기 · Ctrl+Z 되돌리기 · 폰은 길게 눌러 끌기</span></details></div><div class="src-cal-grid">' +
@@ -5455,7 +5465,7 @@
                             html += '<div class="' + cls.join(' ') + '" data-date="' + k + '"><div class="top"><span class="n">' + x.getDate() + '</span>' +
                                 srcWxHtml(k) + (hol ? '<span class="hn">' + hol + '</span>' : '') + (off ? '<span class="off" title="주문관리에 설정된 가게 휴무일">휴무</span>' : '') +
                                 '<button type="button" class="src-cal-add" title="이 날짜에 상품 넣기" onclick="srcDayAdd(\'' + k + '\')">+</button></div>' +
-                                (byDate[k] || []).slice().sort((a, b) => (SRC_TAG_RANK[a.kind] + (a.hand ? 10 : 0)) - (SRC_TAG_RANK[b.kind] + (b.hand ? 10 : 0)))   /* [수정 2026-10-12] 손으로 쓴 것(✍)은 맨 밑 — 공구 기록에서 끌어온 것보다도 아래 (사장님 요청) */.map(t => { const tv = srcTagView(t, k); /* [수정 2026-10-10] 재공구는 공구 상품 이름으로 */ return '<div class="src-tag ' + t.kind + ' ' + tv.cls + (srcCalPass(t.ref, k) ? '' : ' src-dim') + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(tv.tip || t.name) + '">' + srcRegMark(t.ref, k) + '<span>' + srcEsc(tv.name || t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>'; }).join('') + '</div>';
+                                (byDate[k] || []).slice().sort((a, b) => (SRC_TAG_RANK[a.kind] + (a.hand ? 10 : 0)) - (SRC_TAG_RANK[b.kind] + (b.hand ? 10 : 0)))   /* [수정 2026-10-12] 손으로 쓴 것(✍)은 맨 밑 — 공구 기록에서 끌어온 것보다도 아래 (사장님 요청) */.map(t => { const tv = srcTagView(t, k); /* [수정 2026-10-10] 재공구는 공구 상품 이름으로 */ return '<div class="src-tag ' + t.kind + ' ' + tv.cls + (srcCalPass(t.ref, k) && srcCalLiveOk(t.ref, k) ? '' : ' src-dim') + (t.ref && gSrcSel.has(t.ref) ? ' sel' : '') + '"' + (t.ref ? ' data-ref="' + srcEsc(t.ref) + '"' : '') + ' title="' + srcEsc(tv.tip || t.name) + '">' + srcRegMark(t.ref, k) + '<span>' + srcEsc(tv.name || t.name) + '</span>' + (t.del ? '<button type="button" onclick="' + t.del + '" aria-label="지우기">×</button>' : '') + '</div>'; }).join('') + '</div>';
                         }
                     }
                     return html + '</div></div>';
