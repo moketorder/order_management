@@ -29162,8 +29162,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (isNaN(n) || n < 0) { showToast('0 이상 숫자 또는 "무제한"을 입력하세요.'); _redraw(); return; }
                 const adj = parseInt(optionAdjustments[gOptStockKey(prod, grp.name, it.name)] || 0) || 0;
                 base = Math.max(0, n - adj);
+                /* [신규 2026-10-31] 날짜 없는 당일 과일(matchKey '과일' 등)은 옵션 판매 수가 날마다 안 비워져 지난 주문까지 쌓였다 (사장님 지적 — 오늘 주문이 없는데 1/11).
+                   이런 상품은 수량을 넣으면 쌓인 판매 수를 비우고 넣은 값을 그대로 전체 수량으로 둔다 (묻지 않는다) */
+                const _legacy = typeof isLegacyTodayListProduct === 'function' && isLegacyTodayListProduct(prod);
+                if (_legacy && adj !== 0) {
+                    const ok0 = await fbPutRetry(`${FIREBASE_DB_URL}option_stock/${encodeURIComponent(gOptStockKey(prod, grp.name, it.name))}.json`, null).then(r => r !== false).catch(() => false);
+                    if (ok0) { optionAdjustments[gOptStockKey(prod, grp.name, it.name)] = 0; base = n; }
+                }
                 /* [신규 2026-10-23] 이미 주문이 있으면 물어본다 (사장님 요청) — 그대로 저장(넣은 값 = 남은 수량) / 주문건 반영(넣은 값에서 주문 수를 뺀 것이 남은 수량) */
-                if (adj < 0) {
+                if (adj < 0 && !(_legacy && base === n)) {
                     const ord = -adj;
                     const pick = await gFreshMissDialog(`'${it.name}' 주문이 이미 ${ord}개 있어요.\n\n· 그대로 저장 — 남은 수량 ${n}개\n· 주문건 반영 — ${n}개에서 주문 ${ord}개를 빼 남은 수량 ${Math.max(0, n - ord)}개`, '주문건 반영', '그대로 저장');
                     if (!pick) { _redraw(); return; }
