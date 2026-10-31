@@ -5950,9 +5950,10 @@
                         const imgS = Math.round(Math.max(40, Math.min(130, rh - 16)));
                         const priceF = Math.round(Math.max(21, Math.min(34, rh * .33)));
                         let nameF = Math.round(Math.max(19, Math.min(38, rh * .42)));
-                        const avail = it => { c.font = '900 ' + priceF + 'px ' + F; const pw = it.closed ? 110 : c.measureText(String(it.price || '')).width + priceF * .9; return cellW - 8 - imgS - 12 - 12 - pw - 12 - (it.vendor === '사다드림' ? 90 : 0); };
+                        const avail = it => cellW - 8 - imgS - 12 - 12 - (it.vendor === '사다드림' ? 90 : 0);   // [수정 2026-10-31] 가격은 이름 아래 줄로 — 이름이 칸 너비를 다 쓴다 (사장님 요청)
                         const cutN = () => { c.font = '600 ' + nameF + 'px ' + F; return items.filter(it => c.measureText(String(it.name || '')).width > avail(it)).length; };
                         while (nameF > 19 && cutN() > Math.max(1, items.length * .2)) nameF--;
+                        while (nameF > 16 && nameF * 1.2 + priceF * .8 * 1.15 > rh - 10) nameF--;   // 이름 + 아래 가격 두 줄이 줄 높이에 들어가게
                         // [수정 2026-10-24] 일요일 마감 머리말도 상품명과 같은 비율로 (사장님 요청) — 머리말 높이가 커진 만큼 줄 높이를 다시 잰다
                         const headH = Math.round(Math.max(36, nameF * 1.5)), rhH = (H - gap * (nb - 1) - 12 * nb - headH * Hh) / R;
                         const cutNow = cutN();
@@ -5975,11 +5976,11 @@
                         c.font = '900 ' + dF + 'px ' + F; c.fillText(String(+g.d.slice(8)), X0 + LAB / 2, y + h / 2 + dF * .12);
                         c.font = '700 ' + wF + 'px ' + F; c.fillText(SRC_TH_W[g.i], X0 + LAB / 2, y + h / 2 + dF * .12 + wF * 1.4); c.textAlign = 'left';
                         const ax = X0 + LAB + 4, aw = W - LAB - 8;
-                        let yy = y + 6 + pad / 2, firstRow = true, prevPanel = false;
+                        let yy = y + 6 + pad / 2, firstRow = true, prevPanel = false, panelBot = -99;
                         segs.forEach(sg => {
                             const r = Math.ceil(sg.its.length / k);
                             if (sg.s) {   // 일요일 마감 묶음 — 빨간 머리말 + 옅은 빨강 판 (narrow 면 첫 줄 그 칸만큼만)
-                                const by = yy, bh = headH + rh * (sg.narrow ? 1 : r), bw = sg.narrow ? sg.narrow * cellW : aw;
+                                const by = yy, bh = headH + rh * (sg.narrow ? 1 : r), bw = sg.narrow ? sg.narrow * cellW : aw; panelBot = by + bh;   // [신규 2026-10-31] 판 아래 테두리 높이 — 이 높이엔 점선 안 그음
                                 c.fillStyle = '#fff1f1'; srcThRR(c, ax, by, bw, bh, 12); c.fill();
                                 c.save(); c.strokeStyle = '#e03131'; c.lineWidth = 3; srcThRR(c, ax, by, bw, bh, 12); c.stroke(); c.restore();
                                 c.save(); srcThRR(c, ax, by, bw, bh, 12); c.clip(); c.fillStyle = '#e03131'; c.fillRect(ax, by, bw, headH - 4); c.restore();
@@ -5990,23 +5991,24 @@
                             sg.its.forEach((it, idx) => {
                                 const row = Math.floor(idx / k), col = idx % k, ry = yy + row * rh, cx = ax + col * cellW;
                                 const cy = ry + rh / 2, lx = cx + 8, rx = cx + cellW - 10, hs = imgS / 2;
-                                if (col === 0 && !(firstRow && row === 0) && !(row === 0 && prevPanel)) {   /* [수정 2026-10-31] 빨간 판 바로 아래 줄엔 점선 안 그음 — 판 테두리에 겹쳐 점선처럼 보였다 (사장님 지적) */  c.save(); c.strokeStyle = '#eadfcd'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(ax + 8, ry); c.lineTo(ax + aw - 8, ry); c.stroke(); c.restore(); }
+                                if (col === 0 && !(firstRow && row === 0) && !(row === 0 && prevPanel) && Math.abs(ry - panelBot) > 3) {   /* [수정 2026-10-31] 빨간 판 바로 아래 줄엔 점선 안 그음 — 판 테두리에 겹쳐 점선처럼 보였다 (사장님 지적) */  c.save(); c.strokeStyle = '#eadfcd'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(ax + 8, ry); c.lineTo(ax + aw - 8, ry); c.stroke(); c.restore(); }
                                 if (col > 0) { c.save(); c.strokeStyle = '#f1e7d6'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(cx, ry + 8); c.lineTo(cx, ry + rh - 8); c.stroke(); c.restore(); }
                                 c.save(); srcThRR(c, lx, cy - hs, imgS, imgS, 10); c.clip(); srcThCover(c, imgs[items.indexOf(it)], lx, cy - hs, imgS, imgS, it.closed); if (it.closed) { c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(lx, cy - hs, imgS, imgS); } c.restore();
-                                let pw;
-                                if (it.closed) {
-                                    c.font = '800 18px ' + F; const t = '주문마감', tw = c.measureText(t).width; pw = tw + 24;
-                                    srcThPill(c, rx - pw, cy - 15, pw, 30, '#8f8f8f'); c.fillStyle = '#fff'; c.fillText(t, rx - pw + 12, cy + 6);
-                                } else pw = srcThPrice(c, F, it.price, rx, cy + priceF * .35, priceF, '#f76707', true);
+                                /* [수정 2026-10-31] 가격을 이름 아래 줄로 (사장님 요청 — 긴 이름 뒤가 잘렸다). 이름은 칸 너비를 다 쓰고, 가격·주문마감은 그 밑 왼쪽 */
+                                const nx = lx + imgS + 12, sd = it.vendor === '사다드림', pF = Math.round(priceF * .8);
+                                const blockH = nameF * 1.05 + 6 + pF * .95, nb = cy - blockH / 2 + nameF * .85, pb = nb + 6 + pF * .95;
                                 // [신규 2026-10-16] 사다드림 표시 — 이름 뒤, 진한 보라 바탕 흰 글씨 (빨간 묶음 바탕에서도 눈에 띄게, 사장님 요청)
-                                const nx = lx + imgS + 12, sd = it.vendor === '사다드림';
                                 c.font = '800 15px ' + F; const sdW = sd ? c.measureText('사다드림').width + 16 : 0;
                                 c.font = '600 ' + nameF + 'px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222';
-                                const nm = srcThFit(c, it.name, rx - pw - 12 - nx - (sd ? sdW + 8 : 0)); c.fillText(nm, nx, cy + nameF * .34);
+                                const nm = srcThFit(c, it.name, rx - nx - (sd ? sdW + 8 : 0)); c.fillText(nm, nx, nb);
                                 if (sd) {
                                     const px = nx + c.measureText(nm).width + 8;
-                                    srcThPill(c, px, cy - 13, sdW, 26, it.closed ? '#bdbdbd' : '#7048e8'); c.font = '800 15px ' + F; c.fillStyle = '#fff'; c.fillText('사다드림', px + 8, cy + 5);
+                                    srcThPill(c, px, nb - nameF * .75, sdW, 26, it.closed ? '#bdbdbd' : '#7048e8'); c.font = '800 15px ' + F; c.fillStyle = '#fff'; c.fillText('사다드림', px + 8, nb - nameF * .75 + 18);
                                 }
+                                if (it.closed) {
+                                    c.font = '800 ' + Math.max(14, Math.round(pF * .7)) + 'px ' + F; const t = '주문마감', tw = c.measureText(t).width, ph = Math.round(pF * 1.05);
+                                    srcThPill(c, nx, pb - ph * .78, tw + 20, ph, '#8f8f8f'); c.fillStyle = '#fff'; c.fillText(t, nx + 10, pb - ph * .78 + ph * .68);
+                                } else srcThPrice(c, F, it.price, nx, pb, pF, '#f76707', false);
                             });
                             yy += r * rh; firstRow = false; prevPanel = !!sg.s;
                         });
