@@ -16784,15 +16784,15 @@
                             </div>
                             ${idSubHtml}
                             ${addrHtml}
+                                <div id="cc-refund-acc" title="환불계좌 (손님이 적은 것)" style="display:${String((_savedCust && _savedCust.refundAccount) || "").trim() ? "block" : "none"}; margin-top:5px; font-size:12px; font-weight:700; color:#7c3aed; word-break:break-all;">${(() => {   /* [신규 2026-10-31] 환불계좌 (사장님 요청) — 손님 정보에 있으면 바로, 아직 안 받아 왔으면 서버에서 받아 채운다 */
+                                    const ra = String((_savedCust && _savedCust.refundAccount) || '').trim();
+                                    if (!ra && _custKey) setTimeout(() => { fetch(`${FIREBASE_DB_URL}customers/${encodeURIComponent(_custKey)}/refundAccount.json?t=${Date.now()}`).then(r => r.ok ? r.json() : null).then(v => { const el = document.getElementById('cc-refund-acc'); if (el && v && String(v).trim()) el.style.display = "block", el.textContent = '💳 ' + String(v).trim(); }).catch(() => { }); }, 0);
+                                    return ra ? '💳 ' + gEscapeHtml(ra) : '';
+                                })()}</div>
                             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:5px 8px; margin-top:6px;">
                                 ${_noShowN ? `<span title="눌러서 노쇼 주문 보기" onclick="event.stopPropagation(); gShowNoShowList('${encodeURIComponent(phone)}','${encodeURIComponent(name)}')" style="cursor:pointer; font-size:12px; font-weight:800; color:#c2410c; text-decoration:underline; text-underline-offset:2px;">⛔ 노쇼 ${_noShowN}회</span>` : ''}
                                 ${gender ? `<span style="font-size:12px; font-weight:700; color:#334155;">${genderIcon} ${gender}</span>` : ''}
                                 ${ageGroup ? `<span style="font-size:12px; font-weight:700; color:#334155;">🎂 ${ageGroup}</span>` : ''}
-                                <span id="cc-refund-acc" title="환불계좌 (손님이 적은 것)" style="font-size:12px; font-weight:700; color:#7c3aed; word-break:break-all;">${(() => {   /* [신규 2026-10-31] 환불계좌 (사장님 요청) — 손님 정보에 있으면 바로, 아직 안 받아 왔으면 서버에서 받아 채운다 */
-                                    const ra = String((_savedCust && _savedCust.refundAccount) || '').trim();
-                                    if (!ra && _custKey) setTimeout(() => { fetch(`${FIREBASE_DB_URL}customers/${encodeURIComponent(_custKey)}/refundAccount.json?t=${Date.now()}`).then(r => r.ok ? r.json() : null).then(v => { const el = document.getElementById('cc-refund-acc'); if (el && v && String(v).trim()) el.textContent = '💳 ' + String(v).trim(); }).catch(() => { }); }, 0);
-                                    return ra ? '💳 ' + gEscapeHtml(ra) : '';
-                                })()}</span>
                             </div>
                         </div>
                         <!-- 챙길 것(미완료)은 있을 때만, 맨 위에 -->
