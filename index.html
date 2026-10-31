@@ -8934,7 +8934,8 @@
             const reqs = Object.entries(_staffData.req).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
             const staff = Object.entries(_staffData.staff).sort((a, b) => (a[1].role === b[1].role ? 0 : a[1].role === 'store' ? -1 : 1) || String(a[1].name).localeCompare(String(b[1].name), 'ko'));
 
-            const reqHtml = reqs.length ? reqs.map(([uid, r]) => `
+            /* [수정 2026-10-31] 가게 사람과 배달기사를 따로 본다 (사장님) — 신청은 신청한 프로그램(app)으로, 명단은 권한(role)으로 나눈다 */
+            const reqCard = ([uid, r]) => `
                 <div style="border:1.5px solid #fde68a; background:#fffbeb; border-radius:12px; padding:10px 12px; margin-bottom:8px;">
                     <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
                         <b style="font-size:14px; color:#0f172a;">${esc(r.name || '(이름 없음)')}</b>
@@ -8951,12 +8952,13 @@
                             ${btn('거절', `rejectStaff('${uid}')`, 'border:1.5px solid #fecaca; background:#fff; color:#dc2626;')}
                         </span>
                     </div>
-                </div>`).join('')
-                : `<div style="padding:10px 2px; font-size:12px; font-weight:700; color:#94a3b8;">새 사용 신청이 없습니다.</div>`;
+                </div>`;
+            const none = t => `<div style="padding:8px 2px; font-size:12px; font-weight:700; color:#94a3b8;">${t}</div>`;
+            const reqStore = reqs.filter(([, r]) => r.app !== 'rider'), reqRider = reqs.filter(([, r]) => r.app === 'rider');
 
             /* [수정] 사장만 가게 권한을 주고 빼고, 가게 사람을 취소한다. 직원(가게)은 기사만 허락·취소한다.
                사장은 누구도 취소·강등할 수 없다. (2단계 규칙에도 똑같이 걸려 있다) */
-            const staffHtml = staff.map(([uid, s]) => {
+            const staffCard = ([uid, s]) => {
                 const self = uid === me.uid;
                 const store = s.role === 'store';
                 const isOwner = s.owner === true;
@@ -8975,14 +8977,23 @@
                     </div>
                     <div style="font-size:11px; font-weight:700; color:#94a3b8; margin-top:2px; word-break:break-all;">${esc(s.email || '')} · ${esc(s.device || '')}${s.approvedAt ? ` · ${when(s.approvedAt)} 허락` : ''}</div>
                 </div>`;
-            }).join('');
+            };
+            const staffStore = staff.filter(([, s]) => s.role === 'store'), staffRider = staff.filter(([, s]) => s.role !== 'store');
+            const head = (t, color) => `<div style="font-size:12px; font-weight:900; color:${color}; margin:12px 0 6px;">${t}</div>`;
+            const part = (title, color, line, rq, st) => `
+                <div style="border-top:2px solid ${color}; margin-top:10px; padding-top:4px;">
+                    <div style="font-size:14px; font-weight:900; color:${color}; margin:8px 0 2px;">${title}</div>
+                    <div style="font-size:11px; font-weight:700; color:#94a3b8;">${line}</div>
+                    ${head(`📨 사용 신청 ${rq.length ? rq.length + '건' : ''}`, '#92400e')}
+                    ${rq.length ? rq.map(reqCard).join('') : none('새 신청이 없습니다.')}
+                    ${head(`👥 명단 ${st.length}명`, '#334155')}
+                    ${st.length ? st.map(staffCard).join('') : none('아직 없습니다.')}
+                </div>`;
 
             body.innerHTML = `
-                <div style="font-size:12px; font-weight:900; color:#92400e; margin-bottom:6px;">📨 사용 신청 ${reqs.length ? reqs.length + '건' : ''}</div>
-                <div style="font-size:11px; font-weight:700; color:#94a3b8; margin:-2px 0 8px;">신청한 기기 화면의 확인코드와 같은지 꼭 보고 허락해 주세요.</div>
-                ${reqHtml}
-                <div style="font-size:12px; font-weight:900; color:#334155; margin:14px 0 6px;">👥 가게 사람 ${staff.length}명 <span style="font-weight:700; color:#94a3b8;">· 가게 = 모든 프로그램, 기사 = 배달기사만${me.owner ? '' : ' · 가게 권한은 사장님만 바꿉니다'}</span></div>
-                ${staffHtml || `<div style="padding:10px 2px; font-size:12px; font-weight:700; color:#94a3b8;">아직 없습니다.</div>`}`;
+                <div style="font-size:11px; font-weight:700; color:#94a3b8;">신청한 기기 화면의 확인코드와 같은지 꼭 보고 허락해 주세요.${me.owner ? '' : ' 가게 권한은 사장님만 바꿉니다.'}</div>
+                ${part('🏪 가게', '#1d4ed8', '주문관리·가격표에서 온 신청 · 가게 권한은 모든 프로그램을 연다', reqStore, staffStore)}
+                ${part('🛵 배달기사', '#15803d', '배달기사 앱에서 온 신청 · 기사 권한은 배달기사 앱만 연다', reqRider, staffRider)}`;
         }
         async function approveStaff(uid, role) {
             const r = _staffData.req[uid];
@@ -38766,6 +38777,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         // 사진 팝업 모달 닫기
         function closePhotoModal() {
+            try { gPhotoZoomReset(); } catch (e) { }   // [신규 2026-10-30] 크게 본 사진은 닫으면 원래대로
             const modal = document.getElementById("photo-modal");
             if (modal) {
                 modal.style.display = "none";
@@ -44817,6 +44829,64 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
             <img id="photo-modal-img" src="" style="width: 100%; max-height: 450px; object-fit: contain; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc;">
         </div>
     </div>
+
+    <script>
+    /* [신규 2026-10-30] 배달 완료 사진 — 두 번 누르면 누른 자리를 중심으로 크게, 크게 본 채로 끌어서 움직이기, 다시 두 번 누르면 원래대로 (사장님 요청)
+       컴퓨터는 더블클릭, 폰은 두 번 톡. 사진 밖으로는 끌려 나가지 않는다. 창을 닫으면 원래 크기로 (gPhotoZoomReset) */
+    (function () {
+        const img = document.getElementById('photo-modal-img');
+        if (!img) return;
+        const box = document.createElement('div');
+        box.style.cssText = 'position:relative; overflow:hidden; border-radius:8px; touch-action:manipulation;';
+        img.parentNode.insertBefore(box, img); box.appendChild(img);
+        img.draggable = false; img.style.userSelect = 'none'; img.style.webkitUserSelect = 'none'; img.style.display = 'block';
+        const S = 2.5;
+        let z = 1, x = 0, y = 0, drag = null, moved = false, lastTap = 0, lastToggle = 0;
+        const apply = () => {
+            img.style.transition = drag ? 'none' : 'transform .2s ease';
+            img.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
+            img.style.cursor = z > 1 ? (drag ? 'grabbing' : 'grab') : 'zoom-in';
+            box.style.touchAction = z > 1 ? 'none' : 'manipulation';
+        };
+        const clamp = () => {
+            const mx = box.clientWidth * (z - 1) / 2, my = box.clientHeight * (z - 1) / 2;
+            x = Math.max(-mx, Math.min(mx, x)); y = Math.max(-my, Math.min(my, y));
+        };
+        const toggle = (cx, cy) => {
+            lastToggle = Date.now();
+            if (z > 1) { z = 1; x = 0; y = 0; }
+            else {
+                const r = box.getBoundingClientRect();
+                z = S; x = -(cx - r.left - r.width / 2) * (S - 1); y = -(cy - r.top - r.height / 2) * (S - 1); clamp();
+            }
+            apply();
+        };
+        window.gPhotoZoomReset = () => { z = 1; x = 0; y = 0; drag = null; apply(); };
+        img.addEventListener('dblclick', e => { e.preventDefault(); if (Date.now() - lastToggle < 500) return; toggle(e.clientX, e.clientY); });
+        img.addEventListener('touchend', e => {
+            if (e.touches.length) return;
+            const p = e.changedTouches[0], now = Date.now();
+            if (!moved && now - lastTap < 300) { e.preventDefault(); toggle(p.clientX, p.clientY); lastTap = 0; }
+            else lastTap = now;
+        }, { passive: false });
+        img.addEventListener('pointerdown', e => {
+            moved = false;
+            if (z <= 1) return;
+            drag = { sx: e.clientX, sy: e.clientY, x, y };
+            try { img.setPointerCapture(e.pointerId); } catch (_) { }
+            apply();
+        });
+        img.addEventListener('pointermove', e => {
+            if (!drag) return;
+            const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+            if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+            x = drag.x + dx; y = drag.y + dy; clamp(); apply();
+        });
+        const end = () => { if (drag) { drag = null; apply(); } };
+        img.addEventListener('pointerup', end); img.addEventListener('pointercancel', end);
+        apply();
+    })();
+    </script>
 
     <!-- 인쇄용 숨김 영역 (CSS @media print가 활성화될 때만 나타남) -->
     <div id="print-area" class="print-only"></div>
