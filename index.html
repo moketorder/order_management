@@ -41612,6 +41612,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         /* [수정] 같은 날을 다시 누르면 접는다. 화면이 통째로 바뀌지 않고 그 줄 밑에서 열리므로,
            닫는 길이 단추 하나뿐이면 답답하다. */
+        // [신규 2026-11-01] 매출 달력 보기 방식 — 달력 / 목록 (이 기기에 기억)
+        var msCalView = (() => { try { return localStorage.getItem('moket_ms_cal_view') === 'list' ? 'list' : 'cal'; } catch (e) { return 'cal'; } })();
+        function msSetCalView(v) {
+            msCalView = v === 'list' ? 'list' : 'cal';
+            try { localStorage.setItem('moket_ms_cal_view', msCalView); } catch (e) { }
+            renderManualSaleCalendar();
+        }
         function openMsDayDetail(day) {
             msCalDetailDay = (msCalDetailDay === day) ? '' : day;
             renderManualSaleCalendar();
@@ -41716,10 +41723,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 else expByDay[e.date].exp += parseInt(e.amount) || 0;
             });
 
-            let html = `<div class="ms-cal-grid">`
+            /* [신규 2026-11-01] 달력 ↔ 목록 (사장님 요청) — 목록은 금액이 적힌 날만 날짜순으로, 누르면 그 줄 밑에 속내 */
+            const listView = msCalView === 'list';
+            const BT = on => `flex:1; height:32px; border:1.5px solid ${on ? '#0f172a' : 'var(--border)'}; background:${on ? '#0f172a' : '#fff'}; color:${on ? '#fff' : '#475569'}; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;`;
+            const toggleHtml = `<div style="display:flex; gap:6px; margin-bottom:10px;"><button type="button" onclick="msSetCalView('cal')" style="${BT(!listView)}">📅 달력</button><button type="button" onclick="msSetCalView('list')" style="${BT(listView)}">📋 목록</button></div>`;
+            let html = listView ? '' : `<div class="ms-cal-grid">`
                 + ['일', '월', '화', '수', '목', '금', '토'].map(w => `<div class="ms-cal-head">${w}</div>`).join('');
+            let listHtml = '';
 
-            for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty"></div>`;
+            if (!listView) for (let i = 0; i < lead; i++) html += `<div class="ms-cal-cell empty"></div>`;
 
             // 발주도 날짜별로 미리 모아 둔다 (매입에 함께 센다)
             const poByDay = gPurchaseByDay(msCalMonth);
@@ -41749,6 +41761,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 // 금액이 있는 날은 속내 보기로, 빈 날은 그대로 그 날짜를 적으러 간다
                 const click = has ? `openMsDayDetail('${key}')` : `pickManualSaleDay('${key}')`;
                 const tip = has ? `${key} — 눌러서 내역 보기` : `${key} — 눌러서 적기`;
+                if (listView) {   // 목록 — 적힌 날만 한 줄씩
+                    if (has) {
+                        const open = d === openDay, w = '일월화수목금토'[dow];
+                        listHtml += `<div onclick="${click}" title="${tip}" style="display:flex; align-items:center; gap:8px; padding:10px 12px; border:1.5px solid ${open ? '#0f172a' : 'var(--border)'}; border-radius:10px; margin-bottom:6px; cursor:pointer; background:#fff; font-size:12.5px; font-weight:800;">`
+                            + `<span style="flex:0 0 64px; color:${dow === 0 ? '#dc2626' : dow === 6 ? '#2563eb' : '#0f172a'};">${m}/${d} (${w})</span>`
+                            + `<span style="flex:1; min-width:0; display:flex; flex-wrap:wrap; gap:4px 10px;">`
+                            + (saleSum ? `<span style="color:#0284c7;">매출 ${saleSum.toLocaleString()}원 <small style="color:#94a3b8; font-weight:700;">(💳 ${pos.toLocaleString()} · 🏦 ${tr.toLocaleString()})</small></span>` : '')
+                            + (buySum ? `<span style="color:#d97706;">매입 ${buySum.toLocaleString()}원</span>` : '')
+                            + (eb.exp ? `<span style="color:#dc2626;">지출 ${eb.exp.toLocaleString()}원</span>` : '')
+                            + `</span><span style="flex:0 0 auto; color:#94a3b8;">${open ? '▾' : '▸'}</span></div>`
+                            + (open ? `<div class="ms-cal-detail" style="margin:-2px 0 8px;">${msDayDetailHtml(msCalDetailDay)}</div>` : '');
+                    }
+                    continue;
+                }
                 html += `<div class="${cls}" onclick="${click}" title="${tip}">`
                     + `<div class="ms-cal-day">${d}</div>`
                     + (saleSum ? `<div style="color:#0284c7;">${gShortWon(saleSum)}</div>` : '')
@@ -41761,7 +41787,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     html += `<div class="ms-cal-detail">${msDayDetailHtml(msCalDetailDay)}</div>`;
                 }
             }
-            html += `</div>`;
+            html = listView ? (listHtml || `<div style="padding:24px; text-align:center; color:#94a3b8; font-size:12.5px; font-weight:700;">이 달에 적힌 날이 없어요</div>`) : html + `</div>`;
+            html = toggleHtml + html;
+            if (legend) legend.style.display = listView ? 'none' : '';
 
             // 그 달에 통째로 적어 둔 값 (날짜가 없어 달력에 못 놓는다)
             const mv = manualSales[msCalMonth];
