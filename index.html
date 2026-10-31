@@ -5975,7 +5975,7 @@
                         c.font = '900 ' + dF + 'px ' + F; c.fillText(String(+g.d.slice(8)), X0 + LAB / 2, y + h / 2 + dF * .12);
                         c.font = '700 ' + wF + 'px ' + F; c.fillText(SRC_TH_W[g.i], X0 + LAB / 2, y + h / 2 + dF * .12 + wF * 1.4); c.textAlign = 'left';
                         const ax = X0 + LAB + 4, aw = W - LAB - 8;
-                        let yy = y + 6 + pad / 2, firstRow = true;
+                        let yy = y + 6 + pad / 2, firstRow = true, prevPanel = false;
                         segs.forEach(sg => {
                             const r = Math.ceil(sg.its.length / k);
                             if (sg.s) {   // 일요일 마감 묶음 — 빨간 머리말 + 옅은 빨강 판 (narrow 면 첫 줄 그 칸만큼만)
@@ -5990,7 +5990,7 @@
                             sg.its.forEach((it, idx) => {
                                 const row = Math.floor(idx / k), col = idx % k, ry = yy + row * rh, cx = ax + col * cellW;
                                 const cy = ry + rh / 2, lx = cx + 8, rx = cx + cellW - 10, hs = imgS / 2;
-                                if (col === 0 && !(firstRow && row === 0)) { c.save(); c.strokeStyle = '#eadfcd'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(ax + 8, ry); c.lineTo(ax + aw - 8, ry); c.stroke(); c.restore(); }
+                                if (col === 0 && !(firstRow && row === 0) && !(row === 0 && prevPanel)) {   /* [수정 2026-10-31] 빨간 판 바로 아래 줄엔 점선 안 그음 — 판 테두리에 겹쳐 점선처럼 보였다 (사장님 지적) */  c.save(); c.strokeStyle = '#eadfcd'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(ax + 8, ry); c.lineTo(ax + aw - 8, ry); c.stroke(); c.restore(); }
                                 if (col > 0) { c.save(); c.strokeStyle = '#f1e7d6'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(cx, ry + 8); c.lineTo(cx, ry + rh - 8); c.stroke(); c.restore(); }
                                 c.save(); srcThRR(c, lx, cy - hs, imgS, imgS, 10); c.clip(); srcThCover(c, imgs[items.indexOf(it)], lx, cy - hs, imgS, imgS, it.closed); if (it.closed) { c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(lx, cy - hs, imgS, imgS); } c.restore();
                                 let pw;
@@ -6008,7 +6008,7 @@
                                     srcThPill(c, px, cy - 13, sdW, 26, it.closed ? '#bdbdbd' : '#7048e8'); c.font = '800 15px ' + F; c.fillStyle = '#fff'; c.fillText('사다드림', px + 8, cy + 5);
                                 }
                             });
-                            yy += r * rh; firstRow = false;
+                            yy += r * rh; firstRow = false; prevPanel = !!sg.s;
                         });
                         y += h + gap;
                     });
