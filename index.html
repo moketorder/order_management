@@ -44836,57 +44836,82 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
 
     <script>
     /* [신규 2026-10-30] 배달 완료 사진 — 두 번 누르면 누른 자리를 중심으로 크게, 크게 본 채로 끌어서 움직이기, 다시 두 번 누르면 원래대로 (사장님 요청)
-       컴퓨터는 더블클릭, 폰은 두 번 톡. 사진 밖으로는 끌려 나가지 않는다. 창을 닫으면 원래 크기로 (gPhotoZoomReset) */
+       컴퓨터는 더블클릭, 폰은 두 번 톡. 사진 밖으로는 끌려 나가지 않는다. 창을 닫으면 원래 크기로 (gPhotoZoomReset)
+       [신규 2026-10-31] 폰에서 두 손가락으로 벌리면 크게·오므리면 작게 (사장님 요청) — 1~4배, 두 손가락 가운데를 중심으로 */
     (function () {
         const img = document.getElementById('photo-modal-img');
         if (!img) return;
         const box = document.createElement('div');
-        box.style.cssText = 'position:relative; overflow:hidden; border-radius:8px; touch-action:manipulation;';
+        box.style.cssText = 'position:relative; overflow:hidden; border-radius:8px; touch-action:none;';
         img.parentNode.insertBefore(box, img); box.appendChild(img);
         img.draggable = false; img.style.userSelect = 'none'; img.style.webkitUserSelect = 'none'; img.style.display = 'block';
-        const S = 2.5;
-        let z = 1, x = 0, y = 0, drag = null, moved = false, lastTap = 0, lastToggle = 0;
+        img.style.touchAction = 'none';
+        const S = 2.5, MAX = 4;
+        let z = 1, x = 0, y = 0, drag = null, pinch = null, moved = false, lastTap = 0, lastToggle = 0;
+        const pts = new Map();
         const apply = () => {
-            img.style.transition = drag ? 'none' : 'transform .2s ease';
+            img.style.transition = (drag || pinch) ? 'none' : 'transform .2s ease';
             img.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
             img.style.cursor = z > 1 ? (drag ? 'grabbing' : 'grab') : 'zoom-in';
-            box.style.touchAction = z > 1 ? 'none' : 'manipulation';
         };
         const clamp = () => {
             const mx = box.clientWidth * (z - 1) / 2, my = box.clientHeight * (z - 1) / 2;
             x = Math.max(-mx, Math.min(mx, x)); y = Math.max(-my, Math.min(my, y));
         };
-        const toggle = (cx, cy) => {
+        const center = () => { const r = box.getBoundingClientRect(); return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; };
+        const toggle = (px, py) => {
             lastToggle = Date.now();
             if (z > 1) { z = 1; x = 0; y = 0; }
-            else {
-                const r = box.getBoundingClientRect();
-                z = S; x = -(cx - r.left - r.width / 2) * (S - 1); y = -(cy - r.top - r.height / 2) * (S - 1); clamp();
-            }
+            else { const c = center(); z = S; x = -(px - c.cx) * (S - 1); y = -(py - c.cy) * (S - 1); clamp(); }
             apply();
         };
-        window.gPhotoZoomReset = () => { z = 1; x = 0; y = 0; drag = null; apply(); };
+        window.gPhotoZoomReset = () => { z = 1; x = 0; y = 0; drag = null; pinch = null; pts.clear(); apply(); };
         img.addEventListener('dblclick', e => { e.preventDefault(); if (Date.now() - lastToggle < 500) return; toggle(e.clientX, e.clientY); });
         img.addEventListener('touchend', e => {
             if (e.touches.length) return;
             const p = e.changedTouches[0], now = Date.now();
             if (!moved && now - lastTap < 300) { e.preventDefault(); toggle(p.clientX, p.clientY); lastTap = 0; }
-            else lastTap = now;
+            else lastTap = moved ? 0 : now;
         }, { passive: false });
+        const startDrag = (px, py) => { drag = (z > 1) ? { sx: px, sy: py, x, y } : null; };
         img.addEventListener('pointerdown', e => {
-            moved = false;
-            if (z <= 1) return;
-            drag = { sx: e.clientX, sy: e.clientY, x, y };
+            pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
             try { img.setPointerCapture(e.pointerId); } catch (_) { }
-            apply();
+            if (pts.size === 2) {   // 두 손가락 — 벌리고 오므리기
+                const [a, b] = [...pts.values()];
+                pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z, x, y, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+                drag = null; moved = true; lastTap = 0;
+                apply(); return;
+            }
+            moved = false; startDrag(e.clientX, e.clientY); apply();
         });
         img.addEventListener('pointermove', e => {
+            if (!pts.has(e.pointerId)) return;
+            pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pinch && pts.size >= 2) {
+                const [a, b] = [...pts.values()];
+                const nz = Math.max(1, Math.min(MAX, pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d));
+                const c = center();
+                // 처음 두 손가락 가운데에 있던 사진 자리가, 지금 두 손가락 가운데로 오게
+                const qx = (pinch.mx - c.cx - pinch.x) / pinch.z, qy = (pinch.my - c.cy - pinch.y) / pinch.z;
+                const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+                z = nz; x = mx - c.cx - qx * nz; y = my - c.cy - qy * nz;
+                clamp(); apply(); return;
+            }
             if (!drag) return;
             const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
             if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
             x = drag.x + dx; y = drag.y + dy; clamp(); apply();
         });
-        const end = () => { if (drag) { drag = null; apply(); } };
+        const end = e => {
+            pts.delete(e.pointerId);
+            if (pinch && pts.size < 2) {
+                pinch = null;
+                if (z < 1.05) { z = 1; x = 0; y = 0; }
+                if (pts.size === 1) { const p = [...pts.values()][0]; startDrag(p.x, p.y); }   // 한 손가락 남으면 이어서 끌기
+            } else if (!pts.size) drag = null;
+            apply();
+        };
         img.addEventListener('pointerup', end); img.addEventListener('pointercancel', end);
         apply();
     })();
