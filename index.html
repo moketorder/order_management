@@ -5961,7 +5961,9 @@
                     };
                     const plans = [1, 2, 3].map(plan), okP = plans.filter(p => p.rh >= 40), poolP = okP.length ? okP : plans;
                     // [수정 2026-10-24] 잘리는 이름이 적은 배치를 먼저 (같으면 글씨 큰 쪽, 그다음 줄 높이 큰 쪽)
-                    const P = poolP.reduce((b, x) => (x.cut < b.cut || (x.cut === b.cut && (x.nameF > b.nameF || (x.nameF === b.nameF && x.rh > b.rh)))) ? x : b);
+                    // [수정 2026-10-31] 가격을 뺀 뒤로는 글씨 큰 배치를 먼저 (사장님 요청 — 상품명을 키우자). 잘리는 이름이 15%를 넘는 배치는 뒤로
+                    const cutOk = Math.max(1, Math.round(items.length * .15)), poolC = poolP.filter(p => p.cut <= cutOk), poolQ = poolC.length ? poolC : poolP;
+                    const P = poolQ.reduce((b, x) => (x.nameF > b.nameF || (x.nameF === b.nameF && (x.cut < b.cut || (x.cut === b.cut && x.rh > b.rh)))) ? x : b);
                     const { k, rh, cellW, imgS, priceF, nameF, headH } = P;
                     const pad = Math.max(0, (P.rhRaw - rh) * P.R / nb);   // 줄 높이를 다 못 쓰면(상품이 아주 적으면) 띠마다 여백으로
                     let y = top;
