@@ -6150,7 +6150,16 @@
                                 c.font = '700 ' + mf + 'px ' + F; const m = srcThFit(c, it.mod, tx + mw - mx);
                                 c.fillStyle = it.closed ? '#999' : colD; c.fillText(m, mx, ty + mh * .74);
                             }
-                            if (!NOMOD) ty += modStep(mf, nf);
+                            if (!NOMOD && !TIGHT) {
+                                /* [수정 2026-10-31] 수식어~상품명 사이를 상품명~가격 사이와 같게 (사장님 요청 — 요일별 섬네일).
+                                   글자 크기마다 실제 글자 높이를 재서 맞춘다 — 모든 카드가 같은 값이라 한 줄의 이름 높이가 맞는다 */
+                                c.font = '700 ' + mf + 'px ' + F; const mD = c.measureText('가').actualBoundingBoxDescent || mf * .1;
+                                c.font = '700 ' + nf + 'px ' + F; const nm1 = c.measureText('가'), nA = nm1.actualBoundingBoxAscent || nf * .85, nD = nm1.actualBoundingBoxDescent || nf * .1;
+                                c.font = '900 ' + pf + 'px ' + F; const pA = c.measureText('0').actualBoundingBoxAscent || pf * .72;
+                                const gapNP = nf * .3 + pf * .95 - pA - nD;            // 상품명 아래 ~ 가격 위
+                                const want = mf * 1.35 * .74 + mD + gapNP - nf + nA;  // 수식어 아래에서 그만큼 띄워 상품명 위
+                                ty += Math.max(0, Math.min(modStep(mf, nf), want));
+                            } else if (!NOMOD) ty += modStep(mf, nf);
                             c.font = '700 ' + nf + 'px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222'; srcThNameLines(c, it.name, mw, NL).forEach((ln, li) => c.fillText(ln, tx, ty + nf + li * nf * 1.25));
                             ty += nf * 1.3 * NL;
                             const pw = srcThPrice(c, F, it.price, tx, ty + pf * .95, pf, it.closed ? '#b5b5b5' : '#f76707', false);
