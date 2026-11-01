@@ -42661,39 +42661,18 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 background:${profitMode === m ? '#fff' : 'transparent'}; color:${profitMode === m ? '#059669' : '#64748b'}; box-shadow:${profitMode === m ? '0 1px 3px rgba(0,0,0,.12)' : 'none'};">${l}</button>`;
             const unitBtn = `<button type="button" onclick="profitSetMode('${({ month: 'year', year: 'range', range: 'month' })[profitMode] || 'month'}')" title="누를 때마다 월 → 연도 → 기간" style="${btn} padding:0 10px; color:#059669; border-color:#10b981; background:#ecfdf5;">${({ month: '월', year: '연도', range: '기간' })[profitMode] || '월'} ⇄</button>`;
             const tabs = `<div style="display:flex; gap:3px; background:#e2e8f0; padding:3px; border-radius:10px; margin-bottom:8px;">${tab('month', '월')}${tab('range', '기간')}${tab('year', '연도')}</div>`;
-            let body = '';
-            if (profitMode === 'range') {
-                /* [수정 2026-10-04] 시작 ~ 끝을 한 줄로 작게: [기간 ⇄] [2026.08] ~ [2026.10] 🔄 (사장님 요청)
-                   칸을 누르면 태엽(select.gw-wheel)이 떠서 돌려 고른다. 고를 수 있는 달만 넣는다 (매입을 세기 전·앞으로 올 달은 뺀다) */
-                const sel = 'flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:9px; padding:0 6px; font-size:13.5px; font-weight:900; color:#0f172a; background:#fff; text-align:center;';
-                const all = [];
-                for (let k = MIN; k <= now; k = profitAddMonth(k, 1)) all.push(k);
-                const ymSel = (which, k) => `<select class="gw-wheel" onchange="profitPick('${which}', this.value)" style="${sel}">` +
-                    all.map(x => `<option value="${x}"${x === k ? ' selected' : ''}>${x.slice(0, 4)}.${x.slice(5)}</option>`).join('') + `</select>`;
-                body = `<div style="display:flex; align-items:center; gap:5px;">
-                        ${unitBtn}
-                        ${ymSel('from', f)}
-                        <span style="flex:0 0 auto; font-weight:900; color:#94a3b8;">~</span>
-                        ${ymSel('to', t)}
-                        ${refresh}
-                    </div>`;
-            } else {
-                /* [수정 2026-11-01] 화살표 대신 연도·월 고르는 칸을 따로 (사장님 요청) — 누르면 태엽(select.gw-wheel)이 떠서 돌려 고른다.
-                   고를 수 있는 연도·달만 넣는다 (매입을 세기 전·앞으로 올 달은 뺀다) */
-                const sel = 'flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:9px; padding:0 6px; font-size:15px; font-weight:900; color:#0f172a; background:#fff; text-align:center;';
-                const Y = parseInt(t.slice(0, 4), 10), M = parseInt(t.slice(5), 10);
-                const years = []; for (let y = minY; y <= nowY; y++) years.push(y);
-                const ySel = `<select class="gw-wheel" onchange="profitPickYM('y', this.value)" style="${sel}">${years.map(y => `<option value="${y}"${y === Y ? ' selected' : ''}>${y}년</option>`).join('')}</select>`;
-                const months = []; for (let mm = 1; mm <= 12; mm++) { const k = `${Y}-${String(mm).padStart(2, '0')}`; if (k >= MIN && k <= now) months.push(mm); }
-                const mSel = `<select class="gw-wheel" onchange="profitPickYM('m', this.value)" style="${sel}">${months.map(mm => `<option value="${mm}"${mm === M ? ' selected' : ''}>${mm}월</option>`).join('')}</select>`;
-                body = `<div style="display:flex; align-items:center; gap:6px;">
-                    ${unitBtn}
-                    ${ySel}
-                    ${profitMode === 'year' ? '' : mSel}
-                    ${refresh}
-                </div>`;
+            /* [수정 2026-11-01] 연도 단추 한 줄 + 그 밑에 월 단추 한 줄 (사장님 요청 — 월⇄ 토글은 뺐다).
+               연도를 누르면 그 해, 월을 누르면 그 달. 월 줄 맨 앞 '연간'은 그 해 전체. 고를 수 없는 달(매입 세기 전·앞으로 올 달)은 흐리게 */
+            const Y = parseInt(t.slice(0, 4), 10), M = parseInt(t.slice(5), 10), yearView = profitMode === 'year';
+            const chip = (on, off, act, label, wide) => `<button type="button" ${off ? 'disabled' : `onclick="${act}"`} style="flex:${wide ? '1 0 44px' : '1 1 0'}; min-width:${wide ? '44px' : '0'}; height:34px; border:1.5px solid ${on ? '#059669' : '#cbd5e1'}; background:${on ? '#059669' : (off ? '#f8fafc' : '#fff')}; color:${on ? '#fff' : (off ? '#cbd5e1' : '#334155')}; border-radius:9px; font-size:12.5px; font-weight:800; cursor:${off ? 'default' : 'pointer'}; white-space:nowrap; padding:0 4px;">${label}</button>`;
+            const years = []; for (let y = minY; y <= nowY; y++) years.push(y);
+            const yRow = `<div style="display:flex; gap:5px; align-items:center;">${years.map(y => chip(y === Y, false, `profitPickYM('y', ${y})`, y + '년')).join('')}${refresh}</div>`;
+            let mRow = chip(yearView, false, `profitSetYearView(${Y})`, '연간', true);
+            for (let mm = 1; mm <= 12; mm++) {
+                const k = `${Y}-${String(mm).padStart(2, '0')}`, off = k < MIN || k > now;
+                mRow += chip(!yearView && mm === M, off, `profitPickYM('m', ${mm})`, mm + '월', true);
             }
-            // [수정 2026-10-04] 위 세 칸 단추 대신 앞에 [월 ⇄]/[연도 ⇄] 단추 하나 — 누를 때마다 월 ↔ 연도 (사장님 요청). 기간은 아래 profitMode 'range' (고르는 방법 정하는 중)
+            let body = yRow + `<div style="display:flex; gap:4px; margin-top:6px; flex-wrap:wrap;">${mRow}</div>`;
             box.innerHTML = body;
         }
         function profitSetRange(f, t) { profitCustomFrom = f; profitCustomTo = t; profitRangeKind = 'custom'; renderProfitReport(); }
@@ -42703,12 +42682,56 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             window.__pfLastMonth = t;   // [신규 2026-10-04] 연도로 갔다 돌아오면 보던 달로
             profitSetRange(t, t);
         }
+        /* [신규 2026-11-01] 수익 내역 표의 금액을 누르면 무엇으로 이뤄졌는지 목록 (사장님 요청)
+           act: sale·sale-tr·sale-pos (적어 둔 매출, 날짜별) · buy·buy-po·buy-manual (발주·직접 적은 매입) · expense·exp-fixed·exp-etc (고정비·그외) */
+        function pfShowList(m, act) {
+            const E = gEscapeHtml, won = n => (parseInt(n) || 0).toLocaleString() + '원';
+            const md = d => { const s = String(d || ''); if (/^\d{4}-\d{2}-\d{2}/.test(s)) { const t = new Date(s.slice(0, 10) + 'T00:00:00'); return `${t.getMonth() + 1}/${t.getDate()}(${'일월화수목금토'[t.getDay()]})`; } return /^\d{4}-\d{2}$/.test(s) ? '달 전체' : s; };
+            const rows = [];   // [날짜, 이름, 금액, 작은 글]
+            let title = '';
+            if (act.startsWith('sale')) {
+                title = { sale: '매출', 'sale-tr': '매출 · 🏦 계좌이체', 'sale-pos': '매출 · 💳 포스' }[act];
+                Object.keys(manualSales || {}).filter(k => k === m || k.startsWith(m + '-')).sort().forEach(k => {
+                    const v = manualSales[k] || {}, pos = parseInt(v.pos) || 0, tr = parseInt(v.transfer) || 0;
+                    const amt = act === 'sale-tr' ? tr : act === 'sale-pos' ? pos : pos + tr;
+                    if (amt) rows.push([md(k), '', amt, act === 'sale' ? `💳 ${pos.toLocaleString()} · 🏦 ${tr.toLocaleString()}` : '']);
+                });
+            } else if (act.startsWith('buy')) {
+                title = { buy: '매입', 'buy-po': '매입 · 🚚 발주', 'buy-manual': '매입 · ✍️ 직접' }[act];
+                if (act !== 'buy-manual' && String(m) >= PROFIT_BUY_FROM_MONTH)
+                    (purchaseOrders || []).concat(purchaseArchive || []).filter(po => po && fIsPurchaseDate(String(po.date || '')) && String(po.date).slice(0, 7) === m && (parseInt(po.totalPrice) || 0))
+                        .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+                        .forEach(po => rows.push([md(po.date), `🚚 ${po.itemName || po.item || ''}`, parseInt(po.totalPrice) || 0, po.supplier || '']));
+                if (act !== 'buy-po') gExpenseItemsOf(m, 'buy').forEach(e => rows.push([md(e.date), `✍️ ${e.title || e.name || '직접 적은 매입'}`, parseInt(e.amount) || 0, e.memo || '']));
+            } else {
+                title = { expense: '지출', 'exp-fixed': '지출 · 🏠 고정비', 'exp-etc': '지출 · 🧾 그외' }[act];
+                if (act !== 'exp-etc') gExpenseItemsOf(m, 'fixed').forEach(e => rows.push(['고정비', `🏠 ${e.title || ''}`, parseInt(e.amount) || 0, '']));
+                if (act !== 'exp-fixed') gExpenseItemsOf(m, 'etc').forEach(e => rows.push([md(e.date), `🧾 ${e.title || e.name || ''}`, parseInt(e.amount) || 0, e.memo || '']));
+            }
+            const total = rows.reduce((a, r) => a + r[2], 0);
+            const old = document.getElementById('pf-list'); if (old) old.remove();
+            const box = document.createElement('div'); box.id = 'pf-list';
+            box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:flex-start; justify-content:center; padding:16px; overflow:auto;';
+            box.innerHTML = `<div style="background:#fff; border-radius:14px; width:100%; max-width:520px; padding:14px 16px; box-shadow:0 18px 40px rgba(0,0,0,.2);">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;"><b style="font-size:15px;">${E(m.replace('-', '년 '))}월 ${E(title)}</b><button type="button" data-x="1" style="border:none; background:none; font-size:20px; cursor:pointer;">✕</button></div>
+                <div style="font-size:13px; font-weight:900; color:#0f172a; margin-bottom:8px;">합계 ${won(total)} <span style="color:#94a3b8; font-weight:700;">· ${rows.length}줄</span></div>
+                ${rows.length ? rows.map(r => `<div style="display:flex; align-items:baseline; gap:8px; padding:8px 0; border-top:1px solid #f1f5f9; font-size:12.5px;">
+                    <span style="flex:0 0 62px; font-weight:800; color:#64748b;">${E(r[0])}</span>
+                    <span style="flex:1; min-width:0; font-weight:700; color:#334155; word-break:keep-all;">${E(r[1])}${r[3] ? ` <small style="color:#94a3b8; font-weight:700;">${E(r[3])}</small>` : ''}</span>
+                    <b style="flex:0 0 auto; color:#0f172a;">${won(r[2])}</b></div>`).join('') : '<div style="padding:20px; text-align:center; color:#94a3b8; font-weight:700;">적힌 것이 없어요</div>'}
+            </div>`;
+            box.addEventListener('click', e => { if (e.target === box || e.target.closest('[data-x]')) box.remove(); });
+            document.body.appendChild(box);
+        }
+        // [신규 2026-11-01] '연간' — 그 해 전체 (1월~12월, 올해는 이번 달까지)
+        function profitSetYearView(Y) { profitMode = 'year'; const [f, t] = profitYearRange(Y); profitSetRange(f, t); }
         // [신규 2026-11-01] 연도·월 칸에서 고르기 — 월 보기는 그 달, 연도 보기는 그 해 (연도를 바꿨는데 그 해에 그 달이 없으면 가까운 달로)
         function profitPickYM(part, val) {
             const cur = profitCustomTo || fProfitMonthKey(new Date());
             let Y = parseInt(cur.slice(0, 4), 10), M = parseInt(cur.slice(5), 10);
-            if (part === 'y') Y = parseInt(val, 10); else M = parseInt(val, 10);
+            if (part === 'y') Y = parseInt(val, 10); else { M = parseInt(val, 10); profitMode = 'month'; }
             if (profitMode === 'year') { const [f, t] = profitYearRange(Y); profitSetRange(f, t); return; }
+            profitMode = 'month';
             const t = profitClampMonth(`${Y}-${String(M).padStart(2, '0')}`);
             window.__pfLastMonth = t;
             profitSetRange(t, t);
@@ -43068,8 +43091,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                매출을 누르면 매출 속내만 나온다. 보려던 것만 나와야 눈이 덜 피로하다. */
             tbody.innerHTML = tableMonths.map(m => {
                 const f = monthFigures(m);
-                const cell = (v, color, extra) =>
-                    `<td style="padding:11px 10px; text-align:right; font-weight:900; color:${color}; white-space:nowrap; ${cellLine} ${GROUP_LINE}">${v}${extra || ''}</td>`;
+                // [신규 2026-11-01] 금액을 누르면 무엇으로 이뤄졌는지 목록 (사장님 요청)
+                const pk = act => ` onclick="event.stopPropagation(); pfShowList('${m}','${act}')" title="눌러서 목록 보기"`;
+                const cell = (v, color, extra, act) =>
+                    `<td${act ? pk(act) : ''} style="padding:11px 10px; text-align:right; font-weight:900; color:${color}; white-space:nowrap; ${act ? 'cursor:pointer;' : ''} ${cellLine} ${GROUP_LINE}">${v}${extra || ''}</td>`;
                 // 펼친 속내 칸 — 옅은 바탕으로 본 칸과 구분한다
                 const sub = (v, color) =>
                     `<td style="padding:11px 10px; text-align:right; font-weight:800; font-size:12px; color:${color}; white-space:nowrap; background:#fcfcfd; ${cellLine}">${v.toLocaleString()}</td>`;
@@ -43077,28 +43102,28 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const manualBuy = gExpenseSumOf(m, 'buy');
                 /* [수정] 펼친 묶음은 '총금액 · 세부1 · 세부2' 세 칸으로 벌어진다.
                    머리 위에 걸친 묶음 이름과 짝이 맞아, 어느 항목에 딸린 칸인지 바로 보인다. */
-                const subCell = (v, color) =>
-                    `<td style="padding:11px 10px; text-align:right; font-weight:800; font-size:12px; color:${color}; white-space:nowrap; background:#fcfcfd; ${cellLine} ${SUB_LINE}">${(v || 0).toLocaleString()}</td>`;
+                const subCell = (v, color, act) =>
+                    `<td${act ? pk(act) : ''} style="padding:11px 10px; text-align:right; font-weight:800; font-size:12px; color:${color}; white-space:nowrap; background:#fcfcfd; ${act ? 'cursor:pointer;' : ''} ${cellLine} ${SUB_LINE}">${(v || 0).toLocaleString()}</td>`;
 
                 /* [수정] 묶음의 '총금액'은 속내 두 칸보다 크게 적는다.
                    셋을 다 펼치면 숫자가 아홉 개라 어느 것이 합계인지 한눈에 안 들어왔다.
                    (속내 12px · 총금액 15px) */
-                const mainCell = (v, color) =>
-                    `<td style="padding:11px 10px; text-align:right; font-weight:900; font-size:15px; color:${color}; white-space:nowrap; ${cellLine} ${GROUP_LINE}">${v}</td>`;
+                const mainCell = (v, color, act) =>
+                    `<td${act ? pk(act) : ''} style="padding:11px 10px; text-align:right; font-weight:900; font-size:15px; color:${color}; white-space:nowrap; ${act ? 'cursor:pointer;' : ''} ${cellLine} ${GROUP_LINE}">${v}</td>`;
 
                 const groupCells = (kind) => {
-                    if (kind === 'buy')     return mainCell(f.buy.toLocaleString(), '#d97706') + subCell(f.buy - manualBuy, '#d97706') + subCell(manualBuy, '#d97706');
-                    if (kind === 'sale')    return mainCell(f.sale.toLocaleString(), '#0f172a') + subCell(f.tr, '#7c3aed') + subCell(f.pos, '#0284c7');
-                    if (kind === 'expense') return mainCell(f.exp.toLocaleString(), '#dc2626') + subCell(f.fixed, '#dc2626') + subCell(f.etc, '#dc2626');
+                    if (kind === 'buy')     return mainCell(f.buy.toLocaleString(), '#d97706', 'buy') + subCell(f.buy - manualBuy, '#d97706', 'buy-po') + subCell(manualBuy, '#d97706', 'buy-manual');
+                    if (kind === 'sale')    return mainCell(f.sale.toLocaleString(), '#0f172a', 'sale') + subCell(f.tr, '#7c3aed', 'sale-tr') + subCell(f.pos, '#0284c7', 'sale-pos');
+                    if (kind === 'expense') return mainCell(f.exp.toLocaleString(), '#dc2626', 'expense') + subCell(f.fixed, '#dc2626', 'exp-fixed') + subCell(f.etc, '#dc2626', 'exp-etc');
                     return '';
                 };
 
                 return `
                 <tr>
                     <td style="padding:11px 10px 11px 7px; font-weight:900; color:#334155; white-space:nowrap; ${cellLine} ${stickyCell}">${m.replace('-', '년 ')}월</td>
-                    ${isOpenKind('sale') ? groupCells('sale') : cell(f.sale.toLocaleString(), '#0f172a')}
-                    ${isOpenKind('buy') ? groupCells('buy') : cell(f.buy.toLocaleString(), '#d97706')}
-                    ${isOpenKind('expense') ? groupCells('expense') : cell(f.exp.toLocaleString(), '#dc2626')}
+                    ${isOpenKind('sale') ? groupCells('sale') : cell(f.sale.toLocaleString(), '#0f172a', '', 'sale')}
+                    ${isOpenKind('buy') ? groupCells('buy') : cell(f.buy.toLocaleString(), '#d97706', '', 'buy')}
+                    ${isOpenKind('expense') ? groupCells('expense') : cell(f.exp.toLocaleString(), '#dc2626', '', 'expense')}
                     <!-- [수정] 총합은 '숫자 + (마진률)'이라 칸을 똑같이 나누면 넘쳐서 잘렸다.
                          숫자는 안 쪼개지게 두고, 마진률만 자리가 모자라면 아랫줄로 내린다. -->
                     <td style="padding:11px 10px; text-align:right; font-weight:900; color:${leftColor(f.left)}; ${cellLine} ${GROUP_LINE}">
