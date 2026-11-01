@@ -42677,21 +42677,19 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         ${ymSel('to', t)}
                         ${refresh}
                     </div>`;
-            } else if (profitMode === 'year') {
-                const Y = parseInt(t.slice(0, 4), 10);
-                body = `<div style="display:flex; align-items:center; gap:6px;">
-                    ${unitBtn}
-                    ${arrow(`profitYearStep(-1)`, Y <= minY, '‹')}
-                    <b style="flex:1 1 auto; text-align:center; font-size:16px; font-weight:900; color:#0f172a;">${Y}년</b>
-                    ${arrow(`profitYearStep(1)`, Y >= nowY, '›')}
-                    ${refresh}
-                </div>`;
             } else {
+                /* [수정 2026-11-01] 화살표 대신 연도·월 고르는 칸을 따로 (사장님 요청) — 누르면 태엽(select.gw-wheel)이 떠서 돌려 고른다.
+                   고를 수 있는 연도·달만 넣는다 (매입을 세기 전·앞으로 올 달은 뺀다) */
+                const sel = 'flex:1 1 0; min-width:0; height:38px; border:1.5px solid #cbd5e1; border-radius:9px; padding:0 6px; font-size:15px; font-weight:900; color:#0f172a; background:#fff; text-align:center;';
+                const Y = parseInt(t.slice(0, 4), 10), M = parseInt(t.slice(5), 10);
+                const years = []; for (let y = minY; y <= nowY; y++) years.push(y);
+                const ySel = `<select class="gw-wheel" onchange="profitPickYM('y', this.value)" style="${sel}">${years.map(y => `<option value="${y}"${y === Y ? ' selected' : ''}>${y}년</option>`).join('')}</select>`;
+                const months = []; for (let mm = 1; mm <= 12; mm++) { const k = `${Y}-${String(mm).padStart(2, '0')}`; if (k >= MIN && k <= now) months.push(mm); }
+                const mSel = `<select class="gw-wheel" onchange="profitPickYM('m', this.value)" style="${sel}">${months.map(mm => `<option value="${mm}"${mm === M ? ' selected' : ''}>${mm}월</option>`).join('')}</select>`;
                 body = `<div style="display:flex; align-items:center; gap:6px;">
                     ${unitBtn}
-                    ${arrow(`profitMonthStep(-1)`, t <= MIN, '‹')}
-                    <b style="flex:1 1 auto; text-align:center; font-size:16px; font-weight:900; color:#0f172a;">${t.slice(0, 4)}년 ${parseInt(t.slice(5), 10)}월</b>
-                    ${arrow(`profitMonthStep(1)`, t >= now, '›')}
+                    ${ySel}
+                    ${profitMode === 'year' ? '' : mSel}
                     ${refresh}
                 </div>`;
             }
@@ -42703,6 +42701,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function profitMonthStep(n) {
             const t = profitClampMonth(profitAddMonth(profitCustomTo || fProfitMonthKey(new Date()), n));
             window.__pfLastMonth = t;   // [신규 2026-10-04] 연도로 갔다 돌아오면 보던 달로
+            profitSetRange(t, t);
+        }
+        // [신규 2026-11-01] 연도·월 칸에서 고르기 — 월 보기는 그 달, 연도 보기는 그 해 (연도를 바꿨는데 그 해에 그 달이 없으면 가까운 달로)
+        function profitPickYM(part, val) {
+            const cur = profitCustomTo || fProfitMonthKey(new Date());
+            let Y = parseInt(cur.slice(0, 4), 10), M = parseInt(cur.slice(5), 10);
+            if (part === 'y') Y = parseInt(val, 10); else M = parseInt(val, 10);
+            if (profitMode === 'year') { const [f, t] = profitYearRange(Y); profitSetRange(f, t); return; }
+            const t = profitClampMonth(`${Y}-${String(M).padStart(2, '0')}`);
+            window.__pfLastMonth = t;
             profitSetRange(t, t);
         }
         // 연도: 한 해씩 (1월~12월, 올해는 이번 달까지)
