@@ -41912,7 +41912,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            칸을 통째로 갈아 끼우지 않고, 두 자리에 들어갈 입력칸만 바꿔 끼운다.
            그래야 버튼을 눌러도 칸 위치·너비가 그대로라 화면이 들썩이지 않는다. */
         function setManualEntryKind(kind) {
+            const _prevKind = msEntryKind;
             msEntryKind = (kind === 'expense' || kind === 'buy') ? kind : 'sale';
+            // [신규 2026-11-01] 지출로 넘어오면 '그외'가 먼저 골라져 있게 (사장님 요청) — 고치던 것이 없을 때만
+            const _toEtc = msEntryKind === 'expense' && _prevKind !== 'expense' && !_expEditId;
             const isSale = (msEntryKind === 'sale');
 
             [['ms-kind-buy', 'buy'], ['ms-kind-sale', 'sale'], ['ms-kind-expense', 'expense']].forEach(([id, k]) => {
@@ -41963,6 +41966,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 hint.style.color = '#94a3b8';
             }
             gSyncFixedPanel();   // [신규 2026-10-02] 지출 > 고정비면 달별 고정비 칸
+            if (_toEtc && typeof setExpenseKind === 'function') setExpenseKind('etc');
         }
 
         /* ===== [신규] 직접 입력 팝업 =====
