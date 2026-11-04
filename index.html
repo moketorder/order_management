@@ -22726,7 +22726,7 @@
                 + ` padding:2px 6px; border-radius:4px;">${free ? '면세' : '과세'}</span>`;
         }
         // [신규] 상품등록 칸의 과세·면세. 손대지 않았으면 저장 때 건드리지 않는다 (번호에 이미 정해 둔 값을 지키려고)
-        let uploadFormTaxFree = false, uploadFormTaxTouched = false;
+        let uploadFormTaxFree = false, uploadFormTaxTouched = false, uploadFormTaxByKind = false;   // [수정 2026-11-04] ByKind — 종류(과일·야채) 때문에 면세로 정했는지
         let uploadFormTaxAuto = false;   // [신규] 새 번호에 기본값(과일=면세)을 넣었는지 — 저장 때 새 번호에 적는다
         function paintFormTaxFree() {
             const b = document.getElementById('btn-tax-type');
@@ -33614,10 +33614,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
 
         // [신규] 새 번호이고 과세·면세를 손대지 않았으면 과일·야채는 면세를 기본으로
-        function gAutoTaxByKind() {
-            if (typeof uploadFormTaxTouched === 'undefined' || uploadFormTaxTouched || uploadIsEditMode) return;
+        function gAutoTaxByKind(byKindChange) {
+            if (typeof uploadFormTaxTouched === 'undefined' || uploadFormTaxTouched || (uploadIsEditMode && !byKindChange)) return;   // [수정 2026-11-04] 고치는 중에도 종류를 과일·야채로 바꾸면 면세로 (사장님 요청)
             uploadFormTaxFree = (uploadCurrentTab === 'reserve' && (uploadKind === 'fruit' || uploadKind === 'veg'));
             uploadFormTaxAuto = true;
+            uploadFormTaxByKind = uploadFormTaxFree;   // [신규 2026-11-04]
             paintFormTaxFree();
         }
 
@@ -33768,7 +33769,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     paintKind();
                     paintDateFace();   // [신규] 사다드림이 아니면 '날짜 없음'을 고를 수 있다
                     try { paintAutoCodePrefix(); } catch (e) {}   // [신규] 사다드림 (S) · 과일 (F)
-                    try { gAutoTaxByKind(); } catch (e) {}        // [신규] 과일·야채는 면세가 기본
+                    try { gAutoTaxByKind(true); } catch (e) {}    // [신규] 과일·야채는 면세가 기본
                     try { gPaintNamePreview(); } catch (e) {}     // [신규 2026-10-12] 손님 화면 미리보기의 [사다드림]·[신선식품]도 바로
                 };
                 paintKind();
@@ -36826,7 +36827,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 } catch (e) { console.warn('식별번호 이름 저장 실패(상품 저장에는 지장 없음):', e); }
 
                 // [신규] 과세·면세를 눌러 바꿨으면 이 번호에 적는다
-                if ((uploadFormTaxTouched || (uploadFormTaxAuto && !_existingProd && !gPickedCode)) && /^[PFS]\d+$/.test(_productCode)) {
+                if ((uploadFormTaxTouched || (uploadFormTaxAuto && !_existingProd && !gPickedCode) || (uploadFormTaxByKind && uploadFormTaxFree)) && /^[PFS]\d+$/.test(_productCode)) {   // [수정 2026-11-04] 과일·야채로 면세가 된 것도 그 번호에 적는다
                     try {
                         await fetch(`${FIREBASE_DB_URL}settings/tax_free/${encodeURIComponent(_productCode)}.json`, uploadFormTaxFree
                             ? { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true' }
@@ -38008,7 +38009,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 || (prod.isSada === undefined && /^\s*\[\s*사다드림\s*\]/.test(String(prod.name || '')));
             // [신규] 신선식품 여부 복원 (사다드림이면 신선식품은 꺼진 것으로 본다)
             uploadIsFresh = (prod.isFresh === true || prod.isFresh === 'true');   // [수정 2026-10-03] 신선배송 — 종류 칸을 그릴 때 종류에 맞춰 다시 정해진다
-            uploadFormTaxFree = gIsTaxFreeCode(String(prod.productCode || '').trim()); uploadFormTaxTouched = false; paintFormTaxFree();   // [신규]
+            uploadFormTaxFree = gIsTaxFreeCode(String(prod.productCode || '').trim()); uploadFormTaxTouched = false; uploadFormTaxByKind = false; paintFormTaxFree();   // [신규]
             // [신규] 오늘의추천 여부 복원 (같은 방식)
             uploadEditIsRecommend = (prod.isRecommend === true || prod.isRecommend === 'true')
                 || (prod.isRecommend === undefined && /^\s*\[\s*오늘의추천\s*\]/.test(String(prod.name || '')));
@@ -38226,7 +38227,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (typeof gSrcPendingReg !== 'undefined') gSrcPendingReg = null;   // [신규 2026-10-07] 소싱에서 연 등록 기억도 푼다
             uploadEditIsSada = false; // [신규] 사다드림 체크 기억값 초기화
             uploadIsFresh = false;    // [신규] 신선식품 선택도 함께 초기화
-            uploadFormTaxFree = false; uploadFormTaxTouched = false; paintFormTaxFree();   // [신규] 과세·면세도 처음으로
+            uploadFormTaxFree = false; uploadFormTaxTouched = false; uploadFormTaxByKind = false; paintFormTaxFree();   // [신규] 과세·면세도 처음으로
             uploadStorageType = '';   // [신규] 보관방법 버튼도 해제
             paintStorageType();
             uploadEditIsRecommend = false; // [신규] 오늘의추천 체크 기억값 초기화
@@ -44062,7 +44063,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             if (view) view.value = ok ? c : '';
             // [신규] 번호를 고르거나 바꾸면 그 번호의 과세·면세를 보여 준다 (직접 눌러 바꾼 뒤라면 그대로)
-            if (typeof uploadFormTaxTouched !== 'undefined' && !uploadFormTaxTouched) { uploadFormTaxFree = ok ? gIsTaxFreeCode(c) : false; paintFormTaxFree(); }
+            // [수정 2026-11-04] 번호에 면세가 안 적혀 있어도 종류가 과일·야채면 면세가 기본 (사장님 요청 — 야채인데 과세로 나왔다)
+            if (typeof uploadFormTaxTouched !== 'undefined' && !uploadFormTaxTouched) { const _fv = !uploadIsEditMode && uploadCurrentTab === 'reserve' && (uploadKind === 'fruit' || uploadKind === 'veg'); uploadFormTaxFree = (ok && gIsTaxFreeCode(c)) || _fv; uploadFormTaxByKind = _fv && !(ok && gIsTaxFreeCode(c));   /* 고치는 중(이미 있는 상품)은 번호에 적힌 대로 */ paintFormTaxFree(); }
             /* [수정] 이름표가 걸린 번호만 이름이 떴다. 이름표가 없는 번호(주로 P)는 칸이 비어
                '이름을 못 불러왔나' 싶었다. 이제 그 번호가 무슨 물건인지 옅은 글씨로 보여 준다.
                옅은 글씨는 저장되지 않는다. 이름표로 삼으려면 직접 적어야 한다. */
