@@ -22309,11 +22309,31 @@
             if (!img) return Promise.reject(new Error('사진 없음'));
             const url = gShareImgUrl(img);
             if (!announceBlobCache.has(url)) {
-                announceBlobCache.set(url, fetch(url).then(r => { if (!r.ok) throw new Error('이미지를 못 받아왔어요'); return r.blob(); }).then(gToJpegBlob)
+                // [수정 2026-11-04] 한 번 받은 사진은 기기에 넣어 둔다 — 사진 서버(imgbb)가 멀어 한 장에 1~2초씩 걸렸다
+                announceBlobCache.set(url, gShareCacheGet(url).then(hit => hit || fetch(url).then(r => { if (!r.ok) throw new Error('이미지를 못 받아왔어요'); return r.blob(); }).then(gToJpegBlob)
+                    .then(b => { gShareCachePut(url, b); return b; }))
                     .catch(e => { announceBlobCache.delete(url); throw e; }));
             }
             return announceBlobCache.get(url);
         }
+        // [신규 2026-11-04] 공유 사진 기기 보관함 (Cache Storage) — 다시 열어도 남는다. 400장 넘으면 오래된 것부터 뺀다
+        const SHARE_CACHE = 'moket-share-v1';
+        async function gShareCacheGet(url) {
+            try { if (!window.caches) return null; const r = await (await caches.open(SHARE_CACHE)).match(url); return r ? await r.blob() : null; }
+            catch (e) { return null; }
+        }
+        function gShareCachePut(url, blob) {
+            try {
+                if (!window.caches || !blob) return;
+                caches.open(SHARE_CACHE).then(async c => {
+                    await c.put(url, new Response(blob, { headers: { 'Content-Type': blob.type || 'image/jpeg' } }));
+                    const ks = await c.keys();
+                    if (ks.length > 400) for (const k of ks.slice(0, ks.length - 400)) await c.delete(k);
+                }).catch(() => { });
+            } catch (e) { }
+        }
+        // [신규 2026-11-04] 폰은 화면이 뜨고 조금 뒤 상품 설명을 미리 받아 둔다 — 공유&복사 첫 번째가 설명 받느라 늦었다
+        window.addEventListener('load', () => setTimeout(() => { try { if (gIsPhoneUI()) gGetProductDesc({}).catch(() => { }); } catch (e) { } }, 3000));
         // [신규 2026-11-04] 사진을 받는 동안 공유 허락(누른 순간)이 풀리면 크롬이 공유를 막는다 — 상품을 고르면 미리 받아 둔다
         function gPrefetchShareImgs(p) { try { gGetProductDesc(p).catch(() => { }); } catch (e) { } try { const key = gStableKeyOf(p); (p.images || []).slice(0, 10).forEach((_, i) => gAnnounceBlob(key, i).catch(() => { })); } catch (e) { } }
         // [신규 2026-11-04] 받은 사진으로 공유 — 못 받은 사진은 빼고 보낸다. 공유 허락이 풀렸으면 '📤 사진 보내기' 단추를 띄워 한 번 더 누르면 바로 보낸다
