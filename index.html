@@ -16599,6 +16599,41 @@
             if (caret) caret.textContent = show ? '▼' : '▶';
         }
 
+        /* [신규 2026-11-04] 손님 카드 환불계좌 (사장님 요청)
+           · 있으면 💳 계좌 + [숫자 복사] (은행 이름·띄어쓰기·- 빼고 숫자만) + [고치기]
+           · 없으면 [💳 계좌번호 적기] — 적으면 손님 정보(customers/<번호>/refundAccount)에 저장 */
+        function ccRefundHtml(ra) {
+            const B = 'height:24px; padding:0 8px; border:1.5px solid #c4b5fd; background:#f5f3ff; color:#6d28d9; border-radius:7px; font-size:11.5px; font-weight:800; cursor:pointer; margin-left:6px;';
+            if (!ra) return `<button type="button" onclick="ccRefundEdit()" title="이 손님의 환불계좌를 적어요" style="${B} margin-left:0;">💳 계좌번호 적기</button>`;
+            return `💳 ${gEscapeHtml(ra)}<button type="button" onclick="ccRefundCopy()" title="계좌 숫자만 복사" style="${B}">숫자 복사</button><button type="button" onclick="ccRefundEdit()" title="계좌 고치기" style="${B} border-color:#e2e8f0; background:#fff; color:#64748b;">고치기</button>`;
+        }
+        function ccRefundPaint(ra) { const el = document.getElementById('cc-refund-acc'); if (el) { el.dataset.ra = ra || ''; el.innerHTML = ccRefundHtml(ra); } }
+        function ccRefundCur() {
+            const el = document.getElementById('cc-refund-acc'); if (!el) return '';
+            if (el.dataset.ra != null) return el.dataset.ra;
+            const k = el.dataset.key; return String((((window.__caSaved || {})[k]) || {}).refundAccount || '').trim();
+        }
+        async function ccRefundCopy() {
+            const digits = ccRefundCur().replace(/\D/g, '');
+            if (!digits) { showToast('복사할 계좌 숫자가 없어요'); return; }
+            try { await navigator.clipboard.writeText(digits); showToast(`📋 ${digits} 복사했어요`); } catch (e) { prompt('아래 숫자를 복사해 주세요', digits); }
+        }
+        async function ccRefundEdit() {
+            const el = document.getElementById('cc-refund-acc'); if (!el) return;
+            const k = el.dataset.key;
+            if (!/^01\d{8,9}$/.test(k || '')) { showToast('이 손님은 전화번호가 없어 계좌를 적을 수 없어요'); return; }
+            const cur = ccRefundCur();
+            const v = prompt('환불계좌 (예: 국민 123456-78-901234 홍길동)\n비우고 확인하면 지워요', cur);
+            if (v === null) return;
+            const nv = String(v).trim().slice(0, 80);
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}customers/${encodeURIComponent(k)}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refundAccount: nv || null }) });
+                if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                if (window.__caSaved) { window.__caSaved[k] = window.__caSaved[k] || {}; window.__caSaved[k].refundAccount = nv; }
+                ccRefundPaint(nv);
+                showToast(nv ? '💳 환불계좌를 적었어요' : '환불계좌를 지웠어요');
+            } catch (e) { showToast('저장 못 했어요: ' + gErrKo(e)); }
+        }
         function showCustomerCardModal(phoneEnc, nameEnc){
             const phone = decodeURIComponent(phoneEnc || '');
             const name = decodeURIComponent(nameEnc || '');
@@ -16811,10 +16846,10 @@
                             </div>
                             ${idSubHtml}
                             ${addrHtml}
-                                <div id="cc-refund-acc" title="환불계좌 (손님이 적은 것)" style="display:${String((_savedCust && _savedCust.refundAccount) || "").trim() ? "block" : "none"}; margin-top:5px; font-size:12px; font-weight:700; color:#7c3aed; word-break:break-all;">${(() => {   /* [신규 2026-10-31] 환불계좌 (사장님 요청) — 손님 정보에 있으면 바로, 아직 안 받아 왔으면 서버에서 받아 채운다 */
+                                <div id="cc-refund-acc" data-key="${gEscapeHtml(_custKey || '')}" style="margin-top:5px; font-size:12px; font-weight:700; color:#7c3aed; word-break:break-all;">${(() => {   /* [수정 2026-11-04] 환불계좌 — 있으면 숫자 복사 단추, 없으면 가게가 적는 단추 (사장님 요청) */
                                     const ra = String((_savedCust && _savedCust.refundAccount) || '').trim();
-                                    if (!ra && _custKey) setTimeout(() => { fetch(`${FIREBASE_DB_URL}customers/${encodeURIComponent(_custKey)}/refundAccount.json?t=${Date.now()}`).then(r => r.ok ? r.json() : null).then(v => { const el = document.getElementById('cc-refund-acc'); if (el && v && String(v).trim()) el.style.display = "block", el.textContent = '💳 ' + String(v).trim(); }).catch(() => { }); }, 0);
-                                    return ra ? '💳 ' + gEscapeHtml(ra) : '';
+                                    if (!ra && _custKey) setTimeout(() => { fetch(`${FIREBASE_DB_URL}customers/${encodeURIComponent(_custKey)}/refundAccount.json?t=${Date.now()}`).then(r => r.ok ? r.json() : null).then(v => { if (v && String(v).trim()) ccRefundPaint(String(v).trim()); }).catch(() => { }); }, 0);
+                                    return ccRefundHtml(ra);
                                 })()}</div>
                             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:5px 8px; margin-top:6px;">
                                 ${_noShowN ? `<span title="눌러서 노쇼 주문 보기" onclick="event.stopPropagation(); gShowNoShowList('${encodeURIComponent(phone)}','${encodeURIComponent(name)}')" style="cursor:pointer; font-size:12px; font-weight:800; color:#c2410c; text-decoration:underline; text-underline-offset:2px;">⛔ 노쇼 ${_noShowN}회</span>` : ''}
