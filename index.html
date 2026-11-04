@@ -7655,6 +7655,8 @@
                                 발주 목록·품목 분석에서 그 이름으로 보입니다.
                             </div>
                             <input type="text" id="code-list-search" oninput="renderCodeList()" class="form-control" placeholder="🔍 번호(P0013) 또는 이름으로 검색" style="width:100%; box-sizing:border-box; padding:9px 12px; border-radius:8px; font-size:13px; font-weight:700; border:1.5px solid #cbd5e1;">
+                            <!-- [신규 2026-11-04] 갈래 고르기 — 전체 · 일반(P) · 과일·야채(F) · 사다드림(S) (사장님 요청) -->
+                            <div id="code-list-cats" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;"></div>
                             <div id="code-list-count" style="display:none; justify-content:space-between; align-items:center; gap:8px; width:100%; box-sizing:border-box; margin-top:10px; padding:8px 11px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:12px; font-weight:800; color:#475569;"></div>
                             <!-- [신규] 두 개 이상 고르면 하나로 합칠 수 있다 -->
                             <div id="code-merge-bar" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding:9px 11px; background:#fff7ed; border:1.5px solid #fed7aa; border-radius:8px;">
@@ -40643,16 +40645,26 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             }
         }
 
+        var codeListPre = '';   // [신규 2026-11-04] 식별번호 목록 갈래 ('' 전체 · P · F · S)
         function renderCodeList() {
             const box = document.getElementById('code-list-rows');
             const countBox = document.getElementById('code-list-count');
             if (!box) return;
             const q = String((document.getElementById('code-list-search') || {}).value || '').trim().toLowerCase();
             const all = gCollectCodes();
-            const rows = !q ? all : all.filter(e =>
+            const hit = !q ? all : all.filter(e =>
                 e.code.toLowerCase().includes(q)
                 || e.label.toLowerCase().includes(q)
                 || e.products.some(n => String(n).toLowerCase().includes(q)));
+            // [신규 2026-11-04] 갈래 단추 — 번호 앞 글자로 나눈다 (P 일반 · F 과일·야채 · S 사다드림)
+            const CATS = [['', '전체'], ['P', '🛒 일반'], ['F', '🍎 과일·야채'], ['S', '🧺 사다드림']];
+            if (!CATS.some(([k]) => k === codeListPre)) codeListPre = '';
+            const cbox = document.getElementById('code-list-cats');
+            if (cbox) cbox.innerHTML = CATS.map(([k, l]) => {
+                const n = k ? hit.filter(e => e.code[0] === k).length : hit.length, on = codeListPre === k;
+                return `<button type="button" onclick="codeListPre='${k}'; renderCodeList();" style="flex:1 1 0; min-width:70px; height:34px; border:1.5px solid ${on ? 'var(--primary)' : 'var(--border)'}; background:${on ? 'var(--primary)' : '#fff'}; color:${on ? '#fff' : '#475569'}; border-radius:9px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap;">${l} <span style="opacity:.75;">${n}</span></button>`;
+            }).join('');
+            const rows = codeListPre ? hit.filter(e => e.code[0] === codeListPre) : hit;
 
             if (countBox) {
                 countBox.style.display = 'flex';
