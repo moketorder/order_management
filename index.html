@@ -20343,11 +20343,14 @@
         let psHistF = Object.assign({}, PS_HF0), psHistFOpen = false, psHistCount = { shown: 0, all: 0 };
         try { const v = JSON.parse(localStorage.getItem('ps_hist_filter') || 'null'); if (v && typeof v === 'object') psHistF = Object.assign({}, PS_HF0, v); if (!['', 'has', 'none'].includes(psHistF.kind)) psHistF.kind = ''; if (psHistF.stock === 'out' || psHistF.stock === 'none') psHistF.stock = ''; } catch (e) { }
         const PS_HF_PRESETS = {
-            popIdle: { label: '🔥 인기인데 오래 안 올림', f: { minAvg: 5, minIdle: 30, next: 'no', noSada: true }, sort: 'idle' },
-            due: { label: '⏰ 다시 올릴 때 됨', f: { minRounds: 3, late: true, next: 'no' }, sort: 'idle' },
-            growth: { label: '📈 늘어나는 상품', f: { trend: 'up' }, sort: 'sold' },
-            after: { label: '📦 공구 뒤 남은 상품', f: { minAfter: 5 }, sort: 'sold' }
+            // [신규 2026-11-04] desc — '❓ 설명'을 펴면 보이는 글 (사장님 요청)
+            popIdle: { label: '🔥 인기인데 오래 안 올림', f: { minAvg: 5, minIdle: 30, next: 'no', noSada: true }, sort: 'idle', desc: '한 번 올리면 평균 5개 넘게 팔리던 상품인데, 마지막으로 올린 지 30일이 넘었고 앞으로 잡힌 일정도 없는 것 (사다드림 빼고). 오래 안 올린 순으로 보여요.' },
+            due: { label: '⏰ 다시 올릴 때 됨', f: { minRounds: 3, late: true, next: 'no' }, sort: 'idle', desc: '3번 넘게 올린 상품 중, 평소 다시 올리던 간격보다 늦어졌고 앞으로 잡힌 일정이 없는 것. 오래 안 올린 순으로 보여요.' },
+            growth: { label: '📈 늘어나는 상품', f: { trend: 'up' }, sort: 'sold' , desc: '최근 차례일수록 더 많이 팔리는(추세가 늘어나는) 상품. 많이 팔린 순으로 보여요.' },
+            after: { label: '📦 공구 뒤 남은 상품', f: { minAfter: 5 }, sort: 'sold', desc: '공동구매가 끝난 뒤 상시판매로 넘어가서도 5개 넘게 더 팔린 상품 — 상시로 두기 좋은 것. 많이 팔린 순으로 보여요.' }
         };
+        let psHistHelpOpen = (() => { try { return localStorage.getItem('ps_hist_help') === '1'; } catch (e) { return false; } })();
+        function psHistHelpToggle() { psHistHelpOpen = !psHistHelpOpen; try { localStorage.setItem('ps_hist_help', psHistHelpOpen ? '1' : '0'); } catch (e) { } psHistPaintFilter(); }
         function psHistNum(v) { const n = parseInt(v, 10); return isNaN(n) ? null : n; }
         function psHistPass(x) {
             const F = psHistF, n = psHistNum;
@@ -20406,7 +20409,9 @@
             return `<div class="ps-hf-bar">
                     <button type="button" class="ps-hf-btn${psHistFOpen ? ' on' : ''}" onclick="psHistFToggle()">🔎 조건${act.length ? ` <b>${act.length}</b>` : ''}</button>
                     ${presets}
+                    <button type="button" class="ps-hf-pre${psHistHelpOpen ? ' on' : ''}" onclick="psHistHelpToggle()" title="단추마다 무엇을 골라 보여 주는지">❓ 설명 ${psHistHelpOpen ? '▴' : '▾'}</button>
                 </div>
+                ${psHistHelpOpen ? `<div style="margin:6px 0 4px; padding:10px 12px; border:1.5px solid #e2e8f0; background:#f8fafc; border-radius:10px; display:flex; flex-direction:column; gap:7px;">${Object.keys(PS_HF_PRESETS).map(k => `<div style="font-size:12.5px; line-height:1.55; color:#334155;"><b style="color:#0f172a;">${PS_HF_PRESETS[k].label}</b><br><span style="font-weight:600;">${PS_HF_PRESETS[k].desc || ''}</span></div>`).join('')}</div>` : ''}
                 ${act.length ? `<div class="ps-hf-chips">${act.map(([k, l]) => `<span class="ps-hf-chip">${l}<button type="button" onclick="psHistFClear('${k}')" title="이 조건 풀기">✕</button></span>`).join('')}
                     <button type="button" class="ps-hf-clr" onclick="psHistFClear()">모두 풀기</button> <span class="ps-h-dim" id="ps-hist-count"></span></div>` : ''}
                 ${psHistFOpen ? `<div class="ps-hf-panel">
