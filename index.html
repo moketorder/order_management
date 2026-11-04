@@ -22221,7 +22221,7 @@
             // 접혀 있어도 내용은 미리 그려 둔다 — 펼칠 때 바로 보이라고
             list.innerHTML = pending.map(({ p, key }) => announceRowHtml(p, key)).join('');
             list.style.display = announceBannerCollapsed ? 'none' : 'flex';
-            if (!announceBannerCollapsed && gIsPhoneUI()) pending.slice(0, 6).forEach(({ p, key }) => (p.images || []).slice(0, 10).forEach((_, i) => gAnnounceBlob(key, i).catch(() => {})));
+            if (!announceBannerCollapsed && gIsPhoneUI()) pending.slice(0, 6).forEach(({ p, key }) => (p.images || []).slice(0, 10).forEach((_, i) => gAnnounceBlob(key, i, true, p).catch(() => {})));
         }
 
         function announceRowHtml(p, key) {
@@ -22303,18 +22303,49 @@
                 return await new Promise((res, rej) => cv.toBlob(x => x ? res(x) : rej(new Error('사진 바꾸기 실패')), 'image/jpeg', 0.92));
             } catch (e) { return b; }
         }
-        function gAnnounceBlob(key, i) {
-            const p = uploadProducts[gFindProductIdxByKey(key)];
+        // lo = true 면 미리 받기(배너) — 지금 공유하려는 사진보다 뒤로 미룬다. prod 를 넘기면 상품을 다시 찾지 않는다
+        function gAnnounceBlob(key, i, lo, prod) {
+            const p = prod || uploadProducts[gFindProductIdxByKey(key)];
             const img = p && p.images && p.images[i];
             if (!img) return Promise.reject(new Error('사진 없음'));
             const url = gShareImgUrl(img);
             if (!announceBlobCache.has(url)) {
                 // [수정 2026-11-04] 한 번 받은 사진은 기기에 넣어 둔다 — 사진 서버(imgbb)가 멀어 한 장에 1~2초씩 걸렸다
-                announceBlobCache.set(url, gShareCacheGet(url).then(hit => hit || fetch(url).then(r => { if (!r.ok) throw new Error('이미지를 못 받아왔어요'); return r.blob(); }).then(gToJpegBlob)
+                announceBlobCache.set(url, gShareCacheGet(url).then(hit => hit || gShareQueue(url, () => gShareFetchImg(url), !lo).then(gToJpegBlob)
                     .then(b => { gShareCachePut(url, b); return b; }))
                     .catch(e => { announceBlobCache.delete(url); throw e; }));
-            }
+            } else if (!lo) gSharePromote(url);
             return announceBlobCache.get(url);
+        }
+        /* [수정 2026-11-04] imgbb는 한꺼번에 많이 받으면 몇 장이 30초 넘게 멈췄다가 실패한다 (사장님: 10장 중 1장만, 오래 걸림)
+           · 3장씩 차례로 받는다 — 지금 공유할 사진이 미리 받기(배너)보다 먼저
+           · 한 장이 7초 넘게 멈추면 끊고 다시, 두 번 다 안 되면 사진 중계(wsrv.nl)로 받아 본다 */
+        const gShareQ = { run: 0, hi: [], lo: [] };
+        function gShareQueue(url, job, hi) {
+            return new Promise((res, rej) => { (hi ? gShareQ.hi : gShareQ.lo).push({ url, job, res, rej }); gSharePump(); });
+        }
+        function gSharePromote(url) {
+            const k = gShareQ.lo.findIndex(t => t.url === url);
+            if (k >= 0) { gShareQ.hi.push(gShareQ.lo.splice(k, 1)[0]); gSharePump(); }
+        }
+        function gSharePump() {
+            while (gShareQ.run < 3 && (gShareQ.hi.length || gShareQ.lo.length)) {
+                const t = gShareQ.hi.shift() || gShareQ.lo.shift();
+                gShareQ.run++;
+                Promise.resolve().then(t.job).then(t.res, t.rej).finally(() => { gShareQ.run--; gSharePump(); });
+            }
+        }
+        async function gFetchBlobTO(url, ms) {
+            const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+            try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error('이미지를 못 받아왔어요'); return await r.blob(); }
+            finally { clearTimeout(t); }
+        }
+        async function gShareFetchImg(url) {
+            try { return await gFetchBlobTO(url, 7000); } catch (e) { }
+            try { return await gFetchBlobTO(url, 7000); } catch (e) { }
+            const m = url.match(/^https?:\/\/(i\.ibb\.co\/.+)$/);
+            if (m) return await gFetchBlobTO('https://wsrv.nl/?url=' + encodeURIComponent(m[1]), 15000);
+            throw new Error('이미지를 못 받아왔어요');
         }
         // [신규 2026-11-04] 공유 사진 기기 보관함 (Cache Storage) — 다시 열어도 남는다. 400장 넘으면 오래된 것부터 뺀다
         const SHARE_CACHE = 'moket-share-v1';
@@ -22335,10 +22366,17 @@
         // [신규 2026-11-04] 폰은 화면이 뜨고 조금 뒤 상품 설명을 미리 받아 둔다 — 공유&복사 첫 번째가 설명 받느라 늦었다
         window.addEventListener('load', () => setTimeout(() => { try { if (gIsPhoneUI()) gGetProductDesc({}).catch(() => { }); } catch (e) { } }, 3000));
         // [신규 2026-11-04] 사진을 받는 동안 공유 허락(누른 순간)이 풀리면 크롬이 공유를 막는다 — 상품을 고르면 미리 받아 둔다
-        function gPrefetchShareImgs(p) { try { gGetProductDesc(p).catch(() => { }); } catch (e) { } try { const key = gStableKeyOf(p); (p.images || []).slice(0, 10).forEach((_, i) => gAnnounceBlob(key, i).catch(() => { })); } catch (e) { } }
+        function gPrefetchShareImgs(p) { try { gGetProductDesc(p).catch(() => { }); } catch (e) { } try { const key = gStableKeyOf(p); (p.images || []).slice(0, 10).forEach((_, i) => gAnnounceBlob(key, i, false, p).catch(() => { })); } catch (e) { } }
         // [신규 2026-11-04] 받은 사진으로 공유 — 못 받은 사진은 빼고 보낸다. 공유 허락이 풀렸으면 '📤 사진 보내기' 단추를 띄워 한 번 더 누르면 바로 보낸다
         async function gShareFilesSafe(key, p, namePre, onReady) {
-            const res = await Promise.allSettled(p.images.slice(0, 10).map((_, i) => gAnnounceBlob(key, i)));
+            // [수정 2026-11-04] 몇 장 받았는지 로딩 글에 보여 준다
+            const all = p.images.slice(0, 10).map((_, i) => gAnnounceBlob(key, i, false, p));
+            let done = 0;
+            const lt = document.getElementById('loader-text'), ld = document.getElementById('loader');
+            const paint = () => { if (lt && ld && ld.style.display !== 'none' && all.length > 1) lt.innerText = `💬 사진 준비 중... ${done}/${all.length}`; };
+            all.forEach(pr => pr.then(() => { done++; paint(); }, () => { done++; paint(); }));
+            paint();
+            const res = await Promise.allSettled(all);
             const blobs = res.filter(r => r.status === 'fulfilled').map(r => r.value);
             try { if (typeof onReady === 'function') onReady(); } catch (e) { }
             if (!blobs.length) throw new Error('사진을 하나도 못 받아왔어요');
