@@ -28750,10 +28750,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const v = src[k]; if (!v || typeof v !== 'object') return;
                 Object.values(v).forEach(r => {
                     if (!r || typeof r !== 'object' || gIsFeeRow(r) || isSalesCanceled(r) || /취소/.test(String(r.received || ''))) return;
-                    const isF = r.category === 'fruit' || /^F/i.test(String(r.productCode || ''));
+                    // [수정 2026-11-05] 과일만 센다 — 야채는 빼고 (사장님). 상품번호가 F로 시작하면 과일(두부·콩나물 같은 야채는 P). 번호 없는 옛 주문만 분류로 본다
+                    const _code = String(r.productCode || '').trim();
+                    const isF = _code ? /^F/i.test(_code) : r.category === 'fruit';
                     new Set([evDig(k), evDig(r.phone), evDig(r.kakaoPhone)].filter(Boolean)).forEach(p => {
-                        const s = st[p] = st[p] || { any: 0, fruit: 0 };
+                        const s = st[p] = st[p] || { any: 0, fruit: 0, last: 0, times: [] };
                         s.any++; if (isF) s.fruit++;
+                        const _t = (parseTimestampToDate(r.timestamp) || { getTime: () => 0 }).getTime();   // [신규 2026-11-05] 마지막 주문·쿠폰 받은 뒤 주문
+                        if (_t) { if (_t > s.last) s.last = _t; s.times.push(_t); }
                     });
                 });
             }));
@@ -28813,13 +28817,27 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             } catch (e) { }
         }
         // [수정 2026-11-05] 자동 나눠 주기는 쓰지 않는다 — 명단은 한 번 나눠 준 것으로 확정, 그 뒤로는 새 가입자만 주문서가 알아서 받는다 (사장님 결정)
+        // [신규 2026-11-05] 마지막 접속일 — 손님관리 접속 기록(visits/{날짜}/{번호})에서 가장 최근 날
+        function evLastVisit(ph) {
+            const V = window.__caVisits; if (!V || !ph) return '-';
+            const days = Object.keys(V).sort().reverse();
+            for (const d of days) {
+                const day = V[d] || {};
+                if (day[ph] || Object.keys(day).some(k => evDig(k) === ph)) {
+                    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+                    const n = Math.round((t0 - new Date(d + 'T00:00:00')) / 86400000);
+                    return n <= 0 ? '오늘' : n === 1 ? '어제' : `${n}일 전`;
+                }
+            }
+            return '30일 넘게 없음';
+        }
         function evSet(k, v) { _ev[k] = v; if (k === 'tab') _ev.f = 'all'; renderEventAdmin(false); }
         async function renderEventAdmin(reload) {
             const box = document.getElementById('event-admin-body');
             if (!box) return;
             if (reload || !_ev.data) {
                 box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
-                try { _ev.data = await evLoad(); }
+                try { _ev.data = await evLoad(); try { await gEnsureVisits(false); } catch (e) { } }
                 catch (e) { box.innerHTML = `<div style="padding:30px; text-align:center; color:#dc2626; font-weight:700;">불러오지 못했어요 (${gEscapeHtml(gErrKo(e))})</div>`; return; }
             }
             const D = _ev.data, E = gEscapeHtml, isFc = _ev.tab === 'fc';
@@ -28827,12 +28845,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const fmt = t => { if (!t) return ''; const d = new Date(Number(t)); return `${d.getMonth() + 1}/${d.getDate()}`; };
             const rows = Object.keys(src).map(k => {
                 const v = src[k] || {}, p = D.people[evDig(k)] || { ph: evDig(k), name: '' };
-                return { k, v, p, s: evStatus(v), fruit: (D.st[p.ph] || {}).fruit || 0 };
-            }).filter(r => !evIsTest(r.p) || !r.p.name);
-            const cnt = s => rows.filter(r => r.s === s).length;
+                return { k, v, p, s: evStatus(v), fruit: (D.st[p.ph] || {}).fruit || 0, staff: evIsTest(p) && !!p.name };
+            });   // [수정 2026-11-05] 가게 사람·시험 계정도 목록에는 보인다('가게' 표시) — 확인용 (사장님 요청). 숫자 칸에서는 뺀다
+            const cnt = s => rows.filter(r => r.s === s && !r.staff).length;
             const tabBtn = (k, label) => `<button type="button" class="sub-tab-btn${_ev.tab === k ? ' active' : ''}" onclick="evSet('tab','${k}')">${label}</button>`;
             const card = (label, n, color) => `<div style="flex:1 1 90px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:10px; text-align:center;"><div style="font-size:20px; font-weight:900; color:${color || 'var(--text-main)'};">${n}</div><div style="font-size:11.5px; font-weight:700; color:var(--text-sub);">${label}</div></div>`;
-            const TAG = { used: ['사용', '#dcfce7', '#15803d'], on: ['쓸 수 있음', '#fef9c3', '#a16207'], off: ['기간 지남', '#f1f5f9', '#64748b'], wait: ['아직 안 봄', '#eff6ff', '#1d4ed8'] };
+            const TAG = { used: ['사용', '#dcfce7', '#15803d'], on: [isFc ? '발급 받음' : '쓸 수 있음', '#fef9c3', '#a16207'], off: ['기간 지남', '#f1f5f9', '#64748b'], wait: ['나눠 줌', '#eff6ff', '#1d4ed8'] };
             const chip = (k, label, n) => `<button type="button" onclick="evSet('f','${k}')" style="padding:6px 11px; border-radius:999px; border:1.5px solid ${_ev.f === k ? 'var(--primary)' : 'var(--border)'}; background:${_ev.f === k ? '#fff7ed' : '#fff'}; color:${_ev.f === k ? 'var(--primary)' : '#475569'}; font-size:12.5px; font-weight:800; cursor:pointer;">${label} ${n}</button>`;
             let html = `<div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">${tabBtn('fc', '🍎 과일 할인 쿠폰 3,000원')}${tabBtn('wc', '🚚 과일 무료배송 쿠폰 (끝남)')}</div>`;
             if (isFc && !D.fcOk) {
@@ -28842,14 +28860,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             html += `<div style="font-size:12.5px; font-weight:700; color:var(--text-sub); line-height:1.6; margin-bottom:10px;">${isFc
                 ? '과일을 5,000원 이상 담아 배달로 주문하면 3,000원이 빠져요 (야채 빼고) (픽업은 안 됨). 손님이 주문서에 처음 들어온 날부터 7일. 새 가입자는 저절로 받아요.'
                 : '과일을 담은 당일배송에서 배달비가 빠지던 쿠폰이에요. 11/5부터 새로 주지 않고, 이미 받은 손님만 기간 끝날 때까지 써요.'}</div>`;
-            html += `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">${card('받은 손님', rows.length)}${isFc ? card('아직 안 봄', cnt('wait'), '#1d4ed8') : ''}${card('쓸 수 있음', cnt('on'), '#a16207')}${card('사용', cnt('used'), '#15803d')}${card('기간 지남', cnt('off'), '#64748b')}</div>`;
-            if (isFc) {
-                const tg = evFcTargets(D);
-                html += `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px; border:1px solid #fde68a; background:#fffbeb; border-radius:10px; margin-bottom:12px;">
-                    <div style="flex:1; min-width:180px; font-size:13px; font-weight:800; color:#92400e;">과일·야채를 안 산 손님 중 아직 쿠폰이 없는 손님 <b style="font-size:15px;">${tg.length}명</b><div style="margin-top:3px; font-size:12px; font-weight:700; color:#a16207;">7일은 손님이 주문서에 들어온 날부터</div></div>
-                    <button type="button" onclick="evFcGrant()" ${tg.length ? '' : 'disabled'} style="padding:9px 14px; border:none; border-radius:9px; background:${tg.length ? '#f59e0b' : '#e5e7eb'}; color:${tg.length ? '#fff' : '#9ca3af'}; font-size:13px; font-weight:900; cursor:${tg.length ? 'pointer' : 'default'};">🎁 쿠폰 나눠 주기</button></div>`;
-            }
-            html += `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">${chip('all', '전체', rows.length)}${isFc ? chip('wait', '아직 안 봄', cnt('wait')) : ''}${chip('on', '쓸 수 있음', cnt('on'))}${chip('used', '사용', cnt('used'))}${chip('off', '기간 지남', cnt('off'))}</div>`;
+            html += `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">${card(isFc ? '나눠 준 손님' : '받은 손님', rows.filter(r => !r.staff).length)}${isFc ? card('나눠 줌 · 아직 안 봄', cnt('wait'), '#1d4ed8') : ''}${card(isFc ? '발급 받음 · 쓸 수 있음' : '쓸 수 있음', cnt('on'), '#a16207')}${card('사용', cnt('used'), '#15803d')}${card('기간 지남', cnt('off'), '#64748b')}</div>`;
+            // [수정 2026-11-05] '쿠폰 나눠 주기' 칸은 뺐다 — 명단은 11/5에 143명으로 확정, 그 뒤로는 새 가입자만 주문서가 준다 (사장님 요청)
+            html += `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">${chip('all', '전체', rows.filter(r => !r.staff).length)}${isFc ? chip('wait', '나눠 줌', cnt('wait')) : ''}${chip('on', isFc ? '발급 받음' : '쓸 수 있음', cnt('on'))}${chip('used', '사용', cnt('used'))}${chip('off', '기간 지남', cnt('off'))}</div>`;
             const ORD = { on: 0, wait: 1, used: 2, off: 3 };
             const list = rows.filter(r => _ev.f === 'all' || r.s === _ev.f)
                 .sort((a, b) => (ORD[a.s] - ORD[b.s]) || (Number(b.v.usedAt || b.v.startAt || b.v.grantedAt || 0) - Number(a.v.usedAt || a.v.startAt || a.v.grantedAt || 0)));
@@ -28858,12 +28871,21 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const start = Number(r.v.startAt), end = start ? start + EV_MS : 0;
                 const left = (r.s === 'on') ? Math.ceil((end - Date.now()) / 86400000) : 0;
                 const when = r.s === 'used' ? `${fmt(r.v.usedAt)} 사용` : r.s === 'on' ? `${fmt(end - 1)}까지 · ${left <= 1 ? '오늘까지' : left + '일 남음'}` : r.s === 'off' ? `${fmt(end - 1)} 끝남` : `${fmt(r.v.grantedAt)} 나눠 줌`;
-                const sub = [start ? `${fmt(start)} 받음` : '', r.fruit ? '과일 산 적 있음' : '과일 안 삼'].filter(Boolean).join(' · ');
-                return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px; background:#fff; border:1px solid var(--border); border-radius:10px;">
+                /* [신규 2026-11-05] 손님 간단 정보 — 쿠폰 받은 뒤 주문했는지 · 주문 횟수 · 마지막 주문일 · 마지막 접속일 (사장님 요청) */
+                const so = D.st[r.p.ph] || { any: 0, last: 0, times: [] };
+                const from = start || Number(r.v.grantedAt) || 0;
+                const after = from ? (so.times || []).filter(x => x >= from).length : 0;
+                const lv = evLastVisit(r.p.ph);
+                const sub = [start ? `${fmt(start)} 발급 받음` : (r.v.grantedAt ? `${fmt(r.v.grantedAt)} 나눠 줌 · 아직 주문서에 안 들어옴` : ''), r.fruit ? '과일 산 적 있음' : '과일 안 삼'].filter(Boolean).join(' · ');
+                const _ja = Number(r.p.at) ? (d => `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`)(new Date(Number(r.p.at))) : '';   // 가입일 (사장님 요청)
+                const info = [_ja ? `가입 ${_ja}` : '', from ? (after ? `쿠폰 받고 주문 ${after}번` : '쿠폰 받고 주문 없음') : '', so.any ? `주문 ${so.any}번 · 마지막 주문 ${fmt(so.last)}` : '주문 한 번도 없음', `접속 ${lv}`].filter(Boolean).join(' · ');
+                // [신규 2026-11-05] 줄을 누르면 손님 정보창 (손님 목록과 같은 창, 사장님 요청)
+                return `<div onclick="showCustomerCardModal('${encodeURIComponent(r.p.ph)}','${encodeURIComponent(r.p.name || '')}')" style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px; background:#fff; border:1px solid var(--border); border-radius:10px; cursor:pointer;">
                     <span style="flex:0 0 auto; padding:3px 9px; border-radius:999px; background:${tb}; color:${tf}; font-size:11.5px; font-weight:900;">${tl}</span>
-                    <span style="flex:1; min-width:0;">
+                    <span style="flex:1; min-width:0;">${r.staff ? '<span style="display:inline-block; margin-bottom:2px; padding:1px 6px; border-radius:5px; background:#f1f5f9; color:#475569; font-size:10.5px; font-weight:900;">가게 · 확인용</span>' : ''}
                         <span style="display:block; font-size:13.5px; font-weight:800; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${E(r.p.name || '(이름 없음)')} <span style="color:var(--text-sub); font-weight:700; font-size:12px;">${E(String(r.p.ph).slice(-4))}</span></span>
                         <span style="display:block; margin-top:2px; font-size:11.5px; font-weight:700; color:var(--text-sub);">${E(sub)}</span>
+                        <span style="display:block; margin-top:1px; font-size:11.5px; font-weight:700; color:${after ? '#15803d' : '#64748b'};">${E(info)}</span>
                     </span>
                     <span style="flex:0 0 auto; font-size:12px; font-weight:800; color:#475569; text-align:right;">${E(when)}</span>
                 </div>`;
