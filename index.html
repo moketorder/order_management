@@ -5620,6 +5620,9 @@
                         let price = '', from = false;
                         const ps = (many.length > 1 ? many : prod ? [prod] : []).map(q => (+q.price || 0) || optMin(q)).filter(v => v > 0);
                         if (ps.length) { price = Math.min(...ps); from = many.length > 1 || !(prod && +prod.price); }
+                        // [신규 2026-11-06] 할인 중이면 손님이 내는 값 + 할인 표시 (사장님 요청)
+                        const _sale = (prod && !from && typeof gThumbSale === 'function') ? gThumbSale(prod) : null;
+                        if (_sale) price = _sale.now;
                         const band = r[0] === 'pick' || r[0] === 'direct' ? (bandRows.find(x => x.v === p.vendor && x.n === p.name) || bandRows.find(x => nk(x.n) === nk(p.name))) : null;
                         // 주문 마감 — 마감 단추, 이번 차례(픽업일 6일 전 뒤) 마감 시각이 지남, 이번 차례 재고 0
                         let closedWhy = '';
@@ -5642,7 +5645,8 @@
                             mod: sv.m != null ? sv.m : (String((prod && prod.nameLead) || '').replace(/\s+/g, ' ').trim() || (r[0] === 'sada' ? '' : srcThModFrom(band && band.ds, prod && prod.name))),
                             price: price ? srcThWon(price) + (from ? '~' : '') : '',   // [수정 2026-10-16] 가격은 고치지 않고 늘 상품등록 가격 (사장님 요청)
                             imgs, imgAt: Math.min(+sv.i || 0, Math.max(0, imgs.length - 1)),
-                            closed: !!closedWhy, closedWhy, on: true, sun, sunOn: !!sun, early, dlT, dlDay: dlT ? new Date(dlT).getDay() : -1
+                            closed: !!closedWhy, closedWhy, on: true, sun, sunOn: !!sun, early, dlT, dlDay: dlT ? new Date(dlT).getDay() : -1,
+                            salePct: _sale ? _sale.pct : 0, saleOrig: _sale ? _sale.orig : 0
                         });
                     });
                     return items;
@@ -6008,9 +6012,16 @@
                                 c.font = '800 16px ' + F; const clW = it.closed ? c.measureText('주문마감').width + 20 : 0;
                                 // [신규 2026-10-16] 사다드림 표시 — 이름 뒤, 진한 보라 바탕 흰 글씨 (빨간 묶음 바탕에서도 눈에 띄게, 사장님 요청)
                                 c.font = '800 15px ' + F; const sdW = sd ? c.measureText('사다드림').width + 16 : 0;
+                                // [신규 2026-11-06] 할인 상품 — 이름 뒤 빨간 'n% 할인' 알약 (사장님 요청)
+                                // [수정 2026-11-06] 알약 글씨를 상품명과 같은 크기로 (사장님 요청)
+                                const slT = it.salePct ? it.salePct + '% 할인' : ''; c.font = '800 ' + nameF + 'px ' + F; const slW = slT ? c.measureText(slT).width + Math.round(nameF * .8) : 0, slH = Math.round(nameF * 1.3);
                                 c.font = '600 ' + nameF + 'px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222';
-                                const nm = srcThFit(c, it.name, rx - nx - (sd ? sdW + 8 : 0) - (clW ? clW + 8 : 0)); c.fillText(nm, nx, nb);
+                                const nm = srcThFit(c, it.name, rx - nx - (sd ? sdW + 8 : 0) - (slW ? slW + 8 : 0) - (clW ? clW + 8 : 0)); c.fillText(nm, nx, nb);
                                 let px = nx + c.measureText(nm).width + 8;
+                                if (slW) {
+                                    srcThPill(c, px, cy - slH / 2, slW, slH, it.closed ? '#bdbdbd' : '#e03131'); c.font = '800 ' + nameF + 'px ' + F; c.fillStyle = '#fff'; c.fillText(slT, px + Math.round(nameF * .4), nb);
+                                    px += slW + 8;
+                                }
                                 if (sd) {
                                     srcThPill(c, px, cy - 13, sdW, 26, it.closed ? '#bdbdbd' : '#7048e8'); c.font = '800 15px ' + F; c.fillStyle = '#fff'; c.fillText('사다드림', px + 8, cy + 5);
                                     px += sdW + 8;
@@ -6171,8 +6182,19 @@
                             } else if (!NOMOD) ty += modStep(mf, nf);
                             c.font = '700 ' + nf + 'px ' + F; c.fillStyle = it.closed ? '#a9a9a9' : '#222'; srcThNameLines(c, it.name, mw, NL).forEach((ln, li) => c.fillText(ln, tx, ty + nf + li * nf * 1.25));
                             ty += nf * 1.3 * NL;
-                            const pw = srcThPrice(c, F, it.price, tx, ty + pf * .95, pf, it.closed ? '#b5b5b5' : '#f76707', false);
-                            if (it.closed && pw) { c.fillStyle = '#b5b5b5'; c.fillRect(tx, ty + pf * .6, pw, 3); }
+                            // [신규 2026-11-06] 할인 상품 — 가격 앞 빨간 'n%', 뒤에 그은 할인 전 값 (자리가 있을 때만)
+                            let px0 = tx;
+                            if (it.salePct && it.price) {
+                                c.font = '900 ' + Math.round(pf * .82) + 'px ' + F; const st = it.salePct + '%';
+                                c.fillStyle = it.closed ? '#b5b5b5' : '#e03131'; c.fillText(st, px0, ty + pf * .95); px0 += c.measureText(st).width + Math.round(pf * .2);
+                            }
+                            const pw = srcThPrice(c, F, it.price, px0, ty + pf * .95, pf, it.closed ? '#b5b5b5' : '#f76707', false);
+                            if (it.closed && pw) { c.fillStyle = '#b5b5b5'; c.fillRect(px0, ty + pf * .6, pw, 3); }
+                            if (it.salePct && it.saleOrig && pw) {
+                                const of = Math.round(pf * .5); c.font = '600 ' + of + 'px ' + F;
+                                const os = srcThWon(it.saleOrig) + '원', ow = c.measureText(os).width, ox = px0 + pw + Math.round(pf * .25);
+                                if (ox + ow <= tx + mw) { c.fillStyle = '#9a9a9a'; c.fillText(os, ox, ty + pf * .95); c.fillRect(ox, ty + pf * .95 - of * .35, ow, 2); }
+                            }
                             x += cw + gap;
                         });
                     });
@@ -33512,6 +33534,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (price && !from && (p.useOptions == null || yes(p.useOptions)) && yes(p.useDiscount) && gDiscHas(type, p.discountRate, p.discountAmount)) price = gDiscApply(price, type, p.discountRate, p.discountAmount);
             return price ? price.toLocaleString() + (from ? '~' : '') : '';
         }
+        /* [신규 2026-11-06] 섬네일 할인 표시 (사장님 요청) — 할인 중인 상품이면 { pct, orig, now } (orig = 할인 전, now = 손님이 내는 값), 아니면 null
+           정상가(listPrice) 방식은 정상가 → 가격, 율·금액 할인은 가격 → 깎은 값. 옵션 가격만 있는 상품('~')은 표시하지 않는다 */
+        function gThumbSale(p) {
+            if (!p) return null;
+            const yes = v => v === true || v === 'true';
+            if (!((p.useOptions == null || yes(p.useOptions)) && yes(p.useDiscount))) return null;
+            const pr = parseInt(p.price) || 0; if (!pr) return null;
+            const lp = gProdListPrice(p), type = p.discountType === 'amount' ? 'amount' : 'rate';
+            const orig = lp || pr;
+            const now = lp ? pr : (gDiscHas(type, p.discountRate, p.discountAmount) ? gDiscApply(pr, type, p.discountRate, p.discountAmount) : pr);
+            if (!(now < orig)) return null;
+            return { pct: Math.round((orig - now) / orig * 100), orig, now };
+        }
+        function gThumbSaleOf(p) { const s = gThumbSale(p); return s ? { salePct: s.pct, saleOrig: s.orig } : {}; }
         function gFruitVegRows() {
             const clean = n => String(n || '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
             const live = (uploadProducts || []).filter(p => p && p.name !== '배달비' && ['fruit', 'veg'].includes(gListKind(p))
@@ -33520,7 +33556,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             live.forEach(p => {
                 const name = clean(p.name); if (!name || seen.has(name)) return; seen.add(name);
                 rows.push({ k: gListKind(p), name, mod: String(p.nameLead || '').replace(/\s+/g, ' ').trim(), price: gFvPrice(p),
-                    imgs: (Array.isArray(p.images) ? p.images : []).filter(Boolean), imgAt: 0, closed: gIsProductSoldOut(p), sun: '', vendor: '' });
+                    imgs: (Array.isArray(p.images) ? p.images : []).filter(Boolean), imgAt: 0, closed: gIsProductSoldOut(p), sun: '', vendor: '', ...gThumbSaleOf(p) });
             });
             return rows.sort((a, b) => (a.k === b.k ? 0 : a.k === 'fruit' ? -1 : 1) || a.name.localeCompare(b.name, 'ko'));
         }
@@ -33561,7 +33597,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function gThumbRowOf(p) {
             const name = String(p.name || '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
             return { k: gListKind(p), name, mod: String(p.nameLead || '').replace(/\s+/g, ' ').trim(), price: gFvPrice(p),
-                imgs: (Array.isArray(p.images) ? p.images : []).filter(Boolean), imgAt: 0, closed: gIsProductSoldOut(p), sun: '', vendor: isSadaListProduct(p) ? '사다드림' : '' };
+                imgs: (Array.isArray(p.images) ? p.images : []).filter(Boolean), imgAt: 0, closed: gIsProductSoldOut(p), sun: '', vendor: isSadaListProduct(p) ? '사다드림' : '', ...gThumbSaleOf(p) };
         }
         /* [신규 2026-10-30] 공동구매 목록에서 여러 개 고르고 '🖼 섬네일' (사장님 요청) — 고른 상품으로 단톡방 섬네일과 같은 그림.
            픽업일이 하나면 그 날짜, 여럿이면 첫날~끝날. 글도 같이 (날짜마다 상품명·가격) */
