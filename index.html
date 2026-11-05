@@ -24876,7 +24876,7 @@
             const b1 = document.getElementById('cust-view-list'), b2 = document.getElementById('cust-view-event');
             if (b1) b1.classList.toggle('on', v === 'list');
             if (b2) b2.classList.toggle('on', v === 'event');
-            if (v === 'event') renderEventAdmin(true);
+            if (v === 'event') renderEventAdmin(false);   // [수정 2026-11-05] 받아 둔 자료로 그린다 — 새로 받기는 🔄 단추로만 (사장님 요청)
         }
 
         /* ================= [신규] 일반 관리 (주문서 '사장님 설정'을 옮겨 옴) =================
@@ -28837,7 +28837,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!box) return;
             if (reload || !_ev.data) {
                 box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
-                try { _ev.data = await evLoad(); try { await gEnsureVisits(false); } catch (e) { } }
+                try { _ev.data = await evLoad(); _ev.at = Date.now(); try { await gEnsureVisits(false); } catch (e) { } }
                 catch (e) { box.innerHTML = `<div style="padding:30px; text-align:center; color:#dc2626; font-weight:700;">불러오지 못했어요 (${gEscapeHtml(gErrKo(e))})</div>`; return; }
             }
             const D = _ev.data, E = gEscapeHtml, isFc = _ev.tab === 'fc';
@@ -28852,7 +28852,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const card = (label, n, color) => `<div style="flex:1 1 90px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:10px; text-align:center;"><div style="font-size:20px; font-weight:900; color:${color || 'var(--text-main)'};">${n}</div><div style="font-size:11.5px; font-weight:700; color:var(--text-sub);">${label}</div></div>`;
             const TAG = { used: ['사용', '#dcfce7', '#15803d'], on: [isFc ? '발급 받음' : '쓸 수 있음', '#fef9c3', '#a16207'], off: ['기간 지남', '#f1f5f9', '#64748b'], wait: ['나눠 줌', '#eff6ff', '#1d4ed8'] };
             const chip = (k, label, n) => `<button type="button" onclick="evSet('f','${k}')" style="padding:6px 11px; border-radius:999px; border:1.5px solid ${_ev.f === k ? 'var(--primary)' : 'var(--border)'}; background:${_ev.f === k ? '#fff7ed' : '#fff'}; color:${_ev.f === k ? 'var(--primary)' : '#475569'}; font-size:12.5px; font-weight:800; cursor:pointer;">${label} ${n}</button>`;
-            let html = `<div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">${tabBtn('fc', '🍎 과일 할인 쿠폰 3,000원')}${tabBtn('wc', '🚚 과일 무료배송 쿠폰 (끝남)')}</div>`;
+            // [신규 2026-11-05] 받은 시각 + 🔄 새로 받기 — 누를 때만 서버에서 다시 받는다 (손님 목록과 같은 모양, 사장님 요청)
+            const _at = _ev.at ? new Date(_ev.at) : null;
+            let html = `<div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                <span style="flex:1; font-size:12.5px; font-weight:800; color:var(--text-sub);">${_at ? `${_at.getHours()}:${String(_at.getMinutes()).padStart(2, '0')}에 받은 자료` : ''}</span>
+                <button type="button" onclick="renderEventAdmin(true)" style="padding:8px 12px; border:1px solid var(--border); border-radius:10px; background:#fff; font:inherit; font-size:13px; font-weight:800; color:var(--text-main); cursor:pointer;">🔄 새로 받기</button>
+            </div>`;
+            html += `<div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">${tabBtn('fc', '🍎 과일 할인 쿠폰 3,000원')}${tabBtn('wc', '🚚 과일 무료배송 쿠폰 (끝남)')}</div>`;
             if (isFc && !D.fcOk) {
                 html += `<div style="padding:16px; border:1.5px dashed #f59e0b; background:#fffbeb; border-radius:10px; font-size:13px; font-weight:700; color:#92400e; line-height:1.6;">과일 할인 쿠폰 명단을 읽지 못했어요.<br>파이어베이스 콘솔에서 <b>규칙관리.txt</b>의 새 규칙(fruit_coupon)을 게시해 주세요.</div>`;
                 box.innerHTML = html; return;
