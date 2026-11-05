@@ -8524,10 +8524,11 @@
 
             <!-- [수정] 자료 정리 하위 탭: 판매 통계 / 매입·매출 / 아파트 관리 -->
             <!-- [수정] '자료 정리' → '가게 관리'. 주문서에 있던 사장님 설정(배달·영업일·손님 화면)을 '일반 관리'로 옮겨 왔다 -->
-            <div class="segment-control" style="display:grid; grid-template-columns:repeat(6,1fr); background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
+            <div class="segment-control" style="display:grid; grid-auto-flow:column; grid-auto-columns:1fr; background:#e2e8f0; padding:4px; border-radius:12px; margin-bottom:12px;">
                 <div class="segment-btn data-sub-btn active" id="btn-data-sub-sales" onclick="switchDataSubTab('sales')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📊 통계</div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-profit" onclick="switchDataSubTab('profit')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">📈 매입·매출</div>
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-cust" onclick="switchDataSubTab('cust')" style="position:relative; text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">👤 손님<span class="err-badge cust-badge" id="cust-badge-sub" style="display:none;"></span></div>
+                <div class="segment-btn data-sub-btn" id="btn-data-sub-event" onclick="switchDataSubTab('event')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🎁 이벤트</div>   <!-- [신규 2026-11-05] 쿠폰을 손님 목록과 따로 (사장님 요청) -->
                 <div class="segment-btn data-sub-btn" id="btn-data-sub-apart" onclick="switchDataSubTab('apart')" style="text-align:center; padding:10px 0; font-size:12px; font-weight:800; cursor:pointer; border-radius:10px;">🏢 아파트</div>
                 <!-- [신규 2026-10-01] 손님 화면 오류 — 주문서가 남긴 오류를 본다 -->
                 <!-- [수정] 해결 안 한 오류가 있을 때만 보인다 (gErrShowTab) -->
@@ -8543,6 +8544,11 @@
             <!-- [신규 2026-10-01] 손님 화면 오류 — error_logs (최근 30일, 실시간) -->
             <div id="data-sub-errors" style="display:none;">
                 <div id="err-admin-body"><!-- 동적 삽입 --></div>
+            </div>
+
+            <!-- [신규 2026-11-05] 이벤트 — 쿠폰마다 나눠 준 손님·쓴 손님·기간 지난 손님 (손님 목록과 따로) -->
+            <div id="data-sub-event" style="display:none;">
+                <div id="event-admin-body"><!-- 동적 삽입 --></div>
             </div>
 
             <!-- [신규] 손님 관리 — 손님별 연락처·주소·주문 실적을 한 자리에서 본다 -->
@@ -12516,12 +12522,16 @@
         //  물건이 아니므로 배달비 줄처럼 개수·통계·무료배달 기준에서 빼고, 금액 합계에는 그대로 더한다
         function gIsFeeRow(it) {
             const n = gFeeRowName(it);
-            return n === "배달비" || n === FEE_REFUND_NAME || n === "포인트 사용";
+            return n === "배달비" || n === FEE_REFUND_NAME || n === "포인트 사용" || n === "과일 할인 쿠폰";   // [신규 2026-11-05] 과일 할인 쿠폰 줄도
         }
+        // [신규 2026-11-05] 주문서의 과일 할인 쿠폰 줄 (마이너스 3,000원) — 포인트 줄처럼 물건이 아니다. 이름은 주문서·규칙관리와 같아야 한다
+        var FC_ROW_NAME = '과일 할인 쿠폰';
+        function gIsFcRow(it) { return gFeeRowName(it) === FC_ROW_NAME; }
         // [신규 2026-10-28] 주문서의 무료배송 쿠폰(가입 선물) 차감 줄 — 이름은 '배달비 차감' 그대로, feeWhy '첫주문'
         function gIsWcRow(it) { return !!it && it.feeWhy === '첫주문'; }
         // 주문 줄 이름 — 쿠폰 차감 줄은 '과일 무료배송 쿠폰'으로, 노랑 딱지를 붙여 합배송 차감과 구별한다
         function gWcNameHtml(it) {
+            if (gIsFcRow(it)) return `${gEscapeHtml(it.item)} <span style="display:inline-block; padding:1px 6px; border-radius:5px; background:#FFE14D; color:#16200f; font-size:11px; font-weight:800; vertical-align:1px;">과일 쿠폰</span>`;   // [신규 2026-11-05]
             if (!gIsWcRow(it)) return gEscapeHtml(it.item);
             const nm = gEscapeHtml(String(it.item || '').replace(FEE_REFUND_NAME, '과일 무료배송 쿠폰'));
             return `${nm} <span style="display:inline-block; padding:1px 6px; border-radius:5px; background:#FFE14D; color:#16200f; font-size:11px; font-weight:800; vertical-align:1px;">가입 쿠폰</span>`;
@@ -17440,7 +17450,7 @@
                                     const keys = Object.keys((await r.json()) || {});
                                     const other = keys.some(key => !pre.some(x => key.startsWith(x))
                                         && !_canceledKeys.has(key)
-                                        && !/_(배달비|배달비 차감|포인트 사용)(_\d+)?$/.test(key));
+                                        && !/_(배달비|배달비 차감|포인트 사용|과일 할인 쿠폰)(_\d+)?$/.test(key));
                                     if (other) { _mineOf.delete(k); return; }   // 하나 나오면 끝
                                 }
                             }
@@ -17468,7 +17478,9 @@
                 Object.values(grouped).forEach(c => {
                     if (c.shippingMethod === '배달주문') { _printParts.push(c); return; }
                     const pts = c.items.filter(_isPtRow);
-                    const free = c.items.filter(_itemFree), tax = c.items.filter(it => !_itemFree(it) && !_isPtRow(it));
+                    let free = c.items.filter(_itemFree), tax = c.items.filter(it => !_itemFree(it) && !_isPtRow(it));
+                    // [신규 2026-11-05] 과일 할인 쿠폰 줄은 과일(면세) 장으로 — 면세 상품이 없으면 과세 장에 둔다
+                    { const fcs = c.items.filter(gIsFcRow); if (fcs.length) { tax = tax.filter(it => !gIsFcRow(it)); if (free.length) free = free.concat(fcs); else tax = tax.concat(fcs); } }
                     // 한 종류뿐이면 한 장 — 과세·면세 표시는 두 장으로 나뉠 때만 붙인다 (면세만이면 합계금액 앞에 * 로 알린다)
                     if (!free.length || !tax.length) { _printParts.push(Object.assign({}, c, { taxLabel: '', taxFreeOnly: free.length > 0 && !tax.length })); return; }
                     // 두 장으로 나눌 때 포인트를 과세 장(아직 안 낸 금액만큼)부터 채우고 남는 건 면세 장으로
@@ -17566,6 +17578,7 @@
                     printItems.forEach(it => {
                         if (it.paid === true || it.paid === "true" || String(it.paid).toUpperCase() === "TRUE") return;
                         if (_isPtRow(it)) { _unpaidPt -= _amtOf(it); return; }
+                        if (gIsFcRow(it)) { _unpaidFree += _amtOf(it); return; }   // [신규 2026-11-05] 과일 할인 쿠폰은 면세(과일)에서 먼저 뺀다
                         if (gIsFeeRow(it)) return;
                         let code = String(it.productCode || '').trim();
                         if (!code) { const p = (uploadProducts || []).find(p => p && p.name === String(it.item || '').trim()); code = p ? String(p.productCode || '').trim() : ''; }
@@ -17573,6 +17586,7 @@
                     });
                     // [수정 2026-10-03] 포인트는 과세 바코드에서 먼저 빼고, 모자란 만큼 면세 바코드에서 뺀다 (사장님 요청).
                     //  예전엔 과세에서만 빼서, 면세 상품만 있으면 면세 바코드가 포인트를 안 뺀 금액으로 찍혔다.
+                    if (_unpaidFree < 0) _unpaidFree = 0;   // [신규 2026-11-05] 면세 상품보다 쿠폰이 크면 남는 건 과세에서
                     const _taxBeforePt = _unpaidSum + _unpaidPt - _unpaidFree;
                     const _ptOnTax = Math.min(_unpaidPt, Math.max(0, _taxBeforePt));
                     const _unpaidTax = _taxBeforePt - _ptOnTax;
@@ -17594,7 +17608,7 @@
                         // 1. 입금 완료 여부 뱃지 생성 (입고 상태 및 수령 여부는 전면 제외)
                         const isPaid = (it.paid === true || it.paid === "true" || String(it.paid).toUpperCase() === "TRUE");
                         // [수정 2026-10-03] '포인트 사용' 줄은 돈을 받을 줄이 아니라서 입금 표시를 붙이지 않는다 (사장님 요청)
-                        if (_isPtRow(it)) {
+                        if (_isPtRow(it) || gIsFcRow(it)) {   // [신규 2026-11-05] 과일 할인 쿠폰 줄도 입금 표시 없음
                         } else if (isPaid) {
                             statusBadge += ' <span style="font-size:10px; color:#000; font-weight:800; border:1.5px solid #000; padding:1px 3px; border-radius:2px; margin-left:4px; display:inline-block; line-height:1;">[입금완료]</span>';
                         } else {
@@ -24819,7 +24833,7 @@
         // ===== [신규] 가게 관리(옛 자료 정리) — 하위 탭 (판매 통계 / 매입·매출 / 손님 관리 / 아파트 관리 / 일반 관리) =====
         function switchDataSubTab(which) {
             // [수정] '매입·매출'이 늘어 세 갈래가 됐다. 보일 것 하나만 켜고 나머지는 끈다.
-            const keys = ['sales', 'profit', 'cust', 'apart', 'general', 'errors'];
+            const keys = ['sales', 'profit', 'cust', 'event', 'apart', 'general', 'errors'];   // [신규 2026-11-05] event
             if (!keys.includes(which)) which = 'sales';
             keys.forEach(k => {
                 const sec = document.getElementById('data-sub-' + k);
@@ -24839,6 +24853,7 @@
             }
             else if (which === 'general') renderGeneralAdmin(true);
             else if (which === 'errors') renderErrorAdmin();
+            else if (which === 'event') renderEventAdmin(true);   // [신규 2026-11-05]
         }
 
         /* ================= [신규] 일반 관리 (주문서 '사장님 설정'을 옮겨 옴) =================
@@ -28690,6 +28705,127 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
         /* [신규 2026-10-28] 과일 무료배송 쿠폰(가입 선물) — 손님 관리 '🎟 쿠폰' 탭 (사장님 요청). 보기만 한다.
            welcome_coupon/<번호> = { startAt(쿠폰을 처음 본 때), usedAt?, usedRef? }. 기간은 startAt 부터 7일 */
+        /* ===== [신규 2026-11-05] 🎁 이벤트 — 쿠폰마다 따로 본다 (사장님 요청: 손님 목록과 따로 관리) =====
+           · 🍎 과일 할인 쿠폰 3,000원 (fruit_coupon/<번호> = { grantedAt?, startAt?, usedAt?, usedRef? })
+               - '쿠폰 나눠 주기': 과일·야채를 한 번도 안 산 손님(취소 뺌) 중 아직 칸이 없는 손님에게 grantedAt 을 적는다
+               - 손님이 주문서에 처음 들어온 때 startAt 이 적히고 그날부터 7일. 새 가입자는 주문서가 알아서 칸을 만든다
+           · 🚚 과일 무료배송 쿠폰 (welcome_coupon) — 2026-11-05부터 새로 안 준다. 이미 받은 손님만 보여 준다 */
+        let _ev = { tab: 'fc', f: 'all', data: null };
+        const EV_MS = 7 * 86400000;
+        const evDig = v => { let d = String(v || '').replace(/\D/g, ''); if (d.startsWith('82')) d = '0' + d.slice(2); return d; };
+        async function evLoad() {
+            const get = async p => {
+                const r = await fetch(`${FIREBASE_DB_URL}${p}.json?t=${Date.now()}`);
+                if (!r.ok) { if (r.status === 401 || r.status === 403) return null; throw new Error(`${p} ${r.status}`); }
+                return (await r.json()) || {};
+            };
+            const [cust, wc, fc, od, ar] = await Promise.all(['customers', 'welcome_coupon', 'fruit_coupon', 'orders', 'orders_archive'].map(get));
+            await gLoadPrivateSettings();
+            // 번호마다 산 것 (취소 줄·배달비·포인트·쿠폰 줄 뺌)
+            const st = {};
+            [od || {}, ar || {}].forEach(src => Object.keys(src).forEach(k => {
+                const v = src[k]; if (!v || typeof v !== 'object') return;
+                Object.values(v).forEach(r => {
+                    if (!r || typeof r !== 'object' || gIsFeeRow(r) || isSalesCanceled(r) || /취소/.test(String(r.received || ''))) return;
+                    const isF = r.category === 'fruit' || /^F/i.test(String(r.productCode || ''));
+                    new Set([evDig(k), evDig(r.phone), evDig(r.kakaoPhone)].filter(Boolean)).forEach(p => {
+                        const s = st[p] = st[p] || { any: 0, fruit: 0 };
+                        s.any++; if (isF) s.fruit++;
+                    });
+                });
+            }));
+            const people = {};
+            Object.keys(cust || {}).forEach(k => {
+                const c = cust[k] || {};
+                const ph = evDig(k) || evDig(c.kakaoPhone) || evDig(c.phone);
+                if (ph) people[ph] = { ph, key: k, name: String(c.name || c.kakaoName || ''), at: Number(c.createdAt) || 0 };
+            });
+            return { wc: wc || {}, fc: fc || {}, fcOk: fc !== null, st, people };
+        }
+        function evStatus(v) {
+            if (!v) return 'none';
+            if (v.usedRef) return 'used';
+            if (!Number(v.startAt)) return 'wait';
+            return Date.now() < Number(v.startAt) + EV_MS ? 'on' : 'off';
+        }
+        function evIsTest(p) { return !p || CA_STAFF_PHONES.has(p.ph) || /테스트|모켓1234/.test(p.name); }
+        // 쿠폰을 나눠 줄 손님 — 과일·야채를 안 샀고, 과일 쿠폰 칸이 아직 없는 손님
+        function evFcTargets(D) {
+            return Object.values(D.people).filter(p => !evIsTest(p) && !((D.st[p.ph] || {}).fruit) && !D.fc[p.key] && !D.fc[p.ph]);
+        }
+        async function evFcGrant() {
+            const D = _ev.data; if (!D || !D.fcOk) return;
+            const list = evFcTargets(D);
+            if (!list.length) { showToast('나눠 줄 손님이 없어요.'); return; }
+            const noOrd = list.filter(p => !((D.st[p.ph] || {}).any)).length;
+            if (!await psConfirm(`과일 할인 쿠폰(3,000원)을 ${list.length}명에게 나눠 줄까요?\n\n· 아무것도 안 산 손님 ${noOrd}명\n· 다른 상품만 산 손님 ${list.length - noOrd}명\n\n손님이 주문서에 처음 들어온 날부터 7일 동안 쓸 수 있어요.`, '나눠 주기')) return;
+            const now = Date.now(), up = {};
+            list.forEach(p => { up[p.key] = { grantedAt: now }; });
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}fruit_coupon.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(up) });
+                if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                showToast(`${list.length}명에게 과일 할인 쿠폰을 나눠 줬어요.`);
+            } catch (e) { showToast('나눠 주지 못했어요: ' + gErrKo(e)); }
+            renderEventAdmin(true);
+        }
+        function evSet(k, v) { _ev[k] = v; if (k === 'tab') _ev.f = 'all'; renderEventAdmin(false); }
+        async function renderEventAdmin(reload) {
+            const box = document.getElementById('event-admin-body');
+            if (!box) return;
+            if (reload || !_ev.data) {
+                box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
+                try { _ev.data = await evLoad(); }
+                catch (e) { box.innerHTML = `<div style="padding:30px; text-align:center; color:#dc2626; font-weight:700;">불러오지 못했어요 (${gEscapeHtml(gErrKo(e))})</div>`; return; }
+            }
+            const D = _ev.data, E = gEscapeHtml, isFc = _ev.tab === 'fc';
+            const src = isFc ? D.fc : D.wc;
+            const fmt = t => { if (!t) return ''; const d = new Date(Number(t)); return `${d.getMonth() + 1}/${d.getDate()}`; };
+            const rows = Object.keys(src).map(k => {
+                const v = src[k] || {}, p = D.people[evDig(k)] || { ph: evDig(k), name: '' };
+                return { k, v, p, s: evStatus(v), fruit: (D.st[p.ph] || {}).fruit || 0 };
+            }).filter(r => !evIsTest(r.p) || !r.p.name);
+            const cnt = s => rows.filter(r => r.s === s).length;
+            const tabBtn = (k, label) => `<button type="button" class="sub-tab-btn${_ev.tab === k ? ' active' : ''}" onclick="evSet('tab','${k}')">${label}</button>`;
+            const card = (label, n, color) => `<div style="flex:1 1 90px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:10px; text-align:center;"><div style="font-size:20px; font-weight:900; color:${color || 'var(--text-main)'};">${n}</div><div style="font-size:11.5px; font-weight:700; color:var(--text-sub);">${label}</div></div>`;
+            const TAG = { used: ['사용', '#dcfce7', '#15803d'], on: ['쓸 수 있음', '#fef9c3', '#a16207'], off: ['기간 지남', '#f1f5f9', '#64748b'], wait: ['아직 안 봄', '#eff6ff', '#1d4ed8'] };
+            const chip = (k, label, n) => `<button type="button" onclick="evSet('f','${k}')" style="padding:6px 11px; border-radius:999px; border:1.5px solid ${_ev.f === k ? 'var(--primary)' : 'var(--border)'}; background:${_ev.f === k ? '#fff7ed' : '#fff'}; color:${_ev.f === k ? 'var(--primary)' : '#475569'}; font-size:12.5px; font-weight:800; cursor:pointer;">${label} ${n}</button>`;
+            let html = `<div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">${tabBtn('fc', '🍎 과일 할인 쿠폰 3,000원')}${tabBtn('wc', '🚚 과일 무료배송 쿠폰 (끝남)')}</div>`;
+            if (isFc && !D.fcOk) {
+                html += `<div style="padding:16px; border:1.5px dashed #f59e0b; background:#fffbeb; border-radius:10px; font-size:13px; font-weight:700; color:#92400e; line-height:1.6;">과일 할인 쿠폰 명단을 읽지 못했어요.<br>파이어베이스 콘솔에서 <b>규칙관리.txt</b>의 새 규칙(fruit_coupon)을 게시해 주세요.</div>`;
+                box.innerHTML = html; return;
+            }
+            html += `<div style="font-size:12.5px; font-weight:700; color:var(--text-sub); line-height:1.6; margin-bottom:10px;">${isFc
+                ? '과일·야채를 5,000원 이상 담으면 3,000원이 빠져요 (픽업·배달 모두, 사다드림 빼고). 손님이 주문서에 처음 들어온 날부터 7일. 새 가입자는 저절로 받아요.'
+                : '과일을 담은 당일배송에서 배달비가 빠지던 쿠폰이에요. 11/5부터 새로 주지 않고, 이미 받은 손님만 기간 끝날 때까지 써요.'}</div>`;
+            html += `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">${card('받은 손님', rows.length)}${isFc ? card('아직 안 봄', cnt('wait'), '#1d4ed8') : ''}${card('쓸 수 있음', cnt('on'), '#a16207')}${card('사용', cnt('used'), '#15803d')}${card('기간 지남', cnt('off'), '#64748b')}</div>`;
+            if (isFc) {
+                const tg = evFcTargets(D);
+                html += `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px; border:1px solid #fde68a; background:#fffbeb; border-radius:10px; margin-bottom:12px;">
+                    <div style="flex:1; min-width:180px; font-size:13px; font-weight:800; color:#92400e;">과일·야채를 안 산 손님 중 아직 쿠폰이 없는 손님 <b style="font-size:15px;">${tg.length}명</b></div>
+                    <button type="button" onclick="evFcGrant()" ${tg.length ? '' : 'disabled'} style="padding:9px 14px; border:none; border-radius:9px; background:${tg.length ? '#f59e0b' : '#e5e7eb'}; color:${tg.length ? '#fff' : '#9ca3af'}; font-size:13px; font-weight:900; cursor:${tg.length ? 'pointer' : 'default'};">🎁 쿠폰 나눠 주기</button></div>`;
+            }
+            html += `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">${chip('all', '전체', rows.length)}${isFc ? chip('wait', '아직 안 봄', cnt('wait')) : ''}${chip('on', '쓸 수 있음', cnt('on'))}${chip('used', '사용', cnt('used'))}${chip('off', '기간 지남', cnt('off'))}</div>`;
+            const ORD = { on: 0, wait: 1, used: 2, off: 3 };
+            const list = rows.filter(r => _ev.f === 'all' || r.s === _ev.f)
+                .sort((a, b) => (ORD[a.s] - ORD[b.s]) || (Number(b.v.usedAt || b.v.startAt || b.v.grantedAt || 0) - Number(a.v.usedAt || a.v.startAt || a.v.grantedAt || 0)));
+            html += list.length ? list.map(r => {
+                const [tl, tb, tf] = TAG[r.s] || ['', '#fff', '#000'];
+                const start = Number(r.v.startAt), end = start ? start + EV_MS : 0;
+                const left = (r.s === 'on') ? Math.ceil((end - Date.now()) / 86400000) : 0;
+                const when = r.s === 'used' ? `${fmt(r.v.usedAt)} 사용` : r.s === 'on' ? `${fmt(end - 1)}까지 · ${left <= 1 ? '오늘까지' : left + '일 남음'}` : r.s === 'off' ? `${fmt(end - 1)} 끝남` : `${fmt(r.v.grantedAt)} 나눠 줌`;
+                const sub = [start ? `${fmt(start)} 받음` : '', r.fruit ? '과일 산 적 있음' : '과일 안 삼'].filter(Boolean).join(' · ');
+                return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px; background:#fff; border:1px solid var(--border); border-radius:10px;">
+                    <span style="flex:0 0 auto; padding:3px 9px; border-radius:999px; background:${tb}; color:${tf}; font-size:11.5px; font-weight:900;">${tl}</span>
+                    <span style="flex:1; min-width:0;">
+                        <span style="display:block; font-size:13.5px; font-weight:800; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${E(r.p.name || '(이름 없음)')} <span style="color:var(--text-sub); font-weight:700; font-size:12px;">${E(String(r.p.ph).slice(-4))}</span></span>
+                        <span style="display:block; margin-top:2px; font-size:11.5px; font-weight:700; color:var(--text-sub);">${E(sub)}</span>
+                    </span>
+                    <span style="flex:0 0 auto; font-size:12px; font-weight:800; color:#475569; text-align:right;">${E(when)}</span>
+                </div>`;
+            }).join('') : `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">해당하는 손님이 없어요.</div>`;
+            box.innerHTML = html;
+        }
+
         function caWcOf(r){ const v = (window.__caWc || {})[String((r && r.phone) || '').replace(/\D/g, '')]; return (v && Number(v.startAt)) ? v : null; }
         // 쿠폰 대상 — 이미 발급됐거나, 손님 정보가 있고 주문이 한 번도 없는 손님 (들어오면 발급된다)
         function caWcTarget(r){ return !!caWcOf(r) || (!!r.saved && !!r.noOrder); }
