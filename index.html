@@ -25952,6 +25952,7 @@
              · 기간(오늘·7일·30일·90일)을 고르면 손님관리의 접속 숫자가 모두 그 기간으로 바뀐다
              · 가게 사람·시험 계정은 접속 셈에서 뺀다 */
         const VISITS_CACHE_KEY = 'moket_visits_days';
+        const VISITS_AT_KEY = 'moket_visits_at';   // [신규 2026-11-05] 날짜마다 서버에서 받은 시각 — 그날 도중에 받은 기록은 다음에 다시 받는다
         const VISIT_LOOKBACK = 30;     // 구경만·발길 끊김을 가리는 고정 잣대
         const VISIT_KEEP_DAYS = 90;    // 기기에 담아 두는 날수
         /* [수정 2026-10-03] 접속·통계에서 뺄 가게 사람·시험 계정 번호도 코드에 적지 않는다 (깃허브에 그대로 보였다).
@@ -26098,14 +26099,20 @@
                     cache = {};
                     try { const raw = await idbGet(VISITS_CACHE_KEY); if (raw) cache = JSON.parse(raw) || {}; } catch (e) { cache = {}; }
                 }
-                const need = days.filter((d, i) => (refresh && i < 2) || !(d in cache));
+                /* [수정 2026-11-05] 그날이 끝나기 전에 받아 둔 날짜는 한 번 더 받는다 (사장님: 11/2 조회 2인데 주문 26).
+                   예전엔 지난 날짜는 다시 안 받아서, 그날 새벽에 받아 둔 덜 찬 기록이 굳어 버렸다. 받은 시각을 따로 적어 둔다 */
+                let _at = {};
+                try { _at = JSON.parse((await idbGet(VISITS_AT_KEY)) || '{}') || {}; } catch (e) { _at = {}; }
+                const _dayEnd = d => new Date(d + 'T00:00:00').getTime() + 86400000 + 10 * 60000;
+                const need = days.filter((d, i) => (refresh && i < 2) || !(d in cache) || (i > 0 && !(Number(_at[d]) >= _dayEnd(d))));
                 if (refresh && caVisitFrom) caRangeDays(caVisitFrom, caVisitTo).forEach(d => { if (!need.includes(d)) need.push(d); });
                 await Promise.all(need.map(async d => {
                     try {
                         const r = await fetch(`${FIREBASE_DB_URL}visits/${d}.json?t=${Date.now()}`);
-                        if (r.ok) cache[d] = (await r.json()) || {};
+                        if (r.ok) { cache[d] = (await r.json()) || {}; _at[d] = Date.now(); }
                     } catch (e) { /* 못 받은 날은 다음에 다시 받는다 */ }
                 }));
+                try { const _k = caLastDays(VISIT_KEEP_DAYS); Object.keys(_at).forEach(d => { if (!_k.includes(d)) delete _at[d]; }); idbSet(VISITS_AT_KEY, JSON.stringify(_at)); } catch (e) { }
                 const keep = caLastDays(VISIT_KEEP_DAYS);
                 const toSave = {};
                 Object.keys(cache).forEach(d => { if (keep.includes(d)) toSave[d] = cache[d]; });
@@ -27336,7 +27343,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                      : caFilter === 'browse' ? all.filter(r => r.browser)
                      : caFilter === 'gone' ? all.filter(r => r.visit && r.visit.gone)
                      : caFilter === 'noshow' ? all.filter(r => r.noShow)
-                     : caFilter === 'coupon' ? all.filter(caWcTarget)
+                     : caFilter === 'coupon' ? (caFilter = 'all', all)
                      : all;
             // '새로 온 손님'을 고르면 늦게 온 순, '고침'을 고르면 최근 고친 순으로 세운다
             if (caFilter === 'new30' && caSort === 'amt') caSort = 'joined';
@@ -27398,7 +27405,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                         ${(nBrowse || caFilter === 'browse') ? fbtn('browse', `👀 구경만 ${nBrowse}`, '#1d4ed8') : ''}
                         ${(nGone || caFilter === 'gone') ? fbtn('gone', `🚪 발길 끊김 ${nGone}`, '#be123c') : ''}
                         ${(nNoShow || caFilter === 'noshow') ? fbtn('noshow', `⛔ 노쇼 ${nNoShow}`, '#c2410c') : ''}
-                        ${fbtn('coupon', `🎟 쿠폰 ${nWc}`, '#a16207')}${/* [신규 2026-10-28] 과일 무료배송 쿠폰 받은 손님 (사장님 요청) */''}
+                        ${/* [수정 2026-11-05] 🎟 쿠폰 거르기는 뺐다 — 쿠폰은 손님 > 🎁 이벤트에서 본다 (사장님 요청) */''}
                         ${fbtn('withdrawn', `🚫 탈퇴 ${WD.length}`, '#64748b')}${/* [수정 2026-10-03] 탈퇴 회원 관리 단추는 0명이어도 늘 보인다 (사장님이 찾지 못했다) */''}
                         ${/* [수정] 늘 0이라 자리만 차지한다. 어긋난 것이 생겼을 때만 내보인다. */
                           (all.length - nSaved > 0 || caFilter === 'nosaved')
@@ -27457,7 +27464,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <div class="ca-r1">
                         ${_custNewMap[String(r.phone || '').replace(/\D/g, '')] ? `<span style="flex:0 0 auto; font-size:11px; font-weight:900; color:#fff; background:#16a34a; padding:1px 6px; border-radius:6px; margin-right:5px;">${_custNewMap[String(r.phone || '').replace(/\D/g, '')] === '재가입' ? '재가입' : '신규'}</span>` : ''}<span class="ca-name">${gEscapeHtml(r.name)}${r.realName && r.realName !== r.name ? `<span style="font-weight:700; color:#94a3b8;"> (${gEscapeHtml(r.realName)})</span>` : ''}</span>
                         ${r.noShow ? `<span onclick="event.stopPropagation(); gShowNoShowList('${encodeURIComponent(r.phone)}','${encodeURIComponent(r.name)}')" style="cursor:pointer; flex:0 0 auto; font-size:11px; font-weight:800; color:#c2410c; text-decoration:underline; text-underline-offset:2px;" title="마지막 노쇼 ${gEscapeHtml(r.noShowLast)} · 눌러서 노쇼 주문 보기">⛔ 노쇼 ${r.noShow}회</span>` : ''}
-                        ${(caWcOf(r) || caFilter === 'coupon') ? caWcChip(r) : ''}
+                        ${/* [수정 2026-11-05] 손님 카드의 쿠폰 딱지도 뺐다 (이벤트에서 본다) */''}
                         <span class="ca-cnt">${r.orders}회</span>
                         <span class="ca-amt" title="${r.amt.toLocaleString()}원">${won(r.amt)}</span>
                     </div>
