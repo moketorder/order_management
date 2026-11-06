@@ -4923,8 +4923,9 @@
                     let links = srcPoLinks(r);   // [신규 2026-10-18] 이은 발주 여러 개
                     const paintCur = () => {
                         const el = document.getElementById('src-polink-cur'); if (!el) return;
-                        el.innerHTML = links.map(l => '<div class="sl"><b class="src-rg o">O</b><span class="n">' + srcEsc(String(l.date || '').slice(5, 10).replace('-', '/') + ' ' + (l.supplier || '') + ' · ' + (l.item || '') + (l.qty ? ' · ' + l.qty + '개' : '')) +
-                            '</span><button type="button" data-unlink="' + srcEsc(l.id) + '" style="border-color:#fca5a5;color:#dc2626;">끊기</button></div>').join('') +
+                        el.innerHTML = links.map(l0 => { const _p = srcPoById(l0.id); return _p ? Object.assign({}, l0, srcPoLinkEntry(_p)) : l0; }).map(l => '<div class="sl"><b class="src-rg o">O</b><span class="n">' + srcEsc(String(l.date || '').slice(5, 10).replace('-', '/') + ' ' + (l.supplier || '') + ' · ' + (l.item || '') + (l.qty ? ' · ' + l.qty + '개' : '')) +
+                            '</span><button type="button" data-poedit="' + srcEsc(l.id) + '" style="border-color:#93c5fd;color:#2563eb;">수정</button>' +   // [신규 2026-11-06] 이은 발주를 바로 고친다 (사장님 요청)
+                            '<button type="button" data-unlink="' + srcEsc(l.id) + '" style="border-color:#fca5a5;color:#dc2626;">끊기</button></div>').join('') +
                             (links.length > 1 ? '<span class="k">발주 ' + links.length + '개 · 낱개 합 ' + links.reduce((s, l) => s + (+l.qty || 0), 0) + '개</span>'
                                 : (links.length ? '' : '<span class="k">아래에서 발주를 누르면 이어져요. 여러 개 이을 수 있어요.</span>'));
                     };
@@ -4963,6 +4964,15 @@
                         const b = e.target.closest('button'); if (!b) return;
                         if (b.dataset.act === 'close') { box.remove(); srcRender(); return; }
                         try {
+                            if (b.dataset.poedit) {   // [신규 2026-11-06] 발주 탭의 수정 칸으로 — 저장·취소하면 이 화면으로 돌아온다
+                                if (!srcPoById(b.dataset.poedit)) { showToast('그 발주를 찾지 못했어요 (지워졌을 수 있어요)'); return; }
+                                const _back = { tab: gVisibleAdminTab(), scroll: window.scrollY || 0 };
+                                box.remove(); srcRender();
+                                switchAdminTab('purchase-history');
+                                editPurchaseOrder(b.dataset.poedit);
+                                gPoEditReturn = _back;
+                                return;
+                            }
                             if (b.dataset.unlink) { await saveLinks(links.filter(l => l.id !== b.dataset.unlink)); showToast('발주 연결을 하나 끊었어요'); }
                             else if (b.dataset.po) {
                                 const po = srcPoById(b.dataset.po); if (!po) return;
@@ -5281,7 +5291,8 @@
                     document.body.appendChild(box);
                     // 마감일과 같게 — 켜면 픽업/배달일 칸을 잠그고 마감 날짜를 따라간다
                     { const ex = document.getElementById('src-sch-exp'), pk = document.getElementById('src-sch-pick'), lk = document.getElementById('src-sch-link');
-                      const sync = () => { pk.disabled = lk.checked; pk.style.background = lk.checked ? '#f1f5f9' : ''; pk.style.color = lk.checked ? '#64748b' : ''; if (lk.checked) pk.value = ex.value; };
+                      // [수정 2026-11-06] 체크를 풀면 픽업/배달일을 일정(달력 이름표) 날짜로 되돌린다 (사장님 요청 — 상품등록 창과 같게)
+                      const sync = () => { pk.disabled = lk.checked; pk.style.background = lk.checked ? '#f1f5f9' : ''; pk.style.color = lk.checked ? '#64748b' : ''; pk.value = lk.checked ? ex.value : day0; };
                       lk.onchange = sync; ex.onchange = () => { if (lk.checked) pk.value = ex.value; }; }
                     box.onclick = async e => {
                         if (e.target === box) return box.remove();
@@ -41535,7 +41546,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 }
 
                 showToast(editingId ? "발주 내역이 수정되었습니다." : "발주 내역이 저장되었습니다.");
-                const _pback = editingId ? null : gPurchaseReturn; gPurchaseReturn = null;   // [신규 2026-10-08]
+                const _pback = editingId ? gPoEditReturn : gPurchaseReturn; gPurchaseReturn = null; gPoEditReturn = null;   // [신규 2026-10-08] · [수정 2026-11-06] 발주 연결 창에서 고친 것도 돌아간다
                 resetPurchaseOrderForm();
                 await loadPurchaseOrders();
                 if (_pback && _pback.tab && _pback.tab !== 'purchase-history') {
@@ -41609,6 +41620,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         /* [신규 2026-10-08] 발주 등록을 다른 화면(소싱 달력·상품 목록)에서 열었으면 저장 뒤 그 화면으로 돌아간다 (사장님 요청) */
         let gPurchaseReturn = null;
+        var gPoEditReturn = null;   // [신규 2026-11-06] 소싱 달력 '발주 연결' 창의 수정 단추로 연 수정 — 저장·취소 뒤 돌아갈 곳
         function resetPurchaseOrderForm() {
             if (typeof gSrcPendingPo !== 'undefined') gSrcPendingPo = null;   // [신규 2026-10-08] 소싱 달력에서 연 발주 대기도 푼다 (엉뚱한 발주에 잇지 않게)
             document.getElementById('purchase-order-form').reset();
@@ -41634,8 +41646,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            수정 중이었으면 새 발주 칸으로, 다른 화면(소싱 달력·상품 목록 등)에서 열었으면 그 화면으로 돌아간다. */
         function cancelPurchaseOrderForm() {
             const wasEditing = !!document.getElementById('purchase-editing-id').value;
-            const back = wasEditing ? null : gPurchaseReturn;
-            gPurchaseReturn = null;
+            const back = wasEditing ? gPoEditReturn : gPurchaseReturn;
+            gPurchaseReturn = null; gPoEditReturn = null;
             resetPurchaseOrderForm();
             if (back && back.tab && back.tab !== 'purchase-history') {
                 switchAdminTab(back.tab);
@@ -43952,12 +43964,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         /* [신규] 발주 목록 정렬.
            칸 이름을 누를 때마다 오름차순 → 내림차순 → 해제(원래 차례)로 돌아간다.
            세 번째에 해제를 두는 이유: 받아 온 차례(최근 발주가 위)로 되돌릴 방법이 있어야 해서다. */
-        let purchaseSort = { key: '', dir: 'asc' };
+        // [수정 2026-11-06] 기본은 발주일자 내림차순(최근이 위) — 사장님 요청
+        const PURCHASE_SORT_DEFAULT = { key: 'date', dir: 'desc' };
+        let purchaseSort = { ...PURCHASE_SORT_DEFAULT };
 
         function setPurchaseSort(key) {
-            if (purchaseSort.key !== key) purchaseSort = { key, dir: 'asc' };
+            // [수정 2026-11-06] 해제하면 기본(발주일자 내림차순)으로. 발주일자 칸은 내림차순 ↔ 오름차순만 오간다
+            if (key === 'date') purchaseSort = { key, dir: (purchaseSort.key === 'date' && purchaseSort.dir === 'desc') ? 'asc' : 'desc' };
+            else if (purchaseSort.key !== key) purchaseSort = { key, dir: 'asc' };
             else if (purchaseSort.dir === 'asc') purchaseSort = { key, dir: 'desc' };
-            else purchaseSort = { key: '', dir: 'asc' };
+            else purchaseSort = { ...PURCHASE_SORT_DEFAULT };
             renderPurchaseOrdersList();
         }
 
@@ -44027,26 +44043,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
             // [수정] 예전에는 검색어가 없으면 무조건 안내문만 띄웠다. 이제 기간만 잡아도 조회된다.
             //  '이 상품 발주목록'으로 들어온 경우엔 조건이 따로 있으므로 안내문을 건너뛴다.
-            if (search === "" && !hasRange && !purchaseCodeFilter) {
-                // [수정] 아직 아무것도 찾지 않은 상태에서는 결과 줄을 감춘다
-                const countBadge = document.getElementById('purchase-total-count-badge');
-                if (countBadge) { countBadge.innerText = ''; countBadge.style.display = 'none'; }
-
-                const promptHtml = `
-                    <div style="text-align: center; padding: 50px 20px;">
-                        <div style="font-size: 28px; margin-bottom: 10px;">🔍</div>
-                        <div style="font-size: 15px; font-weight: 800; color: #334155; margin-bottom: 6px;">기간을 고르거나 검색어를 입력해 주세요.</div>
-                        <div style="font-size: 13px; color: #64748b;"><b>검색창</b>에 상품명·업체명·날짜를 입력하면 <b>전체 기간</b>에서 찾습니다.<br>위의 <b>이번 달 · 지난 달 · 직접</b> 버튼으로 기간을 좁힐 수도 있습니다.</div>
-                    </div>`;
-                tbody.innerHTML = `<tr><td colspan="10">${promptHtml}</td></tr>`;
-                if (mobileContainer) mobileContainer.innerHTML = promptHtml;
-                return;
-            }
+            // [수정 2026-11-06] 아무것도 안 고르고 처음 열면 최근 발주 10개를 보여 준다 (사장님 요청 — 예전엔 안내문만 떴다)
+            const recentMode = (search === "" && !hasRange && !purchaseCodeFilter);
 
             // [신규] 평소에는 최근 10일치만 갖고 있다. 그보다 이전을 보려 하거나 검색을 하면 저장함까지 합쳐서 본다.
             //  저장함은 캐시에서 꺼내므로 대개 네트워크를 쓰지 않고, 없을 때만 한 번 받아 온다.
             const _cutoff = fPurchaseCutoffStr();
-            const needArchive = (search !== "") || !!purchaseCodeFilter || (hasRange && (!startDate || startDate < _cutoff));
+            const needArchive = (search !== "") || !!purchaseCodeFilter || (hasRange && (!startDate || startDate < _cutoff)) || (recentMode && purchaseOrders.length < 10);
             if (needArchive && !isPurchaseArchiveLoaded) {
                 // 아직 없으면 받아 온 뒤 다시 그린다 (지금 화면은 최근 자료만으로 먼저 보여 준다)
                 loadPurchaseArchiveIfNeeded().then(() => renderPurchaseOrdersList());
@@ -44073,6 +44076,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 return nameMatch || dateMatch || supplierMatch;
             });
 
+            if (recentMode) {   // [신규 2026-11-06] 처음 열 때 — 발주일 늦은 차례로 10개
+                const dk = po => { const d = String(po.date || ""); return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : ""; };   // 날짜가 아닌 값(X 등)은 맨 뒤로
+                filtered = filtered.slice().sort((a, b) => dk(b).localeCompare(dk(a)) || String(b.id || "").localeCompare(String(a.id || ""))).slice(0, 10);
+            }
+
             /* [신규] 칸 이름을 눌러 고른 차례대로 늘어놓는다.
                고르지 않았으면(키 없음) 예전처럼 받아 온 차례를 그대로 둔다.
                글자 칸(상품명·업체명 등)은 한글 가나다순, 숫자 칸은 값 크기순으로 견준다. */
@@ -44080,7 +44088,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const num = v => parseInt(v || 0) || 0;
                 const pick = (po) => {
                     switch (purchaseSort.key) {
-                        case 'date': return String(po.date || '');
+                        case 'date': { const d = String(po.date || ''); return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : ''; }   // [수정 2026-11-06] 날짜가 아닌 값(X 등)은 가장 옛날로
                         case 'name': return String(po.itemName || '');
                         case 'code': return String(po.productCode || '');
                         case 'supplier': return String(po.supplier || '');
@@ -44096,7 +44104,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 filtered = filtered.slice().sort((a, b) => {
                     const va = pick(a), vb = pick(b);
                     if (typeof va === 'number') return (va - vb) * dir;
-                    return String(va).localeCompare(String(vb), 'ko') * dir;
+                    // [수정 2026-11-06] 발주일자가 같으면 저장한 차례(시간순)로 — 발주 id 는 시간 순서다
+                    return (String(va).localeCompare(String(vb), 'ko') || (purchaseSort.key === 'date' ? String(a.id || '').localeCompare(String(b.id || '')) : 0)) * dir;
                 });
             }
             gPaintPurchaseSortMarks();
@@ -44107,7 +44116,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (countBadge) {
                 // 결과와 합계를 한 줄 양 끝에 놓아 줄을 다 쓴다
                 countBadge.innerHTML =
-                    `<span>검색 결과 <b style="color:var(--primary);">${filtered.length}건</b></span>` +
+                    `<span>${recentMode ? "최근 발주" : "검색 결과"} <b style="color:var(--primary);">${filtered.length}건</b></span>` +
                     `<span>합계 <b style="color:#334155;">${sumTotal.toLocaleString()}원</b></span>`;
                 countBadge.style.display = 'flex';
             }
@@ -44290,6 +44299,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             }
             const cnt = document.getElementById('code-picker-count');
             if (cnt) cnt.innerText = `${rows.length}개`;
+
+            // [수정 2026-11-06] 처음에는 목록을 안 보인다 — 찾기 칸에 적으면 그때 보인다 (사장님 요청)
+            if (!String(gCodePickerQuery || '').trim()) {
+                box.innerHTML = `<div style="padding:30px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">번호나 이름을 적으면 목록이 나옵니다.</div>`;
+                return;
+            }
 
             if (!rows.length) {
                 box.innerHTML = `<div style="padding:30px; text-align:center; color:#94a3b8; font-weight:800; font-size:13px;">찾는 번호가 없습니다.</div>`;
