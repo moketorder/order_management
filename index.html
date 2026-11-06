@@ -37058,6 +37058,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     showLoader(`📸 사진 업로드 중 (${i + 1}/${uploadSelectedFiles.length}): ${item.displayName}`);
                     const base64Data = await getCompressedBase64(item.file); // 클라이언트에서 리사이즈+압축 후 업로드
                     item.id = await uploadImage(base64Data, item.displayName);   // [수정] Cloudinary·imgbb 중 설정된 곳으로 간다
+                    gLogPhotoUpload(item.id, item.file, name);   // [신규 2026-11-06] 올린 사진 기록 (원본 파일 이름·크기·날짜 → 나중에 드라이브 원본 찾기)
                 }
 
                 // 2. uploadThumbnailIndex로 지정된 대표 섬네일을 0번 인덱스에 배치하여 finalImages 구성
@@ -38824,6 +38825,25 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (staff && typeof staff === 'object') Object.values(staff).forEach(s => { const ph = norm(s && s.phone); if (ph) CA_STAFF_PHONES.add(ph); });
             })();
             return _gPrivP;
+        }
+
+        /* [신규 2026-11-06] 올린 사진 기록 — product_logs/photo_uploads 에 한 줄씩 남긴다 (가게만 읽고 쓰는 자리).
+           인터넷 창은 파일이 있던 폴더를 알려 주지 않으므로 줄이기 전 원본의 이름·크기·고친 날짜를 남긴다.
+           PC에서 이 값으로 구글드라이브 원본을 찾는다. 기록이 실패해도 상품 등록은 그대로 진행한다. */
+        function gLogPhotoUpload(url, file, productName) {
+            try {
+                if (!url) return;
+                const rec = {
+                    u: String(url),
+                    n: String((file && file.name) || ''),
+                    s: Number((file && file.size) || 0),
+                    m: Number((file && file.lastModified) || 0),
+                    p: String(productName || '').slice(0, 120),
+                    t: { '.sv': 'timestamp' }
+                };
+                fetch(`${FIREBASE_DB_URL}product_logs/photo_uploads.json`, { method: 'POST', body: JSON.stringify(rec) })
+                    .catch(e => console.warn('사진 기록 실패:', e && e.message));
+            } catch (e) { console.warn('사진 기록 실패:', e && e.message); }
         }
 
         /* [신규] imgbb 업로드. Cloudinary와 같은 모양으로 주소 한 줄을 돌려준다.
