@@ -40513,6 +40513,18 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const hit = c.hits[hitIdx];
             if (!hit) return;
 
+            /* [수정 2026-11-06] 상품에 번호가 있으면 어느 번호로 이을지 묻는다 (사장님 요청).
+               고르면 다른 번호를 그 번호로 합친다 — 그 번호를 쓰는 상품·발주·후기까지 (번호 합치기와 같은 길, 확인창이 한 번 더 뜬다) */
+            const pc = String(hit.po.productCode || '').trim(), mc = String(c.myCode || '').trim();
+            if (/^[PFS]\d+$/.test(mc) && mc !== pc) {
+                const btn = (code, label, bg, fg, bd) => `<button type="button" onclick="openCodeMerge('${code}', ['${mc}', '${pc}'])" style="margin-left:5px; padding:7px 12px; background:${bg}; color:${fg}; border:1.5px solid ${bd}; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">${label}</button>`;
+                slot.innerHTML =
+                    `<span style="font-size:11.5px; font-weight:800; color:#b45309; margin-right:2px;">어느 번호로 이을까요?</span>` +
+                    btn(mc, `📦 ${mc} (상품)`, '#eef2ff', '#4338ca', '#c7d2fe') +
+                    btn(pc, `🚚 ${pc} (발주)`, '#dcfce7', '#166534', '#bbf7d0') +
+                    `<button type="button" onclick="cancelCodeLink(${candIdx})" style="margin-left:5px; padding:7px 12px; background:#fff; color:#64748b; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">취소</button>`;
+                return;
+            }
             slot.innerHTML =
                 `<span style="font-size:11.5px; font-weight:800; color:#b45309; margin-right:6px;">${hit.po.productCode} 로 이을까요?</span>` +
                 `<button type="button" onclick="applyCodeLink(${candIdx}, ${hitIdx})" style="padding:7px 14px; background:#10b981; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">확인</button>` +
@@ -40915,19 +40927,24 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         /* 고른 번호들을 하나로 합친다.
            남길 번호를 정하고, 나머지 번호를 쓰는 상품·발주를 모두 남길 번호로 바꾼다.
            (이름표는 남길 번호 것을 쓰고, 없으면 사라지는 번호의 이름표를 물려받는다) */
-        async function openCodeMerge() {
-            const codes = [...codeSelected];
+        // [수정 2026-11-06] presetKeep·presetCodes 를 주면 묻지 않고 그 번호로 합친다 (코드 관리 '연결'에서 어느 번호로 할지 고른 뒤 — 사장님 요청)
+        async function openCodeMerge(presetKeep, presetCodes) {
+            const preset = !!(presetKeep && Array.isArray(presetCodes));
+            const codes = preset ? presetCodes : [...codeSelected];
             if (codes.length < 2) { showToast('2개 이상 골라 주세요.'); return; }
 
-            const all = gCollectCodes();
-            const info = codes.map(c => all.find(e => e.code === c)).filter(Boolean);
-            const menu = info.map((e, i) => `${i + 1}. ${e.code}${e.label ? ` (${e.label})` : ''} — 상품 ${e.products.length}개 · 발주 ${e.poCount}건`).join('\n');
-            const pick = prompt(`어느 번호로 합칠까요?\n남길 번호의 순번을 적어 주세요.\n\n${menu}`, '1');
-            if (pick === null) return;
-            const idx = parseInt(pick, 10) - 1;
-            if (isNaN(idx) || idx < 0 || idx >= info.length) { showToast('순번을 다시 적어 주세요.'); return; }
-
-            const keep = info[idx].code;
+            let keep;
+            if (preset) keep = presetKeep;
+            else {
+                const all = gCollectCodes();
+                const info = codes.map(c => all.find(e => e.code === c)).filter(Boolean);
+                const menu = info.map((e, i) => `${i + 1}. ${e.code}${e.label ? ` (${e.label})` : ''} — 상품 ${e.products.length}개 · 발주 ${e.poCount}건`).join('\n');
+                const pick = prompt(`어느 번호로 합칠까요?\n남길 번호의 순번을 적어 주세요.\n\n${menu}`, '1');
+                if (pick === null) return;
+                const idx = parseInt(pick, 10) - 1;
+                if (isNaN(idx) || idx < 0 || idx >= info.length) { showToast('순번을 다시 적어 주세요.'); return; }
+                keep = info[idx].code;
+            }
             const drop = codes.filter(c => c !== keep);
             const dropSet = new Set(drop);
 
@@ -40992,15 +41009,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 updatePublishedProductsTimestamp();
 
                 hideLoader();
-                codeSelected.clear();
+                if (!preset) codeSelected.clear();
                 showToast(`'${keep}' 하나로 합쳤습니다. (상품 ${prodHits.length}개 · 발주 ${poHits.length + arcHits.length}건)`);
-                renderCodeList();
+                if (preset) { await renderCodeLinkCandidates(); if (typeof renderProductsList === 'function') renderProductsList(); }
+                else renderCodeList();
             } catch (e) {
                 hideLoader();
                 console.error('번호 합치기 실패:', e);
                 showToast('번호 합치기 실패: ' + gErrKo(e)
                     + '\n일부만 바뀌었을 수 있으니 목록을 확인해 주세요.');
-                renderCodeList();
+                if (preset) renderCodeLinkCandidates(); else renderCodeList();
             }
         }
 
