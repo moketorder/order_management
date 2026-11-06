@@ -45556,6 +45556,61 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
         soon();
     })();
     </script>
+
+    <!-- [신규 2026-11-06] 검색창마다 오른쪽 안에 ✕ 단추 — 누르면 한 번에 지운다 (사장님 요청).
+         검색창 = type="search" 이거나 안내 글에 '검색'·'찾기'가 든 글 칸. 처음 누르거나 글을 쓸 때 그 칸을 감싸서 ✕ 를 붙인다
+         (나중에 그려지는 창의 검색칸도 저절로 된다). 지우면 input·keyup·change·search 를 알려 원래 찾기가 다시 돈다.
+         빼고 싶은 칸에는 data-no-clear 를 붙인다. -->
+    <style>
+        .gx-wrap { position: relative; min-width: 0; }
+        .gx-btn { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); width: 22px; height: 22px; border: none; border-radius: 50%;
+                  background: #cbd5e1; color: #fff; font-size: 13px; font-weight: 900; line-height: 22px; text-align: center; padding: 0; cursor: pointer; display: none; z-index: 2; }
+        .gx-btn:hover { background: #94a3b8; }
+        .gx-wrap.has-val .gx-btn { display: block; }
+        input.gx-in::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
+    </style>
+    <script>
+    (function () {
+        const isSearch = el => el && el.tagName === 'INPUT' && !el.hasAttribute('data-no-clear') && !el.readOnly && !el.disabled
+            && (el.type === 'search' || (el.type === 'text' && /검색|찾기/.test(el.placeholder || '')));
+        function wrap(el) {
+            if (el.classList.contains('gx-in') || !el.parentNode) return el.closest('.gx-wrap');
+            const cs = getComputedStyle(el), pcs = el.parentElement ? getComputedStyle(el.parentElement) : null;
+            const inFlex = pcs && /flex|grid/.test(pcs.display);
+            const w = document.createElement('span');
+            w.className = 'gx-wrap';
+            w.style.display = (cs.display === 'block' || inFlex) ? 'block' : 'inline-block';
+            if (inFlex) { w.style.flex = cs.flex; w.style.alignSelf = cs.alignSelf; }
+            const sw = el.style.width;
+            if (sw) w.style.width = sw;
+            if (sw || w.style.display === 'block') { el.style.width = '100%'; el.style.boxSizing = 'border-box'; }
+            if (inFlex) { w.style.flex = cs.flex; el.style.flex = 'none'; }
+            el.style.paddingRight = (parseFloat(cs.paddingRight) || 0) + 24 + 'px';
+            const had = document.activeElement === el, s = el.selectionStart, e = el.selectionEnd;
+            el.parentNode.insertBefore(w, el); w.appendChild(el); el.classList.add('gx-in');
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'gx-btn'; b.textContent = '✕'; b.title = '지우기'; b.setAttribute('aria-label', '검색어 지우기');
+            b.addEventListener('pointerdown', ev => ev.preventDefault());   // 검색칸에서 커서가 빠지지 않게
+            b.addEventListener('click', ev => {
+                ev.preventDefault(); ev.stopPropagation();
+                el.value = '';
+                ['input', 'keyup', 'change', 'search'].forEach(t => el.dispatchEvent(new Event(t, { bubbles: true })));
+                w.classList.remove('has-val'); el.focus();
+            });
+            w.appendChild(b);
+            if (had) { el.focus(); try { el.setSelectionRange(s, e); } catch (x) { } }
+            return w;
+        }
+        function paint(el) { const w = wrap(el); if (w) w.classList.toggle('has-val', !!el.value); }
+        ['focusin', 'input', 'keyup', 'change'].forEach(t => document.addEventListener(t, ev => { if (isSearch(ev.target)) paint(ev.target); }, true));
+        // 값이 이미 들어 있는 검색칸(다시 그려진 창 등)도 ✕ 가 보이게 — 화면이 바뀔 때 살핀다
+        let raf = 0;
+        new MutationObserver(() => {
+            if (raf) return;
+            raf = requestAnimationFrame(() => { raf = 0; document.querySelectorAll('input').forEach(el => { if (el.value && isSearch(el) && el.offsetParent) paint(el); }); });
+        }).observe(document.body, { childList: true, subtree: true });
+    })();
+    </script>
 </body>
 
 </html>
