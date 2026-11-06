@@ -6317,6 +6317,7 @@
                    상품 등록 여부·재고는 이름·코드로 찾아 그대로 나온다 */
                 // [신규 2026-10-08] 판매 기록(공구 차례)을 한 번 받아 둔다 — 다 받으면 다시 그린다
                 let gSrcHistAsk = false;
+                window.srcHistReset = () => { gSrc.hist = null; gSrcHistAsk = false; };   // [신규 2026-11-06] 번호 합치기 뒤 판매 기록을 다시 받게
                 function srcHistEnsure() {
                     if (gSrc.hist || gSrcHistAsk) return;
                     gSrcHistAsk = true;
@@ -40965,7 +40966,27 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             } catch (e) { showToast('후기를 확인하지 못했어요: ' + gErrKo(e)); return; }
             const rvHitN = drop.reduce((n, c) => n + Object.keys(rvByDrop[c]).length, 0);
 
-            if (!await psConfirm(`'${keep}' 하나로 합칩니다.\n\n없어지는 번호: ${drop.join(', ')}\n바뀌는 상품: ${prodHits.length}개\n바뀌는 발주: ${poHits.length + arcHits.length}건\n옮기는 후기: ${rvHitN}개\n\n되돌리기 어렵습니다. 진행할까요?`)) return;
+            /* [신규 2026-11-06] 손님 주문 기록(지금 + 보관함)의 번호와 공구 회차 기록(sched_history)도 옮긴다 (사장님 요청 —
+               판매 기록·공구 칩은 주문 번호로 묶여서, 상품·발주만 합치면 칩이 그대로 둘로 나뉘었다). 주문 내용은 그대로, 번호 칸(productCode·sid)만 바꾼다 */
+            const ordUp = {}; let ordN = 0, arTree = null; const histByDrop = {};
+            try {
+                const get = async p => { const r = await fetch(`${FIREBASE_DB_URL}${p}.json?t=${Date.now()}`); if (!r.ok) throw new Error(p + ' ' + r.status); return (await r.json()) || {}; };
+                const [odT, arT] = await Promise.all([get('orders'), get('orders_archive')]); arTree = arT;
+                [['orders', odT], ['orders_archive', arT]].forEach(([node, tree]) => Object.keys(tree).forEach(ph => {
+                    const rows = tree[ph]; if (!rows || typeof rows !== 'object') return;
+                    Object.keys(rows).forEach(k => {
+                        const o = rows[k]; if (!o || typeof o !== 'object') return;
+                        let hit = false;
+                        if (dropSet.has(String(o.productCode || '').trim())) { ordUp[`${node}/${ph}/${k}/productCode`] = keep; o.productCode = keep; hit = true; }
+                        if (dropSet.has(String(o.sid || '').trim())) { ordUp[`${node}/${ph}/${k}/sid`] = keep; o.sid = keep; hit = true; }
+                        if (hit) ordN++;
+                    });
+                }));
+                await Promise.all(drop.map(async c => { histByDrop[c] = await get(`sched_history/${encodeURIComponent(c)}`); }));
+            } catch (e) { showToast('주문 기록을 확인하지 못했어요: ' + gErrKo(e)); return; }
+            const histN = drop.reduce((n, c) => n + Object.keys(histByDrop[c] || {}).length, 0);
+
+            if (!await psConfirm(`'${keep}' 하나로 합칩니다.\n\n없어지는 번호: ${drop.join(', ')}\n바뀌는 상품: ${prodHits.length}개\n바뀌는 발주: ${poHits.length + arcHits.length}건\n바뀌는 주문 기록: ${ordN}줄\n옮기는 공구 회차: ${histN}개\n옮기는 후기: ${rvHitN}개\n\n발주·주문 내용은 그대로이고 번호만 바뀝니다.\n되돌리기 어렵습니다. 진행할까요?`)) return;
 
             showLoader('🔗 번호 합치는 중...');
             try {
@@ -40998,6 +41019,19 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (rvHitN) jobs.push(gMergeReviews(keep, drop, rvByDrop).then(() => true)
                     .catch(e => { console.error('후기 옮기기 실패:', e); return false; }));
 
+                // 5) [신규 2026-11-06] 주문 기록 번호 — 한 번에 너무 크지 않게 400줄씩 나눠 보낸다
+                const ordKeys = Object.keys(ordUp);
+                for (let i = 0; i < ordKeys.length; i += 400) {
+                    const part = {}; ordKeys.slice(i, i + 400).forEach(k => { part[k] = ordUp[k]; });
+                    jobs.push(fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(part) }).then(r => r.ok).catch(() => false));
+                }
+                // 6) [신규 2026-11-06] 공구 회차 기록 — 남길 번호에 같은 회차가 없으면 옮기고, 없어지는 번호 칸은 지운다
+                if (histN) {
+                    const hp = {};
+                    drop.forEach(c => { Object.keys(histByDrop[c] || {}).forEach(rid => { hp[`sched_history/${keep}/${rid}`] = histByDrop[c][rid]; }); hp[`sched_history/${c}`] = null; });
+                    jobs.push(fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(hp) }).then(r => r.ok).catch(() => false));
+                }
+
                 const results = await Promise.all(jobs);
                 if (results.some(ok => ok === false)) throw new Error('일부 저장에 실패했습니다');
 
@@ -41006,6 +41040,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 poHits.concat(arcHits).forEach(po => { po.productCode = keep; });
                 if (keepLabel) gCodeLabels[keep] = keepLabel;
                 drop.forEach(c => { delete gCodeLabels[c]; });
+                // [신규 2026-11-06] 화면이 들고 있는 주문 기록·보관함 캐시·회차 기록도 맞춘다 (판매 기록·공구 칩이 바로 하나로 보이게)
+                try {
+                    [].concat(rawOrders || [], (typeof salesArchiveOrders !== 'undefined' && salesArchiveOrders) || []).forEach(o => {
+                        if (!o) return;
+                        if (dropSet.has(String(o.productCode || '').trim())) o.productCode = keep;
+                        if (dropSet.has(String(o.sid || '').trim())) o.sid = keep;
+                    });
+                    if (arTree && typeof idbSet === 'function' && typeof ARCHIVE_RAW_KEY !== 'undefined') await idbSet(ARCHIVE_RAW_KEY, arTree);
+                    if (typeof psRoundLog !== 'undefined' && psRoundLog) drop.forEach(c => { if (psRoundLog[c]) { psRoundLog[keep] = Object.assign({}, psRoundLog[c], psRoundLog[keep] || {}); delete psRoundLog[c]; } });
+                    if (typeof window.srcHistReset === 'function') window.srcHistReset();
+                } catch (e) { console.warn('화면 자료 맞추기 실패:', e); }
                 updatePublishedProductsTimestamp();
 
                 hideLoader();
