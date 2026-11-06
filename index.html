@@ -41051,7 +41051,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
            남길 번호를 정하고, 나머지 번호를 쓰는 상품·발주를 모두 남길 번호로 바꾼다.
            (이름표는 남길 번호 것을 쓰고, 없으면 사라지는 번호의 이름표를 물려받는다) */
         // [수정 2026-11-06] presetKeep·presetCodes 를 주면 묻지 않고 그 번호로 합친다 (코드 관리 '연결'에서 어느 번호로 할지 고른 뒤 — 사장님 요청)
-        async function openCodeMerge(presetKeep, presetCodes) {
+        async function openCodeMerge(presetKeep, presetCodes, opts) {   // opts.rename — 새 번호로 바꾸기(남길 번호가 아직 없음) · [수정 2026-11-07] 끝나면 true/false 를 돌려준다
             const preset = !!(presetKeep && Array.isArray(presetCodes));
             const codes = preset ? presetCodes : [...codeSelected];
             if (codes.length < 2) { showToast('2개 이상 골라 주세요.'); return; }
@@ -41108,7 +41108,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             } catch (e) { showToast('주문 기록을 확인하지 못했어요: ' + gErrKo(e)); return; }
             const histN = drop.reduce((n, c) => n + Object.keys(histByDrop[c] || {}).length, 0);
 
-            if (!await psConfirm(`'${keep}' 하나로 합칩니다.\n\n없어지는 번호: ${drop.join(', ')}\n바뀌는 상품: ${prodHits.length}개\n바뀌는 발주: ${poHits.length + arcHits.length}건\n바뀌는 주문 기록: ${ordN}줄\n옮기는 공구 회차: ${histN}개\n옮기는 후기: ${rvHitN}개\n\n발주·주문 내용은 그대로이고 번호만 바뀝니다.\n되돌리기 어렵습니다. 진행할까요?`)) return;
+            if (!await psConfirm(`${(opts && opts.rename) ? `'${drop.join(', ')}' 번호를 '${keep}'(으)로 바꿉니다.` : `'${keep}' 하나로 합칩니다.`}\n\n없어지는 번호: ${drop.join(', ')}\n바뀌는 상품: ${prodHits.length}개\n바뀌는 발주: ${poHits.length + arcHits.length}건\n바뀌는 주문 기록: ${ordN}줄\n옮기는 공구 회차: ${histN}개\n옮기는 후기: ${rvHitN}개\n\n발주·주문 내용은 그대로이고 번호만 바뀝니다.\n되돌리기 어렵습니다. 진행할까요?`)) return;
 
             showLoader('🔗 번호 합치는 중...');
             try {
@@ -41140,6 +41140,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 // 4) 후기 — 후기·별점 합계·손님 후기 표(review_keys·review_codes)를 같이 옮긴다
                 if (rvHitN) jobs.push(gMergeReviews(keep, drop, rvByDrop).then(() => true)
                     .catch(e => { console.error('후기 옮기기 실패:', e); return false; }));
+
+                // 4-1) [신규 2026-11-07] 면세 표 — 없어지는 번호가 면세였고 남길 번호에 적힌 게 없으면 물려받는다, 없어지는 번호 칸은 지운다
+                try {
+                    const tf = (typeof gLoadTaxFree === 'function') ? await gLoadTaxFree(true) : {};
+                    const tp = {};
+                    if (!(keep in tf) && drop.some(c => tf[c])) tp[`settings/tax_free/${keep}`] = true;
+                    drop.forEach(c => { if (c in tf) tp[`settings/tax_free/${c}`] = null; });
+                    if (Object.keys(tp).length) jobs.push(fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tp) })
+                        .then(r => { if (r.ok && gTaxFree) { Object.keys(tp).forEach(k => { const c = k.split('/').pop(); if (tp[k]) gTaxFree[c] = true; else delete gTaxFree[c]; }); } return r.ok; }).catch(() => false));
+                } catch (e) { console.warn('면세 표 옮기기 실패:', e); }
 
                 // 5) [신규 2026-11-06] 주문 기록 번호 — 한 번에 너무 크지 않게 400줄씩 나눠 보낸다
                 const ordKeys = Object.keys(ordUp);
@@ -41177,15 +41187,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
                 hideLoader();
                 if (!preset) codeSelected.clear();
-                showToast(`'${keep}' 하나로 합쳤습니다. (상품 ${prodHits.length}개 · 발주 ${poHits.length + arcHits.length}건)`);
-                if (preset) { await renderCodeLinkCandidates(); if (typeof renderProductsList === 'function') renderProductsList(); }
-                else renderCodeList();
+                showToast((opts && opts.rename) ? `'${drop.join(', ')}' → '${keep}' 로 바꿨습니다. (상품 ${prodHits.length}개 · 발주 ${poHits.length + arcHits.length}건)` : `'${keep}' 하나로 합쳤습니다. (상품 ${prodHits.length}개 · 발주 ${poHits.length + arcHits.length}건)`);
+                if (preset && !opts) { await renderCodeLinkCandidates(); if (typeof renderProductsList === 'function') renderProductsList(); }
+                else { renderCodeList(); if (typeof renderProductsList === 'function') renderProductsList(); }
+                return true;
             } catch (e) {
                 hideLoader();
                 console.error('번호 합치기 실패:', e);
                 showToast('번호 합치기 실패: ' + gErrKo(e)
                     + '\n일부만 바뀌었을 수 있으니 목록을 확인해 주세요.');
-                if (preset) renderCodeLinkCandidates(); else renderCodeList();
+                if (preset && !opts) renderCodeLinkCandidates(); else renderCodeList();
+                return false;
             }
         }
 
@@ -41285,11 +41297,73 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         /* 이름표만 고친다. 번호(code) 자체는 상품·발주·주문 기록이 모두 물고 있어 바꾸지 않는다.
            번호를 옮겨 붙이는 일은 옆의 '코드 연결'에서 한다. */
+        /* [수정 2026-11-07] 번호 수정 창 — 이름표 + 갈래(P 일반 · F 과일·야채 · S 사다드림) + 번호 (사장님 요청).
+           번호를 바꾸면 번호 합치기와 같은 길(openCodeMerge)로 옮긴다 — 상품·발주·손님 주문 기록·공구 회차·후기·면세 표.
+           바꿀 번호가 이미 있으면 그 번호로 합친다 (확인창이 한 번 더 뜬다) */
+        function gCodeEditDialog(code) {
+            return new Promise(resolve => {
+                const E = gEscapeHtml, cur = gCodeLabelOf(code), pre0 = code[0];
+                const CATS = [['P', '🛒 일반'], ['F', '🍎 과일·야채'], ['S', '🧺 사다드림']];
+                const m = document.createElement('div');
+                m.style.cssText = 'position:fixed; inset:0; z-index:2147483400; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;';
+                const inCss = 'width:100%; height:40px; padding:0 11px; border:1.5px solid #cbd5e1; border-radius:9px; font-size:14px; font-weight:800; box-sizing:border-box;';
+                m.innerHTML = `<div style="background:#fff; border-radius:14px; padding:16px; width:100%; max-width:380px; display:flex; flex-direction:column; gap:12px; font-family:inherit;">
+                    <div style="font-size:15px; font-weight:900;">🏷️ ${E(code)} 수정</div>
+                    <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:800; color:#475569;">이름표 (비우면 지워요)<input id="ced-label" type="text" data-no-clear value="${E(cur)}" placeholder="예: 백봉오골계 유정란" style="${inCss}"></label>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:800; color:#475569;">갈래
+                        <div id="ced-cats" style="display:flex; gap:6px;">${CATS.map(([k, l]) => `<button type="button" data-cat="${k}" style="flex:1; height:36px; border-radius:9px; font-size:12.5px; font-weight:900; cursor:pointer; border:1.5px solid ${k === pre0 ? 'var(--primary)' : 'var(--border)'}; background:${k === pre0 ? 'var(--primary)' : '#fff'}; color:${k === pre0 ? '#fff' : '#475569'};">${l}</button>`).join('')}</div></div>
+                    <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:800; color:#475569;">번호<input id="ced-code" type="text" data-no-clear value="${E(code)}" autocomplete="off" spellcheck="false" style="${inCss} font-family:monospace; text-transform:uppercase;"></label>
+                    <div id="ced-note" style="font-size:11.5px; font-weight:700; color:#94a3b8; line-height:1.5;">번호를 바꾸면 이 번호를 쓰는 상품·발주·주문 기록·후기가 모두 새 번호로 옮겨가요.</div>
+                    <div style="display:flex; gap:8px;"><button type="button" data-act="no" style="flex:1; height:42px; border:1.5px solid var(--border); background:#fff; border-radius:10px; font-size:14px; font-weight:900; color:#475569; cursor:pointer;">취소</button>
+                        <button type="button" data-act="ok" style="flex:1; height:42px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:900; cursor:pointer;">저장</button></div></div>`;
+                document.body.appendChild(m);
+                const codeIn = m.querySelector('#ced-code'), note = m.querySelector('#ced-note');
+                const paintNote = () => {
+                    const v = String(codeIn.value || '').trim().toUpperCase();
+                    if (v === code) { note.style.color = '#94a3b8'; note.textContent = '번호를 바꾸면 이 번호를 쓰는 상품·발주·주문 기록·후기가 모두 새 번호로 옮겨가요.'; return; }
+                    if (!/^[PFS]\d+$/.test(v)) { note.style.color = '#dc2626'; note.textContent = 'P·F·S 다음에 숫자로 적어 주세요 (예: F0052)'; return; }
+                    const ex = gCollectCodes().find(e => e.code === v);
+                    note.style.color = ex ? '#c2410c' : '#15803d';
+                    note.textContent = ex ? `${v}는 이미 있는 번호예요 (${ex.label || ex.products[0] || ''}) — 저장하면 ${v}로 합쳐요.` : `${code} → ${v} 로 바뀌어요.`;
+                };
+                codeIn.oninput = paintNote;
+                m.onclick = async ev => {
+                    const b = ev.target.closest('button');
+                    if (ev.target === m) { m.remove(); return resolve(null); }
+                    if (!b) return;
+                    if (b.dataset.cat) {
+                        const k = b.dataset.cat;
+                        m.querySelectorAll('#ced-cats button').forEach(x => { const on = x.dataset.cat === k; x.style.borderColor = on ? 'var(--primary)' : 'var(--border)'; x.style.background = on ? 'var(--primary)' : '#fff'; x.style.color = on ? '#fff' : '#475569'; });
+                        if (k === code[0]) codeIn.value = code;
+                        else { codeIn.value = '…'; try { await gFreshCodeSources(); } catch (e) { } codeIn.value = gNextProductCode(k); }
+                        paintNote(); return;
+                    }
+                    if (b.dataset.act === 'no') { m.remove(); return resolve(null); }
+                    if (b.dataset.act === 'ok') {
+                        const v = String(codeIn.value || '').trim().toUpperCase();
+                        if (!/^[PFS]\d+$/.test(v)) { paintNote(); return; }
+                        m.remove(); resolve({ label: String(m.querySelector('#ced-label').value || '').trim(), code: v });
+                    }
+                };
+                setTimeout(() => m.querySelector('#ced-label').focus(), 50);
+            });
+        }
         async function editCodeLabel(code) {
             const cur = gCodeLabelOf(code);
-            const next = prompt(`'${code}' 이름표를 적어 주세요.\n(비우고 확인하면 이름표가 지워집니다)`, cur);
-            if (next === null) return;
-            const label = String(next).trim();
+            const got = await gCodeEditDialog(code);
+            if (!got) return;
+            // 번호를 바꾸면 합치기 길로 옮기고, 이름표는 새 번호에 적는다
+            if (got.code !== code) {
+                const ok = await openCodeMerge(got.code, [code, got.code], { rename: !gCollectCodes().some(e => e.code === got.code) });
+                if (ok && got.label !== gCodeLabelOf(got.code)) {
+                    try {
+                        const r = await fetch(`${FIREBASE_DB_URL}product_code_labels/${encodeURIComponent(got.code)}.json`, { method: got.label ? 'PUT' : 'DELETE', headers: { 'Content-Type': 'application/json' }, body: got.label ? JSON.stringify(got.label) : null });
+                        if (r.ok) { if (got.label) gCodeLabels[got.code] = got.label; else delete gCodeLabels[got.code]; renderCodeList(); }
+                    } catch (e) { }
+                }
+                return;
+            }
+            const label = got.label;
             if (label === cur) return;
 
             showLoader('🏷️ 이름표 저장 중...');
