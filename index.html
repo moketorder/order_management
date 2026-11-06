@@ -29574,12 +29574,18 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
         /* [신규 2026-10-14] 주문 집계 카드의 옵션 항목 이름 → { gi, ii, remain } (사장님 요청 — 옵션 수량도 여기서 고친다).
            주문의 옵션 글자에는 항목 이름만 있으므로 이름으로 맞춘다. 같은 이름이 여러 묶음에 있으면 앞 묶음 것. */
+        // [신규 2026-11-07] 옵션 묶음이 둘 이상인 상품 — 항목 이름 앞에 묶음 이름을 붙여 구분한다 ('중목 사이즈 · M 사이즈 1+1')
+        function salesOptMultiGroup(prod) { return !!prod && ((prod.options) || []).filter(g => g && (g.items || []).length).length > 1; }
+        function salesOptLabel(prod, group, nm) {
+            if (!salesOptMultiGroup(prod) || !group) return nm;
+            return String(group).replace(/\s*선택\s*$/, '').trim() + ' · ' + nm;
+        }
         function salesOptStockCells(prod) {
             const out = new Map();
             if (!prod || !gOptionRowsOf(prod).length) return out;   // 선택옵션을 안 쓰는 상품은 칸을 달지 않는다
             ((prod.options) || []).forEach((g, gi) => {
                 ((g && g.items) || []).forEach((it, ii) => {
-                    const nm = String((it && it.name) || '').trim();
+                    const nm = salesOptLabel(prod, g && g.name, String((it && it.name) || '').trim());
                     if (!nm || out.has(nm)) return;
                     out.set(nm, { gi, ii, remain: gOptRemain(prod, g.name, it) });
                 });
@@ -29732,12 +29738,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     g.optionQty.set(_opt, (g.optionQty.get(_opt) || 0) + _q);
                     // [신규] 옵션 항목별 총 개수 — 조합('초코, 우유 ×2')이 아니라 실제로 사와야 할 수량을 센다.
                     //  '이름 ×N'의 N은 주문 1개당 개수이므로 주문수량(_q)을 곱한다.
-                    _opt.split(',').forEach(part => {
-                        const t = part.trim();
-                        if (!t) return;
-                        const m = t.match(/^(.*?)\s*[×xX]\s*(\d+)$/);
-                        const nm = m ? m[1].trim() : t;
-                        const per = m ? (parseInt(m[2]) || 1) : 1;
+                    // [수정 2026-11-07] 옵션 묶음이 둘 이상이면 '묶음 · 항목'으로 센다 (사장님: 중목 M·장목 M 이 'M 사이즈'로 섞여 어느 옵션인지 안 보였다).
+                    //  주문에 남은 optionPicks(묶음·항목·수량)가 있으면 그것으로, 없으면 예전처럼 옵션 글로
+                    const _picks = (Array.isArray(o.optionPicks) && o.optionPicks.length && salesOptMultiGroup(g.prod))
+                        ? o.optionPicks.map(pk => ({ nm: salesOptLabel(g.prod, pk.group, String(pk.name || '').trim()), per: parseInt(pk.qty) || 1 }))
+                        : _opt.split(',').map(part => { const t = part.trim(); if (!t) return null; const m = t.match(/^(.*?)\s*[×xX]\s*(\d+)$/); return { nm: m ? m[1].trim() : t, per: m ? (parseInt(m[2]) || 1) : 1 }; }).filter(Boolean);
+                    _picks.forEach(({ nm, per }) => {
                         if (!nm) return;
                         g.optionItemQty.set(nm, (g.optionItemQty.get(nm) || 0) + per * _q);
                         // [신규 2026-10-12] 옵션 항목마다 누가 몇 개 주문했는지 (사장님 요청 — 사올 개수를 누르면 보여 준다)
