@@ -7697,10 +7697,12 @@
                             <div id="code-list-cats" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;"></div>
                             <div id="code-list-count" style="display:none; justify-content:space-between; align-items:center; gap:8px; width:100%; box-sizing:border-box; margin-top:10px; padding:8px 11px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:12px; font-weight:800; color:#475569;"></div>
                             <!-- [신규] 두 개 이상 고르면 하나로 합칠 수 있다 -->
-                            <div id="code-merge-bar" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding:9px 11px; background:#fff7ed; border:1.5px solid #fed7aa; border-radius:8px;">
-                                <span id="code-merge-text" style="flex:1; min-width:0; font-size:12.5px; font-weight:800; color:#c2410c;"></span>
-                                <button type="button" onclick="openCodeMerge()" style="flex:0 0 auto; padding:7px 12px; border:none; border-radius:7px; background:#c2410c; color:#fff; font-size:12px; font-weight:800; cursor:pointer;">합치기</button>
-                                <button type="button" onclick="clearCodeSelection()" style="flex:0 0 auto; padding:7px 10px; border:1.5px solid #fed7aa; border-radius:7px; background:#fff; color:#c2410c; font-size:12px; font-weight:800; cursor:pointer;">선택 해제</button>
+                            <!-- [수정 2026-11-07] 번호를 고르면 화면 아래에 단추 줄이 뜬다 (상품목록과 같게 — 사장님 요청) · 삭제 단추 추가 -->
+                            <div id="code-merge-bar" class="batch-action-bar no-print" style="flex-direction:row; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <span id="code-merge-text" style="flex:1 1 100%; min-width:0; font-size:13px; font-weight:800; color:#c2410c;"></span>
+                                <button type="button" onclick="openCodeMerge()" style="flex:1; height:44px; border:none; border-radius:10px; background:#c2410c; color:#fff; font-size:14px; font-weight:900; cursor:pointer;">🔗 합치기</button>
+                                <button type="button" onclick="deleteSelectedCodes()" style="flex:1; height:44px; border:1.5px solid #fca5a5; border-radius:10px; background:#fff; color:#dc2626; font-size:14px; font-weight:900; cursor:pointer;">🗑 삭제</button>
+                                <button type="button" onclick="clearCodeSelection()" style="flex:1; height:44px; border:1.5px solid var(--border); border-radius:10px; background:#fff; color:#475569; font-size:14px; font-weight:900; cursor:pointer;">선택 해제</button>
                             </div>
                         </div>
                         <div id="code-list-rows"><!-- 동적 삽입 --></div>
@@ -40998,11 +41000,51 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const bar = document.getElementById('code-merge-bar');
             const txt = document.getElementById('code-merge-text');
             if (!bar) return;
-            const n = codeSelected.size;
-            bar.style.display = (n >= 1) ? 'flex' : 'none';
+            // [수정 2026-11-07] 화면 아래 단추 줄 — 번호 목록이 보일 때만 (다른 탭으로 가면 숨긴다)
+            if (bar.parentElement !== document.body) document.body.appendChild(bar);
+            const rowsEl = document.getElementById('code-list-rows');
+            const n = codeSelected.size, on = n >= 1 && !!(rowsEl && rowsEl.offsetParent);
+            bar.classList.toggle('show', on);
             if (txt) txt.innerText = (n >= 2)
-                ? `${n}개 선택됨 — 하나로 합칩니다`
+                ? `${n}개 선택됨 — 합치기는 하나로 합칩니다`
                 : `${n}개 선택됨 — 합치려면 2개 이상 골라 주세요`;
+        }
+        // 다른 탭으로 옮기면 단추 줄을 숨긴다 (누를 때마다 한 번 살핀다)
+        document.addEventListener('click', () => setTimeout(() => { try { paintCodeMergeBar(); } catch (e) { } }, 350), true);
+
+        /* [신규 2026-11-07] 고른 번호 지우기 (사장님 요청).
+           이름표를 지우고, 그 번호를 쓰는 상품·발주의 번호 칸을 비운다 (상품·발주 내용은 그대로).
+           손님 주문 기록에 적힌 번호는 그대로 둔다 — 판매 기록이 남아야 해서 */
+        async function deleteSelectedCodes() {
+            const codes = [...codeSelected];
+            if (!codes.length) return;
+            const set = new Set(codes);
+            const prodHits = (uploadProducts || []).map((p, i) => ({ p, i })).filter(({ p }) => p && set.has(String(p.productCode || '').trim()));
+            const poHits = (purchaseOrders || []).filter(po => po && set.has(String(po.productCode || '').trim()));
+            const arcHits = (purchaseArchive || []).filter(po => po && set.has(String(po.productCode || '').trim()));
+            if (!await psConfirm(`번호 ${codes.length}개를 지울까요?\n\n${codes.join(', ')}\n\n번호를 지우는 상품: ${prodHits.length}개\n번호를 지우는 발주: ${poHits.length + arcHits.length}건\n\n상품·발주 내용은 그대로이고 번호 칸만 비워요.\n손님 주문 기록의 번호는 그대로 둡니다.\n다시 쓰려면 번호를 새로 붙여야 해요.`, '삭제', true)) return;
+            showLoader('🗑 번호 지우는 중...');
+            try {
+                const jobs = [];
+                if (prodHits.length) { const patch = {}; prodHits.forEach(({ i }) => { patch[`${i}/productCode`] = ''; }); jobs.push(fbPatchProducts(patch)); }
+                poHits.forEach(po => jobs.push(fbPutRetry(`${FIREBASE_DB_URL}purchase_orders/${po.id}/productCode.json`, '')));
+                arcHits.forEach(po => jobs.push(fbPutRetry(`${FIREBASE_DB_URL}purchase_orders_archive/${po.id}/productCode.json`, '')));
+                codes.forEach(c => jobs.push(fetch(`${FIREBASE_DB_URL}product_code_labels/${encodeURIComponent(c)}.json`, { method: 'DELETE' }).then(r => r.ok).catch(() => false)));
+                const results = await Promise.all(jobs);
+                if (results.some(ok => ok === false)) throw new Error('일부 저장에 실패했습니다');
+                prodHits.forEach(({ p }) => { p.productCode = ''; });
+                poHits.concat(arcHits).forEach(po => { po.productCode = ''; });
+                codes.forEach(c => { delete gCodeLabels[c]; });
+                if (prodHits.length) updatePublishedProductsTimestamp();
+                hideLoader();
+                codeSelected.clear();
+                showToast(`번호 ${codes.length}개를 지웠어요.`);
+                renderCodeList();
+            } catch (e) {
+                hideLoader();
+                showToast('번호 지우기 실패: ' + gErrKo(e) + '\n일부만 바뀌었을 수 있으니 목록을 확인해 주세요.');
+                renderCodeList();
+            }
         }
 
         /* 고른 번호들을 하나로 합친다.
