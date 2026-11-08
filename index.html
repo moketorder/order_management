@@ -3549,6 +3549,7 @@
                         #purchase-section-sourcing .src-cal-day .hn { font-size:10px; font-weight:800; color:#dc2626; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
                         #purchase-section-sourcing .src-cal-day .off { font-size:10px; font-weight:900; color:#fff; background:#64748b; border-radius:4px; padding:0 4px; white-space:nowrap; flex:0 0 auto; }
                         #purchase-section-sourcing .src-tag { font-size:10.5px; font-weight:800; border-radius:5px; padding:1px 4px; display:flex; gap:3px; align-items:center; background:var(--src-acc-soft); color:var(--src-acc); min-width:0; }
+                        #purchase-section-sourcing .src-tag.src-qhit { outline:2.5px solid #f59e0b; outline-offset:1px; background:#fef3c7 !important; color:#7c2d12 !important; }   /* [신규 2026-11-08] 찾기 말이 든 이름표 */
                         #purchase-section-sourcing .src-tag span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
                         #purchase-section-sourcing .src-tag.alt { background:var(--src-pick); color:var(--src-pick-ink); }
                         #purchase-section-sourcing .src-tag.direct { background:#e2e8f0; color:#334155; }
@@ -5338,8 +5339,22 @@
                 }
 
                 // 발주관리 → 발주 등록 화면을 열고 매입처·상품명·단가·판매가를 채워 둔다. 수량은 사장님이 넣는다.
-                function srcToPurchase(tg, rec, rs) {
+                async function srcToPurchase(tg, rec, rs) {
                     try {
+                        /* [신규 2026-11-08] 예전 발주 내역을 불러와 채운다 (사장님 요청 — 공구 했던 상품을 끌어다 놓고 발주등록하면
+                           업체명이 '공구'로 들어가고 매입가·박스 내 수량이 비어 있었다).
+                           같은 식별번호(이름표·이어진 상품)의 가장 최근 발주, 번호가 없으면 같은 이름의 가장 최근 발주 */
+                        let _prevPo = null;
+                        try {
+                            if (typeof loadPurchaseArchiveIfNeeded === 'function') await loadPurchaseArchiveIfNeeded();
+                            const _ref = rs ? srcRefGet(JSON.parse(rs)) : null, _pp0 = srcProdForTg(tg);
+                            const _code = String((_ref && _ref.code) || tg.code || (_pp0 && _pp0.productCode) || '').trim();
+                            const _all = [].concat(purchaseOrders || [], purchaseArchive || []).filter(po => po && /^\d{4}-\d{2}-\d{2}$/.test(String(po.date || '')));
+                            let _c = /^[PFS]\d+$/.test(_code) ? _all.filter(po => String(po.productCode || '').trim() === _code) : [];
+                            if (!_c.length) { const me = srcNormName(tg.name); _c = _all.filter(po => srcNormName(po.itemName) === me); }
+                            _prevPo = _c.sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+                        } catch (e) { console.warn('예전 발주를 못 찾았어요:', e); }
+                        const _gbTag = !tg.vendor || /^(공구|공동구매)$/.test(String(tg.vendor).trim());   // 공구 했던 상품에서 끌어온 이름표 — 업체가 '공구'로 적혀 있다
                         // [수정 2026-10-08] 소싱이 일정 탭으로 옮겨 가서 발주 탭으로 먼저 넘어가야 발주 등록 칸이 보인다 (사장님 지적)
                         const _back = { tab: gVisibleAdminTab(), scroll: window.scrollY || 0 };   // 저장 뒤 돌아올 곳
                         switchAdminTab('purchase-history');
@@ -5348,16 +5363,20 @@
                         switchPurchaseSubTab('register');
                         const set = (id, v) => { const el = document.getElementById(id); if (!el || v === undefined || v === null || v === '') return; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
                         gSrcPendingPo = rs ? { ref: rs, name: tg.name, multi: !!tg.multiItem } : null;   // [신규 2026-10-08] 달력 이름표에서 연 발주 — 저장되면 그 이름표에 잇는다 (multi: 손으로 쓴 여러 상품 중 하나 — 이름표 이름은 안 바꾼다)
-                        set('purchase-supplier', tg.vendor);
+                        set('purchase-supplier', _gbTag ? (_prevPo && _prevPo.supplier) : tg.vendor);   // [수정 2026-11-08] '공구'는 업체가 아니다 — 예전 발주의 업체
                         set('purchase-item-name', tg.name);
                         // [신규 2026-10-07] 이미 등록된(이어진) 상품이 있으면 그 식별번호로 발주한다 — 발주와 상품이 같은 번호
-                        { const _pp = srcProdForTg(tg); if (_pp && /^[PFS]\d+$/.test(String(_pp.productCode || '').trim())) set('purchase-product-code', String(_pp.productCode).trim()); }
-                        set('purchase-unit-price', String(tg.supply || '').replace(/[^\d]/g, ''));
-                        set('purchase-sale-price', String(rec || '').replace(/[^\d]/g, ''));
+                        { const _pp = srcProdForTg(tg); if (_pp && /^[PFS]\d+$/.test(String(_pp.productCode || '').trim())) set('purchase-product-code', String(_pp.productCode).trim());
+                          else if (_prevPo && /^[PFS]\d+$/.test(String(_prevPo.productCode || '').trim())) set('purchase-product-code', String(_prevPo.productCode).trim()); }
+                        // [수정 2026-11-08] 매입가·박스 내 수량·판매 예정가 — 이름표 값이 없으면 예전 발주 값
+                        set('purchase-unit-price', String(tg.supply || '').replace(/[^\d]/g, '') || (_prevPo && _prevPo.unitPrice));
+                        if (_prevPo && +_prevPo.itemsPerBox > 0) set('purchase-items-per-box', _prevPo.itemsPerBox);
+                        set('purchase-sale-price', String(rec || '').replace(/[^\d]/g, '') || (_prevPo && _prevPo.salePrice));
+                        if (typeof onPurchaseCodeChange === 'function') onPurchaseCodeChange();
                         if (typeof calcPurchaseTotal === 'function') calcPurchaseTotal();
                         const sec = document.getElementById('purchase-section-register'); if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         const q = document.getElementById('purchase-qty'); if (q) setTimeout(() => q.focus(), 300);
-                        showToast('발주 등록에 채워 뒀어요 — 수량만 넣고 저장하세요');
+                        showToast(_prevPo ? `예전 발주(${String(_prevPo.date).slice(5).replace('-', '/')} · ${_prevPo.supplier || ''})에서 불러왔어요 — 수량만 넣고 저장하세요` : '발주 등록에 채워 뒀어요 — 수량만 넣고 저장하세요');
                     } catch (e) { showToast('발주 등록을 못 열었어요: ' + e.message); }
                 }
                 // 밴드 글 열기. 비슷한 상품은 링크가 카드에 없어 밴드 목록(업체·상품명)에서 찾는다.
@@ -6325,7 +6344,7 @@
                         try {
                             if (typeof psRoundLog !== 'undefined' && !psRoundLog && typeof psRoundLogLoad === 'function') await psRoundLogLoad();
                             if (typeof psSchedLoaded !== 'undefined' && !psSchedLoaded && typeof psLoadSchedules === 'function') await psLoadSchedules();
-                            gSrc.hist = psHistBuild();
+                            gSrc.hist = psHistBuild(); gSrc.histAt = Date.now();
                             srcRender();
                         } catch (e) { console.warn('판매 기록을 못 불러왔어요:', e); }
                     })();
@@ -6342,11 +6361,22 @@
                 }
                 function srcHistByCode(code) { return (gSrc.hist || []).find(h => h && h.code === code) || null; }
                 function srcHistLast(h) { const pks = ((h && h.rounds) || []).map(r => r.pk).filter(Boolean).sort(); return pks[pks.length - 1] || ''; }
+                // [신규 2026-11-08] 같은 번호로 달력에 놓은 이름표 중 가장 늦은 날짜 것의 이름 (달력에서 고친 이름)
+                function srcHistTagName(code) {
+                    let best = null;
+                    Object.values(gSrc.manual || {}).forEach(p => {
+                        if (!p || psSafeId(String(p.code || '').trim()) !== code) return;
+                        const nm = String(p.disp || p.name || '').trim(); if (!nm) return;
+                        if (!best || String(p.date || '') >= best.d) best = { nm, d: String(p.date || '') };
+                    });
+                    return best ? best.nm : '';
+                }
                 async function srcHistSave(code, date) {
                     const h = srcHistByCode(code); if (!h) return;
                     const id = 'm' + Date.now().toString(36);
-                    const val = { date, name: h.name, memo: '공구', code: h.code, kw: srcKw(h.name), at: new Date().toISOString() };
-                    try { await srcPut('manual/' + id, val); gSrc.manual[id] = val; showToast(date.slice(5).replace('-', '/') + '에 넣었어요: ' + h.name); }
+                    const nm = srcHistTagName(h.code) || h.name;   // [수정 2026-11-08] 고친 이름으로 놓는다
+                    const val = { date, name: nm, memo: '공구', code: h.code, kw: srcKw(nm), at: new Date().toISOString() };
+                    try { await srcPut('manual/' + id, val); gSrc.manual[id] = val; showToast(date.slice(5).replace('-', '/') + '에 넣었어요: ' + nm); }
                     catch (e) { showToast('저장 못 했어요: ' + e.message); }
                     srcRender();
                 }
@@ -6916,15 +6946,24 @@
                     if (!q) return '<span class="k">상품 이름을 치면 여기에 나와요 (최근에 한 순 40개)</span>';
                     if (!gSrc.hist) return '<span class="k">판매 기록을 불러오는 중…</span>';
                     const md = d => { const [y, m, dd] = String(d).split('-'); return (y === String(new Date().getFullYear()) ? '' : y.slice(2) + '.') + parseInt(m) + '/' + parseInt(dd); };
+                    /* [신규 2026-11-08] 달력에서 고친 이름이 보이게 (사장님: 이름을 고쳤는데 다시 찾으면 그대로) —
+                       같은 번호로 달력에 놓은 이름표 중 가장 늦은 날짜 것의 이름(고친 이름)을 먼저 쓴다 */
+                    const tagName = {};
+                    Object.values(gSrc.manual || {}).forEach(p => {
+                        const c = p && psSafeId(String(p.code || '').trim()); if (!c) return;
+                        const nm = String(p.disp || p.name || '').trim(); if (!nm) return;
+                        if (!tagName[c] || String(p.date || '') >= tagName[c].d) tagName[c] = { nm, d: String(p.date || '') };
+                    });
+                    const nameOf = h => (tagName[h.code] && tagName[h.code].nm) || h.name;
                     const list = gSrc.hist.filter(h => {
-                        const names = [h.name].concat(h.names && h.names.keys ? [...h.names.keys()] : []);
+                        const names = [nameOf(h), h.name].concat(h.names && h.names.keys ? [...h.names.keys()] : []);
                         return names.some(n => String(n || '').replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot).includes(q));
                     }).map(h => {
                         const pks = (h.rounds || []).map(r => r.pk).filter(Boolean).sort();
                         return { h, last: pks[pks.length - 1] || '', n: (h.rounds || []).length };
                     }).filter(x => x.n).sort((a, b) => b.last.localeCompare(a.last)).slice(0, 40);
                     if (!list.length) return '<span class="k">공동구매 했던 상품 중에 없어요</span>';
-                    return list.map(x => '<span class="src-ochip src-hchip" data-hist="' + srcEsc(x.h.code) + '" title="' + srcEsc(x.h.name + ' · ' + x.h.code) + ' · 달력 날짜에 끌어다 놓으면 그날 판매로 저장">' + srcEsc(x.h.name) +   // [수정 2026-10-08] 끌어다 놓기 (사장님 요청)
+                    return list.map(x => '<span class="src-ochip src-hchip" data-hist="' + srcEsc(x.h.code) + '" title="' + srcEsc(nameOf(x.h) + ' · ' + x.h.code) + ' · 달력 날짜에 끌어다 놓으면 그날 판매로 저장">' + srcEsc(nameOf(x.h)) +   // [수정 2026-10-08] 끌어다 놓기 (사장님 요청)
                         '<small>마지막 ' + md(x.last) + ' · ' + x.n + '회 · ' + (x.h.total || 0) + '개' + (x.h.next ? ' · 다음 ' + md(x.h.next) : '') + '</small></span>').join('');
                 }
                 async function srcHistChips() {
@@ -6934,7 +6973,7 @@
                         try {
                             if (typeof psRoundLog !== 'undefined' && !psRoundLog && typeof psRoundLogLoad === 'function') await psRoundLogLoad();
                             if (typeof psSchedLoaded !== 'undefined' && !psSchedLoaded && typeof psLoadSchedules === 'function') await psLoadSchedules();
-                            gSrc.hist = psHistBuild();
+                            gSrc.hist = psHistBuild(); gSrc.histAt = Date.now();
                         } catch (e) { const x = document.getElementById('src-hist-chips'); if (x) x.innerHTML = '<span class="k">판매 기록을 못 불러왔어요 (' + srcEsc(e.message) + ')</span>'; return; }
                     }
                     const el2 = document.getElementById('src-hist-chips'); if (el2) el2.innerHTML = srcHistHtml();
@@ -7036,7 +7075,22 @@
                     const U = srcUniState(); U.q = v;
                     gSrc.onsiteQ.q = v; gSrc.pickQ.q = v; gSrc.histQ = v;   // 예전 칸 함수들이 각자 읽는 검색어
                     srcUniChips();
+                    srcUniMark();
                 }
+                /* [신규 2026-11-08] 찾기에 적은 말이 들어간 달력 이름표를 노랗게 표시한다 (사장님 요청).
+                   띄어쓰기는 빼고 견준다. 달력이 다시 그려져도 표시가 남게 그려질 때마다 다시 칠한다 */
+                function srcUniMark() {
+                    const q = String((gSrc.uniQ && gSrc.uniQ.q) || '').replace(/\s/g, '').toLowerCase();
+                    const tags = document.querySelectorAll('#purchase-section-sourcing .src-tag');
+                    let n = 0;
+                    tags.forEach(t => {
+                        const hit = q.length >= 1 && String(t.textContent || '').replace(/\s/g, '').toLowerCase().includes(q);
+                        t.classList.toggle('src-qhit', hit); if (hit) n++;
+                    });
+                    return n;
+                }
+                { let _mk = 0; new MutationObserver(() => { if (_mk || !(gSrc.uniQ && String(gSrc.uniQ.q || '').trim())) return; _mk = setTimeout(() => { _mk = 0; srcUniMark(); }, 60); })
+                    .observe(document.body, { childList: true, subtree: true }); }
                 function srcUniToggle(k) {
                     const U = srcUniState(); U.on[k] = !U.on[k];
                     srcRender();   // 켜고 끄기 색·밴드 기간 칸을 다시 그린다
@@ -7048,11 +7102,12 @@
                     paint();
                     if (!q && !gSrc.pickQ.vendor) return;
                     if (U.on.band && !gSrc.band) { try { gSrc.band = (await srcGet('band')) || {}; } catch (e) { } paint(); }
+                    if (gSrc.hist && Date.now() - (gSrc.histAt || 0) > 60000) { try { gSrc.hist = psHistBuild(); gSrc.histAt = Date.now(); paint(); } catch (e) { } }   // [신규 2026-11-08] 1분 지난 판매 기록은 다시 만든다 (상품 이름 고친 것 반영)
                     if ((U.on.hist || U.on.onsite) && !gSrc.hist) {   // [수정 2026-10-08] 상시판매에도 마지막 공구 날짜를 붙이려고
                         try {
                             if (typeof psRoundLog !== 'undefined' && !psRoundLog && typeof psRoundLogLoad === 'function') await psRoundLogLoad();
                             if (typeof psSchedLoaded !== 'undefined' && !psSchedLoaded && typeof psLoadSchedules === 'function') await psLoadSchedules();
-                            gSrc.hist = psHistBuild();
+                            gSrc.hist = psHistBuild(); gSrc.histAt = Date.now();
                         } catch (e) { console.warn('판매 기록을 못 불러왔어요:', e); }
                         paint();
                     }
