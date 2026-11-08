@@ -5355,9 +5355,7 @@
                             const _all = [].concat(purchaseOrders || [], purchaseArchive || []).filter(po => po && /^\d{4}-\d{2}-\d{2}$/.test(String(po.date || '')));
                             let _c = /^[PFS]\d+$/.test(_code) ? _all.filter(po => String(po.productCode || '').trim() === _code) : [];
                             if (!_c.length) { const me = srcNormName(tg.name); _c = _all.filter(po => srcNormName(po.itemName) === me); }
-                            _c.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-                            // 업체가 '공구'·빈칸으로 저장된 옛 발주는 건너뛰고 진짜 업체가 적힌 가장 최근 발주를 쓴다
-                            _prevPo = _c.find(po => !/^(공구|공동구매)?$/.test(String(po.supplier || '').trim())) || _c[0] || null;
+                            _prevPo = _c.sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;   // 가장 최근 발주 그대로 (건너뛰지 않는다 — 사장님 요청 2026-11-08)
                         } catch (e) { console.warn('예전 발주를 못 찾았어요:', e); }
                         const _gbTag = !tg.vendor || /^(공구|공동구매)$/.test(String(tg.vendor).trim());   // 공구 했던 상품에서 끌어온 이름표 — 업체가 '공구'로 적혀 있다
                         // [수정 2026-10-08] 소싱이 일정 탭으로 옮겨 가서 발주 탭으로 먼저 넘어가야 발주 등록 칸이 보인다 (사장님 지적)
