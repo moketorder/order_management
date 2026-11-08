@@ -3549,7 +3549,7 @@
                         #purchase-section-sourcing .src-cal-day .hn { font-size:10px; font-weight:800; color:#dc2626; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
                         #purchase-section-sourcing .src-cal-day .off { font-size:10px; font-weight:900; color:#fff; background:#64748b; border-radius:4px; padding:0 4px; white-space:nowrap; flex:0 0 auto; }
                         #purchase-section-sourcing .src-tag { font-size:10.5px; font-weight:800; border-radius:5px; padding:1px 4px; display:flex; gap:3px; align-items:center; background:var(--src-acc-soft); color:var(--src-acc); min-width:0; }
-                        #purchase-section-sourcing .src-tag.src-qhit { outline:2.5px solid #f59e0b; outline-offset:1px; background:#fef3c7 !important; color:#7c2d12 !important; }   /* [신규 2026-11-08] 찾기 말이 든 이름표 */
+                        #purchase-section-sourcing .src-tag.src-qhit { outline:none; background:#ff6b6b !important; color:#fff !important; font-weight:900; box-shadow:0 0 0 2px #ef4444; }   /* [신규 2026-11-08] 찾기 말이 든 이름표 */
                         #purchase-section-sourcing .src-tag span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
                         #purchase-section-sourcing .src-tag.alt { background:var(--src-pick); color:var(--src-pick-ink); }
                         #purchase-section-sourcing .src-tag.direct { background:#e2e8f0; color:#334155; }
@@ -4389,20 +4389,21 @@
                     srcMenuClose();
                     const k = srcNameKey(tg.vendor, tg.name);
                     const m = document.createElement('div'); m.id = 'src-menu';
+                    const _gbLast = srcLastGbTxt(tg, o);   // [신규 2026-11-08] 아래 단추 창에도 최근 공구 날짜 (사장님 요청)
                     // [신규 2026-10-07] 식단표 추천 카드는 단추를 줄인다 — 수정 · 밴드 · 건너뜀 · 추천제외 · 닫기 (사장님 요청, 수정을 맨 앞으로)
                     // [신규 2026-10-08] 다음 주 공구 추천의 상시판매·공구 이름표 — 건너뜀 · 추천제외 · 닫기 (사장님 요청)
-                    if (o.plan) m.innerHTML = '<div class="t">' + srcEsc(tg.name) + '<small>' + srcEsc(tg.vendor) + '</small></div>' +
+                    if (o.plan) m.innerHTML = '<div class="t">' + srcEsc(tg.name) + '<small>' + srcEsc(tg.vendor) + _gbLast + '</small></div>' +
                         (gSrc.skip[k] ? '<button type="button" class="skip undo" data-act="unskip">⏭️ 건너뜀 취소' + srcSkipUntilText(gSrc.skip[k]) + '</button>' : '<button type="button" class="skip" data-act="skipask">⏭️ 건너뜀</button>') +
                         (gSrc.block[k] ? '<button type="button" class="block undo" data-act="unblock">🚫 추천제외 취소</button>' : '<button type="button" class="block" data-act="block">🚫 추천제외</button>') +
                         '<button type="button" data-act="close">✕ 닫기</button>';
-                    else if (o.lineup) m.innerHTML = '<div class="t">' + srcEsc(tg.name) + '<small>' + srcEsc(tg.vendor) + (tg.supply ? ' · ' + srcWon(tg.supply) : '') + '</small></div>' +
+                    else if (o.lineup) m.innerHTML = '<div class="t">' + srcEsc(tg.name) + '<small>' + srcEsc(tg.vendor) + (tg.supply ? ' · ' + srcWon(tg.supply) : '') + _gbLast + '</small></div>' +
                         '<button type="button" data-act="editBand">✏️ 수정</button>' +
                         '<button type="button" data-act="band">🔗 밴드</button>' +
                         (srcRegIdxOfTg(tg) >= 0 ? '<button type="button" class="reg" data-act="link">📎 연결 상품</button><button type="button" class="reg" data-act="product">🛒 상품 수정</button>' : '<button type="button" class="reg" data-act="link">📎 상품 연결</button>') +   // [신규 2026-10-08] 추천 창에서도 (사장님 요청)   // [수정 2026-10-09] 이어져 있으면 상품 연결 자리에 '상품 수정'(누르면 상품 수정 화면) (사장님 요청)
                         (gSrc.skip[k] ? '<button type="button" class="skip undo" data-act="unskip">⏭️ 건너뜀 취소' + srcSkipUntilText(gSrc.skip[k]) + '</button>' : '<button type="button" class="skip" data-act="skipask">⏭️ 건너뜀</button>') +
                         (gSrc.block[k] ? '<button type="button" class="block undo" data-act="unblock">🚫 추천제외 취소</button>' : '<button type="button" class="block" data-act="block">🚫 추천제외</button>') +
                         '<button type="button" data-act="close">✕ 닫기</button>';
-                    else m.innerHTML = '<div class="t">' + srcEsc(tg.name) + '<small>' + srcEsc(tg.vendor) + (tg.supply ? ' · ' + srcWon(tg.supply) : '') + '</small></div>' +
+                    else m.innerHTML = '<div class="t">' + srcEsc(tg.name) + '<small>' + srcEsc(tg.vendor) + (tg.supply ? ' · ' + srcWon(tg.supply) : '') + _gbLast + '</small></div>' +
                         // [수정 2026-10-07] 차례: 수정(✍만) · 밴드 · 발주 등록 · 상품 등록 · 상품 연결 · 일정 추가 · 닫기 — 달력 이름표 창은 이모지·건너뜀·추천제외 뺌 (사장님 요청)
                         (o.manual ? '<button type="button" data-act="editManual">✏️ 수정</button>' : o.ref ? '<button type="button" data-act="editDisp">✏️ 수정</button>' : '') +   // [수정 2026-10-08] 달력 이름표는 모두 수정 (달력에만 보이는 이름)   // [신규 2026-10-07] 달력에 손으로 쓴 것 고치기
                         '<button type="button" data-act="band">🔗 밴드</button>' +
@@ -5347,12 +5348,16 @@
                         let _prevPo = null;
                         try {
                             if (typeof loadPurchaseArchiveIfNeeded === 'function') await loadPurchaseArchiveIfNeeded();
+                            // [수정 2026-11-08] 발주 탭을 아직 안 열었으면 최근 발주(10일치)가 비어 있다 — 먼저 받는다 (목초 구운 유정란 업체가 비던 원인)
+                            if (!(purchaseOrders || []).length && typeof loadPurchaseOrders === 'function') await loadPurchaseOrders();
                             const _ref = rs ? srcRefGet(JSON.parse(rs)) : null, _pp0 = srcProdForTg(tg);
                             const _code = String((_ref && _ref.code) || tg.code || (_pp0 && _pp0.productCode) || '').trim();
                             const _all = [].concat(purchaseOrders || [], purchaseArchive || []).filter(po => po && /^\d{4}-\d{2}-\d{2}$/.test(String(po.date || '')));
                             let _c = /^[PFS]\d+$/.test(_code) ? _all.filter(po => String(po.productCode || '').trim() === _code) : [];
                             if (!_c.length) { const me = srcNormName(tg.name); _c = _all.filter(po => srcNormName(po.itemName) === me); }
-                            _prevPo = _c.sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+                            _c.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+                            // 업체가 '공구'·빈칸으로 저장된 옛 발주는 건너뛰고 진짜 업체가 적힌 가장 최근 발주를 쓴다
+                            _prevPo = _c.find(po => !/^(공구|공동구매)?$/.test(String(po.supplier || '').trim())) || _c[0] || null;
                         } catch (e) { console.warn('예전 발주를 못 찾았어요:', e); }
                         const _gbTag = !tg.vendor || /^(공구|공동구매)$/.test(String(tg.vendor).trim());   // 공구 했던 상품에서 끌어온 이름표 — 업체가 '공구'로 적혀 있다
                         // [수정 2026-10-08] 소싱이 일정 탭으로 옮겨 가서 발주 탭으로 먼저 넘어가야 발주 등록 칸이 보인다 (사장님 지적)
@@ -6358,6 +6363,24 @@
                     const h = gSrc.hist.find(x => x && ((c && x.code === c) || String(x.name || '').replace(/\s/g, '') === nk));
                     const last = h ? srcHistLast(h) : '';
                     return last ? '<span class="src-clast" title="연결된 상품: ' + srcEsc(p.name) + ' · 마지막 공구 ' + last + '">공구 ' + last.slice(5).replace('-', '/') + '</span>' : '';
+                }
+                // [신규 2026-11-08] 아래 단추 창(src-menu)에 붙일 '최근 공구 MM/DD' — 이름표 번호 → 이어진 상품 → 같은 이름 차례로 찾는다
+                function srcLastGbTxt(tg, o) {
+                    try {
+                        if (!gSrc.hist) { srcHistEnsure(); return ''; }
+                        const nk = s => String(s || '').replace(/\s/g, '');
+                        let h = null, p0 = null;
+                        try { p0 = o && o.ref ? srcRefGet(JSON.parse(o.ref)) : null; } catch (e) {}
+                        const c0 = p0 && p0.code ? psSafeId(String(p0.code).trim()) : '';
+                        if (c0) h = srcHistByCode(c0);
+                        if (!h) {
+                            const i = srcRegIdxOfTg(tg, o), p = i >= 0 ? (uploadProducts || [])[i] : null;
+                            if (p) { const c = psSafeId(String(p.productCode || '').trim()); h = gSrc.hist.find(x => x && ((c && x.code === c) || nk(x.name) === nk(p.name))); }
+                        }
+                        if (!h && tg && tg.name) h = gSrc.hist.find(x => x && nk(x.name) === nk(tg.name));
+                        const last = h ? srcHistLast(h) : '';
+                        return last ? ' · <b style="color:#b45309;">🗓 최근 공구 ' + last.slice(5).replace('-', '/') + '</b>' : '';
+                    } catch (e) { return ''; }
                 }
                 function srcHistByCode(code) { return (gSrc.hist || []).find(h => h && h.code === code) || null; }
                 function srcHistLast(h) { const pks = ((h && h.rounds) || []).map(r => r.pk).filter(Boolean).sort(); return pks[pks.length - 1] || ''; }
