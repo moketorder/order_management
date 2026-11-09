@@ -33714,17 +33714,21 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             /* [수정 2026-10-30] 바로 복사하던 것을 창으로 — 글(복사·공유)과 주간 섬네일 같은 그림(공유·받기) (사장님 요청) */
             const word = L.veg.length && L.fruit.length ? '과일·야채' : L.veg.length ? '야채' : '과일';
             const rows = gFruitVegRows();
-            // [신규 2026-10-30] 과일·야채가 다 있으면 묶음 두 개로 — '🍎 과일'(주황) · '🥬 야채'(초록) (사장님 요청)
-            const SF = '🍎 과일', SV = '🥬 야채', both = rows.some(r => r.k === 'fruit') && rows.some(r => r.k === 'veg');
-            rows.forEach(r => { r.sec = both ? (r.k === 'veg' ? SV : SF) : ''; });
+            // [수정 2026-11-10] 과일·야채를 한 장에 묶음 둘로 넣던 것을 각각 한 장씩 (사장님 요청)
+            const pics = [['fruit', '과일', '🍎'], ['veg', '야채', '🥬']].map(([k, w, ic]) => {
+                const rs = rows.filter(r => r.k === k); if (!rs.length) return null;
+                rs.forEach(r => { r.sec = ''; });
+                return {
+                    label: `${ic} ${w} ${rs.length}가지`, rows: rs,
+                    fname: `MOKET_오늘의${w}_${d.getMonth() + 1}월${d.getDate()}일.png`,
+                    opt: {
+                        title: [[`${d.getMonth() + 1}월 ${d.getDate()}일 `, '#fff'], [`(${wd})`, '#ffe066']],
+                        pill: [[`오늘의 ${w} · `, '#2f7a14'], [rs.length + '가지', '#f76707']],
+                        nameLines: 2, tall: true, flow: true, tightMod: true, gap: 10, side: 16 }
+                };
+            }).filter(Boolean);
             gThumbShareDialog({
-                heading: `📋 카톡용 ${word}`, text, rows, day: gTodayISO(),
-                fname: `MOKET_오늘의${word.replace('·', '')}_${d.getMonth() + 1}월${d.getDate()}일.png`,
-                opt: {
-                    title: [[`${d.getMonth() + 1}월 ${d.getDate()}일 `, '#fff'], [`(${wd})`, '#ffe066']],
-                    pill: [[`오늘의 ${word} · `, '#2f7a14'], [rows.length + '가지', '#f76707']],
-                    secColors: { [SF]: ['#fff4e6', '#f76707'], [SV]: ['#ebfbee', '#37b24d'] },
-                    nameLines: 2, tall: true, flow: true, tightMod: true, gap: 10, side: 16 }   // 카드 사이·양옆 여백 줄여 카드 크게 · 상품명 두 줄 · 많으면 세로로 길게 · 묶음은 같은 줄에 이어서 · 수식어 여백 반 (사장님 요청)
+                heading: `📋 카톡용 ${word}`, text, day: gTodayISO(), pics,
             });
         }
         // 상품 하나 → 섬네일 카드 한 칸 (이름·수식어·손님 가격·사진·품절)
@@ -33764,7 +33768,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             });
         }
         // 글(고칠 수 있음·복사·공유) + 섬네일 그림(공유·받기) 창 — 카톡용 과일·야채와 공동구매 섬네일이 같이 쓴다
-        async function gThumbShareDialog({ heading, text, rows, day, fname, opt }) {
+        // [수정 2026-11-10] pics = [{ label, rows, opt, fname }] 를 주면 그림을 여러 장 (카톡용 과일·야채 — 과일 한 장, 야채 한 장, 사장님 요청)
+        async function gThumbShareDialog({ heading, text, rows, day, fname, opt, pics }) {
+            const P = (pics && pics.length) ? pics : [{ label: '', rows, opt, fname }];
             const old = document.getElementById('fv-share'); if (old) old.remove();
             const box = document.createElement('div'); box.id = 'fv-share';
             box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:flex-start; justify-content:center; padding:16px; overflow:auto;';
@@ -33776,7 +33782,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 <div id="fv-img" style="text-align:center; font-size:12px; font-weight:700; color:#64748b;">그림 만드는 중…</div>
             </div>`;
             document.body.appendChild(box);
-            let blob = null;
+            const blobs = [];
             box.addEventListener('click', async e => {
                 if (e.target === box) return box.remove();
                 const b = e.target.closest('[data-a]'); if (!b) return;
@@ -33784,22 +33790,29 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (a === 'x') return box.remove();
                 if (a === 'copy') { try { await navigator.clipboard.writeText(t); showToast('📋 글을 복사했어요 — 카톡에 붙여 넣으세요'); } catch (er) { prompt('아래 글을 복사해 주세요', t); } return; }
                 if (a === 'stext') { try { await navigator.share({ text: t }); } catch (er) { } return; }
-                if (!blob) return;
-                if (a === 'simg') {
-                    const files = [new File([blob], fname, { type: 'image/png' })];
+                const i = +(b.dataset.i || 0);
+                const pick = a === 'simgall' ? P.map((p, j) => j).filter(j => blobs[j]) : (blobs[i] ? [i] : []);
+                if (!pick.length) return;
+                if (a === 'simg' || a === 'simgall') {
+                    const files = pick.map(j => new File([blobs[j]], P[j].fname, { type: 'image/png' }));
                     try { if (navigator.canShare && navigator.canShare({ files })) await navigator.share({ files }); else showToast('이 기기는 그림 공유가 안 돼요 — 그림 받기를 눌러 주세요'); } catch (er) { }
                     return;
                 }
-                if (a === 'dl') { const u = URL.createObjectURL(blob), l = document.createElement('a'); l.href = u; l.download = fname; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); }
+                if (a === 'dl') { const u = URL.createObjectURL(blobs[i]), l = document.createElement('a'); l.href = u; l.download = P[i].fname; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); }
             });
             const out = document.getElementById('fv-img');
             if (typeof window.srcThDrawFv !== 'function') { out.textContent = '그림을 만들 수 없어요 — 새로고침 후 다시 해 주세요'; return; }
             try {
-                const cv = await window.srcThDrawFv(rows, day, opt);
-                blob = await new Promise((res, rej) => cv.toBlob(x => x ? res(x) : rej(new Error('그림 변환 실패')), 'image/png'));
-                const url = URL.createObjectURL(blob);
-                out.innerHTML = `<img src="${url}" style="width:100%; border-radius:10px; border:1px solid #e2e8f0;">
-                    <div style="display:flex; gap:6px; margin-top:8px;">${navigator.canShare ? `<button type="button" data-a="simg" style="${B} border:none; background:#16a34a; color:#fff;">📤 그림 공유</button>` : ''}<button type="button" data-a="dl" style="${B} border:1.5px solid #cbd5e1; background:#fff; color:#334155;">⬇️ 그림 받기</button></div>`;
+                let html = '';
+                for (let j = 0; j < P.length; j++) {
+                    const cv = await window.srcThDrawFv(P[j].rows, day, P[j].opt);
+                    blobs[j] = await new Promise((res, rej) => cv.toBlob(x => x ? res(x) : rej(new Error('그림 변환 실패')), 'image/png'));
+                    const url = URL.createObjectURL(blobs[j]);
+                    html += `${P[j].label ? `<div style="margin:${j ? 18 : 0}px 0 6px; text-align:left; font-size:14px; font-weight:900; color:#0f172a;">${gEscapeHtml(P[j].label)}</div>` : ''}<img src="${url}" style="width:100%; border-radius:10px; border:1px solid #e2e8f0;">
+                    <div style="display:flex; gap:6px; margin-top:8px;">${navigator.canShare ? `<button type="button" data-a="simg" data-i="${j}" style="${B} border:none; background:#16a34a; color:#fff;">📤 그림 공유</button>` : ''}<button type="button" data-a="dl" data-i="${j}" style="${B} border:1.5px solid #cbd5e1; background:#fff; color:#334155;">⬇️ 그림 받기</button></div>`;
+                }
+                if (P.length > 1 && navigator.canShare) html += `<div style="display:flex; margin-top:14px;"><button type="button" data-a="simgall" style="${B} border:none; background:#0f766e; color:#fff;">📤 ${P.length}장 함께 공유</button></div>`;
+                out.innerHTML = html;
             } catch (er) { out.textContent = '그림을 못 만들었어요: ' + ((er && er.message) || er); }
         }
         async function gFreshAllFruits() {
