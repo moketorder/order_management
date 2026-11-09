@@ -22529,7 +22529,10 @@
             const blobs = res.filter(r => r.status === 'fulfilled').map(r => r.value);
             try { if (typeof onReady === 'function') onReady(); } catch (e) { }
             if (!blobs.length) throw new Error('사진을 하나도 못 받아왔어요');
-            const files = blobs.map((b, i) => new File([b], `${namePre}${i + 1}.${(b.type || '').includes('png') ? 'png' : 'jpg'}`, { type: b.type || 'image/jpeg' }));
+            /* [수정 2026-11-09] 파일 이름을 상품·보낸 때마다 다르게 — 늘 '사진_1.jpg'였더니 폰·카톡이 전에 보낸 같은 이름의 사진(다른 상품)을
+               다시 보낸 일이 있었다 (사장님: 나이키 양말 공유에 초코케이크 사진) */
+            const _stamp = `${String((p && p.productCode) || 'p').replace(/[^A-Za-z0-9]/g, '')}_${Date.now().toString(36)}_`;
+            const files = blobs.map((b, i) => new File([b], `${namePre}${_stamp}${i + 1}.${(b.type || '').includes('png') ? 'png' : 'jpg'}`, { type: b.type || 'image/jpeg' }));
             const miss = res.length - blobs.length;
             if (!navigator.canShare || !navigator.canShare({ files })) return { ok: false, why: 'cannot', miss };
             try { await navigator.share({ files }); return { ok: true, miss }; }
