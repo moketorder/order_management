@@ -129,10 +129,21 @@
 
         // ── 1) 로그인 → 허락 여부 ──
         let checking = false;
+        /* [신규 2026-11-09] 아이폰 사파리에서 로그인 확인이 대답 없이 멈추면 화면이 '대기 중'으로만 남았다 (사장님 지적).
+           12초 안에 열리지도, 로그인 창이 뜨지도 않으면 어디서 멈췄는지 알리고 다시 시도·다시 로그인 단추를 낸다 */
+        let gateStage = '로그인 확인';
+        setTimeout(() => {
+            if (window.gStaffMe || (box && box.style.display === 'flex')) return;
+            show(`<div class="sg-sub"><b>${gateStage}</b>이 늦어지고 있어요.<br>인터넷이 느리거나 사파리가 로그인 정보를 못 읽고 있어요.</div>
+                <button class="sg-btn sg-main" onclick="location.reload()">다시 시도</button>
+                <button class="sg-btn sg-ghost" onclick="gStaffSignOut(true)">다시 로그인</button>
+                <div class="sg-hint">계속 안 되면 사파리 설정 → 방문 기록 및 웹 사이트 데이터 지우기 뒤 다시 로그인해 주세요</div>`);
+        }, 12000);
         auth.onAuthStateChanged(async user => {
             if (!user) return loginStep();
             if (checking) return;
             checking = true;
+            gateStage = '가게 허락 확인';
             try { await check(user); } finally { checking = false; }
         });
         auth.getRedirectResult().catch(e => { if (e && e.code !== 'auth/no-auth-event') err('로그인하지 못했습니다. (' + (e.code || e.message) + ')'); });
@@ -269,7 +280,7 @@
         window.gStaffSignOut = async function (quiet) {
             // [수정 2026-10-03] 화면 안 확인 창이 있으면 그것을 쓴다 (미리보기·웹뷰에서는 confirm() 이 바로 '취소'가 된다). 배달기사·가격표에는 없어 예전 창
             if (!quiet && !(typeof psConfirm === 'function' ? await psConfirm('로그아웃할까요?', '로그아웃') : confirm('로그아웃할까요?'))) return;
-            await auth.signOut();
+            await Promise.race([auth.signOut().catch(() => { }), new Promise(r => setTimeout(r, 4000))]);   // [수정 2026-11-09] 로그인 정보가 멈춰 있어도 4초 뒤엔 새로 연다
             location.reload();
         };
     })();
