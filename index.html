@@ -36379,6 +36379,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                                 <select onchange="assignShelf(${index}, this.value)" onclick="event.stopPropagation()" style="flex:1; min-width:0; padding:6px 2px; border:1.5px solid ${cur ? 'var(--primary)' : 'var(--border)'}; border-radius:6px; font-size:11px; font-weight:700; background:white; box-sizing:border-box;">${shelfOpts.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
                                 <button type="button" onclick="event.stopPropagation(); editProduct(${index})" style="flex-shrink:0; padding:6px 8px; border:1.5px solid #64748b; background:#f1f5f9; color:#475569; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">수정</button>
                             </div>
+                            ${/* [신규 2026-11-09] 상시판매 손님 화면 맨 위로 — 전체 탭 / 분류 탭 / 둘 다 (사장님 요청) */''}
+                            ${String(prod.displayTab || '').startsWith('onsite-') ? (() => { const a = Number(prod.pinAll) > 0, c = Number(prod.pinCat) > 0, on = a || c;
+                                return `<button type="button" onclick="event.stopPropagation(); gTogglePinTop(${index})" title="손님 상시판매 화면에서 맨 위에 보이게" style="width:100%; padding:6px 4px; border:1.5px solid ${on ? '#7c3aed' : 'var(--border)'}; background:${on ? '#f5f3ff' : '#fff'}; color:${on ? '#6d28d9' : '#64748b'}; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">📌 ${on ? (a && c ? '맨 위 (둘 다)' : a ? '맨 위 (전체)' : '맨 위 (분류)') : '맨 위로'}</button>`; })() : ''}
                         </div>`;
                     } else {
                         // [신규] 당일/예약 탭도 재고관리와 동일하게 재고 입력칸, 수정 버튼 제공 (선반 드롭다운·기존 복제/품절 버튼 제외) · [수정 2026-10-05] 변경 단추 뺌 — 엔터나 칸을 떠나면 저장
@@ -38013,6 +38016,28 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!prod) return false;
             const k = fGetAdjKey(prod.matchKey, prod.name, prod.sid);
             return uploadClosedMap[k] === true || uploadClosedMap[encodeURIComponent(k)] === true || gIsExpiredAdmin(prod);
+        }
+        /* [신규 2026-11-09] 상시판매 상품을 손님 화면 맨 위로 (사장님 요청) — pinAll: '전체' 탭, pinCat: 그 분류 탭.
+           값은 누른 때(숫자)라 여러 개면 나중에 올린 것이 더 위. 품절·마감이면 주문서가 그대로 아래로 보낸다 */
+        async function gTogglePinTop(index) {
+            const prod = uploadProducts[index];
+            if (!prod) { showToast("상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요."); renderProductsList(); return; }
+            const a = Number(prod.pinAll) > 0, c = Number(prod.pinCat) > 0;
+            const opts = [{ label: '전체', value: 'all' }, { label: '분류', value: 'cat' }, { label: '둘 다', value: 'both', main: true }];
+            if (a || c) opts.push({ label: '풀기', value: 'off' });
+            const pick = await psChoose(`'${prod.name}'\n\n손님 상시판매 화면 어디에서 맨 위에 보일까요?\n· 전체: '전체' 탭\n· 분류: 이 상품의 분류 탭`, opts);
+            if (!pick) return;
+            const now = Date.now();
+            const pa = (pick === 'all' || pick === 'both') ? (a ? prod.pinAll : now) : null;
+            const pc = (pick === 'cat' || pick === 'both') ? (c ? prod.pinCat : now) : null;
+            try {
+                const ok = await fbPatchProducts({ [`${index}/pinAll`]: pa, [`${index}/pinCat`]: pc, [`${index}/updatedAt`]: now });
+                if (!ok) throw new Error('저장 실패');
+                prod.pinAll = pa; prod.pinCat = pc;
+                updatePublishedProductsTimestamp();
+                showToast(pick === 'off' ? '맨 위 고정을 풀었습니다.' : `맨 위로 올렸습니다 (${pick === 'all' ? '전체' : pick === 'cat' ? '분류' : '전체·분류'}).`);
+            } catch (e) { showToast('바꾸지 못했습니다: ' + gErrKo(e)); }
+            renderProductsList();
         }
         async function toggleProductClosed(index) {
             const prod = uploadProducts[index];
