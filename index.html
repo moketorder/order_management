@@ -36128,8 +36128,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const isProductSoldOut = gIsProductSoldOut;
 
             const grouped = {};
+            // [신규 2026-11-09] 📌 맨 위로 올린 상시판매 상품은 목록에서도 맨 위 묶음에 (사장님 요청) — 전체 탭은 pinAll, 분류 탭은 pinCat
+            const _pinF = uploadManageTab === 'inv-all' ? 'pinAll' : 'pinCat';
+            const _pinOf = p => isInventoryView ? (Number(p && p[_pinF]) || 0) : 0;
             filteredProducts.forEach(({ prod, index }) => {
-                const mKey = isInventoryView ? String(prod.shelf || '')
+                const mKey = _pinOf(prod) > 0 ? '__pin' : isInventoryView ? String(prod.shelf || '')
                     : isReserveView ? (getReserveGroupDate(prod) || '날짜미정')
                     : (prod.matchKey || "기타");
                 if (!grouped[mKey]) {
@@ -36139,6 +36142,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             });
 
             const groupKeys = Object.keys(grouped).sort((a, b) => {
+                if (a === '__pin' || b === '__pin') return a === '__pin' ? -1 : 1;
                 if (isInventoryView) {
                     const oa = gShelfOrder(a);
                     const ob = gShelfOrder(b);
@@ -36167,7 +36171,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 groupTitle.style = "font-size: 13px; font-weight: 800; color: var(--text-sub); margin: 16px 0 8px 4px; padding-left: 6px; border-left: 3px solid var(--primary);";
                 
                 let displayTitle = mKey;
-                if (isInventoryView) {
+                if (mKey === '__pin') displayTitle = '📌 맨 위 (손님 화면에서도 맨 위)';
+                else if (isInventoryView) {
                     displayTitle = gShelfLabel(mKey);
                 }
                 else if (isReserveView) {
@@ -36191,6 +36196,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
 
                 // 숨김 상품은 밑으로 정렬하고, 노출 여부가 같으면 가나다순으로 정렬
                 grouped[mKey].sort((a, b) => {
+                    if (mKey === '__pin') { const d = _pinOf(b.prod) - _pinOf(a.prod); if (d) return d; }   // 손님 화면과 같은 차례 — 나중에 올린 것이 위
                     /* [신규] 재고관리·예약판매: 그 묶음 '안에서만' 품절 상품을 뒤로 보낸다.
                        (묶음·날짜 차례는 그대로 둔다)
                        [수정] 예약판매도 같이 넣었다. 그 날짜에 파는 것 중 아직 살 수 있는 것이
