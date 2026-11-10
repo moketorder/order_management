@@ -35331,13 +35331,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             btn.style.display = isEdit ? 'flex' : 'none';
             if (!isEdit) { setDescBoxOpen(true); return; }
 
-            // 접힌 채로도 무슨 글인지 알 수 있게 첫 줄을 버튼에 적어 둔다
+            gDescLabelSync();
+            setDescBoxOpen(false);
+        }
+        // 접힌 채로도 무슨 글인지 알 수 있게 첫 줄을 버튼에 적어 둔다
+        // [수정 2026-11-10] 설명은 서랍(product_desc)에서 나중에 받아 오거나 사장님이 고치므로 그때마다 다시 적는다 (사장님 지적 — 설명이 있는데 '상세설명 없음')
+        function gDescLabelSync() {
+            const btn = document.getElementById('desc-toggle'), label = document.getElementById('desc-toggle-text'), ta = document.getElementById('productDesc');
+            if (!btn) return;
             const text = String((ta && ta.value) || '').trim();
             const first = text.split('\n').map(s => s.trim()).find(Boolean) || '';
             if (label) label.innerText = first ? first : '상세설명 없음';
             btn.title = first ? '눌러서 상세설명 펴기/접기' : '상세설명이 비어 있습니다. 눌러서 적으세요.';
-            setDescBoxOpen(false);
         }
+        document.addEventListener('input', e => { if (e.target && e.target.id === 'productDesc') gDescLabelSync(); });
 
         // [신규] 사진 목록 펼침 여부. 장수 버튼으로 여닫는다 (기본은 접힘).
         let photoListOpen = false;
@@ -38705,6 +38712,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                                 if (uploadEditProductKey !== index) return;
                                 _d.value = v;
                                 autoResizeTextarea(_d);
+                                try { gDescLabelSync(); } catch (e) { }   // [수정 2026-11-10] 접힌 단추 글도 받아 온 설명 첫 줄로
                             })
                             .catch(e => console.error('상품 설명 불러오기 실패:', e));
                     }
