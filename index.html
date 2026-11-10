@@ -4541,7 +4541,8 @@
                    srcItemPo: 이름표에 이은 발주 중 그 상품 이름이 맞는 것 (여러 개면 낱개 수를 더함) */
                 function srcManualItems(rs) {
                     try { const r = typeof rs === 'string' ? JSON.parse(rs) : rs; if (!r || r[0] !== 'manual') return []; const p = srcRefGet(r); if (!p) return [];
-                        const a = String(p.disp || p.name || '').split(/\s*[,，/+·]\s*/).map(s => s.trim()).filter(Boolean); return a.length > 1 ? a : []; } catch (e) { return []; }
+                        // [수정 2026-11-10] '2+1'·'1+1'처럼 숫자 사이 + 는 나누지 않는다 (사장님 지적 — 광천 돌자반 볶음 35g 2+1 이 두 상품으로 나뉨)
+                        const a = String(p.disp || p.name || '').replace(/(\d)\s*\+\s*(?=\d)/g, '$1\u0001').split(/\s*[,，/+·]\s*/).map(s => s.replace(/\u0001/g, '+').trim()).filter(Boolean); return a.length > 1 ? a : []; } catch (e) { return []; }
                 }
                 function srcItemMatch(a, b) { a = srcNormName(a); b = srcNormName(b); return !!(a && b && (a.includes(b) || b.includes(a))); }
                 function srcItemRegIdx(rs, item) {
