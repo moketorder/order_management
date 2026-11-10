@@ -22527,7 +22527,8 @@
             const i = Math.max(0, Math.min(Number(photoIndex) || 0, p.images.length - 1));
             try {
                 const url = gCdnUrl(p.images[i], 900);
-                const res = await fetch(url);
+                let res = await fetch(url);
+                if (!res.ok && url !== p.images[i]) res = await fetch(p.images[i]);   // [수정 2026-11-10] 사본이 아직 없으면 원래 주소로
                 if (!res.ok) throw new Error('이미지를 못 받아왔어요');
                 const srcBlob = await res.blob();
                 const pngBlob = await (async () => {
@@ -22558,7 +22559,7 @@
         /* [수정 2026-11-04] 카톡 공유 사진 실패 고침 (사장님 요청)
            · 사진 주소에 f_auto 가 붙으면 크롬은 AVIF·WebP 로 받아 왔다 — 이름만 .jpg 라 카톡이 못 받는 일이 있었다 → 공유용은 f_jpg 로 받는다
            · 그래도 jpg·png 가 아니면(다른 사진 주소의 webp 등) 그림판(canvas)에서 JPG 로 바꿔 보낸다 */
-        function gShareImgUrl(img) { return gCdnUrl(img, 900).replace('f_auto', 'f_jpg'); }
+        function gShareImgUrl(img) { if (/^https?:\/\/i\.ibb\.co\//.test(String(img || '').trim())) return String(img).trim(); return gCdnUrl(img, 900).replace('f_auto', 'f_jpg'); }   // [수정 2026-11-10] imgbb 는 원래 주소 그대로 — 사본 먼저·imgbb 다음은 gShareFetchImg 가 한다
         async function gToJpegBlob(b) {
             if (b && /image\/(jpeg|jpg|png)/i.test(b.type || '')) return b;
             try {
@@ -30901,9 +30902,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             paint();
             document.body.appendChild(box);
         }
+        /* [수정 2026-11-10] imgbb 사진은 깃허브 사본(moketorder/photos, 15분마다 복사)을 먼저 보인다 (사장님 지적 — imgbb 가 막히면
+           오류 대신 'service unavailable' 그림을 줘서 미리보기가 그 그림으로 보였다). 사본이 아직 없으면(새 사진) 아래 error 길로 raw → imgbb */
         function gCdnUrl(url, size) {
             const str = String(url || '').trim();
             if (!str || str.startsWith('data:') || str.startsWith('blob:')) return str;
+            { const ib = str.match(/^https?:\/\/i\.ibb\.co\/([A-Za-z0-9]+\/[A-Za-z0-9._-]+)$/); if (ib) return 'https://moketorder.github.io/photos/' + ib[1]; }
             const m = str.match(/^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.*)$/);
             if (!m) return str;
             const rest = m[2];
@@ -39344,7 +39348,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // 깃허브 페이지에 아직 안 열린 새 사진(올린 지 1분 안쪽)은 raw 주소로 대신 받는다 — 주문관리 화면 모든 사진에
         document.addEventListener('error', ev => {
             const im = ev.target;
-            if (!im || im.tagName !== 'IMG' || im.dataset.ghRaw) return;
+            if (!im || im.tagName !== 'IMG') return;
+            // [수정 2026-11-10] raw 도 없으면(사본 전 imgbb 사진) imgbb 원래 주소로
+            if (im.dataset.ghRaw) { const rr = String(im.src || '').match(/^https:\/\/raw\.githubusercontent\.com\/moketorder\/photos\/main\/([A-Za-z0-9]+\/[A-Za-z0-9._-]+)$/); if (rr && !im.dataset.ghIbb && !/^(u|band)\//.test(rr[1])) { im.dataset.ghIbb = '1'; im.src = 'https://i.ibb.co/' + rr[1]; } return; }
             const mm = String(im.src || '').match(/^https:\/\/moketorder\.github\.io\/photos\/(.+)$/);
             if (!mm) return;
             im.dataset.ghRaw = '1';
