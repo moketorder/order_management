@@ -39858,6 +39858,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             setTimeout(() => { inp.focus(); inp.select(); }, 60);
         }
 
+        // [신규 2026-11-10] 카드의 재고 칸에서 바로 저장 — 창(scSaveStock)과 같은 길로 저장한다 (나갈 주문 빼기 묻기 포함)
+        async function scInlineStock(code, inp) {
+            if (!inp || inp.dataset.busy) return;
+            const v = String(inp.value).trim();
+            if (v === '' || v === inp.dataset.orig) { inp.value = inp.dataset.orig; return; }
+            const modalInp = document.getElementById('sc-stock-input');
+            if (!modalInp) return;
+            inp.dataset.busy = '1';
+            try { scEditCode = code; modalInp.value = v; await scSaveStock(); }
+            finally {
+                delete inp.dataset.busy;
+                if (inp.isConnected) { inp.value = inp.dataset.orig; scEditCode = ''; }   // 저장이 안 됐으면(취소·실패) 원래 숫자로 — 저장되면 목록이 새로 그려진다
+            }
+        }
         function closeScStock() {
             const el = document.getElementById('sc-stock-modal');
             if (el) el.style.display = 'none';
@@ -40067,9 +40081,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                      onclick="scToggleOpen('${r.code}')">
                     <div style="display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;">
                         <b style="font-size:13.5px; color:#0f172a; flex:1 1 200px; min-width:0;">${c.dot} ${gEscapeHtml(r.name)}${gCodeLabelChip(r.code)}</b>
-                        <span onclick="event.stopPropagation(); scEditStock('${r.code}')" title="눌러서 재고 고치기"
-                            style="font-size:12px; font-weight:900; color:${r.stock > 0 ? '#0f172a' : '#b91c1c'};
-                                   border:1px dashed #cbd5e1; border-radius:6px; padding:1px 7px; cursor:pointer; background:#fff;">재고 ${r.stock}개 ✏️</span>
+                        ${/* [수정 2026-11-10] 재고를 창 없이 바로 고친다 — 숫자 칸에 적고 엔터(또는 칸을 벗어나면) 저장, Esc 는 되돌림 (사장님 요청) */''}
+                        <span onclick="event.stopPropagation()" title="숫자를 고치고 엔터 — 바로 저장돼요"
+                            style="display:inline-flex; align-items:center; gap:3px; font-size:12px; font-weight:900; color:${r.stock > 0 ? '#0f172a' : '#b91c1c'};
+                                   border:1px dashed #cbd5e1; border-radius:6px; padding:0 4px 0 7px; background:#fff;">재고
+                            <input type="number" inputmode="numeric" min="0" value="${r.stock}" data-orig="${r.stock}" onfocus="this.select()"
+                                onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();} else if(event.key==='Escape'){this.value=this.dataset.orig; this.blur();}"
+                                onblur="scInlineStock('${r.code}', this)"
+                                style="width:46px; height:22px; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:5px; padding:0 4px; font-size:12px; font-weight:900; text-align:right; color:inherit; background:#fff;">개</span>
                         <span style="font-size:12px; font-weight:900; color:${c.fg}; background:#fff;
                                      border:1px solid ${c.bd}; border-radius:6px; padding:1px 7px;">${r.days}일 전</span>
                     </div>
