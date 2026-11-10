@@ -5288,8 +5288,8 @@
                         '<div class="ps-f"><label>분류탭</label><select class="ps-in" data-ontab="' + i + '">' + tabOpts + '</select></div>' +
                         '<div class="ps-f"><label>냉장고 분류</label><select class="ps-in" data-onshelf="' + i + '">' + shelfOpts + '</select></div>' +
                         '<div class="ps-f"><label>상시판매 금액' + (gb ? ' <span style="color:#2563eb;">· 공구가 ' + gb.toLocaleString() + '원</span>' : '') + '</label>' +
-                        '<input type="number" min="0" inputmode="numeric" class="ps-in" data-onprice="' + i + '" placeholder="' + (on0 > 0 ? on0.toLocaleString() + '원 (상시가)' : gb.toLocaleString() + '원 그대로') + '" title="비우면 상품의 상시가(없으면 지금 가격) 그대로"></div>' +
-                        '</div></div>';
+                        '<input type="number" min="0" inputmode="numeric" class="ps-in ps-nospin" data-onprice="' + i + '" placeholder="' + (on0 > 0 ? on0.toLocaleString() + '원 (상시가)' : gb.toLocaleString() + '원 그대로') + '" title="비우면 상품의 상시가(없으면 지금 가격) 그대로"></div>' +
+                        '</div>' + (typeof gOptOnsiteHtml === 'function' ? gOptOnsiteHtml(idx) : '') + '</div>';   // [신규 2026-11-10] 옵션 상품은 옵션별 상시가
                 }
                 // 노출일정에 일정 추가 창
                 async function srcSchedDialog(refs) {
@@ -8051,6 +8051,9 @@
         .ps-in { box-sizing: border-box; width: 100%; min-width: 0; height: 36px; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 0 8px; font-size: 12.5px; font-family: inherit; background: #fff; color: #0f172a; }
         .ps-in:focus { outline: none; border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96,165,250,.18); }
         .ps-in::placeholder { color: #a3aec0; font-weight: 600; }
+        /* [신규 2026-11-10] 상시판매 금액 칸 — 위아래 화살표 없이 키보드로만 (사장님 요청). 휠은 아래 스크립트에서 막는다 */
+        .ps-nospin::-webkit-outer-spin-button, .ps-nospin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .ps-nospin { -moz-appearance: textfield; appearance: textfield; }
         .ps-in-time { flex: 0 0 84px; width: 84px; font-weight: 800; padding: 0 4px; }
         .ps-in-s { flex: 0 0 64px; width: 64px; height: 28px; font-size: 11.5px; padding: 0 6px; }
         .ps-ta { height: auto; min-height: 52px; padding: 7px 8px; line-height: 1.4; resize: vertical; }
@@ -18718,6 +18721,39 @@
         }
         // 카드에 넣을 칸 (단독 일정에만)
         // fieldsOnly=true 면 체크박스 줄 없이 분류탭·금액 칸만 (묶음 일정의 '상시' 단추 아래에 쓴다)
+        /* [신규 2026-11-10] 상시판매 전환 칸 — 옵션 상품은 옵션 항목마다 공구가와 상시가(고칠 수 있음)를 보인다 (사장님 요청).
+           고치면 바로 상품 옵션의 priceOnsite 로 저장 → 상시판매로 넘어갈 때 그 값이 손님 가격 (gOptsPriced) */
+        function gOptOnsiteHtml(idx) {
+            const p = uploadProducts[idx];
+            if (!p || !Array.isArray(p.options)) return '';
+            const rows = [];
+            p.options.forEach((g, gi) => ((g && g.items) || []).forEach((it, ii) => {
+                if (!it || !String(it.name || '').trim()) return;
+                const gb = Number(it.priceGb) > 0 ? Number(it.priceGb) : (parseInt(it.price) || 0), on = Number(it.priceOnsite) || 0;
+                rows.push(`<div style="display:grid; grid-template-columns:minmax(0,1fr) 92px 110px; gap:6px; align-items:center;">
+                    <span style="font-size:12px; font-weight:800; color:#0f172a; overflow-wrap:anywhere;">${p.options.length > 1 && g.name ? `<span style="color:#94a3b8;">${gEscapeHtml(g.name)} · </span>` : ''}${gEscapeHtml(it.name)}</span>
+                    <span style="font-size:11.5px; font-weight:800; color:#2563eb; text-align:right;">공구가 ${gb.toLocaleString()}원</span>
+                    <input type="number" min="0" inputmode="numeric" class="ps-in ps-nospin" style="height:32px;" value="${on > 0 ? on : ''}" placeholder="상시가" title="이 옵션의 상시가 — 비우면 공구가 그대로"
+                        onclick="event.stopPropagation()" onchange="gOptOnsiteSet(${idx}, ${gi}, ${ii}, this.value)">
+                </div>`);
+            }));
+            if (!rows.length) return '';
+            return `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #cbd5e1; display:flex; flex-direction:column; gap:5px;">
+                <div style="font-size:10.5px; font-weight:800; color:#64748b;">옵션별 상시가 <span style="font-weight:700;">· 비우면 공구가 그대로 · 고치면 바로 저장</span></div>${rows.join('')}</div>`;
+        }
+        // [신규 2026-11-10] 상시판매 금액 칸(ps-nospin)은 마우스 휠로 숫자가 바뀌지 않게 — 휠을 굴리면 칸에서 빠져나온다 (사장님 요청)
+        document.addEventListener('wheel', e => { const t = e.target; if (t && t.classList && t.classList.contains('ps-nospin') && document.activeElement === t) t.blur(); }, { passive: true });
+        async function gOptOnsiteSet(idx, gi, ii, val) {
+            const p = uploadProducts[idx], it = p && p.options && p.options[gi] && (p.options[gi].items || [])[ii];
+            if (!it) { showToast('옵션을 찾지 못했어요 — 새로고침해 주세요'); return; }
+            const v = Math.max(0, parseInt(val, 10) || 0), gb = Number(it.priceGb) > 0 ? Number(it.priceGb) : (parseInt(it.price) || 0);
+            const base = `${idx}/options/${gi}/items/${ii}`;
+            const ok = await fbPatchProducts({ [`${base}/priceOnsite`]: v > 0 ? v : null, [`${base}/priceGb`]: v > 0 ? gb : (Number(it.priceGb) > 0 ? Number(it.priceGb) : null), [`${idx}/updatedAt`]: Date.now() });
+            if (!ok) { showToast('저장하지 못했어요 — 잠시 뒤 다시 해 주세요'); return; }
+            it.priceOnsite = v > 0 ? v : null; if (v > 0) it.priceGb = gb;
+            updatePublishedProductsTimestamp();
+            showToast(v > 0 ? `${it.name} 상시가 ${v.toLocaleString()}원으로 저장했어요` : `${it.name} 상시가를 비웠어요 (공구가 그대로)`);
+        }
         function psToOnsiteHtml(key, fieldsOnly) {
             const it = psItem(key);
             const p = uploadProducts[it.idx];
@@ -18741,8 +18777,8 @@
                         <div class="ps-f"><label>냉장고 분류</label>
                             <select class="ps-in" onchange="psItemSetToOnsiteShelf('${kq}', this.value)">${shelfOpts}</select></div>
                         <div class="ps-f"><label>상시판매 금액${(n => n > 0 ? ` <span style="color:#2563eb;">· 공구가 ${n.toLocaleString()}원</span>` : '')(Number(p.priceGb) > 0 ? Number(p.priceGb) : (Number(p.price) || 0))}</label>${/* [신규 2026-11-10] 공구가도 보이게 (사장님 요청 — 얼마 받아야 할지 모르겠다) */''}
-                            <input type="number" min="0" inputmode="numeric" class="ps-in" value="${Number(it.toOnsitePrice) > 0 ? Number(it.toOnsitePrice) : ''}" placeholder="${Number(p.priceOnsite) > 0 ? Number(p.priceOnsite).toLocaleString() + '원 (상시가)' : (Number(p.price) || 0).toLocaleString() + '원 그대로'}" title="비우면 상품의 상시가(없으면 지금 가격) 그대로" onchange="psItemSetToOnsitePrice('${kq}', this.value)"></div>
-                    </div>`;
+                            <input type="number" min="0" inputmode="numeric" class="ps-in ps-nospin" value="${Number(it.toOnsitePrice) > 0 ? Number(it.toOnsitePrice) : ''}" placeholder="${Number(p.priceOnsite) > 0 ? Number(p.priceOnsite).toLocaleString() + '원 (상시가)' : ((Number(p.price) || 0) > 0 ? (Number(p.price) || 0).toLocaleString() + '원 그대로' : (Array.isArray(p.options) && p.options.length ? '옵션별로 아래에' : '0원 그대로'))}" title="비우면 상품의 상시가(없으면 지금 가격) 그대로" onchange="psItemSetToOnsitePrice('${kq}', this.value)"></div>
+                    </div>` + gOptOnsiteHtml(it.idx);   // [신규 2026-11-10] 옵션 상품은 옵션 항목마다 상시가
             if (fieldsOnly) return `<div style="font-size:11px; font-weight:700; color:var(--text-sub); margin-bottom:6px;">🏪 상시판매 전환 — 픽업일이 지나면 남은 재고로${doneTxt}</div>${fields}`;
             // [수정 2026-10-03] 제목 '끝나면'을 '상시판매 전환' 체크박스 하나로 합쳤다 (사장님 요청)
             return `<div class="ps-sec">
