@@ -3117,6 +3117,10 @@
                             <div class="form-group">
                                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
                                     <label style="margin-bottom:0;">과세 · 공구가 · 상시가 · 정상가 · 재고 · 상세옵션</label>
+                                    <label class="switch-container" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-left:auto; margin-right:10px;" title="체크하면 상시가 = 공구가 (공구가를 고치면 같이 바뀌어요). 풀면 상시가를 비워 직접 적어요">
+                                        <input type="checkbox" id="productPriceSame" onchange="gPriceSameToggle(this)" style="cursor:pointer; width:16px; height:16px;">
+                                        <span style="font-size:12px; font-weight:700; color:#15803d; user-select:none;">공구가=상시가</span>
+                                    </label>
                                     <label class="switch-container" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
                                         <input type="checkbox" id="unlimitedStock" onchange="toggleUnlimitedStock()" style="cursor:pointer; width:16px; height:16px;">
                                         <span style="font-size:12px; font-weight:700; color:var(--text-sub); user-select:none;">재고 무제한</span>
@@ -23379,6 +23383,23 @@
                 uploadDiscountListPrice = v; uploadDiscountAmount = Math.max(0, v - sell);
             }
         }
+        /* [신규 2026-11-10] '공구가=상시가' 체크 (사장님 요청) — 체크하면 상시가 칸에 공구가를 넣고 잠근다(공구가를 고치면 따라 바뀜),
+           풀면 상시가를 비우고 적을 수 있게 */
+        function gPriceSameSet(on) {
+            const cb = document.getElementById('productPriceSame'), o = document.getElementById('productPriceOnsite'), pe = document.getElementById('productPrice');
+            if (cb) cb.checked = !!on;
+            if (!o) return;
+            if (on) { if (pe) o.value = pe.value; o.readOnly = true; o.style.background = '#f0fdf4'; o.style.color = '#15803d'; }
+            else { o.readOnly = false; o.style.background = ''; o.style.color = ''; }
+        }
+        function gPriceSameToggle(cb) {
+            gPriceSameSet(cb.checked);
+            if (!cb.checked) { const o = document.getElementById('productPriceOnsite'); if (o) { o.value = ''; o.focus(); } }
+            try { gPriceReqSync(); } catch (e) { }
+        }
+        document.addEventListener('input', e => {
+            if (e.target && e.target.id === 'productPrice') { const cb = document.getElementById('productPriceSame'); if (cb && cb.checked) { const o = document.getElementById('productPriceOnsite'); if (o) o.value = e.target.value; } }
+        });
         // [신규 2026-10-13] 상시판매로 등록하면서 상시가를 적었으면 공구가 칸은 비워도 된다
         function gPriceReqSync() {
             const pe = document.getElementById('productPrice'), on = document.getElementById('productPriceOnsite');
@@ -23390,6 +23411,7 @@
             const input = document.getElementById('productPrice');
             if (!input) return;
             ['productPriceOnsite', 'productPriceStore'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });   // [신규 2026-10-13]
+            try { gPriceSameSet(false); } catch (e) { }   // [신규 2026-11-10] '공구가=상시가' 체크 풀기
             input.type = 'number';
             input.value = '';
             delete input.dataset.prevValue;
@@ -23895,6 +23917,20 @@
             renderDetailOptionBody();
         }
 
+        // [신규 2026-11-10] 옵션 묶음 '공구가=상시가' — 체크하면 항목 상시가 = 공구가, 풀면 상시가 비움 (사장님 요청)
+        function setDetailOptionSame(gi, on) {
+            syncDetailOptionDraft();
+            const g = optionModalDraft && optionModalDraft.groups[gi]; if (!g) return;
+            g.sameOnsite = !!on;
+            (g.items || []).forEach(it => { if (!it) return; it.priceOnsite = on ? ((Number(it.priceGb) > 0 ? Number(it.priceGb) : (parseInt(it.price) || 0)) || null) : null; });
+            renderDetailOptionBody();
+        }
+        // 묶음이 '같음'이면 공구가를 고치는 대로 상시가 칸도 따라간다
+        document.addEventListener('input', e => {
+            const el = e.target; if (!el || !el.dataset || el.dataset.optRole !== 'item-price') return;
+            const g = optionModalDraft && optionModalDraft.groups[parseInt(el.dataset.gi)]; if (!g || !g.sameOnsite) return;
+            const o = document.querySelector(`#product-option-modal-body [data-opt-role="item-onsite"][data-gi="${el.dataset.gi}"][data-ii="${el.dataset.ii}"]`); if (o) o.value = el.value;
+        });
         function addDetailOptionItem(gi) {
             syncDetailOptionDraft();
             if (!optionModalDraft || !optionModalDraft.groups[gi]) return;
@@ -23979,6 +24015,9 @@
                          수량이 정해진 상품(빵처럼 종류별로 몇 개씩만 되는 것)을 다루려면 필요하다.
                          칸 이름을 머리글로 달아 어느 칸이 무엇인지 보이게 한다. -->
                     ${/* [신규 2026-10-15] 항목 정렬 (사장님 요청) — 체크해 두면 저장할 때도 그 순서로 맞춘다 */''}
+                    ${/* [신규 2026-11-10] 묶음마다 '공구가=상시가' (사장님 요청) — 체크하면 이 묶음 항목 전부 상시가 = 공구가, 풀면 상시가를 비운다 */''}
+                    ${(() => { if (g.sameOnsite === undefined) { const its = (g.items || []).filter(it => it && String(it.name || '').trim()); g.sameOnsite = its.length > 0 && its.every(it => Number(it.priceOnsite) > 0 && Number(it.priceOnsite) === (Number(it.priceGb) > 0 ? Number(it.priceGb) : (parseInt(it.price) || 0))); } return ''; })()}
+                    <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; margin: 0 0 8px; font-size: 12px; font-weight: 800; color: #15803d;"><input type="checkbox" ${g.sameOnsite ? 'checked' : ''} onchange="setDetailOptionSame(${gi}, this.checked)" style="position: static; opacity: 1; width: 16px; height: 16px; margin: 0; cursor: pointer;">공구가=상시가 (이 옵션 항목 전부)</label>
                     <div style="display: flex; gap: 14px; align-items: center; font-size: 12px; font-weight: 800; color: var(--text-sub); margin-bottom: 8px;">
                         <span>정렬</span>
                         <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer; margin: 0;"><input type="checkbox" ${g.sortBy === 'price' ? 'checked' : ''} onchange="setDetailOptionSort(${gi}, 'price', this.checked)" style="position: static; opacity: 1; display: inline-block; appearance: auto; -webkit-appearance: checkbox; pointer-events: auto; width: 16px; height: 16px; margin: 0; accent-color: #7c3aed;">금액순 (싼 것부터)</label>
@@ -24002,8 +24041,8 @@
                         <input type="number" data-opt-role="item-price" data-gi="${gi}" data-ii="${ii}" value="${Number(it.priceGb) > 0 ? Number(it.priceGb) : (parseInt(it.price) || 0)}" min="0" title="공구가"
                             style="flex: 0 0 84px; width: 84px; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
                         ${/* [신규 2026-11-10] 옵션 항목 상시가 (사장님 요청) — 상시판매로 옮겨지면 이 값이 손님 가격. 비우면 공구가 그대로 */''}
-                        <input type="number" data-opt-role="item-onsite" data-gi="${gi}" data-ii="${ii}" value="${Number(it.priceOnsite) > 0 ? Number(it.priceOnsite) : ''}" min="0" placeholder="상시가" title="상시가 — 상시판매일 때 손님 가격 (비우면 공구가)"
-                            style="flex: 0 0 84px; width: 84px; padding: 9px 11px; border: 1.5px solid #bbf7d0; background: #f0fdf4; border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
+                        <input type="number" data-opt-role="item-onsite" data-gi="${gi}" data-ii="${ii}" value="${g.sameOnsite ? (Number(it.priceGb) > 0 ? Number(it.priceGb) : (parseInt(it.price) || '')) : (Number(it.priceOnsite) > 0 ? Number(it.priceOnsite) : '')}" min="0" placeholder="상시가" title="상시가 — 상시판매일 때 손님 가격"${g.sameOnsite ? ' readonly' : ''}
+                            style="flex: 0 0 84px; width: 84px; padding: 9px 11px; border: 1.5px solid #bbf7d0; background: ${g.sameOnsite ? '#dcfce7' : '#f0fdf4'}; color: ${g.sameOnsite ? '#15803d' : 'inherit'}; border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
                         <input type="number" data-opt-role="item-stock" data-gi="${gi}" data-ii="${ii}" value="${stockVal}" min="0" placeholder="제한없음" title="비워 두면 수량 제한 없음. 0을 적으면 품절로 표시됩니다."
                             style="flex: 0 0 72px; width: 72px; padding: 9px 8px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
                         <button type="button" onclick="removeDetailOptionItem(${gi}, ${ii})" title="이 항목 삭제"
@@ -30067,13 +30106,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             //  발주하러 갈 때 같은 종류끼리 모여 있어야 챙기기 쉽다. (묶음 안 순서는 위 정렬 버튼 그대로)
             const UPCAT_ORDER = [
                 ['fruit', '🍎 과일', '#dc2626', '#fef2f2'],
+                ['veg', '🥬 야채', '#15803d', '#f0fdf4'],   // [신규 2026-11-10] 과일과 따로 (사장님 요청)
                 ['group', '🗓️ 공동구매', '#2563eb', '#eff6ff'],
                 ['sada', '🛵 사다드림', '#0891b2', '#ecfeff'],
                 ['other', '🏪 상시판매', '#c2410c', '#fff7ed']
             ];
             // [수정] 주문에 적힌 분류(ocat)를 넘긴다. 예전에는 상품의 category(상품엔 이 칸이 없다)를 넘겨
             //  사실상 늘 빈 값이었고, 상품을 못 찾으면 날짜 공구도 '상시판매'로 떨어졌다.
-            const catOf = (r) => salesProductCategory(r.prod, r.name, r.ocat || '');
+            // [수정 2026-11-10] 주문은 과일·야채를 함께 'fruit'로 적는다 — 상품 종류(없으면 이름의 야채·채소)로 야채를 가른다
+            const catOf = (r) => {
+                const c = salesProductCategory(r.prod, r.name, r.ocat || '');
+                if (c !== 'fruit') return c;
+                const veg = r.prod ? gListKind(r.prod) === 'veg' : /야채|채소/.test(String(r.name || ''));
+                return veg ? 'veg' : 'fruit';
+            };
             const grouped = new Map(UPCAT_ORDER.map(([k]) => [k, []]));
             filteredRows.forEach(r => {
                 const c = catOf(r);
@@ -37206,13 +37252,27 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 return;
             }
             // [신규 2026-10-21] 상시가는 꼭 적어야 저장된다 (사장님 요청 — 상시판매로 넘어갈 때·가격표에 쓴다)
+            /* [수정 2026-11-10] 상시가가 비어 있으면 막지 않고 '공구가와 같나요?' 묻는다 — 같다면 공구가를 넣고 그대로 저장 (사장님 요청).
+               옵션 항목 상시가도 같이 본다. 과일·야채·사다드림은 상시판매로 안 넘어가서 묻지 않는다 (사장님 선택) */
             {
                 const _onEl = document.getElementById('productPriceOnsite');
-                const _isFruitForm = (uploadCurrentTab === 'reserve' && uploadKind === 'fruit');   // [신규 2026-10-23] 과일은 상시가 없어도 저장 (사장님 요청)
-                if (_onEl && !_isFruitForm && String(_onEl.value).trim() === '') {   // [수정 2026-10-21] 0원도 적은 것으로 (사장님 요청) — 비어 있을 때만 막는다
-                    showToast("상시가를 적어 주세요.");
-                    try { _onEl.focus(); _onEl.style.borderColor = '#dc2626'; setTimeout(() => { _onEl.style.borderColor = ''; }, 2500); } catch (e) { }
-                    return;
+                const _skipOnsite = uploadCurrentTab === 'reserve' && (['fruit', 'veg', 'sada'].includes(uploadKind) || !!(document.getElementById('productIsSada') || {}).checked);
+                const _pEmpty = !!_onEl && String(_onEl.value).trim() === '';   // [수정 2026-10-21] 0원도 적은 것으로 — 비어 있을 때만
+                const _optUse = !!uploadUseChoiceOptions && Array.isArray(uploadProductOptions);
+                const _optMiss = _optUse ? uploadProductOptions.reduce((n, g) => n + ((g && g.items) || []).filter(it => it && String(it.name || '').trim() && !(Number(it.priceOnsite) > 0)).length, 0) : 0;
+                if (!_skipOnsite && (_pEmpty || _optMiss)) {
+                    const where = [_pEmpty ? '상품' : '', _optMiss ? `옵션 ${_optMiss}개` : ''].filter(Boolean).join(' · ');
+                    const ans = await psChoose(`상시가가 비어 있어요 (${where}).\n\n공구가와 같나요?\n같으면 공구가를 상시가로 넣고 저장해요.`,
+                        [{ label: '직접 적을게요', value: 'write' }, { label: '같아요 · 저장', value: 'same', main: true }]);
+                    if (ans !== 'same') {
+                        if (_pEmpty && _onEl) { try { _onEl.focus(); _onEl.style.borderColor = '#dc2626'; setTimeout(() => { _onEl.style.borderColor = ''; }, 2500); } catch (e) { } }
+                        else if (_optMiss) { try { openDetailOptionSetting(); } catch (e) { } }
+                        return;
+                    }
+                    if (_pEmpty && _onEl) { _onEl.value = String((document.getElementById('productPrice') || {}).value || '').trim(); gPriceSameSet(true); }
+                    if (_optMiss) uploadProductOptions.forEach(g => ((g && g.items) || []).forEach(it => {
+                        if (it && !(Number(it.priceOnsite) > 0)) { const gb = Number(it.priceGb) > 0 ? Number(it.priceGb) : (parseInt(it.price) || 0); if (gb > 0) { it.priceOnsite = gb; it.priceGb = gb; } }
+                    }));
                 }
             }
 
@@ -38609,6 +38669,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
               const _o = document.getElementById('productPriceOnsite'), _s = document.getElementById('productPriceStore');
               if (_o) _o.value = Number(prod.priceOnsite) > 0 ? prod.priceOnsite : (prod.priceOnsite === 0 || prod.priceOnsite === '0' ? '0' : (_on ? (prod.price || '') : ''));   // [수정 2026-10-21] 0원으로 저장한 것은 0
               if (_s) _s.value = Number(prod.listPrice) > 0 ? prod.listPrice : '';
+              { const _pv = String((document.getElementById('productPrice') || {}).value || '').trim(); gPriceSameSet(!!_o && _pv !== '' && String(_o.value).trim() === _pv); }   // [신규 2026-11-10] 공구가·상시가가 같으면 '같음' 체크된 채로 연다
               setTimeout(gPriceReqSync, 0); }
             /* [용량절감] 상품 설명은 product_desc 서랍으로 옮기는 중이다.
                상품 목록에 아직 남아 있으면 그것을 쓰고, 없으면 서랍에서 받아 채운다.
