@@ -4545,7 +4545,7 @@
                 function srcManualItems(rs) {
                     try { const r = typeof rs === 'string' ? JSON.parse(rs) : rs; if (!r || r[0] !== 'manual') return []; const p = srcRefGet(r); if (!p) return [];
                         // [수정 2026-11-10] '2+1'·'1+1'처럼 숫자 사이 + 는 나누지 않는다 (사장님 지적 — 광천 돌자반 볶음 35g 2+1 이 두 상품으로 나뉨)
-                        const a = String(p.disp || p.name || '').replace(/(\d)\s*\+\s*(?=\d)/g, '$1\u0001').split(/\s*[,，/+·]\s*/).map(s => s.replace(/\u0001/g, '+').trim()).filter(Boolean); return a.length > 1 ? a : []; } catch (e) { return []; }
+                        const a = String(p.disp || p.name || '').replace(/\d(?:\s*\+)+/g, m => m.replace(/\+/g, '\u0001')).split(/\s*[,，/+·]\s*/).map(s => s.replace(/\u0001/g, '+').trim()).filter(Boolean); return a.length > 1 ? a : []; } catch (e) { return []; }
                 }
                 function srcItemMatch(a, b) { a = srcNormName(a); b = srcNormName(b); return !!(a && b && (a.includes(b) || b.includes(a))); }
                 function srcItemRegIdx(rs, item) {
@@ -25489,6 +25489,16 @@
             { const d = document.getElementById('rva-tab-del'); if (d) d.classList.toggle('active', t === 'del'); }
             renderReviewsAdmin(false);
         }
+        // [신규 2026-11-10] 후기 찾기 — 상품 이름·후기 글·답글·손님에 찾는 말이 든 카드만 보이고, 개수·평균도 그 카드로 다시 센다
+        function rvaRvFilter() {
+            const q = String(_rva.rvQ || '').trim().toLowerCase();
+            const cards = [...document.querySelectorAll('.rva-rv-card')];
+            let n = 0, sum = 0;
+            cards.forEach(c => { const hit = !q || String(c.dataset.rvs || '').includes(q); c.style.display = hit ? '' : 'none'; if (hit) { n++; sum += Number(c.dataset.st) || 0; } });
+            const cnt = document.getElementById('rva-rv-cnt');
+            if (cnt) cnt.innerHTML = `후기 ${n.toLocaleString()}개${q ? ` <span style="color:#2563eb;">(‘${gEscapeHtml(q)}’ 찾음)</span>` : ''} · 평균 <span style="color:#f5b301;">★ ${n ? (sum / n).toFixed(1) : '-'}</span>`;
+            const none = document.getElementById('rva-rv-none'); if (none) none.style.display = (cards.length && !n) ? '' : 'none';
+        }
         async function renderReviewsAdmin(reload) {
             const box = document.getElementById('rva-body');
             if (!box) return;
@@ -25545,12 +25555,15 @@
                 const bar = `<div class="card" style="padding:10px 12px; margin-bottom:10px;">
                         <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">${pc('all', '전체')}${pc('today', '오늘')}${pc('7', '7일')}${pc('30', '30일')}${pc('month', '이번 달')}${pc('last', '지난 달')}${pc('pick', '📅 날짜 고르기')}</div>
                         ${P === 'pick' ? `<div style="display:flex; gap:6px; align-items:center; margin-top:8px; flex-wrap:wrap;"><input type="date" value="${E(_rva.rvFrom || '')}" max="${today}" onchange="_rva.rvFrom=this.value; renderReviewsAdmin(false);" class="form-control" style="flex:1 1 130px; height:36px;"><span style="font-weight:800; color:#64748b;">~</span><input type="date" value="${E(_rva.rvTo || '')}" max="${today}" onchange="_rva.rvTo=this.value; renderReviewsAdmin(false);" class="form-control" style="flex:1 1 130px; height:36px;"></div>` : ''}
-                        <div style="margin-top:7px; font-size:12px; font-weight:800; color:#64748b;">후기 ${shown.length.toLocaleString()}개 · 평균 <span style="color:#f5b301;">★ ${avg}</span></div>
+                        ${/* [신규 2026-11-10] 상품 이름·후기 글로 찾기 (사장님 요청) — 글자마다 다시 그리지 않고 카드만 숨겨 한글 입력이 안 깨지게 */''}
+                        <input type="search" id="rva-rv-q" placeholder="🔍 상품 이름·후기 글·손님으로 찾기" value="${E(_rva.rvQ || '')}" oninput="_rva.rvQ=this.value; rvaRvFilter()" style="width:100%; box-sizing:border-box; height:38px; margin-top:8px; border:1.5px solid #cbd5e1; border-radius:9px; padding:0 10px; font-size:13px;">
+                        <div id="rva-rv-cnt" style="margin-top:7px; font-size:12px; font-weight:800; color:#64748b;">후기 ${shown.length.toLocaleString()}개 · 평균 <span style="color:#f5b301;">★ ${avg}</span></div>
                     </div>`;
                 if (!shown.length) { box.innerHTML = bar + `<div class="card" style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">이 기간에 받은 후기가 없습니다.</div>`; return; }
                 box.innerHTML = bar + shown.map(x => {
                     const isNew = (x.at || 0) > seen;
-                    return `<div class="card" style="background:#fff; border-radius:14px; padding:13px 15px; margin-bottom:10px; border:1px solid var(--border); ${x.hidden ? 'opacity:.55;' : ''}">
+                    const _srch = [x.item, x.text, x.reply, x._code, x.name, x._ph ? rvName[x._ph] : '', x._ph].map(s => String(s || '')).join(' ').toLowerCase();
+                    return `<div class="card rva-rv-card" data-rvs="${E(_srch)}" data-st="${Number(x.stars) || 0}" style="background:#fff; border-radius:14px; padding:13px 15px; margin-bottom:10px; border:1px solid var(--border); ${x.hidden ? 'opacity:.55;' : ''}">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
                             <div style="min-width:0;">
                                 <div style="font-size:14px; font-weight:900; color:#0f172a; word-break:keep-all;">${isNew ? '<span style="color:#dc2626; font-size:11px; font-weight:900; letter-spacing:.3px; margin-right:5px;">신규</span>' : ''}<span style="color:#f5b301;">★ ${Number(x.stars) || 0}</span> ${E(x.item || x._code)}</div>
@@ -25566,7 +25579,8 @@
                         ${x.text ? `<div style="margin-top:7px; font-size:13.5px; font-weight:600; color:#334155; line-height:1.55; white-space:pre-wrap; word-break:keep-all;">${E(x.text)}</div>` : ''}
                         ${x.reply ? `<div style="margin-top:7px; background:#f1f5f9; border-radius:8px; padding:7px 10px; font-size:12.5px; color:#475569;"><b style="color:#16a34a;">모켓</b> ${E(x.reply)}</div>` : ''}
                     </div>`;
-                }).join('');
+                }).join('') + '<div id="rva-rv-none" class="card" style="display:none; padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">찾는 후기가 없어요.</div>';
+                rvaRvFilter();   // [신규 2026-11-10] 적어 둔 찾는 말이 있으면 바로 거른다
                 return;
             }
             // ── 손님 포인트
