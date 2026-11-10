@@ -5270,6 +5270,8 @@
                     };
                     setTimeout(() => document.addEventListener('pointerdown', srcMenuOutside, true), 0);
                 }
+                // [신규 2026-11-10] 끝나면 상시판매로 갈 분류탭 처음 값 — 예전 상시판매 분류탭 (없으면 '')
+                function srcOnsTab0(idx) { try { return (idx >= 0 && typeof psPrevOnsiteTab === 'function') ? psPrevOnsiteTab(uploadProducts[idx]) : ''; } catch (e) { return ''; } }
                 // 노출일정에 일정 추가 창
                 async function srcSchedDialog(refs) {
                     srcMenuClose();
@@ -5307,8 +5309,13 @@
                         fld('픽업/배달일', '<input type="date" id="src-sch-pick" value="' + pick0 + '"' + (linked0 ? ' disabled style="background:#f1f5f9;color:#64748b;"' : '') + '>' +
                             '<label title="켜 두면 마감 날짜를 바꿀 때 픽업/배달일도 같이 바뀌어요" style="flex:0 0 auto;display:flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;color:#475569;white-space:nowrap;cursor:pointer;">' +
                             '<input type="checkbox" id="src-sch-link"' + (linked0 ? ' checked' : '') + ' style="width:16px !important;height:16px !important;position:static !important;opacity:1 !important;margin:0 !important;"> 마감일과 같게</label>') +
-                        '<div class="sec">' + rows.map((x, i) => '<div class="sl">' + (x.idx === null ? '' : x.idx >= 0 ? '<b class="src-rg o">O</b>' : '<b class="src-rg x">X</b>') + '<span class="n">' + srcEsc(x.pname || x.p.name) + '</span>' +
-                            (x.idx === null || x.idx < 0 ? '<button type="button" data-link="' + i + '">연결</button><button type="button" data-reg="' + i + '">상품 등록</button>' : '') + '</div>').join('') + '</div>' +
+                        '<div class="sec">' + (many && rows.some(x => x.idx >= 0) ? '<div style="display:flex;justify-content:flex-end;"><button type="button" data-onsall="1" style="height:28px;padding:0 10px;border-radius:7px;border:1.5px solid #c2410c;background:#fff;color:#c2410c;font-size:11.5px;font-weight:800;cursor:pointer;">🏪 전부 끝나면 상시</button></div>' : '') +
+                        rows.map((x, i) => '<div class="sl" style="flex-wrap:wrap;">' + (x.idx === null ? '' : x.idx >= 0 ? '<b class="src-rg o">O</b>' : '<b class="src-rg x">X</b>') + '<span class="n">' + srcEsc(x.pname || x.p.name) + '</span>' +
+                            (x.idx === null || x.idx < 0 ? '<button type="button" data-link="' + i + '">연결</button><button type="button" data-reg="' + i + '">상품 등록</button>'
+                                // [신규 2026-11-10] 일정이 끝나면(픽업일 지난 자정) 남은 재고로 상시판매 전환 — 노출일정 카드의 '상시판매 전환'과 같다 (사장님 요청)
+                                : '<button type="button" data-ons="' + i + '" title="픽업일이 지난 자정부터, 재고가 남았으면 상시판매로 돌려 계속 팔아요">🏪 끝나면 상시</button>' +
+                                  '<select data-ontab="' + i + '" style="display:none;flex:1 1 100%;height:30px;border:1.5px solid #fdba74;border-radius:7px;font-size:12px;font-weight:700;">' +
+                                  (srcOnsTab0(x.idx) ? '' : '<option value="">상시판매 분류탭 고르기</option>') + ONSITE_CATS.map(c => '<option value="' + c.key + '"' + (srcOnsTab0(x.idx) === c.key ? ' selected' : '') + '>' + srcEsc(c.label) + '</option>').join('') + '</select>') + '</div>').join('') + '</div>' +
                         (miss.length ? '<div style="font-size:12px;font-weight:800;color:#dc2626;">' + (miss.some(x => x.idx === null) ? '상품 목록을 아직 못 받았어요 — 잠시 뒤 다시 열어 주세요' : '상품 등록이 안 된 것이 ' + miss.length + '개 있어요 — 모두 등록해야 일정을 걸 수 있어요') + '</div>' : '') +
                         '<div class="row"><button type="button" data-act="close">닫기</button><button type="button" class="ok" data-act="go"' + (miss.length ? ' disabled style="opacity:.4;cursor:default"' : '') + '>일정 추가</button></div></div>';
                     document.body.appendChild(box);
@@ -5317,10 +5324,20 @@
                       // [수정 2026-11-06] 체크를 풀면 픽업/배달일을 일정(달력 이름표) 날짜로 되돌린다 (사장님 요청 — 상품등록 창과 같게)
                       const sync = () => { pk.disabled = lk.checked; pk.style.background = lk.checked ? '#f1f5f9' : ''; pk.style.color = lk.checked ? '#64748b' : ''; pk.value = lk.checked ? ex.value : day0; };
                       lk.onchange = sync; ex.onchange = () => { if (lk.checked) pk.value = ex.value; }; }
+                    // [신규 2026-11-10] 끝나면 상시판매 — 줄마다 켜고 끄기, 켜면 분류탭 고르는 칸이 보인다
+                    const onsOn = rows.map(() => false);
+                    const paintOns = i => {
+                        const b = box.querySelector('[data-ons="' + i + '"]'), s = box.querySelector('[data-ontab="' + i + '"]'); if (!b) return;
+                        b.style.background = onsOn[i] ? '#c2410c' : '#fff'; b.style.color = onsOn[i] ? '#fff' : '#c2410c'; b.style.borderColor = '#c2410c';
+                        if (s) s.style.display = onsOn[i] ? '' : 'none';
+                    };
+                    rows.forEach((x, i) => paintOns(i));
                     box.onclick = async e => {
                         if (e.target === box) return box.remove();
                         const b = e.target.closest('button'); if (!b || b.disabled) return;
                         if (b.dataset.act === 'close') return box.remove();
+                        if (b.dataset.ons != null) { const i = +b.dataset.ons; onsOn[i] = !onsOn[i]; paintOns(i); return; }
+                        if (b.dataset.onsall != null) { const all = rows.every((x, i) => !(x.idx >= 0) || onsOn[i]); rows.forEach((x, i) => { if (x.idx >= 0) { onsOn[i] = !all; paintOns(i); } }); return; }
                         if (b.dataset.link != null) {
                             const x = rows[+b.dataset.link]; box.remove();
                             return srcLinkDialog({ name: x.p.name, vendor: srcVendorOf(x.r, x.p) }, () => srcSchedDialog(refs), x.rs);
@@ -5342,15 +5359,19 @@
                         if (exp <= rel) { showToast('마감은 노출보다 뒤여야 해요'); return; }
                         const label = many ? String((document.getElementById('src-sch-name') || {}).value || '').trim() : '';
                         if (many && !label) { showToast('일정 이름을 적어 주세요'); return; }
+                        const onsTab = i => String((box.querySelector('[data-ontab="' + i + '"]') || {}).value || '');
+                        { const k = rows.findIndex((x, i) => onsOn[i] && !onsTab(i)); if (k >= 0) { showToast('🏪 상시판매 분류탭을 골라 주세요'); const s = box.querySelector('[data-ontab="' + k + '"]'); if (s) s.focus(); return; } }
                         b.disabled = true;
                         try {
                             if (typeof psSchedLoaded !== 'undefined' && !psSchedLoaded) await psLoadSchedules();
                             const gid = many ? psNewGroupId() : null;   // 묶음은 노출·마감·픽업이 모두 같다
                             if (typeof psUndoMark === 'function') psUndoMark('소싱 — 일정 추가');
                             let ok = 0;
-                            for (const x of rows) {
+                            for (const [i, x] of rows.entries()) {
                                 const it = await psItemAdd(x.idx, { releaseAt: rel, expireAt: exp, pickup: pkv, group: gid, groupLabel: label || null });
                                 if (it) ok++;
+                                // [신규 2026-11-10] 끝나면 상시판매 전환 — 고른 분류탭이 예전 상시판매 탭과 같으면 비워 둔다 (노출일정 카드와 같게)
+                                if (it && onsOn[i]) { const t = onsTab(i); await psItemSave(it.key, { toOnsite: true, toOnsiteDone: null, toOnsiteTab: (t && t !== psPrevOnsiteTab(uploadProducts[x.idx])) ? t : null }, true); }
                             }
                             box.remove();
                             showToast(ok === rows.length ? '📅 노출일정에 ' + ok + '개 ' + (many ? '"' + label + '" 묶음으로 ' : '') + '걸었어요' : '📅 ' + ok + '/' + rows.length + '개만 걸었어요 — 나머지는 겹치거나 걸 수 없는 상품이에요');
