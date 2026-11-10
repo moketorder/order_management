@@ -8452,6 +8452,8 @@
         /* 발주 관리 분류 카테고리 색상 (비활성=컬러 테두리 / 활성=컬러 채움) */
         .up-cat-fruit { border-color:#fca5a5; color:#dc2626; }
         .up-cat-fruit.active { background:#ef4444; border-color:#ef4444; color:#fff; }
+        .up-cat-veg { border-color:#86efac; color:#15803d; }   /* [신규 2026-11-10] 주문 집계 야채 단추 */
+        .up-cat-veg.active { background:#16a34a; border-color:#16a34a; color:#fff; }
         .up-cat-group { border-color:#93c5fd; color:#2563eb; }
         .up-cat-group.active { background:#3b82f6; border-color:#3b82f6; color:#fff; }
         .up-cat-sada  { border-color:#6ee7b7; color:#059669; }
@@ -8899,7 +8901,8 @@
                     </div>
                     <div id="sales-upcat-tabs" style="display:flex; gap:4px; flex-wrap:nowrap; align-items:center; margin-bottom:9px;">
                         <button type="button" data-sales-upcat="fruit" onclick="setSalesUpcomingCat('fruit')" class="sales-toggle-btn up-cat-fruit" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">과일</button>
-                        <!-- [수정] 과일 · 공동구매 · 사다드림 · 상시판매 순으로 정렬 -->
+                        <!-- [수정 2026-11-10] 과일 · 야채 · 공동구매 · 사다드림 · 상시판매 순 (사장님 요청 — 야채 단추 더함) -->
+                        <button type="button" data-sales-upcat="veg" onclick="setSalesUpcomingCat('veg')" class="sales-toggle-btn up-cat-veg" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">야채</button>
                         <button type="button" data-sales-upcat="group" onclick="setSalesUpcomingCat('group')" class="sales-toggle-btn up-cat-group" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">공동구매</button>
                         <button type="button" data-sales-upcat="sada" onclick="setSalesUpcomingCat('sada')" class="sales-toggle-btn up-cat-sada" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">사다드림</button>
                         <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn up-cat-other" style="flex:1 1 0; min-width:0; padding-left:3px; padding-right:3px; font-size:12px; white-space:nowrap;">상시판매</button>
@@ -28786,6 +28789,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (/^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(mk)) return 'group'; // 공동구매: matchKey가 날짜
             return 'other';
         }
+        /* [신규 2026-11-10] 주문 집계 묶음: salesProductCategory 의 'fruit'를 과일·야채로 가른다 (사장님 요청 — 야채 단추).
+           주문은 과일·야채를 함께 'fruit'로 적으므로 상품 종류(gListKind, 없으면 이름의 야채·채소)로 야채를 가린다 */
+        function salesUpcatOf(prod, name, ocat){
+            const c = salesProductCategory(prod, name, ocat);
+            if (c !== 'fruit') return c;
+            const veg = prod ? gListKind(prod) === 'veg' : /야채|채소/.test(String(name || ''));
+            return veg ? 'veg' : 'fruit';
+        }
         let salesUpcomingSort = { key: 'qty', dir: 'desc' };   // 발주 관리 정렬(기본: 주문수량 많은 순)
         let salesRankSort = { key: 'amount', dir: 'desc' };     // 판매 순위 정렬(기본: 판매액 많은 순)
         // [이동] 아래 상태들은 함수보다 먼저 선언되어야 초기 렌더 시 TDZ 에러가 안 남
@@ -29896,7 +29907,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     if (_inScope) todayAfterMap.set(key, (todayAfterMap.get(key) || 0) + (parseInt(o.qty || 0) || 0));
                 }
                 // 카드 집계: 카테고리 + 날짜범위 필터
-                if (salesUpcomingCats.size > 0 && !salesUpcomingCats.has(salesProductCategory(prod, o.item, o.category))) return; // 카테고리 필터(비어있으면 전체)
+                if (salesUpcomingCats.size > 0 && !salesUpcomingCats.has(salesUpcatOf(prod, o.item, o.category))) return; // 카테고리 필터(비어있으면 전체) — [수정 2026-11-10] 야채를 과일과 따로
                 const info = getOrderDateInfo(o);
                 if (!info.dateStr || info.dateStr === '기타') return;
                 const p = info.dateStr.split('-');
@@ -30120,12 +30131,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // [수정] 주문에 적힌 분류(ocat)를 넘긴다. 예전에는 상품의 category(상품엔 이 칸이 없다)를 넘겨
             //  사실상 늘 빈 값이었고, 상품을 못 찾으면 날짜 공구도 '상시판매'로 떨어졌다.
             // [수정 2026-11-10] 주문은 과일·야채를 함께 'fruit'로 적는다 — 상품 종류(없으면 이름의 야채·채소)로 야채를 가른다
-            const catOf = (r) => {
-                const c = salesProductCategory(r.prod, r.name, r.ocat || '');
-                if (c !== 'fruit') return c;
-                const veg = r.prod ? gListKind(r.prod) === 'veg' : /야채|채소/.test(String(r.name || ''));
-                return veg ? 'veg' : 'fruit';
-            };
+            const catOf = (r) => salesUpcatOf(r.prod, r.name, r.ocat || '');   // [수정 2026-11-10] 위 분류 단추와 같은 잣대
             const grouped = new Map(UPCAT_ORDER.map(([k]) => [k, []]));
             filteredRows.forEach(r => {
                 const c = catOf(r);
@@ -30135,10 +30141,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const rows = grouped.get(k);
                 const q = rows.reduce((a, r) => a + r.qty, 0);
                 const amt = rows.reduce((a, r) => a + r.amount, 0);
-                return `<div style="display:flex; align-items:center; gap:6px; margin:10px 0 6px;">
-                        <span style="font-size:11.5px; font-weight:900; color:${color}; background:${bg}; padding:3px 9px; border-radius:6px;">${label}</span>
-                        <span style="font-size:11px; font-weight:700; color:var(--text-sub);">${rows.length}종 · ${q}개 · ${amt.toLocaleString()}원</span>
-                    </div>` + rows.map(cardHTML).join('');
+                /* [수정 2026-11-10] 종류마다 바탕색 상자로 감싸고 맨 위에 굵은 제목 띠 (사장님 요청 — 작은 꼬리표만으로는 구분이 잘 안 됐다) */
+                return `<div style="margin:12px 0; background:${bg}; border:2px solid ${color}; border-radius:12px; padding:0 6px 6px; overflow:hidden;">
+                        <div style="display:flex; align-items:center; gap:8px; margin:0 -6px 8px; padding:9px 12px; background:${color}; color:#fff;">
+                            <span style="font-size:15px; font-weight:900; white-space:nowrap;">${label}</span>
+                            <span style="flex:1 1 auto; text-align:right; font-size:12px; font-weight:800; opacity:.95; white-space:nowrap;">${rows.length}종 · ${q}개 · ${amt.toLocaleString()}원</span>
+                        </div>` + rows.map(cardHTML).join('') + `</div>`;
             }).join('');
             if (sumBox) sumBox.innerHTML =
                 salesStatChip('상품 종류', filteredRows.length + '종') +
