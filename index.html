@@ -2717,6 +2717,11 @@
         }
         /* [신규 2026-10-13] 과세·공구가·상시가·정상가·재고·상세옵션 한 줄 — 폰에선 칸이 좁아 여백·글자를 줄인다 (숫자가 잘리지 않게) */
         @media (max-width: 600px) {
+            /* [신규 2026-11-10] 후기 포인트 넣기 — 폰에서 메모는 윗줄, 포인트 칸·사용·넣기는 한 줄 (사장님 요청) */
+            .pta-row { flex-wrap: wrap !important; }
+            .pta-row > #pta-memo { order: -1; flex: 1 1 100% !important; }
+            .pta-row > #pta-amt { flex: 1 1 0 !important; min-width: 0 !important; width: auto !important; }
+            .pta-row > button { flex: 0 0 auto !important; }
             .price-row6 { gap: 3px !important; }
             .price-row6 input.form-control { padding: 0 3px !important; font-size: 12.5px !important; text-align: center; -moz-appearance: textfield; }
             .price-row6 input.form-control::-webkit-outer-spin-button, .price-row6 input.form-control::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -8514,6 +8519,7 @@
             .opt-item-head { display: none !important; }
             .opt-item-row > .opt-item-name { flex: 1 1 100% !important; }
             .opt-item-row > input[data-opt-role="item-price"] { flex: 1 1 0 !important; width: auto !important; min-width: 0 !important; }
+            .opt-item-row > input[data-opt-role="item-onsite"] { flex: 1 1 0 !important; width: auto !important; min-width: 0 !important; }   /* [신규 2026-11-10] 옵션 상시가 */
             .opt-item-row > input[data-opt-role="item-stock"] { flex: 1 1 0 !important; width: auto !important; min-width: 0 !important; }
             .opt-item-row { margin-bottom: 10px !important; }
         }
@@ -18615,6 +18621,7 @@
                     hide: false, showToday: true, showReserve: true, updatedAt: now
                 };
                 if (price > 0) f.price = price;
+                { const _o = gOptsPriced(p.options, true); if (_o) f.options = _o; }   // [신규 2026-11-10] 옵션 항목도 상시가로 (사장님 요청)
                 if (raw.toOnsiteShelf !== undefined && raw.toOnsiteShelf !== null) f.shelf = raw.toOnsiteShelf === '-' ? '' : String(raw.toOnsiteShelf);   // [신규 2026-10-12] 냉장고 분류(선반)
                 const patch = {};
                 Object.keys(f).forEach(k => { patch[`${idx}/${k}`] = f[k]; });
@@ -18984,10 +18991,24 @@
             return toISODate(pickup || '') || toISODate((sch && sch.pickup) || '') || fMsToDateKey(exp) || fMsToDateKey(rel) || '';
         }
         // 상품 줄에 적을 값 (patch 꼴: { 칸: 값 })
+        /* [신규 2026-11-10] 옵션 항목 가격 — 상시판매(onsite=true)면 상시가(priceOnsite, 없으면 공구가), 아니면 공구가(priceGb, 없으면 지금 가격).
+           상시가·공구가를 따로 적은 항목이 하나도 없으면 null (바꿀 것 없음) */
+        function gOptsPriced(opts, onsite) {
+            if (!Array.isArray(opts)) return null;
+            const has = opts.some(g => g && Array.isArray(g.items) && g.items.some(it => it && (Number(it.priceOnsite) > 0 || Number(it.priceGb) > 0)));
+            if (!has) return null;
+            return opts.map(g => (g && Array.isArray(g.items)) ? { ...g, items: g.items.map(it => {
+                if (!it) return it;
+                const gb = Number(it.priceGb) > 0 ? Number(it.priceGb) : (parseInt(it.price) || 0), on = Number(it.priceOnsite) || 0;
+                return { ...it, priceGb: gb, price: (onsite && on > 0) ? on : gb };
+            }) } : g);
+        }
         function psOnsiteToGroupFields(p, key) {
             const _gb = Number(p && p.priceGb) || 0;   // [신규 2026-10-13] 공구가를 따로 적어 뒀으면 공동구매는 그 가격으로
+            const _opts = gOptsPriced(p && p.options, false);   // [신규 2026-11-10] 옵션도 공구가로
             return {
                 ...(_gb > 0 && _gb !== Number(p.price) ? { price: _gb } : {}),
+                ...(_opts ? { options: _opts } : {}),
                 date: key, matchKey: key, kind: 'group', displayTab: null, nextDate: null,
                 onsiteTabPrev: String(p.displayTab || '') || null
             };
@@ -23517,6 +23538,9 @@
                     .map(it => {
                         const row = { name: String(it.name).trim(), price: parseInt(it.price) || 0 };
                         { const sub = String(it.sub || '').trim(); if (sub) row.sub = sub; }   // [신규 2026-10-05] 둘째 줄 (비우면 저장 안 함)
+                        // [신규 2026-11-10] 공구가·상시가 (사장님 요청 — 상시판매로 옮겨지면 상시가가 손님 가격). 상시가가 없으면 둘 다 안 남긴다
+                        if (Number(it.priceOnsite) > 0) { row.priceOnsite = Number(it.priceOnsite); row.priceGb = Number(it.priceGb) > 0 ? Number(it.priceGb) : row.price; row.price = row.priceGb; }
+                        else if (Number(it.priceGb) > 0) row.priceGb = Number(it.priceGb);
                         // [신규] 항목별 수량. 비워 두면 제한 없음이므로 아예 저장하지 않는다.
                         //  (0은 '품절'이라는 뜻이라 반드시 저장해야 한다)
                         const raw = String(it.stock === undefined || it.stock === null ? "" : it.stock).trim();
@@ -23635,6 +23659,10 @@
                     g.items[ii].sub = el.value;   // [신규 2026-10-05] 둘째 줄
                 } else if (el.dataset.optRole === 'item-price' && g.items[ii]) {
                     g.items[ii].price = parseInt(el.value) || 0;
+                    g.items[ii].priceGb = g.items[ii].price;   // [신규 2026-11-10] 이 칸은 공구가 — 상시판매면 저장할 때 상시가로 바꿔 넣는다 (gOptsPriced)
+                } else if (el.dataset.optRole === 'item-onsite' && g.items[ii]) {
+                    const v = parseInt(el.value) || 0;
+                    g.items[ii].priceOnsite = v > 0 ? v : null;
                 } else if (el.dataset.optRole === 'item-stock' && g.items[ii]) {
                     // 빈 칸은 '제한 없음'. 0(품절)과 구분해야 하므로 빈 문자열 그대로 둔다.
                     const raw = String(el.value).trim();
@@ -23958,7 +23986,8 @@
                     </div>
                     <div class="opt-item-head" style="display: flex; gap: 6px; align-items: center; font-size: 11px; font-weight: 800; color: var(--text-sub); margin-bottom: 6px;">
                         <span style="flex: 1 1 auto;">선택 항목</span>
-                        <span style="flex: 0 0 84px; text-align: right;">금액</span>
+                        <span style="flex: 0 0 84px; text-align: right;">공구가</span>
+                        <span style="flex: 0 0 84px; text-align: right; color: #15803d;">상시가</span>
                         <span style="flex: 0 0 72px; text-align: right;">수량</span>
                         <span style="flex: 0 0 34px;"></span>
                     </div>`;
@@ -23970,8 +23999,11 @@
                     <div class="opt-item-row" style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;">
                         <input class="opt-item-name" type="text" data-opt-role="item-name" data-gi="${gi}" data-ii="${ii}" value="${escapeAttrValue(it.name)}" placeholder="항목명 (예: 사과)"
                             style="flex: 1 1 auto; min-width: 0; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 600; outline: none;">
-                        <input type="number" data-opt-role="item-price" data-gi="${gi}" data-ii="${ii}" value="${parseInt(it.price) || 0}" min="0"
+                        <input type="number" data-opt-role="item-price" data-gi="${gi}" data-ii="${ii}" value="${Number(it.priceGb) > 0 ? Number(it.priceGb) : (parseInt(it.price) || 0)}" min="0" title="공구가"
                             style="flex: 0 0 84px; width: 84px; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
+                        ${/* [신규 2026-11-10] 옵션 항목 상시가 (사장님 요청) — 상시판매로 옮겨지면 이 값이 손님 가격. 비우면 공구가 그대로 */''}
+                        <input type="number" data-opt-role="item-onsite" data-gi="${gi}" data-ii="${ii}" value="${Number(it.priceOnsite) > 0 ? Number(it.priceOnsite) : ''}" min="0" placeholder="상시가" title="상시가 — 상시판매일 때 손님 가격 (비우면 공구가)"
+                            style="flex: 0 0 84px; width: 84px; padding: 9px 11px; border: 1.5px solid #bbf7d0; background: #f0fdf4; border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
                         <input type="number" data-opt-role="item-stock" data-gi="${gi}" data-ii="${ii}" value="${stockVal}" min="0" placeholder="제한없음" title="비워 두면 수량 제한 없음. 0을 적으면 품절로 표시됩니다."
                             style="flex: 0 0 72px; width: 72px; padding: 9px 8px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 700; outline: none; text-align: right;">
                         <button type="button" onclick="removeDetailOptionItem(${gi}, ${ii})" title="이 항목 삭제"
@@ -25444,7 +25476,7 @@
                         <button type="button" onclick="showCustomerCardModal('${encodeURIComponent(pick)}','${encodeURIComponent(nameOf[pick] || '')}')" style="margin-left:auto; border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; border-radius:8px; height:30px; padding:0 10px; font-weight:800; cursor:pointer;">👤 카드</button>
                         <button type="button" onclick="_rva.pick=''; renderReviewsAdmin(false);" style="border:none; background:#e2e8f0; border-radius:8px; height:30px; padding:0 10px; font-weight:800; cursor:pointer;">닫기</button>
                     </div>
-                    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+                    <div class="pta-row" style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
                         <input id="pta-amt" type="number" inputmode="numeric" class="form-control" placeholder="포인트" style="flex:1 1 100px; height:38px;">
                         <input id="pta-memo" class="form-control" placeholder="메모 (예: 이벤트 당첨, 매장 사용)" value="" style="flex:2 1 140px; height:38px;">
                         <button type="button" onclick="ptaAdjust(-1)" style="height:38px; padding:0 12px; border:none; border-radius:8px; background:#dc2626; color:#fff; font-weight:800; cursor:pointer;">사용</button>
@@ -37416,7 +37448,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     useAmountLimit: uploadUseAmountLimit,
                     minAmount: uploadMinAmount,
                     maxAmount: uploadMaxAmount,
-                    options: uploadProductOptions,
+                    options: gOptsPriced(uploadProductOptions, uploadCurrentTab === 'onsite') || uploadProductOptions,   // [신규 2026-11-10] 상시판매면 옵션도 상시가
                     useAgencyFee: uploadUseAgencyFee,
                     /* [용량절감] 대행료는 규칙(agencyFeeRule) 네 숫자가 기준이다.
                        구간표(agencyFeeTiers)는 그 규칙에서 그대로 만들어지는 값이라 저장하지 않는다.
