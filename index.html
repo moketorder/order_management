@@ -28979,8 +28979,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     const _code = String(r.productCode || '').trim();
                     const isF = _code ? /^F/i.test(_code) : r.category === 'fruit';
                     new Set([evDig(k), evDig(r.phone), evDig(r.kakaoPhone)].filter(Boolean)).forEach(p => {
-                        const s = st[p] = st[p] || { any: 0, fruit: 0, last: 0, times: [] };
-                        s.any++; if (isF) s.fruit++;
+                        const s = st[p] = st[p] || { any: 0, fruit: 0, last: 0, times: [], _ts: new Set() };
+                        if (isF) s.fruit++;
+                        /* [수정 2026-11-10] 주문 횟수는 상품 줄 수가 아니라 주문 한 번(같은 주문 시각)으로 센다 (사장님 — 주문 횟수가 상품 개수로 나왔다).
+                           손님 목록 주문 차례(customerOrderSequences)와 같은 잣대 */
+                        const _ts = String(r.timestamp || '');
+                        if (_ts && s._ts.has(_ts)) return;
+                        if (_ts) s._ts.add(_ts);
+                        s.any++;
                         const _t = (parseTimestampToDate(r.timestamp) || { getTime: () => 0 }).getTime();   // [신규 2026-11-05] 마지막 주문·쿠폰 받은 뒤 주문
                         if (_t) { if (_t > s.last) s.last = _t; s.times.push(_t); }
                     });
