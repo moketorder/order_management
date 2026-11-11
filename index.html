@@ -33397,6 +33397,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             buildManageCategoryTabs();
             buildSubTabs();
             renderProductsList();
+            gCenterManageTab();   // [신규 2026-11-12]
         }
 
         // [신규] 공동구매 탭을 열었을 때 기본으로 고를 날짜.
@@ -33405,6 +33406,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function gDefaultReserveTab() {
             try {
                 const n = new Date();
+                // [신규 2026-11-12] 0시~15시(과일 마감 전)는 과일 칸부터 (사장님 요청) — 과일 칸이 있을 때만
+                if (n.getHours() < 15 && (uploadProducts || []).some(p => isLegacyTodayListProduct(p) && gListKind(p) === 'fruit')) return '_과일';
                 const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
                 const hasToday = (uploadProducts || []).some(p =>
                     isReserveListProduct(p) && getReserveGroupDate(p) === today);
@@ -33894,6 +33897,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             clearProductSearch();
             buildSubTabs();
             renderProductsList();
+            gCenterManageTab();
+        }
+        // [신규 2026-11-12] 고른 분류 칸을 줄 가운데로 (사장님 요청) — 맨 끝 칸은 더 밀 수 없으니 끝에 그대로 둔다
+        function gCenterManageTab() {
+            setTimeout(() => {
+                const c = document.getElementById('manage-category-tabs'); if (!c || c.scrollWidth <= c.clientWidth + 2) return;
+                const b = c.querySelector('.segment-btn.active'); if (!b) return;
+                const br = b.getBoundingClientRect(), cr = c.getBoundingClientRect();
+                const left = c.scrollLeft + (br.left - cr.left) - (c.clientWidth - br.width) / 2;
+                c.scrollTo({ left: Math.max(0, Math.min(left, c.scrollWidth - c.clientWidth)), behavior: 'smooth' });
+            }, 30);
         }
 
         // [신규 2026-09-30] 공동구매 목록 — 지금 고른 날짜 탭에 들어가는 상품인지 (종류는 따지지 않음)
