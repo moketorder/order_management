@@ -7639,7 +7639,7 @@
                                 <div class="po-f-name">
                                     <!-- [수정] 식별번호가 상품명 아래에 한 줄을 통째로 차지하고 있었다.
                                          상품등록 화면처럼 상품명 라벨 오른쪽 끝에 붙여 자리를 안 먹게 한다. -->
-                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">
+                                    <div class="po-name-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 800; color: #475569; margin-bottom: 6px;">
                                         <span style="display: inline-flex; align-items: center; gap: 8px;">
                                             <span>📦 발주 상품명</span>
                                             <!-- [신규] 등록 상품을 검색해서 고르는 창. 고르면 상품명·판매가·식별번호가 한 번에 채워진다. -->
@@ -7649,8 +7649,8 @@
                                         </span>
                                         <!-- [신규] 식별번호 — 이름이 달라도 이 번호가 같으면 같은 상품으로 본다.
                                              손으로 못 고치게 읽기전용. '🔍 번호 찾기'로 고르면 채워지고, 비어 있으면 저장할 때 자동으로 붙는다. -->
-                                        <span style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                            <span style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
+                                        <span class="po-code-grp" style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                            <span class="po-code-lab" style="font-size:12px; font-weight:800; color:#475569; white-space:nowrap;">🔖 식별번호</span>
                                             <input type="text" id="purchase-product-code" class="form-control" placeholder="자동 (P)" readonly tabindex="-1" style="flex:0 0 100px; width:100px; height:30px; padding:5px 9px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:12.5px; font-weight:800; box-sizing:border-box; background:#f1f5f9; color:#334155; cursor:default;">
                                             <!-- [신규] 번호가 '자동'일 때 붙을 갈래를 고른다 — 일반 P, 사다드림 S, 과일 F -->
                                             <span id="purchase-code-prefix" style="display:inline-flex; gap:3px;">
@@ -8392,6 +8392,14 @@
 
         /* 핸드폰: 반반은 그대로 두고 글씨·여백만 조인다 */
         @media (max-width: 560px) {
+            /* [신규 2026-11-11] 발주 상품명 · 번호 찾기 · + · 식별번호를 한 줄에 (사장님 요청) — 식별번호 묶음을 풀어 같은 줄에 잇고,
+               '🔖 식별번호' 글자는 빼고 번호 칸만. 이름 칸·이름 저장은 다음 줄 */
+            .po-name-row { justify-content: flex-start !important; gap: 6px !important; }
+            .cn-txt { display: none; }   /* [신규 2026-11-11] 번호 고르기 창 '＋ 번호 만들기' → 폰은 ＋ 만 (한 줄에 들어가게) */
+            .po-name-row > .po-code-grp { display: contents !important; }
+            .po-name-row .po-code-lab { display: none; }
+            .po-name-row #purchase-product-code { flex: 0 0 72px !important; width: 72px !important; margin-left: auto; }
+            .po-name-row #purchase-code-name { flex: 1 1 60% !important; }
             .po-form-grid { gap: 10px; }
             .po-form-grid .po-f-date > label,
             .po-form-grid .po-f-sup > label,
@@ -45988,16 +45996,16 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                 <!-- [신규] 갈래 번호를 여기서 바로 만든다.
                      과일(F)·사다드림(S)은 자동으로 붙지 않는다. 자동은 언제나 P 다.
                      그래서 새 갈래를 트려면 창을 닫고 딴 데서 만들어 와야 했다. -->
-                <div style="display:flex; gap:6px; margin-top:8px; align-items:center; flex-wrap:wrap;">
+                <div style="display:flex; gap:6px; margin-top:8px; align-items:center; flex-wrap:nowrap;">   <!-- [수정 2026-11-11] 한 줄로 (폰은 ＋ 만, 사장님 요청) -->
                     <select id="code-new-prefix" style="flex:0 0 auto; height:32px; padding:0 7px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:800; color:#475569; background:#fff; cursor:pointer;">
                         <option value="F">🍑 과일 F</option>
                         <option value="S">🛒 사다드림 S</option>
                         <option value="P">📦 일반 P</option>
                     </select>
                     <input type="text" id="code-new-label" placeholder="새 번호에 걸 이름 (예: 샤인머스켓)" onkeydown="if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); createNewCode(); }"
-                        style="flex:1 1 150px; min-width:120px; box-sizing:border-box; height:32px; padding:0 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:700;">
+                        style="flex:1 1 0; min-width:0; box-sizing:border-box; height:32px; padding:0 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:12.5px; font-weight:700;">
                     <button type="button" onclick="createNewCode()"
-                        style="flex:0 0 auto; height:32px; padding:0 12px; border:1.5px solid #86efac; background:#f0fdf4; color:#15803d; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">＋ 번호 만들기</button>
+                        style="flex:0 0 auto; height:32px; padding:0 12px; border:1.5px solid #86efac; background:#f0fdf4; color:#15803d; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;" title="새 번호 만들기">＋<span class="cn-txt"> 번호 만들기</span></button>
                 </div>
             </div>
             <div id="code-picker-list" style="overflow-y:auto; padding:10px 14px 14px; -webkit-overflow-scrolling:touch;"></div>
