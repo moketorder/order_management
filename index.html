@@ -3313,6 +3313,8 @@
                         <!-- [신규 2026-10-02] 고른 상품으로 가격표 생성기와 같은 모양의 A4 가격표를 만든다 (할인이면 정상가 줄도) -->
                         <button class="btn-batch" onclick="handleBatchPriceTag()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(76, 175, 32, 0.35); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #3f8f1a; white-space: nowrap; overflow: hidden;">🏷️ 가격표</button>
                         <button class="btn-batch type-purchase" onclick="handleBatchPurchase()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #10b981; border-color: rgba(16, 185, 129, 0.25); white-space: nowrap; overflow: hidden;">🚚 발주</button>
+                        <!-- [신규 2026-11-11] 수량 한 번에 바꾸기 (사장님 요청) -->
+                        <button class="btn-batch" onclick="handleBatchStock()" title="고른 상품 수량을 한 번에 바꿔요 (999·∞ = 무제한)" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #0f766e; white-space: nowrap; overflow: hidden;">🔢 수량</button>
                         <button class="btn-batch" onclick="handleBatchDeselect()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid var(--border); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #64748b; white-space: nowrap; overflow: hidden;">✕ 선택 해제</button>
                         <button class="btn-batch type-delete" onclick="handleBatchDelete()" style="flex: 1 1 0; min-width: 0; padding: 9px 1px; border: 1.5px solid rgba(220, 38, 38, 0.3); background: white; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 2px; transition: var(--transition); color: #dc2626; white-space: nowrap; overflow: hidden;">🗑️ 삭제</button>
                     </div>
@@ -38702,6 +38704,36 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!p) return;
             if (!(await psConfirm(`${p.name || '이 상품'}\n\n품절로 바꿀까요? 수량이 0이 돼요.\n다시 팔려면 수량 칸에 숫자를 적으면 돼요.`, '품절로', true))) return;
             updateProductStock(index, '0');
+        }
+        /* [신규 2026-11-11] 고른 상품 수량 한 번에 바꾸기 (사장님 요청) — 숫자 하나를 묻고, 상품마다 목록 수량 칸과 같은 길(updateProductStock)로 저장.
+           나갈 주문이 있는 상품은 그 상품에서 '빼고 넣을지' 따로 묻는다. 999·∞·무제한 = 무제한 */
+        function gAskStockDialog(n) {
+            return new Promise(resolve => {
+                let box = document.getElementById('ps-confirm-box'); if (box) box.remove();
+                box = document.createElement('div'); box.id = 'ps-confirm-box';
+                box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px;';
+                box.innerHTML = `<div style="background:#fff; border-radius:14px; padding:18px; max-width:340px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                    <div style="font-size:14px; font-weight:900; color:#0f172a; margin-bottom:4px;">🔢 수량 한 번에 바꾸기</div>
+                    <div style="font-size:12px; font-weight:700; color:#64748b; margin-bottom:10px;">고른 상품 ${n}개의 지금 남은 수량을 이 숫자로 바꿔요 · 999 = 무제한</div>
+                    <input type="text" id="bs-in" inputmode="numeric" placeholder="예: 10" style="width:100%; box-sizing:border-box; height:44px; border:1.5px solid #cbd5e1; border-radius:10px; padding:0 12px; font-size:16px; font-weight:800;">
+                    <div style="display:flex; gap:6px; margin-top:12px;"><button type="button" data-v="0" style="flex:1; height:42px; border:1.5px solid #e2e8f0; background:#f8fafc; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">취소</button><button type="button" data-v="1" style="flex:1.4; height:42px; border:none; background:#0f766e; color:#fff; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">바꾸기</button></div></div>`;
+                const inp = () => box.querySelector('#bs-in');
+                const done = v => { box.remove(); resolve(v); };
+                box.addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (b) done(b.dataset.v === '1' ? String(inp().value || '').trim() : null); else if (e.target === box) done(null); });
+                box.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); done(String(inp().value || '').trim()); } else if (e.key === 'Escape') done(null); });
+                document.body.appendChild(box); setTimeout(() => inp().focus(), 30);
+            });
+        }
+        async function handleBatchStock() {
+            const idxs = [...uploadSelectedProductIndices].filter(i => uploadProducts[i]);
+            if (!idxs.length) { showToast('상품을 골라 주세요'); return; }
+            const v = await gAskStockDialog(idxs.length);
+            if (v === null) return;
+            const unl = /^(999|∞|무제한)$/i.test(v), n = parseInt(String(v).replace(/[^\d]/g, ''), 10);
+            if (!unl && (isNaN(n) || n < 0 || !/^\d+$/.test(v))) { showToast('0 이상 숫자를 적어 주세요'); return; }
+            for (const i of idxs) await updateProductStock(i, unl ? '무제한' : String(n));
+            showToast(`🔢 ${idxs.length}개 상품 수량을 ${unl ? '무제한' : n + '개'}으로 바꿨어요`);
+            renderProductsList();
         }
         function gStockInputCommit(index, el) {
             const v = String(el.value || '').trim(), orig = String(el.dataset.orig || '');
