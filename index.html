@@ -30273,7 +30273,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                             <span style="color:var(--text-sub);">부족분 ${shortText}</span>
                             ${r.doneQty > 0 ? `<span style="color:var(--text-sub);">완료수량 <b style="color:#7c3aed; font-weight:900;">${r.doneQty}개</b></span>` : ''}
                         </div>
-                        ${idx >= 0 ? `<div style="flex-shrink:0; display:flex; gap:4px; align-items:center;">
+                        ${/* [신규 2026-11-11] 마감된 상품은 재고 칸에 '마감', 변경 대신 '풀기' (사장님 요청 — 수량이 보여 열린 줄 착각) */''}
+                        ${(idx >= 0 && gIsClosedAdmin(r.prod)) ? `<div style="flex-shrink:0; display:flex; gap:4px; align-items:center;">
+                            <input type="text" value="마감" readonly tabindex="-1" onclick="event.stopPropagation();" title="손님 화면에서 마감된 상품" style="width:42px; padding:4px 3px; border:1.5px solid #fecaca; background:#fef2f2; color:#dc2626; border-radius:6px; font-size:12px; font-weight:900; text-align:center; box-sizing:border-box; cursor:default;">
+                            <button type="button" onclick="event.stopPropagation(); gAggUnclose(${idx})" title="마감을 풀어 다시 주문을 받아요" style="padding:5px 11px; border:1.5px solid #dc2626; background:#fff; color:#dc2626; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">풀기</button>
+                        </div>` : idx >= 0 ? `<div style="flex-shrink:0; display:flex; gap:4px; align-items:center;">
                             <input type="text" id="sales-stock-input-${idx}" value="${stockInputVal}" placeholder="${stockInputVal}" inputmode="numeric" onclick="event.stopPropagation();" onfocus="this.value='';" onkeydown="if(event.key==='Enter'){event.preventDefault(); salesUpdateStock(${idx}, this.value);}" title="재고 수량 입력 (숫자, 999=무제한)" style="width:42px; padding:4px 3px; border:1.5px solid var(--border); border-radius:6px; font-size:12px; font-weight:700; text-align:center; box-sizing:border-box;">
                             <button type="button" onclick="event.stopPropagation(); salesUpdateStock(${idx}, document.getElementById('sales-stock-input-${idx}').value)" style="padding:5px 11px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button>
                         </div>` : ''}
@@ -38374,6 +38378,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function gIsExpiredAdmin(prod) {
             const t = Number(prod && prod.expireAt) || 0;
             return !!(t && prod.showWeekly !== true && Date.now() >= t);
+        }
+        // [신규 2026-11-11] 주문 집계의 '풀기' — 상품 목록 '마감 풀기'와 같은 길(toggleProductClosed), 끝나면 집계도 다시 그린다
+        async function gAggUnclose(idx) {
+            if (!gIsClosedAdmin(uploadProducts[idx])) return;
+            await toggleProductClosed(idx);
+            try { if (typeof renderSalesUpcoming === 'function') renderSalesUpcoming(); } catch (e) { }
         }
         function gIsClosedAdmin(prod) {
             if (!prod) return false;
