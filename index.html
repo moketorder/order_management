@@ -3732,6 +3732,9 @@
                         #purchase-section-sourcing .src-tg.onsite.on { background:#ede9fe; border-color:#a78bfa; color:#5b21b6; }
                         #purchase-section-sourcing .src-tg.band.on { background:#ccfbf1; border-color:#2dd4bf; color:#0f766e; }
                         #purchase-section-sourcing .src-tg.hist.on { background:#fef3c7; border-color:#fbbf24; color:#b45309; }
+                        #purchase-section-sourcing .src-tg.prod.on { background:#dbeafe; border-color:#60a5fa; color:#1d4ed8; }   /* [신규 2026-11-11] 상품 목록 찾기 */
+                        #purchase-section-sourcing .src-pchip { background:#eff6ff; border-color:#bfdbfe; color:#1e3a8a; }
+                        #purchase-section-sourcing .src-pchip small { color:#2563eb; }
                         #purchase-section-sourcing .src-uni-sec { margin-top:6px; }
                         #purchase-section-sourcing .src-uni-sec > b { display:block; font-size:11.5px; font-weight:900; margin:4px 0; }
                         #purchase-section-sourcing .src-uni-sec.onsite > b { color:#5b21b6; } #purchase-section-sourcing .src-uni-sec.band > b { color:#0f766e; } #purchase-section-sourcing .src-uni-sec.hist > b { color:#b45309; }
@@ -6459,7 +6462,9 @@
                     return best ? best.nm : '';
                 }
                 async function srcHistSave(code, date) {
-                    const h = srcHistByCode(code); if (!h) return;
+                    let h = srcHistByCode(code);
+                    // [신규 2026-11-11] 공구 기록이 없는 상품(🛒 상품 목록에서 끌어온 것)은 등록 상품 이름으로
+                    if (!h) { const p = (uploadProducts || []).find(x => x && psSafeId(String(x.productCode || '').trim()) === code); if (!p) return; h = { code, name: String(p.name || '').replace(/^\[[^\]]*\]\s*/, '') }; }
                     const id = 'm' + Date.now().toString(36);
                     const nm = srcHistTagName(h.code) || h.name;   // [수정 2026-11-08] 고친 이름으로 놓는다
                     const val = { date, name: nm, memo: '공구', code: h.code, kw: srcKw(nm), at: new Date().toISOString() };
@@ -7072,6 +7077,7 @@
                    상시·밴드 이름표는 예전처럼 달력 날짜에 끌어다 놓으면 저장된다 (data-code·data-no). */
                 function srcUniState() {
                     gSrc.uniQ = gSrc.uniQ || { q: '', on: { onsite: true, band: true, hist: true } };   // [수정 2026-10-09] 처음엔 셋 다 켜 둔다 (사장님 요청 — 10/7 엔 다 꺼 뒀었다)
+                    if (gSrc.uniQ.on.prod === undefined) gSrc.uniQ.on.prod = true;   // [신규 2026-11-11] 🛒 상품 목록도 처음엔 켜 둔다
                     return gSrc.uniQ;
                 }
                 /* [신규 2026-10-21] 소싱 메모 — 달력과 찾기 칸 사이, 생각나는 것을 적어 둔다 (사장님 요청).
@@ -7128,7 +7134,7 @@
                     const U = srcUniState(), on = U.on, Q = gSrc.pickQ;
                     const tg = (k, t) => '<button type="button" class="src-tg ' + k + (on[k] ? ' on' : '') + '" onclick="srcUniToggle(\'' + k + '\')">' + t + '</button>';
                     return '<div class="src-onsite src-uni">' +
-                        '<div class="bar">' + tg('band', '📦 밴드') + tg('hist', '🗓 공구') + tg('onsite', '🏪 상시') +   // [수정 2026-10-07] 차례: 밴드 · 공구 · 상시 (사장님 요청)
+                        '<div class="bar">' + tg('band', '📦 밴드') + tg('hist', '🗓 공구') + tg('onsite', '🏪 상시') + tg('prod', '🛒 상품') +   // [신규 2026-11-11] 상품 목록(등록 상품)도 찾기 (사장님 요청)   // [수정 2026-10-07] 차례: 밴드 · 공구 · 상시 (사장님 요청)
                         '<input type="search" id="src-uni-q" placeholder="상품 이름으로 찾기" value="' + srcEsc(U.q) + '" oninput="srcUniInput(this.value)">' +
                         (on.band ? srcVendorSelHtml() : '') +   // [신규 2026-10-09] 업체 거르기 (사장님 요청)
                         (on.band ? '<select onchange="gSrc.pickQ.days=+this.value; srcUniChips()" title="밴드 상품 기간">' + [[7, '최근 1주'], [14, '최근 2주'], [28, '최근 4주'], [56, '최근 8주'], [0, '기간 전체']].map(([d, l]) => '<option value="' + d + '"' + (Q.days === d ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>' : '') +
@@ -7149,14 +7155,36 @@
                 }
                 function srcUniHtml() {
                     const U = srcUniState(), on = U.on;
-                    if (!on.onsite && !on.band && !on.hist) return '<span class="k">왼쪽에서 찾을 곳을 켜 주세요</span>';
+                    if (!on.onsite && !on.band && !on.hist && !on.prod) return '<span class="k">왼쪽에서 찾을 곳을 켜 주세요</span>';
                     const hasQ = !!String(U.q || '').trim(), vOnly = !hasQ && on.band && !!gSrc.pickQ.vendor;   // [신규 2026-10-09] 업체만 고른 때는 밴드 상품만
                     if (!hasQ && !vOnly) return '<span class="k">상품 이름을 치면 켜 둔 곳에서 찾아요</span>';
                     const sec = (k, t, html) => '<div class="src-uni-sec ' + k + '"><b>' + t + '</b><div class="chips">' + html + '</div></div>';
                     if (vOnly) return sec('band', '📦 밴드 상품 · ' + srcEsc(gSrc.pickQ.vendor), srcBandPickHtml());
                     return (on.band ? sec('band', '📦 밴드 상품', srcBandPickHtml()) : '') +
                         (on.hist ? sec('hist', '🗓 공동구매 했던 상품', srcHistHtml()) : '') +
-                        (on.onsite ? sec('onsite', '🏪 상시판매', srcOnsiteChipsHtml()) : '');
+                        (on.onsite ? sec('onsite', '🏪 상시판매', srcOnsiteChipsHtml()) : '') +
+                        (on.prod ? sec('prod', '🛒 상품 목록', srcProdChipsHtml()) : '');
+                }
+                /* [신규 2026-11-11] 상품 목록(등록한 상품)에서 찾기 (사장님 요청 — 공구를 한 번도 안 한 새 상품도 찾게).
+                   식별번호마다 한 칸. 달력 날짜에 끌어다 놓으면 공구 이름표(메모 '공구' + 번호)로 저장 — 공구 했던 상품과 같다 */
+                function srcProdChipsHtml() {
+                    const q = String((gSrc.uniQ && gSrc.uniQ.q) || '').trim().replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
+                    if (!q) return '';
+                    const seen = new Set(), list = [];
+                    (uploadProducts || []).forEach(p => {
+                        if (!p || p.name === '배달비') return;
+                        const code = psSafeId(String(p.productCode || '').trim()); if (!/^[PFS]\d+$/.test(code) || seen.has(code)) return;
+                        const nm = String(p.name || '').replace(/^\[[^\]]*\]\s*/, '');
+                        const hay = (nm + ' ' + code).replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
+                        if (!hay.includes(q)) return;
+                        seen.add(code); list.push({ code, nm, p });
+                    });
+                    if (!list.length) return '<span class="k">상품 목록에 없어요</span>';
+                    return list.slice(0, 40).map(x => {
+                        const on = String(x.p.displayTab || '').startsWith('onsite-'), price = Number(x.p.price) || 0;
+                        return '<span class="src-ochip src-hchip src-pchip" data-hist="' + srcEsc(x.code) + '" title="' + srcEsc(x.nm + ' · ' + x.code) + ' · 달력 날짜에 끌어다 놓으면 그날 공구로 저장">' + srcEsc(x.nm) +
+                            '<small>' + x.code + (price ? ' · ' + price.toLocaleString() + '원' : '') + (on ? ' · 상시' : '') + '</small></span>';
+                    }).join('');
                 }
                 function srcUniInput(v) {
                     const U = srcUniState(); U.q = v;
