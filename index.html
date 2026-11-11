@@ -4551,7 +4551,8 @@
                 function srcManualItems(rs) {
                     try { const r = typeof rs === 'string' ? JSON.parse(rs) : rs; if (!r || r[0] !== 'manual') return []; const p = srcRefGet(r); if (!p) return [];
                         // [수정 2026-11-10] '2+1'·'1+1'처럼 숫자 사이 + 는 나누지 않는다 (사장님 지적 — 광천 돌자반 볶음 35g 2+1 이 두 상품으로 나뉨)   // [수정 2026-11-10] / 로는 나누지 않는다 (사장님 요청 — 상품명에 / 가 들어갈 수 있다)
-                        const a = String(p.disp || p.name || '').replace(/\d(?:\s*\+)+/g, m => m.replace(/\+/g, '\u0001')).split(/\s*[,，+·]\s*/).map(s => s.replace(/\u0001/g, '+').trim()).filter(Boolean); return a.length > 1 ? a : []; } catch (e) { return []; }
+                        // [수정 2026-11-11] · 로도 나누지 않는다 (사장님 지적 — '삼겹살·목살'은 한 상품)
+                        const a = String(p.disp || p.name || '').replace(/\d(?:\s*\+)+/g, m => m.replace(/\+/g, '\u0001')).split(/\s*[,，+]\s*/).map(s => s.replace(/\u0001/g, '+').trim()).filter(Boolean); return a.length > 1 ? a : []; } catch (e) { return []; }
                 }
                 function srcItemMatch(a, b) { a = srcNormName(a); b = srcNormName(b); return !!(a && b && (a.includes(b) || b.includes(a))); }
                 function srcItemRegIdx(rs, item) {
