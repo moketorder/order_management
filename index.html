@@ -29884,6 +29884,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             return parseTimestampToDate(o.timestamp);
         }
 
+        // [신규 2026-11-12] 매출 칸 밑 작은 글씨 — 아직 배달·픽업 안 끝난(대기·입고) 금액 (사장님 요청). 없으면 안 붙인다
+        function gSalesWaitTag(amt) {
+            return amt > 0 ? `<div style="font-size:11px; font-weight:800; color:#d97706; margin-top:1px;" title="아직 배달·픽업이 안 끝난 주문 금액 (완료되면 위 금액으로 들어가요)">대기 ${amt.toLocaleString()}원</div>` : '';
+        }
         function salesStatChip(label, val, color){
             return `<div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:8px 12px; min-width:90px;">
                 <div style="font-size:11px; color:var(--text-sub); font-weight:700;">${label}</div>
@@ -30426,6 +30430,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 return true;
             });
             let totalAmount = 0, totalQty = 0, deliveredAmount = 0, pickupDoneAmount = 0, unpaidAmount = 0, deliveryQty = 0, pickupQty = 0;
+            let deliveryWaitAmount = 0, pickupWaitAmount = 0;   // [신규 2026-11-12] 아직 배달·픽업 안 끝난 금액 (사장님 요청 — 완료만 세서 오늘 픽업이 0원으로 보였다)
             // [신규] 상품 카테고리(과일/공동구매/상시판매)별 판매액 — 상품명으로 상품 매칭해 분류
             const _prodByName = {}; (typeof uploadProducts !== 'undefined' ? uploadProducts : []).forEach(p => { if (p && p.name) _prodByName[p.name] = p; });
             const catAmt = { fruit: 0, group: 0, sada: 0, other: 0 };
@@ -30449,6 +30454,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 // else: 입금됐지만 아직 배달/픽업 전(선입금) → 3칸 어디에도 넣지 않음
                 const isDeliveryO = isSalesDelivery(o);
                 if (isDeliveryO) deliveryQty += q; else pickupQty += q;
+                if (_st !== '배달완료' && _st !== '픽업') { if (isDeliveryO) deliveryWaitAmount += amt; else pickupWaitAmount += amt; }
                 const _cdd = salesOrderDate(o);
                 const _cdk = (_cdd && !isNaN(_cdd.getTime())) ? `${_cdd.getFullYear()}-${_cdd.getMonth()+1}-${_cdd.getDate()}` : 'nodate';
                 const custKey = salesPersonKey(o) + '|' + _cdk; // [변경] 주문건수 = 손님 × 날짜 (한 사람이 여러 날 주문하면 각각 1건)
@@ -30501,8 +30507,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (metrics) metrics.innerHTML = [
                 // 1줄: 금액 (총판매액=배달+픽업 완료)
                 salesStatChip('총 판매액', (deliveredAmount + pickupDoneAmount).toLocaleString() + '원'),
-                salesStatChip('배달', deliveredAmount.toLocaleString() + '원', '#059669'),
-                salesStatChip('픽업', pickupDoneAmount.toLocaleString() + '원', pickupDoneAmount > 0 ? '#7c3aed' : null),
+                salesStatChip('배달', deliveredAmount.toLocaleString() + '원' + gSalesWaitTag(deliveryWaitAmount), '#059669'),
+                salesStatChip('픽업', pickupDoneAmount.toLocaleString() + '원' + gSalesWaitTag(pickupWaitAmount), pickupDoneAmount > 0 ? '#7c3aed' : null),
                 // 2줄: 건수
                 salesStatChip('총 판매건수', custTotal.toLocaleString() + '건'),
                 salesStatChip('배달 건수', custDelivery.toLocaleString() + '건', '#059669'),
