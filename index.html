@@ -24481,6 +24481,9 @@
                 const today = new Date(); today.setHours(0, 0, 0, 0);
                 const dayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
                 if (localStorage.getItem('moket_autohide_day') === dayKey) return 0;
+                // [신규 2026-11-12] 노출일정이 살아 있는 상품은 숨기지 않으려고 일정을 먼저 받는다 (못 받으면 오늘은 날짜 숨김을 미룬다)
+                if (!psSchedLoaded) { try { await psLoadSchedules(); } catch (e) { } }
+                if (!psSchedLoaded) return 0;
 
                 const patch = {};
                 const logs = [];
@@ -24518,6 +24521,15 @@
                         return;
                     }
                     if (p.showWeekly === true || p.showWeekly === 'true') return;          // 매주 상품은 날짜가 밀린다
+                    /* [신규 2026-11-12] 노출일정이 아직 살아 있으면(마감 전이거나 픽업일이 오늘·앞날) 날짜 칸이 지났어도 숨기지 않는다
+                       (사장님 지적 — 베통: 노출일정은 11/16까지인데 날짜 칸에 옛 날짜 11/9가 남아 11/10 0시에 숨겨졌다) */
+                    if (p.sid && psSched && psSched[p.sid]) {
+                        const _now = Date.now(), _td = dayKey;
+                        // 이미 시작한(올라간 시각이 지난) 차례만 본다 — 앞으로 올라갈 다음 차례가 있다고 지난 상품을 미리 띄워 두지 않게
+                        const _live = Object.values(psSched[p.sid]).some(it => it && (!Number(it.releaseAt) || Number(it.releaseAt) <= _now)
+                            && ((Number(it.expireAt) && Number(it.expireAt) > _now) || (it.pickup && String(it.pickup) >= _td)));
+                        if (_live) return;
+                    }
                     const s = String(p.matchKey || p.date || '').trim().replace(/[.\/]/g, '-');
                     const dm = s.match(/(\d{2,4})-(\d{1,2})-(\d{1,2})|^(\d{1,2})-(\d{1,2})$/);
                     if (!dm) return;                                                       // 날짜가 없는 상품은 그대로 둔다
@@ -37490,6 +37502,22 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 matchKey = gTodayISO();
                 date = matchKey;
             }
+            /* [신규 2026-11-12] 상품 수정 때 노출일정의 픽업일과 날짜 칸이 다르면 맞출지 묻는다 (사장님 지적 — 베통).
+               노출일정만 바꾸고 날짜 칸에 옛 날짜가 남아 있으면 그 날짜가 지난 밤 자동으로 숨겨진다.
+               지금 살아 있는(시작했거나 앞으로 올라갈) 차례 중 픽업일이 날짜 칸보다 늦은 가장 가까운 것을 권한다 */
+            try {
+                const _sid = uploadEditProductRef && uploadEditProductRef.sid;
+                if (_sid && uploadCurrentTab === 'reserve' && /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) && psSched && psSched[_sid]) {
+                    const _now = Date.now(), _td = gTodayISO();
+                    const _pk = Object.values(psSched[_sid]).filter(it => it && it.pickup && String(it.pickup) >= _td && String(it.pickup) > date
+                        && !(Number(it.expireAt) && Number(it.expireAt) <= _now)).map(it => String(it.pickup)).sort()[0];
+                    if (_pk && confirm(`노출일정 픽업일은 ${_pk.slice(5).replace('-', '/')}인데 날짜 칸은 ${date.slice(5).replace('-', '/')}이에요.\n날짜를 ${_pk.slice(5).replace('-', '/')}로 바꿔서 저장할까요?\n(그대로 두면 ${date.slice(5).replace('-', '/')}이 지난 밤 자동으로 숨겨질 수 있어요)`)) {
+                        matchKey = _pk; date = _pk;
+                        const _dv = document.getElementById('categoryValue');
+                        if (_dv) { _dv.value = _pk; uploadSelectedDate = _pk; if (_dv._paintFace) _dv._paintFace(); }
+                    }
+                }
+            } catch (e) { console.warn('노출일정 날짜 맞추기 확인 실패:', e); }
             /* [수정 2026-10-03] 상시판매는 보관 분류 칸이 없어졌다 (사장님 요청).
                분류(matchKey)는 보관방법 단추(냉동·냉장·상온) 값을 그대로 쓰고, 안 골랐으면 '상시판매'로 둔다.
                주문서·통계·재고가 모두 이 두 가지를 상시판매로 알아본다.
