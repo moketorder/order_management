@@ -97,6 +97,7 @@
         function show(html) {
             const put = () => {
                 if (!box) { box = document.createElement('div'); box.id = 'staff-gate'; document.body.appendChild(box); }
+                delete box.dataset.wait;   // [신규 2026-11-13] 다른 창(로그인·신청)을 띄우면 '확인 중' 창이 아니다
                 box.innerHTML = `<div class="sg-card"><div class="sg-logo">🔐 MOKET ${APP_NAME}</div>${html}</div>`;
                 box.style.display = 'flex';
             };
@@ -132,13 +133,19 @@
         /* [신규 2026-11-09] 아이폰 사파리에서 로그인 확인이 대답 없이 멈추면 화면이 '대기 중'으로만 남았다 (사장님 지적).
            12초 안에 열리지도, 로그인 창이 뜨지도 않으면 어디서 멈췄는지 알리고 다시 시도·다시 로그인 단추를 낸다 */
         let gateStage = '로그인 확인';
-        setTimeout(() => {
-            if (window.gStaffMe || (box && box.style.display === 'flex')) return;
-            show(`<div class="sg-sub"><b>${gateStage}</b>이 늦어지고 있어요.<br>인터넷이 느리거나 사파리가 로그인 정보를 못 읽고 있어요.</div>
+        /* [수정 2026-11-13] 12초는 아이폰엔 짧았다 (사장님 — 자꾸 다시 로그인이 뜬다). 앱을 다시 열면 로그인 확인이 그보다 오래 걸릴 때가 많아,
+           기다리면 들어가질 것을 '다시 로그인'으로 로그아웃시켰다. → 20초엔 '확인 중' 안내와 다시 시도만, 60초가 넘어야 다시 로그인 단추.
+           그 사이 확인이 끝나면 창은 저절로 닫힌다 (check → hide) */
+        const gateWait = (late) => {
+            if (window.gStaffMe || (box && box.style.display === 'flex' && !box.dataset.wait)) return;
+            show(`<div class="sg-sub"><b>${gateStage}</b> 중이에요… 잠시만 기다려 주세요.<br>확인이 끝나면 저절로 열려요.</div>
                 <button class="sg-btn sg-main" onclick="location.reload()">다시 시도</button>
-                <button class="sg-btn sg-ghost" onclick="gStaffSignOut(true)">다시 로그인</button>
-                <div class="sg-hint">계속 안 되면 사파리 설정 → 방문 기록 및 웹 사이트 데이터 지우기 뒤 다시 로그인해 주세요</div>`);
-        }, 12000);
+                ${late ? `<button class="sg-btn sg-ghost" onclick="if(confirm('로그아웃하고 구글로 다시 로그인할까요?')) gStaffSignOut(true)">그래도 안 되면 · 다시 로그인</button>
+                <div class="sg-hint">계속 안 되면 사파리 설정 → 방문 기록 및 웹 사이트 데이터 지우기 뒤 다시 로그인해 주세요</div>` : ''}`);
+            if (box) box.dataset.wait = '1';
+        };
+        setTimeout(() => gateWait(false), 20000);
+        setTimeout(() => gateWait(true), 60000);
         auth.onAuthStateChanged(async user => {
             if (!user) return loginStep();
             if (checking) return;
