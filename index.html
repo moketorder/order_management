@@ -129,6 +129,22 @@
         const inApp = /KAKAOTALK|Instagram|FBAN|FBAV|NAVER|Line\//i.test(navigator.userAgent);
 
         // ── 1) 로그인 → 허락 여부 ──
+        /* [신규 2026-11-13] 여는 데 걸린 시간 기록 (사장님 요청 — 아이폰에서 왜 요즘 늦는지 보려고).
+           페이지를 연 때부터 ms: auth(로그인 정보 읽음) · staffAsk/staff(가게 허락 묻고 받음) · open(열림) · wait(20/60초 창이 떴나).
+           열리면 gate_logs/<날짜>/<번호> 에 남긴다. 못 열고 닫혔으면 이 기기에 넣어 두었다가 다음에 열릴 때 같이 올린다 */
+        const GT = { at: Date.now(), dev: deviceLabel(), ua: String(navigator.userAgent || '').slice(0, 160), vis: document.visibilityState };
+        const gtMark = k => { if (GT[k] == null) GT[k] = Math.round(performance.now()); };
+        document.addEventListener('DOMContentLoaded', () => gtMark('dom'));   // 화면(큰 코드 포함)을 다 읽은 때
+        window.addEventListener('pagehide', () => { if (GT.open == null) { try { GT.closed = Math.round(performance.now()); localStorage.setItem('moket_gate_pending', JSON.stringify(GT)); } catch (e) { } } });
+        async function gtFlush(user) {
+            try {
+                const d = new Date(), day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const put = (v, i) => db(`gate_logs/${day}/${Date.now().toString(36)}${i}.json`, { method: 'PUT', body: JSON.stringify(Object.assign({ who: (user && user.email) || '' }, v)) });
+                let pend = null; try { pend = JSON.parse(localStorage.getItem('moket_gate_pending') || 'null'); } catch (e) { }
+                if (pend) { pend.failed = 1; await put(pend, 'p'); localStorage.removeItem('moket_gate_pending'); }
+                await put(GT, 'n');
+            } catch (e) { console.warn('여는 시간 기록 실패(규칙 게시 전일 수 있음):', e && e.message); }
+        }
         let checking = false;
         /* [신규 2026-11-09] 아이폰 사파리에서 로그인 확인이 대답 없이 멈추면 화면이 '대기 중'으로만 남았다 (사장님 지적).
            12초 안에 열리지도, 로그인 창이 뜨지도 않으면 어디서 멈췄는지 알리고 다시 시도·다시 로그인 단추를 낸다 */
@@ -143,10 +159,12 @@
                 ${late ? `<button class="sg-btn sg-ghost" onclick="if(confirm('로그아웃하고 구글로 다시 로그인할까요?')) gStaffSignOut(true)">그래도 안 되면 · 다시 로그인</button>
                 <div class="sg-hint">계속 안 되면 사파리 설정 → 방문 기록 및 웹 사이트 데이터 지우기 뒤 다시 로그인해 주세요</div>` : ''}`);
             if (box) box.dataset.wait = '1';
+            GT.wait = late ? 60 : 20; GT.waitStage = gateStage;   // [신규 2026-11-13] 기다림 창이 떴다
         };
         setTimeout(() => gateWait(false), 20000);
         setTimeout(() => gateWait(true), 60000);
         auth.onAuthStateChanged(async user => {
+            gtMark('auth'); if (!user) GT.noUser = 1;
             if (!user) return loginStep();
             if (checking) return;
             checking = true;
@@ -183,7 +201,8 @@
 
         async function check(user) {
             let staff = null;
-            try { staff = await db(`staff/${user.uid}.json`); }
+            gtMark('staffAsk');
+            try { staff = await db(`staff/${user.uid}.json`); gtMark('staff'); }
             catch (e) { return fail('허락 여부를 확인하지 못했습니다. (' + e.message + ')'); }
             if (staff && roleOk(staff.role)) {
                 /* [신규] 사장 표시 — 첫 등록자(사장님)에게만 붙는다. 사장은 아무도 취소·강등할 수 없고,
@@ -196,6 +215,7 @@
                 window.gStaffMe = { uid: user.uid, role: staff.role, owner, name: staff.name || user.displayName || '', email: staff.email || user.email || '', phone: staff.phone || '' };
                 hide();
                 openGate();
+                gtMark('open'); gtFlush(user);
                 return;
             }
             if (staff) {
