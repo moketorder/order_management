@@ -3559,6 +3559,9 @@
                         #purchase-section-sourcing .src-calf .src-btn { min-width:44px; color:#dc2626; border-color:#fca5a5; background:#fff; font-weight:900; }
                         #purchase-section-sourcing .src-calf .src-btn.on { background:#dc2626; border-color:#dc2626; color:#fff; }
                         #purchase-section-sourcing .src-cal-grid { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:4px 10px; }
+                        /* [신규 2026-11-13] 달력 안만 위아래로 움직인다 (사장님 요청) — 화면 높이 안쪽에서 스크롤, 요일 줄은 위에 붙어 있다 */
+                        #purchase-section-sourcing .src-cal-grid { max-height:calc(100vh - 220px); min-height:320px; overflow-y:auto; overscroll-behavior:contain; padding-right:4px; }
+                        #purchase-section-sourcing .src-cal-dow { position:sticky; top:0; z-index:3; background:#fff; padding:3px 0; }
                         #purchase-section-sourcing .src-cal-dow { font-size:11px; color:var(--src-sub); font-weight:800; text-align:center; }
                         #purchase-section-sourcing .src-cal-day { min-height:132px; border:1px solid var(--src-line); border-radius:8px; padding:4px; background:#f8fafc; display:flex; flex-direction:column; gap:3px; min-width:0; box-sizing:border-box; }
                         #purchase-section-sourcing .src-cal-day.other { opacity:.45; }
@@ -3990,6 +3993,21 @@
                     document.querySelectorAll('#purchase-section-sourcing [data-src-tab]').forEach(b => b.classList.toggle('on', b.dataset.srcTab === t));
                     srcRender();
                 }
+                /* [신규 2026-11-13] 달력 안 스크롤 자리 지키기 — 이름표를 옮기거나 고치면 달력을 새로 그려 맨 위로 튀지 않게.
+                   처음 보일 때는 '이번 주'가 위에 오게 */
+                (function srcCalKeepScroll() {
+                    let saved = null, lastGrid = null;
+                    document.addEventListener('scroll', e => { const t = e.target; if (t && t.classList && t.classList.contains('src-cal-grid')) saved = t.scrollTop; }, true);
+                    const fit = () => {
+                        const g = document.querySelector('#purchase-section-sourcing .src-cal-grid');
+                        if (!g || g === lastGrid || !g.offsetParent) return;
+                        lastGrid = g;
+                        if (saved != null) { g.scrollTop = saved; return; }
+                        const now = g.querySelector('.src-cal-wkbar.now');
+                        if (now) { g.scrollTop = Math.max(0, now.getBoundingClientRect().top - g.getBoundingClientRect().top + g.scrollTop - 30); saved = g.scrollTop; }
+                    };
+                    let t = 0; new MutationObserver(() => { if (t) return; t = requestAnimationFrame(() => { t = 0; fit(); }); }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+                })();
                 async function srcRender() {
                     const v = document.getElementById('src-view');
                     if (!v) return;
