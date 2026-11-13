@@ -37554,8 +37554,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const _sid = uploadEditProductRef && uploadEditProductRef.sid;
                 if (_sid && uploadCurrentTab === 'reserve' && /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) && psSched && psSched[_sid]) {
                     const _now = Date.now(), _td = gTodayISO();
-                    const _pk = Object.values(psSched[_sid]).filter(it => it && it.pickup && String(it.pickup) >= _td && String(it.pickup) > date
-                        && !(Number(it.expireAt) && Number(it.expireAt) <= _now)).map(it => String(it.pickup)).sort()[0];
+                    /* [수정 2026-11-13] 지금 진행 중인 차례(올라갔고 아직 안 끝난 것)의 픽업일만 견준다 (사장님 지적 — 구운란:
+                       이번 차례 픽업 11/16이 날짜 칸과 맞는데, 아직 시작 안 한 다음 주 차례 픽업 11/23 때문에 창이 떴다).
+                       진행 중인 차례가 없으면 날짜 칸이 이미 지났을 때만 가장 가까운 다음 차례를 권한다 */
+                    const _all = Object.values(psSched[_sid]).filter(it => it && it.pickup && !(Number(it.expireAt) && Number(it.expireAt) <= _now));
+                    const _cur = _all.filter(it => !Number(it.releaseAt) || Number(it.releaseAt) <= _now);
+                    let _pk = '';
+                    if (_cur.length) { if (!_cur.some(it => String(it.pickup) === date)) _pk = _cur.map(it => String(it.pickup)).filter(k => k > date).sort()[0] || ''; }
+                    else if (date < _td) _pk = _all.map(it => String(it.pickup)).filter(k => k >= _td).sort()[0] || '';
                     if (_pk && confirm(`노출일정 픽업일은 ${_pk.slice(5).replace('-', '/')}인데 날짜 칸은 ${date.slice(5).replace('-', '/')}이에요.\n날짜를 ${_pk.slice(5).replace('-', '/')}로 바꿔서 저장할까요?\n(그대로 두면 ${date.slice(5).replace('-', '/')}이 지난 밤 자동으로 숨겨질 수 있어요)`)) {
                         matchKey = _pk; date = _pk;
                         const _dv = document.getElementById('categoryValue');
