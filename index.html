@@ -32101,6 +32101,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             else { s.key = key; s.dir = (key === 'name') ? 'asc' : 'desc'; } // 이름=가나다, 숫자=큰순 기본
             renderTrendDetailTable();
         }
+        /* [신규 2026-11-13] 이름표 밑에 상품 전체 이름을 작게 (사장님 요청 — '한우 모듬 4종'만 보여 무슨 상품인지 다 안 보였다).
+           식별번호를 상품 하나만 쓰고 그 이름이 이름표와 다를 때만. 여러 상품이 한 번호를 같이 쓰면(과일·사다드림) 하나만 골라 보이면 엉뚱해서 뺀다 */
+        function _trendFullName(key, shown) {
+            try {
+                const c = String(key || '').trim();
+                if (!/^[A-Z]\d+$/.test(c)) return '';
+                const names = [...new Set((uploadProducts || []).filter(p => p && p.name && String(p.productCode || '').trim() === c).map(p => String(p.name).trim()))];
+                if (names.length !== 1 || names[0] === String(shown || '').trim()) return '';
+                return `<div style="margin-top:2px; font-size:11px; font-weight:600; color:#94a3b8; line-height:1.35;">${gEscapeHtml(names[0])}</div>`;
+            } catch (e) { return ''; }
+        }
         function renderTrendDetailTable(){
             const cont = document.getElementById('trend-detail-table');
             if (!cont) return;
@@ -32119,7 +32130,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <th onclick="sortTrendDetail('cnt')" style="${th} text-align:right;">건수${_trendArrow('cnt')}</th>
                     <th onclick="sortTrendDetail('amount')" style="${th} text-align:right;">금액${_trendArrow('amount')}</th>
                 </tr></thead>
-                <tbody>${sorted.map(([nm, v]) => `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:8px; word-break:break-all;">${gEscapeHtml(v.name || nm)}</td><td style="padding:8px; text-align:right; white-space:nowrap; font-weight:800; color:#2563eb;">${v.cnt}건</td><td style="padding:8px; text-align:right; white-space:nowrap; font-weight:700;">${v.amount.toLocaleString()}${salesMetricUnit()}</td></tr>`).join('')}</tbody>
+                <tbody>${sorted.map(([nm, v]) => `<tr style="border-top:1px solid #f1f5f9;"><td style="padding:8px; word-break:break-all;">${gEscapeHtml(v.name || nm)}${_trendFullName(nm, v.name)}</td><td style="padding:8px; text-align:right; white-space:nowrap; font-weight:800; color:#2563eb;">${v.cnt}건</td><td style="padding:8px; text-align:right; white-space:nowrap; font-weight:700;">${v.amount.toLocaleString()}${salesMetricUnit()}</td></tr>`).join('')}</tbody>
             </table>`;
         }
         function showTrendDetail(startISO, endISO, title){
