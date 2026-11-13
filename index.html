@@ -140,10 +140,19 @@
             try {
                 const d = new Date(), day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 const put = (v, i) => db(`gate_logs/${day}/${Date.now().toString(36)}${i}.json`, { method: 'PUT', body: JSON.stringify(Object.assign({ who: (user && user.email) || '' }, v)) });
+                // 못 올린 기록(규칙 게시 전 등)은 이 기기에 최대 20개 모아 두었다가 올라가는 때에 같이 올린다
+                let q = []; try { q = JSON.parse(localStorage.getItem('moket_gate_q') || '[]') || []; } catch (e) { }
                 let pend = null; try { pend = JSON.parse(localStorage.getItem('moket_gate_pending') || 'null'); } catch (e) { }
-                if (pend) { pend.failed = 1; await put(pend, 'p'); localStorage.removeItem('moket_gate_pending'); }
-                await put(GT, 'n');
-            } catch (e) { console.warn('여는 시간 기록 실패(규칙 게시 전일 수 있음):', e && e.message); }
+                if (pend) { pend.failed = 1; q.push(pend); localStorage.removeItem('moket_gate_pending'); }
+                q.push(GT);
+                try {
+                    for (let i = 0; i < q.length; i++) await put(q[i], 'q' + i);
+                    localStorage.removeItem('moket_gate_q');
+                } catch (e) {
+                    try { localStorage.setItem('moket_gate_q', JSON.stringify(q.slice(-20))); } catch (e2) { }
+                    console.warn('여는 시간 기록 실패(규칙 게시 전일 수 있음 — 기기에 모아 둠):', e && e.message);
+                }
+            } catch (e) { console.warn('여는 시간 기록 실패:', e && e.message); }
         }
         let checking = false;
         /* [신규 2026-11-09] 아이폰 사파리에서 로그인 확인이 대답 없이 멈추면 화면이 '대기 중'으로만 남았다 (사장님 지적).
