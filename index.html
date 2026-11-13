@@ -7571,7 +7571,9 @@
 
                     if (Q.src === 'n') {
                     gSrc._tc = cats;   // [신규 2026-10-13] 분야 단추가 번호로 고른다
-                    html += '<div class="src-bar"><span class="k">분야</span>' + chips(i => 'gSrc.trendQ.cat=gSrc._tc[' + i + ']; gSrc.trendQ.sub=0; srcRender()', cats, ci) + '</div>';
+                    // [수정 2026-11-13] 단추 차례만 '식품'을 맨 앞으로 (사장님 요청) — 자료는 원래 번호(ci)로 고른다
+                    { const ord = cats.map((c, i) => i).sort((a, b) => (cats[b] === '식품') - (cats[a] === '식품'));
+                      html += '<div class="src-bar"><span class="k">분야</span>' + chips(j => 'gSrc.trendQ.cat=gSrc._tc[' + ord[j] + ']; gSrc.trendQ.sub=0; srcRender()', ord.map(i => cats[i]), ord.indexOf(ci)) + '</div>'; }
                     if (subs.length > 1) html += '<div class="src-bar"><span class="k">하위</span>' + chips(i => 'gSrc.trendQ.sub=' + i + '; srcRender()', subs.map((x, i) => subName(i)), Q.sub) + '</div>';
                     const kwRow = at(C.kw, Q.sub) || {};
                     html += '<div class="src-tr-grid"><div class="src-tr-box"><h4>🔎 인기 검색어 · ' + srcEsc(Q.cat) + (Q.sub ? ' › ' + srcEsc(subName(Q.sub)) : '') + ' · ' + srcEsc(grpName[Q.grp] || Q.grp) + '</h4>' +
