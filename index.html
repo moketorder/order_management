@@ -39028,7 +39028,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 || (prod.isSada === undefined && /^\s*\[\s*사다드림\s*\]/.test(String(prod.name || '')));
             // [신규] 신선식품 여부 복원 (사다드림이면 신선식품은 꺼진 것으로 본다)
             uploadIsFresh = (prod.isFresh === true || prod.isFresh === 'true');   // [수정 2026-10-03] 신선배송 — 종류 칸을 그릴 때 종류에 맞춰 다시 정해진다
-            uploadFormTaxFree = gIsTaxFreeCode(String(prod.productCode || '').trim()); uploadFormTaxTouched = false; uploadFormTaxByKind = false; paintFormTaxFree();   // [신규]
+            uploadFormTaxFree = gIsTaxFreeCode(String(prod.productCode || '').trim()); uploadFormTaxTouched = false; uploadFormTaxByKind = false;
+            // [신규 2026-11-13] 고칠 때도 야채·과일은 면세가 기본 (사장님 요청) — 번호에 면세가 안 적혀 있으면 면세로 열고, 저장하면 번호에도 적는다
+            if (!uploadFormTaxFree && !String(prod.displayTab || '').startsWith('onsite-') && ['veg', 'fruit'].includes(gListKind(prod))) { uploadFormTaxFree = true; uploadFormTaxByKind = true; }
+            paintFormTaxFree();   // [신규]
             // [신규] 오늘의추천 여부 복원 (같은 방식)
             uploadEditIsRecommend = (prod.isRecommend === true || prod.isRecommend === 'true')
                 || (prod.isRecommend === undefined && /^\s*\[\s*오늘의추천\s*\]/.test(String(prod.name || '')));
@@ -45429,7 +45432,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (view) view.value = ok ? c : '';
             // [신규] 번호를 고르거나 바꾸면 그 번호의 과세·면세를 보여 준다 (직접 눌러 바꾼 뒤라면 그대로)
             // [수정 2026-11-04] 번호에 면세가 안 적혀 있어도 종류가 과일·야채면 면세가 기본 (사장님 요청 — 야채인데 과세로 나왔다)
-            if (typeof uploadFormTaxTouched !== 'undefined' && !uploadFormTaxTouched) { const _fv = !uploadIsEditMode && uploadCurrentTab === 'reserve' && (uploadKind === 'fruit' || uploadKind === 'veg'); uploadFormTaxFree = (ok && gIsTaxFreeCode(c)) || _fv; uploadFormTaxByKind = _fv && !(ok && gIsTaxFreeCode(c));   /* 고치는 중(이미 있는 상품)은 번호에 적힌 대로 */ paintFormTaxFree(); }
+            if (typeof uploadFormTaxTouched !== 'undefined' && !uploadFormTaxTouched) { const _fv = uploadCurrentTab === 'reserve' && (uploadKind === 'fruit' || uploadKind === 'veg'); uploadFormTaxFree = (ok && gIsTaxFreeCode(c)) || _fv; uploadFormTaxByKind = _fv && !(ok && gIsTaxFreeCode(c));   /* [수정 2026-11-13] 고칠 때도 과일·야채는 면세가 기본 (사장님 요청) */ paintFormTaxFree(); }
             /* [수정] 이름표가 걸린 번호만 이름이 떴다. 이름표가 없는 번호(주로 P)는 칸이 비어
                '이름을 못 불러왔나' 싶었다. 이제 그 번호가 무슨 물건인지 옅은 글씨로 보여 준다.
                옅은 글씨는 저장되지 않는다. 이름표로 삼으려면 직접 적어야 한다. */
