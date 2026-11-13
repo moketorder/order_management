@@ -18712,6 +18712,7 @@
                 const today = gTodayISO();
                 const late = due.length ? [] : items.filter(it => it.rid !== p.schedRid && Number(it.releaseAt) && now >= psOpenAt(it.releaseAt)
                     && Number(it.expireAt) && now >= Number(it.expireAt) && Number(it.createdAt) > Number(it.expireAt) && !it.toOnsiteDone
+                    && !it.autoRepeat   // [수정 2026-11-13] 반복이 저절로 만든 일정은 '나중에 넣은 일정'이 아니다 — 지난 차례를 붙여 날짜가 12/4로 갔다 (사장님 지적)
                     && (it.pickup || fMsToDateKey(it.expireAt)) >= today);
                 const cand = due.length ? due : late;
                 if (!cand.length) continue;
@@ -19634,10 +19635,17 @@
                         const items = psItemsOfSid(p.sid).filter(it => Number(it.releaseAt));
                         if (!items.length) break;
                         const last = items.reduce((a, b) => Number(b.releaseAt) > Number(a.releaseAt) ? b : a);
-                        const step = w * 7;
-                        const rel = psShiftTs(last.releaseAt, step, null);
+                        /* [수정 2026-11-13] 이미 마감이 지난 차례는 만들지 않고 건너뛴다 (사장님 지적 — 우둔살 육회·한우모듬:
+                           마지막 일정이 한 달 전이면 10/17·10/24·10/31·11/7처럼 끝난 차례까지 만들어졌고, 그게 날짜를 12/4로 바꿨다).
+                           마지막 일정에서 주기만큼 몇 번 건너뛰어 마감이 지금보다 뒤인 첫 차례부터 만든다 */
+                        let step = w * 7, rel, exp;
+                        for (let k = 1; k <= 60; k++) {
+                            step = w * 7 * k;
+                            rel = psShiftTs(last.releaseAt, step, null);
+                            exp = last.expireAt ? psShiftTs(last.expireAt, step, null) : null;
+                            if (!((exp && exp <= Date.now()) || (!exp && rel <= Date.now() - 86400000))) break;
+                        }
                         if (rel > Date.now() + PS_REPEAT_AHEAD_MS) break;
-                        const exp = last.expireAt ? psShiftTs(last.expireAt, step, null) : null;
                         const pk = psItemPickup(last);
                         const data = { releaseAt: rel, expireAt: exp, pickup: pk ? psAddDays(pk, step) : null, autoRepeat: true,
                             group: last.group ? (String(last.group).split('@')[0] + '@' + rel) : null, groupLabel: last.groupLabel || null,
