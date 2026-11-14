@@ -25874,7 +25874,7 @@
                 const get = async path => { const r = await fetch(`${FIREBASE_DB_URL}${path}.json?t=${Date.now()}`); return r.ok ? await r.json() : null; };
                 if (ph) { const had = await get(`review_codes/${ph}/${encodeURIComponent(nc)}`); if (had && had.rid && had.rid !== rid) { showToast('이 손님은 그 상품에 이미 후기가 있어요 — 옮기지 않았어요'); return; } }
                 const keep = {}; ['stars', 'text', 'name', 'item', 'at', 'ref', 'pts', 'reply', 'hidden'].forEach(k => { if (cur[k] !== undefined) keep[k] = cur[k]; });
-                keep.item = item; keep.movedFrom = { code, item: cur.item || '', at: Date.now() };
+                keep.item = item;   // [수정 2026-11-14] movedFrom 표시는 뺀다 — 서버 규칙이 후기에 정해진 칸만 받아서 통째로 거절됐다
                 const up = { [`product_reviews/${nc}/${rid}`]: keep, [`product_reviews/${code}/${rid}`]: null };
                 const [s0, s1] = await Promise.all([get(`review_stats/${encodeURIComponent(code)}`), get(`review_stats/${encodeURIComponent(nc)}`)]);
                 const stars = Number(cur.stars) || 0;
@@ -41946,7 +41946,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 Object.keys(rv).forEach(rid => {
                     const v = rv[rid];
                     if (!v || typeof v !== 'object') return;
-                    up[`product_reviews/${keep}/${rid}`] = Object.assign({}, v, { movedFrom: { code: c, item: v.item || '', at: now } });
+                    /* [수정 2026-11-14] 서버 규칙이 후기에 정해진 칸만 받는다($other 거절) — 예전엔 movedFrom 을 붙여 후기 옮기기가 통째로 거절됐다
+                       (사장님: 윤가네 김치 합쳤는데 후기 3개가 그대로 남음). 정해진 칸만 옮긴다 */
+                    const mv = {}; ['stars', 'text', 'name', 'item', 'at', 'ref', 'pts', 'reply', 'hidden'].forEach(k => { if (v[k] !== undefined) mv[k] = v[k]; });
+                    up[`product_reviews/${keep}/${rid}`] = mv;
                     up[`product_reviews/${c}/${rid}`] = null;
                     if ((Number(v.at) || 0) >= lastAt) { lastAt = Number(v.at) || 0; last = rid; }
                 });
