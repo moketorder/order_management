@@ -37854,7 +37854,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                    그래서 이름을 적어 놓고 저장하면 그 이름이 그냥 사라졌다.
                    이제는 방금 정해진 번호에 그 이름을 건다. 이미 같은 이름이면 건드리지 않는다. */
                 try {
-                    const _lab = gCleanCodeLabel(document.getElementById('productCodeLabel')?.value);   // [수정 2026-11-07] [사다드림] 말머리 뗌
+                    let _lab = gCleanCodeLabel(document.getElementById('productCodeLabel')?.value);   // [수정 2026-11-07] [사다드림] 말머리 뗌
+                    if (!_lab && /^[PFS]\d+$/.test(_productCode)) { await gLoadCodeLabels(); if (!gCodeLabelOf(_productCode)) _lab = gDefaultCodeLabel(document.getElementById('productName')?.value); }   // [신규 2026-11-14] 이름표가 없으면 상품명으로
                     if (_lab && /^[PFS]\d+$/.test(_productCode) && _lab !== gCodeLabelOf(_productCode)) {
                         await fetch(`${FIREBASE_DB_URL}product_code_labels.json`, {
                             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -41669,6 +41670,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // 이름표만 (없으면 빈 글자)
         // [신규 2026-11-07] 번호 이름표에는 '[사다드림]' 말머리를 넣지 않는다 (사장님 요청) — 저장하는 곳마다 거친다
         function gCleanCodeLabel(s) { return String(s || '').replace(/^\s*\[사다드림\]\s*/, '').trim(); }
+        // [신규 2026-11-14] 이름표를 안 적고 저장하면 상품명(앞 [과일] 같은 말머리는 뗌)을 이름표로 (사장님 요청)
+        function gDefaultCodeLabel(name) { return String(name || '').replace(/^\s*(\[[^\]]*\]\s*)+/, '').trim(); }
         function gCodeLabelOf(code) {
             return String((gCodeLabels || {})[String(code || '').trim()] || '').trim();
         }
@@ -42508,7 +42511,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             /* [신규] 상품등록과 같게, 이름 칸에 적어 둔 것이 있으면 이 번호에 함께 걸어 준다.
                번호가 '자동'일 때는 ✔ 이름 저장 단추가 안 먹어 적어 둔 이름이 사라졌다. */
             try {
-                const _lab = gCleanCodeLabel(document.getElementById('purchase-code-name')?.value);   // [수정 2026-11-07] [사다드림] 말머리 뗌
+                let _lab = gCleanCodeLabel(document.getElementById('purchase-code-name')?.value);   // [수정 2026-11-07] [사다드림] 말머리 뗌
+                if (!_lab && /^[PFS]\d+$/.test(productCode)) { await gLoadCodeLabels(); if (!gCodeLabelOf(productCode)) _lab = gDefaultCodeLabel(itemName); }   // [신규 2026-11-14] 이름표가 없으면 발주 상품명으로
                 if (_lab && /^[PFS]\d+$/.test(productCode) && _lab !== gCodeLabelOf(productCode)) {
                     await fetch(`${FIREBASE_DB_URL}product_code_labels.json`, {
                         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -45391,7 +45395,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
         async function createNewCode() {
             const pre = String(document.getElementById('code-new-prefix')?.value || 'F').trim().toUpperCase();
-            const label = gCleanCodeLabel(document.getElementById('code-new-label')?.value);   // [수정 2026-11-07] [사다드림] 말머리 뗌
+            let label = gCleanCodeLabel(document.getElementById('code-new-label')?.value);   // [수정 2026-11-07] [사다드림] 말머리 뗌
+            // [신규 2026-11-14] 이름을 안 적으면 상품등록·발주 칸의 상품명으로
+            if (!label) label = gDefaultCodeLabel(gCodePickerTarget === 'purchase' ? document.getElementById('purchase-item-name')?.value : gCodePickerTarget === 'product' ? document.getElementById('productName')?.value : '');
             if (!/^[PFS]$/.test(pre)) { showToast('갈래를 골라 주세요.'); return; }
             if (!label) { showToast('새 번호에 걸 이름을 적어 주세요.'); return; }
 
