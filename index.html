@@ -41764,6 +41764,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 arcHits.forEach(po => jobs.push(fbPutRetry(`${FIREBASE_DB_URL}purchase_orders_archive/${po.id}/productCode.json`, '')));
                 codes.forEach(c => jobs.push(fetch(`${FIREBASE_DB_URL}product_code_labels/${encodeURIComponent(c)}.json`, { method: 'DELETE' }).then(r => r.ok).catch(() => false)));
                 const results = await Promise.all(jobs);
+                if (arcHits.length) await gPurchaseArchiveChanged();
                 if (results.some(ok => ok === false)) throw new Error('일부 저장에 실패했습니다');
                 prodHits.forEach(({ p }) => { p.productCode = ''; });
                 poHits.concat(arcHits).forEach(po => { po.productCode = ''; });
@@ -41898,6 +41899,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 }
 
                 const results = await Promise.all(jobs);
+                if (arcHits.length) await gPurchaseArchiveChanged();
                 if (results.some(ok => ok === false)) throw new Error('일부 저장에 실패했습니다');
 
                 // 화면이 들고 있는 값도 맞춰 둔다
@@ -42275,6 +42277,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 try { localStorage.setItem(PURCHASE_ARCHIVE_MARK_KEY, String(mark)); } catch (e) {}
             } catch (e) { console.warn('발주 저장함 표식 갱신 실패:', e); }
             return mark;
+        }
+
+        /* [신규 2026-11-14] 저장함 발주의 번호를 고친 뒤 부른다 (번호 합치기·지우기).
+           예전엔 서버만 고치고 표식을 안 바꿔서, 모든 기기가 예전 사본(IndexedDB)을 계속 보여 줬다
+           (사장님: 윤가네 김치 합쳤는데 발주가 안 옮겨진 것 같다 — 서버는 옮겨져 있었다) */
+        async function gPurchaseArchiveChanged() {
+            try { await gTouchPurchaseArchiveMark(); await refreshPurchaseArchive(true); } catch (e) { console.warn('발주 저장함 새로 받기 실패:', e); }
         }
 
         async function gFetchPurchaseArchiveMark() {
