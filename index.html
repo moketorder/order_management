@@ -45862,7 +45862,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             } catch (e) { console.warn('가격표 고친 것 못 받음:', e); }
             const tags = prods.map(p => {
                 const t = gPriceTagOf(p);
-                t.def = { head: t.head, name: t.name, desc: t.desc, price: t.price };   // ↺ 로 돌아갈 상품 값
+                t.def = { head: t.head, name: t.name, desc: t.desc, price: t.price, storage: t.storage || '' };   // ↺ 로 돌아갈 상품 값
                 const e = edits[gPriceTagDbKey(t.key)];
                 if (e) {
                     ['head', 'name'].forEach(f => { if (typeof e[f] === 'string') t[f] = e[f]; });
@@ -45871,6 +45871,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     // 가격은 고칠 때와 판매가·할인이 같을 때만 고친 값 — 그 사이 바뀌었으면 새 가격을 따른다
                     if (e.price != null && Number(e.basePrice) === t.price && Number(e.baseOrig || 0) === t.orig) t.price = Math.max(0, parseInt(e.price) || 0);
                     if (e.noOrig === true) t.noOrig = true;   // [신규 2026-10-14] 정상가 줄을 뺀 가격표
+                    if (typeof e.storage === 'string') t.storage = e.storage;   // [신규 2026-11-14] 가격표에서 고른 보관 (냉동·냉장·상온·없음)
                     t.edited = true;
                 }
                 return t;
@@ -45918,6 +45919,8 @@ body { font-family:"Pretendard Variable", Pretendard, sans-serif; margin:0; padd
 .p-badges { display:flex; gap:5px; margin-bottom:3px; }
 .badge-common { font-size:13px; font-weight:800; height:26px; line-height:24px; padding:0 10px; min-width:84px; border-radius:0; white-space:nowrap; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1px solid transparent; }
 .p-storage-inline { color:#444; background:#e2e6ea; border-color:#dae0e5; }
+.p-st { cursor:pointer; user-select:none; }
+.p-st.empty { background:transparent; color:#cbd5e1; border:1px dashed #cbd5e1; order:3; }
 .p-head { background:#e8f5e9; color:#2e7d32; border-color:#c8e6c9; }
 .p-head:empty { background:transparent; border:1px dashed #c8e6c9; order:2; }   /* [수정 2026-10-14] 말머리가 없으면 보관방법이 맨 왼쪽 (빈 말머리 칸은 오른쪽으로) */
 .p-head:empty::before { content:"말머리"; color:#a5d6a7; }
@@ -45995,7 +45998,8 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                     '<div class="p-desc" contenteditable="true">' + esc(t.desc) + '</div>' +   // [수정 2026-10-07] 한줄소개가 상품명 위 (사장님 요청)
                     '<div class="p-name" contenteditable="true">' + esc(t.name) + '</div>' +
                     '<div class="p-badges"><div class="badge-common p-head" contenteditable="true">' + esc(t.head) + '</div>' +
-                    (t.storage ? '<div class="badge-common p-storage-inline">' + t.storage + '</div>' : '') + '</div>' +
+                    // [수정 2026-11-14] 보관 딱지를 눌러 냉동 → 냉장 → 상온 → 없음 으로 고른다 (사장님 요청)
+                    '<div class="badge-common p-storage-inline p-st' + (t.storage ? '' : ' empty no-print') + '" title="눌러서 냉동·냉장·상온 고르기">' + (t.storage || '보관') + '</div></div>' +
                     '<div class="p-prices">' +
                     (t.orig && !t.noOrig ? '<div class="p-orig-box"><div class="p-orig-line"><div class="p-orig-label">정상가</div><div class="p-orig-val-row"><span class="p-orig-val">' + won(t.orig) + '원</span></div></div>' +
                         '<div class="p-info-text">' + esc(t.off) + '</div></div>' : '') +
@@ -46025,8 +46029,8 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
             }
             function save(t) {
                 if (t.copy) { st.textContent = (t.once ? '이번에만 쓰는 가격표라 저장되지 않아요' : '복제본은 이번 인쇄에만 써요'); return; }   // [신규 2026-10-19] 원본의 고친 기록을 덮어쓰지 않게
-                var same = t.head === t.def.head && t.name === t.def.name && t.desc === t.def.desc && t.price === t.def.price && !t.noOrig;
-                var edit = same ? null : { head: t.head, name: t.name, desc: t.desc, price: t.price, basePrice: t.def.price, baseOrig: t.orig || 0, baseDesc: t.def.desc, noOrig: !!t.noOrig };
+                var same = t.head === t.def.head && t.name === t.def.name && t.desc === t.def.desc && t.price === t.def.price && !t.noOrig && (t.storage || '') === (t.def.storage || '');
+                var edit = same ? null : { head: t.head, name: t.name, desc: t.desc, price: t.price, basePrice: t.def.price, baseOrig: t.orig || 0, baseDesc: t.def.desc, noOrig: !!t.noOrig, storage: t.storage || '' };
                 var op = window.opener;
                 st.textContent = '저장 중…';
                 (op && !op.closed && op.gPriceTagSave ? op.gPriceTagSave(t.key, edit) : Promise.reject(new Error('주문관리 창이 닫혔어요')))
@@ -46084,6 +46088,13 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                 document.execCommand('insertText', false, (ev.clipboardData.getData('text/plain') || '').replace(/\s*\n\s*/g, ' '));
             });
             area.addEventListener('click', function (ev) {
+                var sb = ev.target.closest('.p-st');
+                if (sb) {   // [신규 2026-11-14] 보관 고르기 — 냉동 → 냉장 → 상온 → 없음
+                    var tg = sb.closest('.price-tag'), tt = read(tg), ORD = ['🧊 냉동', '❄️ 냉장', '🌡️ 상온', ''];
+                    tt.storage = ORD[(ORD.indexOf(tt.storage || '') + 1) % ORD.length];
+                    render(); save(tt);
+                    return;
+                }
                 var b = ev.target.closest('button'); if (!b) return;
                 var t = T[+b.closest('.price-tag').dataset.i];
                 if (b.classList.contains('delete-btn')) { T.splice(T.indexOf(t), 1); render(); }
@@ -46094,7 +46105,7 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                 }
                 else if (b.classList.contains('orig-btn')) { t.noOrig = !t.noOrig; render(); save(t); }
                 else if (b.classList.contains('reset-btn')) {
-                    t.head = t.def.head; t.name = t.def.name; t.desc = t.def.desc; t.price = t.def.price; t.noOrig = false;
+                    t.head = t.def.head; t.name = t.def.name; t.desc = t.def.desc; t.price = t.def.price; t.noOrig = false; t.storage = t.def.storage || '';
                     render(); save(t);
                 }
             });
