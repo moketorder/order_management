@@ -36486,11 +36486,40 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 box.innerHTML = card(`<div style="font-size:12px; font-weight:800; color:#64748b; margin-bottom:4px;">후기 ${list.length}개 · 답글·숨김은 상품 › 후기 화면에서</div>${html}`);
             } catch (e) { box.innerHTML = card('<div style="padding:20px; text-align:center; color:#dc2626; font-weight:700;">후기를 못 불러왔어요</div>'); }
         }
+        /* [신규 2026-11-14] 검색어가 있으면 공동구매·상시판매를 같이 찾아 두 칸으로 나눠 보여 준다 (사장님 요청 — 어느 탭에서 찾든).
+           지금 보는 쪽이 위, 다른 쪽이 아래. 검색 중에는 날짜·종류·선반 탭과 상관없이 그쪽 전체에서 찾는다. */
+        let _plDualTarget = null;
         function renderProductsList() {
+            if (!_plDualTarget && productSearchKeyword && String(productSearchKeyword).trim()) {
+                const main = document.getElementById('products-list-container');
+                main.innerHTML = '';
+                const sv = { t: uploadManageDeliveryType, tab: uploadManageTab, sub: uploadSubTab, kind: uploadManageKind };
+                const order = [sv.t === 'inventory' ? 'inventory' : 'reserve', sv.t === 'inventory' ? 'reserve' : 'inventory'];
+                try {
+                    order.forEach((t, i) => {
+                        const head = document.createElement('div');
+                        head.style.cssText = 'font-size:14px; font-weight:900; padding:8px 10px; border-radius:8px; margin:' + (i ? '22px' : '2px') + ' 0 4px; '
+                            + (t === 'inventory' ? 'background:#ecfdf5; color:#047857;' : 'background:#eff6ff; color:#1d4ed8;');
+                        head.textContent = t === 'inventory' ? '📦 상시판매에서 찾은 상품' : '🗓️ 공동구매에서 찾은 상품';
+                        const box = document.createElement('div');
+                        main.appendChild(head); main.appendChild(box);
+                        uploadManageDeliveryType = t;
+                        if (t === 'inventory') { uploadManageTab = 'inv-all'; uploadSubTab = 'all'; }
+                        else { uploadManageTab = 'all'; uploadManageKind = 'all'; }
+                        _plDualTarget = box;
+                        try { renderProductsList(); } finally { _plDualTarget = null; }
+                    });
+                } finally {
+                    uploadManageDeliveryType = sv.t; uploadManageTab = sv.tab; uploadSubTab = sv.sub; uploadManageKind = sv.kind;
+                }
+                { const s = document.getElementById('inv-sort-sel'); if (s) { s.style.display = uploadManageDeliveryType === 'inventory' ? '' : 'none'; s.value = gInvSort; } }
+                try { refreshManageTabCounts(); } catch (e) { }
+                return;
+            }
             { const s = document.getElementById('inv-sort-sel'); if (s) { s.style.display = uploadManageDeliveryType === 'inventory' ? '' : 'none'; s.value = gInvSort; } }
             try { psRoundTick(); } catch (e) { }   // [신규 2026-10-05] 상품 목록이 바뀌면 공동구매 회차(노출·숨김·바뀜)를 맞춘다
             try { gAutoTidySoldOut(); } catch (e) { }   // [신규 2026-10-27] 품절된 상시판매 상품은 저절로 품절 칸으로, 재고가 들어오면 원래 칸으로 (사장님 요청)
-            const container = document.getElementById('products-list-container');
+            const container = _plDualTarget || document.getElementById('products-list-container');
             container.innerHTML = '';
 
             if (uploadProducts.length === 0) {
