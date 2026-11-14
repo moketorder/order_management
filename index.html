@@ -15647,7 +15647,7 @@
                없으면 그날 마지막 주문에 새로 붙인다. */
             const current = feeRows.reduce((a, o) => a + amountOf(o), 0)
                           - allRefunds.reduce((a, o) => a + amountOf(o), 0);
-            const needed = (base >= 15000) ? 0 : await gGetDeliveryFee();
+            const needed = (base >= await gGetFreeMin()) ? 0 : await gGetDeliveryFee();   // [수정 2026-11-14] 무료배달 기준은 설정값 (없으면 15,000원)
             /* [신규 2026-10-28] 쿠폰은 그날 과일이 남아 있고 배달비가 붙어 있어야 쓸모가 있다.
                과일을 모두 취소했거나 배달비가 필요 없어지면 쿠폰 줄도 취소한다 (손님이 주문서를 다시 열면 쿠폰이 돌아간다) */
             const hasFruit = productRows.some(o => o.category === 'fruit' && !/야채|채소/.test(String(o.item || '')));
@@ -15690,6 +15690,16 @@
         }
 
         let _cachedDeliveryFee = 0;
+        // [신규 2026-11-14] 무료배달 기준 금액 (delivery_free_min, 못 읽으면 15,000원)
+        let _cachedFreeMin = 0;
+        async function gGetFreeMin() {
+            if (_cachedFreeMin > 0) return _cachedFreeMin;
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}delivery_free_min.json?t=` + Date.now());
+                if (res.ok) { const v = parseInt(await res.json()); if (v > 0) _cachedFreeMin = v; }
+            } catch (e) { }
+            return _cachedFreeMin || 15000;
+        }
         async function gGetDeliveryFee() {
             if (_cachedDeliveryFee > 0) return _cachedDeliveryFee;
             try {
@@ -25346,10 +25356,11 @@
             if (reload || !_gen) {
                 box.innerHTML = `<div style="padding:30px; text-align:center; color:var(--text-sub); font-weight:700;">불러오는 중...</div>`;
                 const get = async p => { try { const r = await fetch(`${FIREBASE_DB_URL}${p}.json?t=${Date.now()}`); return r.ok ? await r.json() : null; } catch (e) { return null; } };
-                const [d, fee, sat, sun, hol, pl, lg, ts, hrs, hn] = await Promise.all(["delivery_status", "delivery_fee", "saturday_as_weekday", "sunday_as_weekday", "public_holidays", "product_list_enabled", "login_entry_enabled", "today_sale", "store_hours", "settings/home_notice"].map(get));
+                const [d, fee, sat, sun, hol, pl, lg, ts, hrs, hn, fmin] = await Promise.all(["delivery_status", "delivery_fee", "saturday_as_weekday", "sunday_as_weekday", "public_holidays", "product_list_enabled", "login_entry_enabled", "today_sale", "store_hours", "settings/home_notice", "delivery_free_min"].map(get));
                 _gen = {
                     delivery: d === true,
                     fee: (fee === null || isNaN(parseInt(fee))) ? 3000 : parseInt(fee),
+                    freeMin: (fmin === null || !(parseInt(fmin) > 0)) ? 15000 : parseInt(fmin),   // [신규 2026-11-14] 무료배달 기준 금액
                     sat: sat === true,
                     sun: sun === true,   // [신규] 일요일 영업 (적혀 있지 않으면 휴무)
                     ts: (ts && typeof ts === 'object') ? ts : { auto: true, open: '00:00', close: '15:00' },   // [신규] 당일판매 시간
@@ -25357,7 +25368,7 @@
                     productList: pl === null ? true : !!pl,
                     login: lg === null ? true : lg === true,
                     hours: Object.assign({}, GEN_HOURS_DEFAULT, (hrs && typeof hrs === 'object') ? hrs : {}),   // [신규] 매장 운영시간
-                    homeNotice: (hn && typeof hn === 'object') ? { on: hn.on !== false, text: String(hn.text || '') } : { on: false, text: '' }   // [신규 2026-10-03] 홈 가게 소식
+                    homeNotice: (hn && typeof hn === 'object') ? { on: hn.on !== false, text: String(hn.text || ''), mode: hn.mode === 'greet' ? 'greet' : 'custom', custom: String(hn.custom != null ? hn.custom : (hn.mode === 'greet' ? '' : (hn.text || ''))) } : { on: false, text: '', mode: 'custom', custom: '' }   // [신규 2026-10-03] 홈 가게 소식 · [2026-11-14] 기본 인사/직접 적기
                 };
                 await gLoadPrivateSettings(true);   // [신규 2026-10-03] 🔑 칸에 보여 줄 값
                 const t = new Date();
@@ -25401,7 +25412,13 @@
                         <input id="gen-fee" type="number" min="0" step="100" value="${G.fee}" style="width:110px; height:34px; padding:0 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:800; text-align:right; box-sizing:border-box;">
                         <span style="font-size:13px; font-weight:800; color:#475569;">원</span>
                         <button type="button" onclick="gGenSaveFee()" style="height:34px; padding:0 12px; border:none; background:var(--primary); color:#fff; border-radius:8px; font-size:12.5px; font-weight:900; cursor:pointer;">저장</button>
-                    </span>`, `지금 ${G.fee.toLocaleString()}원`))
+                    </span>`, `지금 ${G.fee.toLocaleString()}원`)
+                    // [신규 2026-11-14] 무료배달 기준 금액 (사장님 요청) — 같은 날 받는 상품이 이 금액 이상이면 배달비 무료
+                    + row('무료배달 기준', `<span style="display:inline-flex; align-items:center; gap:6px;">
+                        <input id="gen-free-min" type="number" min="0" step="1000" value="${G.freeMin}" style="width:110px; height:34px; padding:0 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:800; text-align:right; box-sizing:border-box;">
+                        <span style="font-size:13px; font-weight:800; color:#475569;">원 이상</span>
+                        <button type="button" onclick="gGenSaveFreeMin()" style="height:34px; padding:0 12px; border:none; background:var(--primary); color:#fff; border-radius:8px; font-size:12.5px; font-weight:900; cursor:pointer;">저장</button>
+                    </span>`, `지금 ${G.freeMin.toLocaleString()}원 이상이면 배달비 무료`))
                 + card('🏠 홈 가게 소식',
                     // [신규 2026-10-03] 켜기/끄기 — 누르는 즉시 손님 홈에 반영된다 (사장님 요청. 예전 체크칸은 '저장'을 눌러야 바뀌었다)
                     row('손님 홈에 보이기', `<span style="display:inline-flex; gap:3px; background:#e2e8f0; padding:3px; border-radius:10px;">${[[true, '켜기'], [false, '끄기']].map(([v, l]) => `<button type="button" onclick="gGenSetHomeNoticeOn(${v})"
@@ -25409,8 +25426,15 @@
                                background:${G.homeNotice.on === v ? '#fff' : 'transparent'}; color:${G.homeNotice.on === v ? 'var(--primary)' : 'var(--text-sub)'};
                                box-shadow:${G.homeNotice.on === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'};">${l}</button>`).join('')}</span>`,
                         G.homeNotice.on ? (G.homeNotice.text.trim() ? '지금 손님 홈에 보여요' : '켜져 있지만 적은 소식이 없어 안 보여요') : '지금 손님 홈에 안 보여요')
-                    + `<div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin:8px 0 6px; line-height:1.5; border-top:1px solid #f1f5f9; padding-top:8px;">손님 주문서 홈 맨 위 '가게 소식'에 나옵니다. 한 줄에 한 가지씩 적어 주세요. 둘째 줄부터는 손님이 접을 수 있어요.</div>`
-                    + `<textarea id="gen-home-notice" rows="3" maxlength="300" placeholder="예) 한글날(금) 육회 공동구매 올렸어요" style="width:100%; padding:9px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:700; line-height:1.5; box-sizing:border-box; resize:vertical; font-family:inherit;">${gEscapeHtml(G.homeNotice.text)}</textarea>`
+                    // [신규 2026-11-14] 기본 인사 / 직접 적기 고르기 (사장님 요청)
+                    + row('내용', `<span style="display:inline-flex; gap:3px; background:#e2e8f0; padding:3px; border-radius:10px;">${[['greet', '기본 인사'], ['custom', '직접 적기']].map(([v, l]) => `<button type="button" onclick="gGenHomeNoticeMode('${v}')"
+                        style="height:32px; padding:0 14px; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;
+                               background:${G.homeNotice.mode === v ? '#fff' : 'transparent'}; color:${G.homeNotice.mode === v ? 'var(--primary)' : 'var(--text-sub)'};
+                               box-shadow:${G.homeNotice.mode === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'};">${l}</button>`).join('')}</span>`, G.homeNotice.mode === 'greet' ? '정해진 인사말이 나와요' : '적은 글이 나와요')
+                    + (G.homeNotice.mode === 'greet'
+                        ? `<div style="margin-top:8px; padding:11px 12px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:8px; font-size:14px; font-weight:700; color:#334155; line-height:1.5;">${gEscapeHtml(GEN_HOME_GREETING)}</div>`
+                        : `<div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin:8px 0 6px; line-height:1.5; border-top:1px solid #f1f5f9; padding-top:8px;">손님 주문서 홈 맨 위 '가게 소식'에 나옵니다. 한 줄에 한 가지씩 적어 주세요. 둘째 줄부터는 손님이 접을 수 있어요.</div>`
+                        + `<textarea id="gen-home-notice" rows="3" maxlength="300" placeholder="예) 한글날(금) 육회 공동구매 올렸어요" style="width:100%; padding:9px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:700; line-height:1.5; box-sizing:border-box; resize:vertical; font-family:inherit;">${gEscapeHtml(G.homeNotice.custom)}</textarea>`)
 
                     + `<button type="button" onclick="gGenSaveHomeNotice()" style="width:100%; height:40px; margin-top:10px; border:none; background:var(--primary); color:#fff; border-radius:10px; font-size:14px; font-weight:900; cursor:pointer;">가게 소식 저장</button>`)
                 + card('📱 손님 화면',
@@ -25601,6 +25625,18 @@
                 _gen.fee = v;
                 showToast(`배달비를 ${v.toLocaleString()}원으로 저장했습니다.`);
             } catch (e) { showToast('배달비를 저장하지 못했습니다: ' + gErrKo(e)); }
+            renderGeneralAdmin(false);
+        }
+        // [신규 2026-11-14] 무료배달 기준 금액 저장 (delivery_free_min) — 주문서·그날 배달비 맞추기가 같이 쓴다
+        async function gGenSaveFreeMin() {
+            const v = parseInt((document.getElementById('gen-free-min') || {}).value, 10);
+            if (isNaN(v) || v <= 0) return showToast('무료배달 기준 금액을 바르게 적어 주세요.');
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}delivery_free_min.json`, { method: 'PUT', body: JSON.stringify(v) });
+                if (!r.ok) throw new Error(r.status === 401 ? '서버 규칙에 아직 이 칸이 없어요 (규칙관리.txt를 게시해 주세요)' : '서버 응답 ' + r.status);
+                _gen.freeMin = v; _cachedFreeMin = v;
+                showToast(`무료배달 기준을 ${v.toLocaleString()}원 이상으로 저장했습니다.`);
+            } catch (e) { showToast('무료배달 기준을 저장하지 못했습니다: ' + gErrKo(e)); }
             renderGeneralAdmin(false);
         }
 
@@ -26248,13 +26284,27 @@
             } catch (e) { showToast('가게 소식을 바꾸지 못했습니다: ' + gErrKo(e)); }
             renderGeneralAdmin(false);
         }
+        /* [신규 2026-11-14] 홈 가게 소식 — 기본 인사 / 직접 적기 (사장님 요청).
+           손님 주문서는 text 만 읽는다 → 기본 인사면 text 에 인사말을 넣고, 직접 적은 글은 custom 에 따로 남겨 다시 '직접 적기'를 누르면 그대로 나온다 */
+        const GEN_HOME_GREETING = '안녕하세요 모두를 위한 공동구매마켓 모켓입니다.';
+        function gGenHomeNoticeMode(v) {
+            if (!_gen || !_gen.homeNotice) return;
+            const ta = document.getElementById('gen-home-notice');
+            if (ta) _gen.homeNotice.custom = String(ta.value || '');   // 적던 글은 잃지 않게
+            _gen.homeNotice.mode = v;
+            renderGeneralAdmin(false);
+        }
         async function gGenSaveHomeNotice() {
-            const text = String((document.getElementById('gen-home-notice') || {}).value || '').replace(/\r/g, '').trim();
+            const H = (_gen && _gen.homeNotice) || {};
+            const mode = H.mode === 'greet' ? 'greet' : 'custom';
+            const ta = document.getElementById('gen-home-notice');
+            const custom = (ta ? String(ta.value || '') : String(H.custom || '')).replace(/\r/g, '').trim();
+            const text = mode === 'greet' ? GEN_HOME_GREETING : custom;
             const on = !!(_gen && _gen.homeNotice && _gen.homeNotice.on);   // [수정 2026-10-03] 켜기/끄기는 위 단추가 따로 바로 저장한다 — 글 저장은 켜짐 상태를 그대로 둔다
             try {
-                const r = await fetch(`${FIREBASE_DB_URL}settings/home_notice.json`, { method: 'PUT', body: JSON.stringify({ on, text, at: Date.now() }) });
+                const r = await fetch(`${FIREBASE_DB_URL}settings/home_notice.json`, { method: 'PUT', body: JSON.stringify({ on, text, mode, custom, at: Date.now() }) });
                 if (!r.ok) throw new Error('서버 응답 ' + r.status);
-                _gen.homeNotice = { on, text };
+                _gen.homeNotice = { on, text, mode, custom };
                 showToast(on && text ? '가게 소식을 저장했습니다. 손님 홈에 나옵니다.' : '가게 소식을 저장했습니다. 손님 홈에는 안 나옵니다.');
             } catch (e) { showToast('가게 소식을 저장하지 못했습니다: ' + gErrKo(e)); }
             renderGeneralAdmin(false);
