@@ -25387,7 +25387,7 @@
                     productList: pl === null ? true : !!pl,
                     login: lg === null ? true : lg === true,
                     hours: Object.assign({}, GEN_HOURS_DEFAULT, (hrs && typeof hrs === 'object') ? hrs : {}),   // [신규] 매장 운영시간
-                    homeNotice: (hn && typeof hn === 'object') ? { on: hn.on !== false, text: String(hn.text || ''), mode: hn.mode === 'greet' ? 'greet' : 'custom', greet: String(hn.greet || ''), custom: String(hn.custom != null ? hn.custom : (hn.mode === 'greet' ? '' : (hn.text || ''))) } : { on: false, text: '', mode: 'custom', custom: '' }   // [신규 2026-10-03] 홈 가게 소식 · [2026-11-14] 기본 인사/직접 적기
+                    homeNotice: (hn && typeof hn === 'object') ? { on: hn.on !== false, text: String(hn.text || ''), popup: hn.popup === true, mode: hn.mode === 'greet' ? 'greet' : 'custom', greet: String(hn.greet || ''), custom: String(hn.custom != null ? hn.custom : (hn.mode === 'greet' ? '' : (hn.text || ''))) } : { on: false, text: '', mode: 'custom', custom: '' }   // [신규 2026-10-03] 홈 가게 소식 · [2026-11-14] 기본 인사/직접 적기
                 };
                 await gLoadPrivateSettings(true);   // [신규 2026-10-03] 🔑 칸에 보여 줄 값
                 const t = new Date();
@@ -25446,6 +25446,10 @@
                                box-shadow:${G.homeNotice.on === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'};">${l}</button>`).join('')}</span>`,
                         G.homeNotice.on ? (G.homeNotice.text.trim() ? '지금 손님 홈에 보여요' : '켜져 있지만 적은 소식이 없어 안 보여요') : '지금 손님 홈에 안 보여요')
                     // [신규 2026-11-14] 기본 인사 / 직접 적기 고르기 (사장님 요청)
+                    // [신규 2026-11-14] 손님이 처음 들어올 때 가게 소식을 팝업으로 (과일 쿠폰 창처럼, '오늘 하루 보지 않기') — 누르는 즉시 저장 (사장님 요청)
+                    + row('팝업으로 띄우기', `<label style="display:inline-flex; align-items:center; gap:7px; cursor:pointer; font-size:13px; font-weight:800; color:#334155;">
+                        <input type="checkbox" ${G.homeNotice.popup ? 'checked' : ''} onchange="gGenSetHomeNoticePopup(this.checked)" style="width:18px !important; height:18px !important; position:static !important; opacity:1 !important; pointer-events:auto !important; margin:0 !important; accent-color:var(--primary); cursor:pointer;">처음 들어올 때 팝업</label>`,
+                        G.homeNotice.popup ? '손님이 주문서에 들어오면 팝업으로 떠요' : '홈 맨 위에만 보여요')
                     + row('내용', `<span style="display:inline-flex; gap:3px; background:#e2e8f0; padding:3px; border-radius:10px;">${[['greet', '기본 인사'], ['custom', '직접 적기']].map(([v, l]) => `<button type="button" onclick="gGenHomeNoticeMode('${v}')"
                         style="height:32px; padding:0 14px; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;
                                background:${G.homeNotice.mode === v ? '#fff' : 'transparent'}; color:${G.homeNotice.mode === v ? 'var(--primary)' : 'var(--text-sub)'};
@@ -26320,6 +26324,16 @@
             _gen.homeNotice.mode = v;
             renderGeneralAdmin(false);
         }
+        async function gGenSetHomeNoticePopup(v) {
+            if (!_gen || !_gen.homeNotice) return;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}settings/home_notice.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ popup: !!v, at: Date.now() }) });
+                if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                _gen.homeNotice.popup = !!v;
+                showToast(v ? '가게 소식을 팝업으로 띄워요 (켜져 있을 때만)' : '가게 소식 팝업을 껐어요');
+            } catch (e) { showToast('바꾸지 못했습니다: ' + gErrKo(e)); }
+            renderGeneralAdmin(false);
+        }
         // 기본 인사 '수정' — 적는 칸으로 바꾼다 (저장은 '가게 소식 저장')
         function gGenGreetEdit() {
             if (!_gen || !_gen.homeNotice) return;
@@ -26337,9 +26351,9 @@
             const text = mode === 'greet' ? greet : custom;
             const on = !!(_gen && _gen.homeNotice && _gen.homeNotice.on);   // [수정 2026-10-03] 켜기/끄기는 위 단추가 따로 바로 저장한다 — 글 저장은 켜짐 상태를 그대로 둔다
             try {
-                const r = await fetch(`${FIREBASE_DB_URL}settings/home_notice.json`, { method: 'PUT', body: JSON.stringify({ on, text, mode, custom, greet, at: Date.now() }) });
+                const r = await fetch(`${FIREBASE_DB_URL}settings/home_notice.json`, { method: 'PUT', body: JSON.stringify({ on, text, mode, custom, greet, popup: !!H.popup, at: Date.now() }) });
                 if (!r.ok) throw new Error('서버 응답 ' + r.status);
-                _gen.homeNotice = { on, text, mode, custom, greet };
+                _gen.homeNotice = { on, text, mode, custom, greet, popup: !!H.popup };
                 showToast(on && text ? '가게 소식을 저장했습니다. 손님 홈에 나옵니다.' : '가게 소식을 저장했습니다. 손님 홈에는 안 나옵니다.');
             } catch (e) { showToast('가게 소식을 저장하지 못했습니다: ' + gErrKo(e)); }
             renderGeneralAdmin(false);
