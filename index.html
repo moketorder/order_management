@@ -19329,8 +19329,27 @@
             if (!it || !newKey) return false;   // [수정 2026-10-02] 날짜 없는 상품도 픽업일을 적어 둘 수 있다
             const minKey = fMsToDateKey(it.expireAt) || fMsToDateKey(it.releaseAt) || '';
             if (minKey && newKey < minKey) { showToast('⚠️ 픽업일은 마감 날짜보다 앞설 수 없어요'); return false; }
-            if (psItemPickup(it) === newKey) return false;
-            return psItemSave(key, { pickup: newKey });
+            /* [수정 2026-11-14] 판매 중인 공구는 화면 픽업일을 상품 날짜에서 읽는다 — 상품 날짜를 먼저 금요일로 고쳐 두면
+               '이미 같다'고 보고 일정의 픽업일(it.pickup)을 안 고쳤다 (사장님: 왕란 픽업일을 금요일로 바꿨는데 목요일로 남음).
+               일정에 적힌 픽업일까지 같을 때만 건너뛴다 */
+            const oldPick = it.pickup || psItemPickup(it);
+            if (psItemPickup(it) === newKey && (it.pickup || '') === newKey) return false;
+            const ok = await psItemSave(key, { pickup: newKey });
+            // 반복 상품이면 뒤에 이미 만들어 둔 차례들의 픽업일도 같은 만큼 옮긴다 (예: 목 → 금이면 다음 주들도 금)
+            const p = uploadProducts[it.idx];
+            if (ok && p && Number(p.repeatWeeks) > 0 && oldPick && oldPick !== newKey) {
+                const ms = k => { const a = String(k).split('-').map(Number); return new Date(a[0], a[1] - 1, a[2], 12).getTime(); };
+                const dd = Math.round((ms(newKey) - ms(oldPick)) / 86400000);
+                const later = psItemsOfSid(p.sid).filter(x => x.key !== key && Number(x.releaseAt) > Number(it.releaseAt) && x.pickup);
+                for (const x of later) {
+                    const d = new Date(ms(x.pickup) + dd * 86400000);
+                    let nk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    const ek = fMsToDateKey(x.expireAt) || '';
+                    if (ek && nk < ek) nk = ek;   // 마감보다 앞서지 않게
+                    if (nk !== x.pickup) await psItemSave(x.key, { pickup: nk }, true);
+                }
+            }
+            return ok;
         }
         async function psSetPickupFromInput(key, value) {
             psUndoMark('픽업일');
