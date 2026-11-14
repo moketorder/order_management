@@ -42010,16 +42010,47 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const [bg, fg] = preColor[pre(e.code)] || preColor.P;
                 const names = e.products.slice(0, 2).join(' · ') + (e.products.length > 2 ? ` 외 ${e.products.length - 2}개` : '');
                 const on = codeSelected.has(e.code);
-                return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin-bottom:6px; background:${on ? '#fff7ed' : '#fff'}; border:1px solid ${on ? '#fed7aa' : 'var(--border)'}; border-radius:10px;">
+                const open = codeListOpen.has(e.code);
+                return `<div style="margin-bottom:6px; background:${on ? '#fff7ed' : '#fff'}; border:1px solid ${on ? '#fed7aa' : (open ? '#93c5fd' : 'var(--border)')}; border-radius:10px;">
+                    <div style="display:flex; align-items:center; gap:10px; padding:10px 12px;">
                     <input type="checkbox" onchange="toggleCodeSelect('${e.code}')" ${on ? 'checked' : ''} title="합칠 번호 고르기" style="flex:0 0 auto; width:17px !important; height:17px !important; position:static !important; opacity:1 !important; pointer-events:auto !important; margin:0 !important; accent-color:#c2410c; cursor:pointer;">
-                    <span style="flex:0 0 auto; padding:4px 9px; border-radius:6px; background:${bg}; color:${fg}; font-size:12px; font-weight:900;">${e.code}</span>
-                    <span style="flex:1; min-width:0;">
+                    <span onclick="gCodeListToggle('${e.code}')" title="연결된 상품 펼치기" style="flex:0 0 auto; padding:4px 9px; border-radius:6px; background:${bg}; color:${fg}; font-size:12px; font-weight:900; cursor:pointer;">${e.code} <span style="font-size:10px;">${open ? '▲' : '▼'}</span></span>
+                    <span onclick="gCodeListToggle('${e.code}')" style="flex:1; min-width:0; cursor:pointer;">
                         <span style="display:block; font-size:13px; font-weight:800; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.label ? gEscapeHtml(e.label) : `<span style="color:#cbd5e1;">이름표 없음</span>`}</span>
                         <span style="display:block; margin-top:2px; font-size:11px; font-weight:700; color:var(--text-sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${names ? gEscapeHtml(names) : '연결된 상품 없음'}${e.poCount ? ` · 발주 ${e.poCount}건${e.lastDate ? ` (최근 ${e.lastDate})` : ''}` : ''}</span>
                     </span>
                     <button type="button" onclick="editCodeLabel('${e.code}')" title="이름표 고치기" style="flex:0 0 auto; padding:6px 10px; border:1.5px solid var(--border); background:#fff; color:#475569; border-radius:7px; font-size:12px; font-weight:800; cursor:pointer;">수정</button>
+                    </div>${open ? gCodeListProductsHtml(e.code) : ''}
                 </div>`;
             }).join('');
+        }
+
+        /* [신규 2026-11-14] 코드 목록에서 번호를 누르면 그 번호에 이어진 상품을 펼쳐 보여 주고, 바로 상품 수정으로 간다 (사장님 요청) */
+        var codeListOpen = new Set();
+        function gCodeListToggle(code) {
+            if (codeListOpen.has(code)) codeListOpen.delete(code); else codeListOpen.add(code);
+            renderCodeList();
+        }
+        function gCodeListProductsHtml(code) {
+            const E = gEscapeHtml;
+            const list = [];
+            (uploadProducts || []).forEach((p, i) => { if (p && String(p.productCode || '').trim() === code) list.push({ p, i }); });
+            if (!list.length) return `<div style="padding:8px 12px 12px; font-size:12px; font-weight:700; color:#94a3b8; border-top:1px dashed var(--border);">이 번호에 이어진 상품이 없어요 (발주 기록만 있어요)</div>`;
+            return `<div style="padding:6px 10px 10px; border-top:1px dashed var(--border); display:flex; flex-direction:column; gap:6px;">` + list.map(({ p, i }) => {
+                const img0 = (p.images && p.images[0]) ? String(p.images[0]) : '';
+                const img = img0 ? ((img0.startsWith('data:') || img0.startsWith('http')) ? gCdnUrl(img0, 120) : `https://lh3.googleusercontent.com/d/${img0}=s120`) : '';
+                const hidden = p.hide === true || p.hide === 'true' || ((p.showToday === false || p.showToday === 'false') && (p.showReserve === false || p.showReserve === 'false'));
+                const where = String(p.matchKey || p.date || '').trim();
+                const price = parseInt(p.price) || 0;
+                return `<div style="display:flex; align-items:center; gap:9px; padding:6px 8px; background:#f8fafc; border:1px solid var(--border); border-radius:8px;">
+                    ${img ? `<img src="${E(img)}" loading="lazy" style="flex:0 0 auto; width:40px; height:40px; object-fit:cover; border-radius:6px; background:#e2e8f0;">` : `<span style="flex:0 0 auto; width:40px; height:40px; border-radius:6px; background:#e2e8f0;"></span>`}
+                    <span style="flex:1; min-width:0;">
+                        <span style="display:block; font-size:12.5px; font-weight:800; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${E(p.name || '')}</span>
+                        <span style="display:block; margin-top:2px; font-size:11px; font-weight:700; color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${hidden ? '<span style="color:#ef4444;">🙈 숨김</span>' : '<span style="color:#16a34a;">👁️ 노출</span>'}${where ? ' · ' + E(where) : ''}${price ? ' · ' + price.toLocaleString() + '원' : ''}</span>
+                    </span>
+                    <button type="button" onclick="editProduct(${i})" title="상품 수정 화면으로" style="flex:0 0 auto; padding:6px 10px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:7px; font-size:12px; font-weight:800; cursor:pointer;">상품 수정</button>
+                </div>`;
+            }).join('') + `</div>`;
         }
 
         /* 이름표만 고친다. 번호(code) 자체는 상품·발주·주문 기록이 모두 물고 있어 바꾸지 않는다.
