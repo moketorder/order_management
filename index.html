@@ -5766,13 +5766,13 @@
                     const refs = [];
                     Object.entries(gSrc.picks || {}).forEach(([w, items]) => Object.entries(items || {}).forEach(([key, p]) => { if (!p) return; const d = p.date || srcAddDays(w, Math.max(0, SRC_DAYS.indexOf(p.day))); if (inWk(d)) refs.push({ d, r: ['pick', w, key], p }); }));
                     ['direct', 'manual', 'onsite'].forEach(k => Object.entries(gSrc[k] || {}).forEach(([id, p]) => { if (p && inWk(p.date)) refs.push({ d: p.date, r: [k, id], p }); }));
-                    (gSrc.sada || []).forEach(p => { if (inWk(p.date) && !p.hide) refs.push({ d: p.date, r: ['sada', p.code], p: { name: p.name, code: p.code, vendor: '사다드림' } }); });
+                    (gSrc.sada || []).forEach(p => { if (inWk(p.date) && !p.hide) refs.push({ d: p.date, r: ['sada', p.code], p: { name: p.name, code: p.code, sid: p.sid || '', vendor: '사다드림' } }); });
                     // [신규 2026-10-16] 사다드림이 빠지지 않게 — 달력 자료(gSrc.sada)에 없으면 등록 상품에서 사다드림·그 주 픽업일인 것을 직접 넣는다 (사장님 요청)
                     list.forEach(q => {
                         if (!(q.isSada === true || q.isSada === 'true') || q.hide || !inWk(q.date)) return;
-                        const code = String(q.productCode || q.sid || '');
-                        if (refs.some(o => o.r[0] === 'sada' && o.p.code === code && o.d === q.date)) return;
-                        refs.push({ d: q.date, r: ['sada', code], p: { name: String(q.name || '').replace(/^\s*\[사다드림\]\s*/, ''), code, vendor: '사다드림' } });
+                        const code = String(q.productCode || q.sid || ''), sid = String(q.sid || code);
+                        if (refs.some(o => o.r[0] === 'sada' && (o.p.sid || o.p.code) === sid && o.d === q.date)) return;   // [수정 2026-11-14] 같은 번호의 다른 상품은 따로
+                        refs.push({ d: q.date, r: ['sada', code], p: { name: String(q.name || '').replace(/^\s*\[사다드림\]\s*/, ''), code, sid, vendor: '사다드림' } });
                     });
                     const now = Date.now(), seen = new Set(), items = [];
                     refs.sort((a, b) => a.d.localeCompare(b.d)).forEach(({ d, r, p }) => {
@@ -5783,7 +5783,8 @@
                         const link = (gSrc.reg || {})[key];
                         let prod = null, many = [];
                         if (!(link && link.none)) {
-                            if (p.code && byCode[p.code]) prod = byCode[p.code];
+                            if (p.sid && bySid[p.sid]) prod = bySid[p.sid];   // [신규 2026-11-14] 사다드림은 노출번호로 먼저 (같은 식별번호 상품이 여럿일 때)
+                            if (!prod && p.code && byCode[p.code]) prod = byCode[p.code];
                             if (!prod && link) prod = (link.sid && bySid[link.sid]) || (link.code && byCode[link.code]) || null;
                             if (link && Array.isArray(link.many)) many = link.many.map(m => (m.sid && bySid[m.sid]) || (m.code && byCode[m.code])).filter(Boolean);
                             if (!prod) prod = byName[srcNormName(p.name)] || null;
@@ -6431,9 +6432,11 @@
                         const seen = new Set(); gSrc.sada = [];
                         const addSada = (p, date) => {
                             if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return;
-                            const code = String(p.productCode || p.sid || ''), k = code + '|' + date;
+                            /* [수정 2026-11-14] 같은 날·같은 식별번호라도 상품(노출번호 sid)이 다르면 따로 (사장님 지적 —
+                               가윤떡집 피자설기·딸기모찌가 둘 다 S0063이라 화요일에 하나만 보였다) */
+                            const code = String(p.productCode || p.sid || ''), sid = String(p.sid || code), k = sid + '|' + date;
                             if (seen.has(k)) return; seen.add(k);
-                            gSrc.sada.push({ date, code, name: String(p.name || '').replace(/^\s*\[사다드림\]\s*/, ''), hide: !!p.hide });
+                            gSrc.sada.push({ date, code, sid, name: String(p.name || '').replace(/^\s*\[사다드림\]\s*/, ''), hide: !!p.hide });
                         };
                         prods.forEach(p => addSada(p, p.date));
                         try {
