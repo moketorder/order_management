@@ -25368,7 +25368,7 @@
                     productList: pl === null ? true : !!pl,
                     login: lg === null ? true : lg === true,
                     hours: Object.assign({}, GEN_HOURS_DEFAULT, (hrs && typeof hrs === 'object') ? hrs : {}),   // [신규] 매장 운영시간
-                    homeNotice: (hn && typeof hn === 'object') ? { on: hn.on !== false, text: String(hn.text || ''), mode: hn.mode === 'greet' ? 'greet' : 'custom', custom: String(hn.custom != null ? hn.custom : (hn.mode === 'greet' ? '' : (hn.text || ''))) } : { on: false, text: '', mode: 'custom', custom: '' }   // [신규 2026-10-03] 홈 가게 소식 · [2026-11-14] 기본 인사/직접 적기
+                    homeNotice: (hn && typeof hn === 'object') ? { on: hn.on !== false, text: String(hn.text || ''), mode: hn.mode === 'greet' ? 'greet' : 'custom', greet: String(hn.greet || ''), custom: String(hn.custom != null ? hn.custom : (hn.mode === 'greet' ? '' : (hn.text || ''))) } : { on: false, text: '', mode: 'custom', custom: '' }   // [신규 2026-10-03] 홈 가게 소식 · [2026-11-14] 기본 인사/직접 적기
                 };
                 await gLoadPrivateSettings(true);   // [신규 2026-10-03] 🔑 칸에 보여 줄 값
                 const t = new Date();
@@ -25432,7 +25432,12 @@
                                background:${G.homeNotice.mode === v ? '#fff' : 'transparent'}; color:${G.homeNotice.mode === v ? 'var(--primary)' : 'var(--text-sub)'};
                                box-shadow:${G.homeNotice.mode === v ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'};">${l}</button>`).join('')}</span>`, G.homeNotice.mode === 'greet' ? '정해진 인사말이 나와요' : '적은 글이 나와요')
                     + (G.homeNotice.mode === 'greet'
-                        ? `<div style="margin-top:8px; padding:11px 12px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:8px; font-size:14px; font-weight:700; color:#334155; line-height:1.5;">${gEscapeHtml(GEN_HOME_GREETING)}</div>`
+                        // [수정 2026-11-14] 기본 인사 옆 '수정' — 누르면 적는 칸으로 바뀌고 '가게 소식 저장'으로 함께 저장 (사장님 요청)
+                        ? (G.homeNotice.greetEdit
+                            ? `<input id="gen-home-greet" type="text" maxlength="100" value="${gEscapeHtml(G.homeNotice.greet || GEN_HOME_GREETING)}" style="width:100%; height:42px; margin-top:8px; padding:0 12px; border:1.5px solid var(--primary); border-radius:8px; font-size:14px; font-weight:700; box-sizing:border-box;">`
+                            : `<div style="display:flex; align-items:center; gap:8px; margin-top:8px; padding:8px 8px 8px 12px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:8px;">
+                                <span style="flex:1; min-width:0; font-size:14px; font-weight:700; color:#334155; line-height:1.5;">${gEscapeHtml(G.homeNotice.greet || GEN_HOME_GREETING)}</span>
+                                <button type="button" onclick="gGenGreetEdit()" style="flex:0 0 auto; height:32px; padding:0 12px; border:1.5px solid var(--border); background:#fff; color:#475569; border-radius:7px; font-size:12.5px; font-weight:800; cursor:pointer;">수정</button></div>`)
                         : `<div style="font-size:11.5px; font-weight:700; color:#94a3b8; margin:8px 0 6px; line-height:1.5; border-top:1px solid #f1f5f9; padding-top:8px;">손님 주문서 홈 맨 위 '가게 소식'에 나옵니다. 한 줄에 한 가지씩 적어 주세요. 둘째 줄부터는 손님이 접을 수 있어요.</div>`
                         + `<textarea id="gen-home-notice" rows="3" maxlength="300" placeholder="예) 한글날(금) 육회 공동구매 올렸어요" style="width:100%; padding:9px 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:700; line-height:1.5; box-sizing:border-box; resize:vertical; font-family:inherit;">${gEscapeHtml(G.homeNotice.custom)}</textarea>`)
 
@@ -26291,20 +26296,31 @@
             if (!_gen || !_gen.homeNotice) return;
             const ta = document.getElementById('gen-home-notice');
             if (ta) _gen.homeNotice.custom = String(ta.value || '');   // 적던 글은 잃지 않게
+            const gi = document.getElementById('gen-home-greet');
+            if (gi) _gen.homeNotice.greet = String(gi.value || '');
             _gen.homeNotice.mode = v;
             renderGeneralAdmin(false);
+        }
+        // 기본 인사 '수정' — 적는 칸으로 바꾼다 (저장은 '가게 소식 저장')
+        function gGenGreetEdit() {
+            if (!_gen || !_gen.homeNotice) return;
+            _gen.homeNotice.greetEdit = true;
+            renderGeneralAdmin(false);
+            setTimeout(() => { const gi = document.getElementById('gen-home-greet'); if (gi) { gi.focus(); gi.select(); } }, 30);
         }
         async function gGenSaveHomeNotice() {
             const H = (_gen && _gen.homeNotice) || {};
             const mode = H.mode === 'greet' ? 'greet' : 'custom';
             const ta = document.getElementById('gen-home-notice');
             const custom = (ta ? String(ta.value || '') : String(H.custom || '')).replace(/\r/g, '').trim();
-            const text = mode === 'greet' ? GEN_HOME_GREETING : custom;
+            const gi = document.getElementById('gen-home-greet');
+            const greet = (gi ? String(gi.value || '') : String(H.greet || '')).replace(/\r/g, '').trim() || GEN_HOME_GREETING;
+            const text = mode === 'greet' ? greet : custom;
             const on = !!(_gen && _gen.homeNotice && _gen.homeNotice.on);   // [수정 2026-10-03] 켜기/끄기는 위 단추가 따로 바로 저장한다 — 글 저장은 켜짐 상태를 그대로 둔다
             try {
-                const r = await fetch(`${FIREBASE_DB_URL}settings/home_notice.json`, { method: 'PUT', body: JSON.stringify({ on, text, mode, custom, at: Date.now() }) });
+                const r = await fetch(`${FIREBASE_DB_URL}settings/home_notice.json`, { method: 'PUT', body: JSON.stringify({ on, text, mode, custom, greet, at: Date.now() }) });
                 if (!r.ok) throw new Error('서버 응답 ' + r.status);
-                _gen.homeNotice = { on, text, mode, custom };
+                _gen.homeNotice = { on, text, mode, custom, greet };
                 showToast(on && text ? '가게 소식을 저장했습니다. 손님 홈에 나옵니다.' : '가게 소식을 저장했습니다. 손님 홈에는 안 나옵니다.');
             } catch (e) { showToast('가게 소식을 저장하지 못했습니다: ' + gErrKo(e)); }
             renderGeneralAdmin(false);
