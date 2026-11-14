@@ -4657,7 +4657,7 @@
                     if (link && link.none) return -1;   // [신규 2026-10-08] 끊어 둔 것
                     if (link) { if (link.sid && link.sid in ix.bySid) return ix.bySid[link.sid]; if (link.code && link.code in ix.byCode) return ix.byCode[link.code]; }
                     const n = srcNormName(tg.name);
-                    return (n && n in ix.byName) ? ix.byName[n] : -1;
+                    return srcNameIdxVendorOk(ix, (n && n in ix.byName) ? ix.byName[n] : -1, tg.vendor);   // [수정 2026-11-14] 업체 다르면 잇지 않음
                 }
                 // [신규 2026-10-09] 상품 등록 칸에 발주의 낱개 수량(재고)·식별번호를 넣는다 — 넣은 것 이름들
                 function srcFillFromPo(po) {
@@ -4828,7 +4828,15 @@
                     // [신규 2026-10-22] 공동구매 했던 상품을 끌어다 놓은 이름표는 상품코드를 갖고 있다 — 이름이 그 뒤 바뀌어도 코드로 잇는다 (사장님: 공구한 상품인데 왜 상품등록이 연결 안 돼?)
                     if (p.code && p.code in ix.byCode) return ix.byCode[p.code];
                     const n = srcNormName(p.name);
-                    return (n && n in ix.byName) ? ix.byName[n] : -1;
+                    return srcNameIdxVendorOk(ix, (n && n in ix.byName) ? ix.byName[n] : -1, r[0] === 'manual' ? '' : srcVendorOf(r, p));
+                }
+                /* [신규 2026-11-14] 이름만 같아 이어 본 등록 상품이 다른 업체 밴드에서 등록한 것이면 잇지 않는다 (사장님 요청 —
+                   팔도곳간 홍가리비를 넣었는데 11/6 방랑미식가 홍가리비로 이어져 재공구로 보였다). 업체가 다르면 새 상품으로 본다 */
+                function srcNameIdxVendorOk(ix, i, vendor) {
+                    if (i == null || i < 0 || !vendor || /^(공구|공동구매|상시판매)$/.test(String(vendor).trim())) return i;   // 업체가 아닌 표시(공구 기록·상시)는 그대로
+                    const p = ix.list[i]; if (!p) return i;
+                    const ls = Object.values(gSrc.reg || {}).filter(l => l && !l.none && l.vendor && ((l.sid && l.sid === p.sid) || (l.code && l.code === p.productCode)));
+                    return (ls.length && !ls.some(l => l.vendor === vendor)) ? -1 : i;
                 }
                 let _srcRegIx = null, _srcRegIxAt = 0;
                 /* [수정 2026-10-07] 이름표 앞에 발주·상품 둘 다 (사장님 요청)
@@ -5285,7 +5293,7 @@
                     const l = (gSrc.reg || {})[srcNameKey(tg.vendor || '', tg.name)];
                     let i = -1;
                     if (l) i = (l.sid && l.sid in ix.bySid) ? ix.bySid[l.sid] : ((l.code && l.code in ix.byCode) ? ix.byCode[l.code] : -1);
-                    if (i < 0) { const n = srcNormName(tg.name); if (n in ix.byName) i = ix.byName[n]; }
+                    if (i < 0) { const n = srcNormName(tg.name); if (n in ix.byName) i = srcNameIdxVendorOk(ix, ix.byName[n], tg.vendor); }   // [수정 2026-11-14] 업체 다르면 잇지 않음
                     return i >= 0 ? ix.list[i] : null;
                 }
                 // 그 소싱 상품의 가장 최근 발주 (날짜 상관없이, 식별번호 있는 것)
