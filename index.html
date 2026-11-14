@@ -45922,6 +45922,8 @@ body { font-family:"Pretendard Variable", Pretendard, sans-serif; margin:0; padd
 .p-head:empty { background:transparent; border:1px dashed #c8e6c9; order:2; }   /* [수정 2026-10-14] 말머리가 없으면 보관방법이 맨 왼쪽 (빈 말머리 칸은 오른쪽으로) */
 .p-head:empty::before { content:"말머리"; color:#a5d6a7; }
 .p-desc:empty::before { content:"한줄소개"; color:#cbd5e1; }
+.p-name:empty::before { content:"상품명"; color:#cbd5e1; }
+.p-num:empty::before { content:"가격"; color:#fdba74; }
 .p-name { font-size:24px; font-weight:800; color:var(--primary-color); line-height:1.2; margin-bottom:4px; white-space:nowrap; }
 .p-desc { font-size:16px; color:#666; line-height:1.4; margin-bottom:6px; white-space:nowrap; }
 .p-prices { position:absolute; bottom:14px; left:10px; right:10px; display:flex; flex-direction:row; justify-content:space-between; align-items:flex-end; }
@@ -45938,7 +45940,7 @@ body { font-family:"Pretendard Variable", Pretendard, sans-serif; margin:0; padd
 .p-comma { font-size:0.75em !important; display:inline-block; margin-left:0 !important; }
 @media print {
   .no-print, .p-head:empty { display:none !important; }
-  .p-desc:empty::before { content:none; }
+  .p-desc:empty::before, .p-name:empty::before, .p-num:empty::before { content:none; }
   body { background:white; padding:0; margin:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   @page { size:A4; margin:0 !important; }
   html, body { width:210mm; height:297mm; margin:0 !important; padding:0 !important; overflow:visible !important; }
@@ -45946,7 +45948,7 @@ body { font-family:"Pretendard Variable", Pretendard, sans-serif; margin:0; padd
   [contenteditable]:focus { outline:none; }
 }
 </style></head><body>
-<div class="bar no-print"><b>🏷️ 가격표 <span id="cnt"></span>장</b><i id="st"></i><button onclick="window.print()">🖨️ 인쇄</button></div>
+<div class="bar no-print"><b>🏷️ 가격표 <span id="cnt"></span>장</b><i id="st"></i><button id="add-once" title="빈 가격표를 한 장 더해요. 여기서 적은 것은 저장되지 않아요 (이번 인쇄에만)" style="background:#fff; color:#15803d; border:1.5px solid #16a34a; padding:0 16px;">➕ 이번에만 쓸 가격표</button><button onclick="window.print()" style="margin-left:0;">🖨️ 인쇄</button></div>
 <div id="area"></div>
 <script>
 var adjustFontSize = ${gPtAdjustFontSize.toString()};
@@ -45988,7 +45990,7 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                     (t.orig ? '<button class="orig-btn no-print" title="정상가 줄 빼기/넣기">' + (t.noOrig ? '정상가 넣기' : '정상가 빼기') + '</button>' : '') +
                     // [신규 2026-10-19] 복제 — 같은 가격표를 바로 뒤에 한 장 더 (사장님 요청). 복제본에서 고친 것은 이번 인쇄에만 쓰고 저장하지 않는다
                     '<button class="copy-btn no-print" title="이 가격표를 한 장 더"' + (t.orig ? ' style="right:122px;"' : '') + '>⧉ 복제</button>' +
-                    (t.copy ? '<div class="copy-mark no-print" title="복제본에서 고친 것은 저장되지 않아요">복제본</div>' : '') +
+                    (t.copy ? '<div class="copy-mark no-print" title="여기서 고친 것은 저장되지 않아요">' + (t.once ? '이번에만' : '복제본') + '</div>' : '') +
                     '<div class="info-side full">' +
                     '<div class="p-desc" contenteditable="true">' + esc(t.desc) + '</div>' +   // [수정 2026-10-07] 한줄소개가 상품명 위 (사장님 요청)
                     '<div class="p-name" contenteditable="true">' + esc(t.name) + '</div>' +
@@ -46035,6 +46037,20 @@ var adjustFontSize = ${gPtAdjustFontSize.toString()};
                     })
                     .catch(function (e) { st.textContent = '저장 실패'; console.error(e); });
             }
+            /* [신규 2026-11-14] 이번에만 쓸 빈 가격표 (사장님 요청 — 다른 상품 가격표의 이름을 고쳐 쓰면 그 상품 가격표에 저장돼 남았다).
+               복제본처럼 저장하지 않는다 */
+            var addOnce = document.getElementById('add-once');
+            if (addOnce) addOnce.onclick = function () {
+                var e0 = { head: '', name: '', desc: '', price: 0 };
+                T.push({ key: '', head: '', name: '', desc: '', storage: '', price: 0, orig: 0, off: '', copy: true, once: true, def: e0 });
+                render(); st.textContent = '빈 가격표를 더했어요 · 저장되지 않아요';
+                setTimeout(function () {
+                    var tags = document.querySelectorAll('.price-tag'), last = tags[tags.length - 1];
+                    if (!last) return;
+                    last.scrollIntoView({ block: 'center' });
+                    var n = last.querySelector('.p-name'); if (n) n.focus();
+                }, 60);
+            };
             area.addEventListener('input', function (ev) {
                 var el = ev.target; if (!el.isContentEditable) return;
                 if (!el.textContent.trim()) el.innerHTML = '';   // 다 지우면 빈칸 (말머리는 인쇄에서 빠진다)
