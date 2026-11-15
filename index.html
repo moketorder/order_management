@@ -6141,7 +6141,7 @@
                         // [수정 2026-10-24] 일요일 마감 머리말도 상품명과 같은 비율로 (사장님 요청) — 머리말 높이가 커진 만큼 줄 높이를 다시 잰다
                         const headH = Math.round(Math.max(36, nameF * 1.5)), rhH = (H - gap * (nb - 1) - 12 * nb - headH * Hh) / R;
                         const cutNow = cutN();
-                        return { k, R, rh: rhH, rhRaw: rhH, cellW, imgS: Math.round(Math.max(40, Math.min(130, rhH - 16))), priceF, nameF, headH, cut: cutNow };
+                        return { k, R, rh: rhH, rhRaw: rhH, cellW, imgS: Math.round(Math.max(12, Math.min(130, rhH - 16 >= 40 ? rhH - 16 : rhH - 6))), priceF, nameF, headH, cut: cutNow };   // [수정 2026-11-15] 사진이 줄 높이보다 크면 위아래 줄을 덮었다 (사장님: 한눈에 섬네일이 넘친다) — 줄이 낮으면 줄 높이에 맞춘다
                     };
                     const plans = [1, 2, 3].map(plan), okP = plans.filter(p => p.rh >= 40), poolP = okP.length ? okP : plans;
                     // [수정 2026-10-24] 잘리는 이름이 적은 배치를 먼저 (같으면 글씨 큰 쪽, 그다음 줄 높이 큰 쪽)
@@ -6225,6 +6225,8 @@
                     c.textAlign = 'left';
                 }
                 async function srcThDrawDay(items, d, di, opt) {   // [신규 2026-10-30] opt = { title, pill } — 머리말 글을 바꿀 때 (카톡용 과일·야채)
+                    // [신규 2026-11-15] 요일별 섬네일은 사다드림을 맨 앞에 (사장님 요청). 나머지 차례는 그대로 (카톡용 과일·야채는 손대지 않는다)
+                    if (!opt) items = items.map((it, i) => [it, i]).sort((a, b) => ((b[0].vendor === '사다드림') - (a[0].vendor === '사다드림')) || a[1] - b[1]).map(x => x[0]);
                     const F = await srcThFonts(), cv = document.createElement('canvas'); cv.width = cv.height = 1080;
                     const c = cv.getContext('2d'), [col, colD] = SRC_TH_DAYC[di];
                     c.fillStyle = '#fff7ea'; c.fillRect(0, 0, 1080, 1080);
