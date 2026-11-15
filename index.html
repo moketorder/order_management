@@ -6119,7 +6119,7 @@
                        요일마다 가로로 꽉 찬 띠 하나를 위에서 아래로 쌓고, 띠 안에서 상품을 한 줄에 k개씩 늘어놓는다.
                        k(1~3)마다 재 보고 상품명이 가장 크게 나오는 것을 고른다. 줄 높이·상품명·사진·가격 크기는 모든 줄이 같다.
                        일요일 마감 상품은 그 요일 띠 맨 앞에 따로 줄을 잡아 빨간 머리말 + 옅은 빨강 판으로 묶는다 (예전과 같은 모양) */
-                    const HEAD = 36, top = 188, H = 862, gap = 12, X0 = 30, W = 1020, LAB = 66;
+                    const HEAD = 36, top = 188, H = 862, gap = 8, X0 = 30, W = 1020, LAB = 66;
                     const sunOf = it => (!it.closed && it.sun && it.sunOn) ? it.sun : '';
                     const segsOf = g => { const segs = []; g.its.forEach(it => { const s = sunOf(it); const last = segs[segs.length - 1]; if (last && last.s === s) last.its.push(it); else segs.push({ s, its: [it] }); }); return segs; };
                     const bands = byDay.map(g => ({ g, segs: segsOf(g) }));
@@ -6129,19 +6129,19 @@
                     const plan = k => {
                         const R = bands.reduce((a, b) => a + mseg(b.segs, k).reduce((x, s) => x + Math.ceil(s.its.length / k), 0), 0);
                         const Hh = bands.reduce((a, b) => a + mseg(b.segs, k).filter(s => s.s).length, 0);
-                        const rhRaw = (H - gap * (nb - 1) - 12 * nb - HEAD * Hh) / R, rh = rhRaw;   // [수정 2026-10-24] 줄 높이 제한을 없앴다 — 상품이 적어도 요일 칸을 꽉 채운다 (사장님 요청)
+                        const rhRaw = (H - gap * (nb - 1) - 6 * nb - HEAD * Hh) / R, rh = rhRaw;   // [수정 2026-10-24] 줄 높이 제한을 없앴다 — 상품이 적어도 요일 칸을 꽉 채운다 (사장님 요청)
                         const cellW = (W - LAB - 8) / k;
-                        const imgS = Math.round(Math.max(40, Math.min(130, rh - 16)));
+                        const imgS = Math.round(Math.max(12, Math.min(130, rh - 4)));   // [수정 2026-11-15] 사진이 줄 높이를 꽉 채운다 (사장님 요청 — 너무 안 보인다)
                         const priceF = Math.round(Math.max(21, Math.min(34, rh * .33)));
-                        let nameF = Math.round(Math.max(19, Math.min(46, rh * .5)));   // [수정 2026-10-31] 가격을 빼고 상품명을 키운다 (사장님 요청)
+                        let nameF = Math.round(Math.max(12, Math.min(46, (rh - 4) / 1.2)));   // [수정 2026-11-15] 줄 높이만큼 크게   // [수정 2026-10-31] 가격을 빼고 상품명을 키운다 (사장님 요청)
                         const avail = it => cellW - 8 - imgS - 12 - 12 - (it.vendor === '사다드림' ? 90 : 0) - (it.closed ? 110 : 0);   // [수정 2026-10-31] 가격은 이름 아래 줄로 — 이름이 칸 너비를 다 쓴다 (사장님 요청)
                         const cutN = () => { c.font = '600 ' + nameF + 'px ' + F; return items.filter(it => c.measureText(String(it.name || '')).width > avail(it)).length; };
-                        while (nameF > 19 && cutN() > Math.max(1, items.length * .2)) nameF--;
-                        while (nameF > 16 && nameF * 1.25 > rh - 10) nameF--;   // 이름 한 줄이 줄 높이에 들어가게
+                        while (nameF > 14 && cutN() > Math.max(1, items.length * .2)) nameF--;
+                        while (nameF > 10 && nameF * 1.2 > rh - 4) nameF--;   // 이름 한 줄이 줄 높이에 들어가게
                         // [수정 2026-10-24] 일요일 마감 머리말도 상품명과 같은 비율로 (사장님 요청) — 머리말 높이가 커진 만큼 줄 높이를 다시 잰다
-                        const headH = Math.round(Math.max(36, nameF * 1.5)), rhH = (H - gap * (nb - 1) - 12 * nb - headH * Hh) / R;
+                        const headH = Math.round(Math.max(36, nameF * 1.5)), rhH = (H - gap * (nb - 1) - 6 * nb - headH * Hh) / R;
                         const cutNow = cutN();
-                        return { k, R, rh: rhH, rhRaw: rhH, cellW, imgS: Math.round(Math.max(12, Math.min(130, rhH - 16 >= 40 ? rhH - 16 : rhH - 6))), priceF, nameF, headH, cut: cutNow };   // [수정 2026-11-15] 사진이 줄 높이보다 크면 위아래 줄을 덮었다 (사장님: 한눈에 섬네일이 넘친다) — 줄이 낮으면 줄 높이에 맞춘다
+                        return { k, R, rh: rhH, rhRaw: rhH, cellW, imgS: Math.round(Math.max(12, Math.min(130, rhH - 4))), priceF, nameF, headH, cut: cutNow };   // [수정 2026-11-15] 사진이 줄 높이보다 크면 위아래 줄을 덮었다 (사장님: 한눈에 섬네일이 넘친다) — 줄이 낮으면 줄 높이에 맞춘다
                     };
                     const plans = [1, 2, 3].map(plan), okP = plans.filter(p => p.rh >= 40), poolP = okP.length ? okP : plans;
                     // [수정 2026-10-24] 잘리는 이름이 적은 배치를 먼저 (같으면 글씨 큰 쪽, 그다음 줄 높이 큰 쪽)
@@ -6154,7 +6154,7 @@
                     bands.forEach(({ g, segs: segs0 }) => {
                         const segs = mseg(segs0, k);
                         const rows = segs.reduce((x, s) => x + Math.ceil(s.its.length / k), 0), heads = segs.filter(s => s.s).length;
-                        const h = 12 + rh * rows + headH * heads + pad;
+                        const h = 6 + rh * rows + headH * heads + pad;
                         c.save(); c.shadowColor = 'rgba(60,40,10,.16)'; c.shadowBlur = 12; c.shadowOffsetY = 4;   /* [수정 2026-10-31] 요일마다 그림자 조금 더 — 요일 구분 (사장님 요청) */  c.fillStyle = '#fff'; srcThRR(c, X0, y, W, h, 20); c.fill(); c.restore();
                         c.save(); srcThRR(c, X0, y, W, h, 20); c.clip(); c.fillStyle = SRC_TH_DAYC[g.i][0]; c.fillRect(X0, y, LAB, h); c.restore();
                         c.fillStyle = '#fff'; c.textAlign = 'center';
@@ -6162,7 +6162,7 @@
                         c.font = '900 ' + dF + 'px ' + F; c.fillText(String(+g.d.slice(8)), X0 + LAB / 2, y + h / 2 + dF * .12);
                         c.font = '700 ' + wF + 'px ' + F; c.fillText(SRC_TH_W[g.i], X0 + LAB / 2, y + h / 2 + dF * .12 + wF * 1.4); c.textAlign = 'left';
                         const ax = X0 + LAB + 4, aw = W - LAB - 8;
-                        let yy = y + 6 + pad / 2, firstRow = true, prevPanel = false, panelBot = -99;
+                        let yy = y + 3 + pad / 2, firstRow = true, prevPanel = false, panelBot = -99;
                         segs.forEach(sg => {
                             const r = Math.ceil(sg.its.length / k);
                             if (sg.s) {   // 일요일 마감 묶음 — 빨간 머리말 + 옅은 빨강 판 (narrow 면 첫 줄 그 칸만큼만)
