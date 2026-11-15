@@ -9094,7 +9094,7 @@
                     </div>
                 </div>
                 <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px; width:100%;">
-                    <input type="text" id="sales-upcoming-search" placeholder="🔍 상품 검색" oninput="renderSalesUpcoming()" style="flex:1 1 0; min-width:0; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; box-sizing:border-box;">
+                    <input type="text" id="sales-upcoming-search" placeholder="🔍 상품 검색" oninput="gSalesQSave(this.value); renderSalesUpcoming()" style="flex:1 1 0; min-width:0; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; box-sizing:border-box;">
                     <!-- [수정 2026-10-04] 🔄 새로고침 단추는 뺐다 — 주문·재고가 바뀌면 주문 집계가 저절로 바뀐다 (gSalesLiveRefresh) -->
                 </div>
                 <div id="sales-upcoming-sortbar" style="display:flex; gap:4px; margin-bottom:8px; flex-wrap:nowrap; align-items:center;"></div>
@@ -30366,6 +30366,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             });
             // [신규] 상품명 검색 필터
             const _searchEl = document.getElementById('sales-upcoming-search');
+            gSalesQRestore(_searchEl);   // [신규 2026-11-15] 다른 앱에 갔다 오면 검색어가 지워지던 것 — 적어 둔 검색어를 되살린다
             const _kw = _searchEl ? _searchEl.value.trim().toLowerCase() : '';
             const filteredRows = _kw ? rows.filter(r => String(r.name || '').toLowerCase().includes(_kw)) : rows;
             // 정렬 칩 (표 헤더 대신)
@@ -32524,6 +32525,26 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
 
         // [신규] 발주 집계(sales-sub-purchase)를 주문관리 탭 하위로 물리적 이동
+        /* [신규 2026-11-15] 주문 집계 검색어 지키기 (사장님 지적 — 주문관리 창 밖을 누르고 오면 검색어·검색 결과가 없어졌다).
+           손으로 친 검색어를 이 탭(sessionStorage)에 적어 두고, 칸이 저절로 비면(다시 열림·브라우저가 비움) 되살린다.
+           손으로 다 지우면(빈 값 입력·✕) 적어 둔 것도 지운다 */
+        function gSalesQSave(v) { try { sessionStorage.setItem('moket_sales_q', String(v || '')); } catch (e) { } }
+        function gSalesQRestore(el) {
+            if (!el || el.value) return false;
+            let q = ''; try { q = sessionStorage.getItem('moket_sales_q') || ''; } catch (e) { }
+            if (!q) return false;
+            el.value = q;
+            return true;
+        }
+        (function gSalesQWatch() {
+            const back = () => {
+                const el = document.getElementById('sales-upcoming-search');
+                if (el && el.offsetParent && gSalesQRestore(el)) { try { el.dispatchEvent(new Event('keyup', { bubbles: true })); } catch (e) { } renderSalesUpcoming(); }
+            };
+            window.addEventListener('focus', () => setTimeout(back, 50));
+            window.addEventListener('pageshow', () => setTimeout(back, 50));
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(back, 50); });
+        })();
         function _relocatePurchaseAgg(){
             const src = document.getElementById('sales-sub-purchase');
             const dst = document.getElementById('orders-sub-purchase');
