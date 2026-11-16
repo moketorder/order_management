@@ -36602,8 +36602,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const rounds = list.length;
             // [신규 2026-10-05] 누르면 최근 공구일 5차례까지 펼쳐 보여 준다 (사장님 요청) — 차례마다 마지막 픽업일
             const md = d => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
-            const recent = list.slice(-5).reverse().map(([, b]) => md(b)).join(' · ');   // [수정 2026-10-05] 차례마다 마지막 픽업일만 (사장님 요청 — '9/8~9/10' 대신 '9/10')
-            return `<span title="누르면 최근 공구일 5차례까지 보여요 (공구 횟수 — 일주일 안에 붙은 픽업일은 한 번으로 셈)" data-gb-recent="${gEscapeHtml(recent)}" onclick="gGbToggleRecent(event, this)" style="font-size:10px; font-weight:800; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; cursor:pointer; user-select:none;">🛒 ${md(last)} (${rounds}회)</span>`;
+            const recent = list.slice(-5).reverse().map(([a]) => md(a)).join(' · ');   // [수정 2026-11-16] 차례마다 첫 픽업일 (사장님 결정 — 소싱 달력과 같게)   // [수정 2026-10-05] 차례마다 마지막 픽업일만 (사장님 요청 — '9/8~9/10' 대신 '9/10')
+            return `<span title="누르면 최근 공구일 5차례까지 보여요 (공구 횟수 — 일주일 안에 붙은 픽업일은 한 번으로 셈)" data-gb-recent="${gEscapeHtml(recent)}" onclick="gGbToggleRecent(event, this)" style="font-size:10px; font-weight:800; background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:4px; display:inline-flex; align-items:center; cursor:pointer; user-select:none;">🛒 ${md(list[list.length - 1][0])} (${rounds}회)</span>`;
         }
         // 공구일 딱지를 누르면 그 밑에 최근 공구일 줄을 펴고, 다시 누르면 접는다
         function gGbToggleRecent(ev, el) {
@@ -36645,7 +36645,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!prod) return '';
             const c = String(prod.productCode || '').trim();
             const s = gGbHistMap().get(c ? 'c:' + c : 'n:' + fTightName(prod.name || ''));
-            return (s && s.size) ? [...s].sort().pop() : '';
+            if (!s || !s.size) return '';
+            // [수정 2026-11-16] 마지막 차례의 첫 픽업일 (카드 🛒 표시와 같게 — 일주일 안에 붙은 픽업일은 한 차례)
+            let first = '', start = null;
+            [...s].sort().forEach(d => { const t = new Date(`${d}T00:00:00`).getTime(); if (start === null || t - start >= 7 * 86400000) { first = d; start = t; } });
+            return first;
         }
         /* [신규 2026-11-10] 상품 목록에 후기 수 (사장님 요청) — review_stats/<번호> = { n, sum } 를 한 번 받아 두고,
            카드에 '⭐ 4.8 · 후기 12'. 누르면 그 상품 후기(product_reviews/<번호>)를 창으로 */
