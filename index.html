@@ -29273,7 +29273,33 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 b.classList.toggle('active', salesUpcomingCats.has(b.dataset.salesUpcat));
             });
         }
-        function sortSalesRanking(key){ toggleSalesSort(salesRankSort, key, key === 'name' ? 'asc' : 'desc'); renderSalesRanking(); }
+        function sortSalesRanking(key){ toggleSalesSort(salesRankSort, key, (key === 'name' || key === 'sold') ? 'asc' : 'desc'); renderSalesRanking(); }   // [수정 2026-11-16] 소진은 빠른 것(짧은 시간)부터
+        /* [신규 2026-11-16] 상품 순위 인기 기준 (사장님 요청)
+           · per/rounds — 공구 기록(📊 상품별 기록 psHistBuild)의 회차 수와 1회당 평균 판매량 (전체 기간, 0개 회차 포함)
+           · soldH — 같은 식별번호 상품 줄 중 품절 기록(stock_soldout)이 올라간 시각 뒤에 있는 것의 '올라가고 품절까지 걸린 시간'(가장 짧은 것). 기록은 마지막 품절만 남는다 */
+        function salesRankExtra() {
+            const st = (window.__psHist ? window.__psHist.length : 0) + '|' + Object.keys(gSoldOutAt || {}).length + '|' + ((uploadProducts || []).length) + '|' + ((typeof rawOrders !== 'undefined' && Array.isArray(rawOrders)) ? rawOrders.length : 0) + '|' + (psRoundLog ? 1 : 0);
+            if (window.__srxSt === st && window.__srx) return window.__srx;
+            const m = new Map();
+            try {
+                const H = window.__psHist || (typeof psHistBuild === 'function' ? psHistBuild() : []);
+                (H || []).forEach(h => { const n = (h.rounds || []).length; if (n) m.set(String(h.code), { rounds: n, per: Math.round((h.total || 0) / n) }); });
+            } catch (e) { console.warn('공구 기록을 못 셌어요:', e); }
+            try {
+                if (!Object.keys(gSoldOutAt || {}).length && !window.__srxSoLoading) { window.__srxSoLoading = true; gLoadSoldOut().then(() => { window.__srx = null; if (salesRankTab === 'product') renderSalesRanking(); }); }
+                (uploadProducts || []).forEach(p => {
+                    if (!p) return;
+                    const c = String(psSafeId(String(p.productCode || '').trim())); if (!c) return;
+                    const so = (gSoldOutAt || {})[fGetAdjKey(p.matchKey, p.name, p.sid)]; if (!so || !so.at) return;
+                    const open = Number(p.releaseAt) ? psOpenAt(p.releaseAt) : 0; if (!open || so.at < open) return;
+                    const h = Math.max(1, Math.round((so.at - open) / 3600000));
+                    const o = m.get(c) || {}; if (o.soldH == null || h < o.soldH) o.soldH = h; m.set(c, o);
+                });
+            } catch (e) { console.warn('품절 시간을 못 셌어요:', e); }
+            window.__srx = m; window.__srxSt = st;
+            return m;
+        }
+        function salesSoldTxt(h) { return h < 24 ? h + '시간' : Math.round(h / 24 * 10) / 10 + '일'; }
 
         function isSalesCanceled(o){ return (o && (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE")); }
         /* [신규] 손님 요청사항 모두 — 같은 날 여러 번 주문하면 주문마다 요청사항이 따로 있는데,
@@ -30689,6 +30715,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const _g = gItemGroup(o);
                 if (!itemMap.has(_g.key)) itemMap.set(_g.key, { qty: 0, amount: 0, name: _g.name });
                 const im = itemMap.get(_g.key); im.qty += q; im.amount += amt;
+                // [신규 2026-11-16] 재구매 손님 수용 — 손님마다 이 상품을 산 날짜 (사장님 요청)
+                { if (!im.buy) im.buy = new Map(); let _bs = im.buy.get(_pk2); if (!_bs) { _bs = new Set(); im.buy.set(_pk2, _bs); } _bs.add(_cdk); }
                 // [신규] 카테고리별 판매액 누적 (과일 / 공동구매(+사다드림) / 상시판매)
                 //  [추가] 금액뿐 아니라 건수·수량도 함께 센다 (아래 카테고리 표에서 쓴다)
                 const _cat = salesProductCategory(_prodByName[rawNm], rawNm, o.category);
@@ -31763,8 +31791,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 { key:'name', label:'상품명', align:'left' },
                 { key:'qty', label:'판매수량', align:'right' },
                 { key:'amount', label:'판매액', align:'right' },
+                // [신규 2026-11-16] 인기 기준 (사장님 요청) — 공구 1회당 판매량 · 재구매 손님 수 · 빨리 소진(올라가고 품절까지 걸린 시간)
+                { key:'per', label:'1회당', align:'right' },
+                { key:'rep', label:'재구매', align:'right' },
+                { key:'sold', label:'소진', align:'right' },
                 { key:'idle', label:'쉰 날', align:'right' }
             ];
+            const XR = salesRankExtra();
             if (rthead) rthead.innerHTML = salesSortHeader(cols, salesRankSort, 'sortSalesRanking');
             // [수정 2026-10-23] 상품 순위 거르기 — 판매 종류 · 픽업/배달(그쪽 수량·금액으로) · 이름 · 보여 줄 개수
             const F = salesRankF, fq = String(F.q || '').replace(/\s/g, '').toLowerCase();
@@ -31772,12 +31805,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const list = (_salesRankingCache || []).map(([k, v]) => { const sp = SP.get(k) || null; return { k, sp, name: v.name || k, cat: v.cat || 'other',
                     qty: F.m === 'pickup' ? (v.pq || 0) : F.m === 'delivery' ? (v.dq || 0) : v.qty,
                     amount: F.m === 'pickup' ? (v.pa || 0) : F.m === 'delivery' ? (v.da || 0) : v.amount,
-                    idle: sp ? sp.idle : null }; })
+                    idle: sp ? sp.idle : null,
+                    rep: v.buy ? [...v.buy.values()].filter(s => s.size >= 2).length : 0,
+                    per: (XR.get(String(psSafeId(k))) || {}).per ?? null, rounds: (XR.get(String(psSafeId(k))) || {}).rounds || 0,
+                    sold: (XR.get(String(psSafeId(k))) || {}).soldH ?? null }; })
                 .filter(r => (F.cat === 'all' || r.cat === F.cat) && (F.m === 'all' || r.qty > 0 || r.amount !== 0) && (!fq || String(r.name).replace(/\s/g, '').toLowerCase().includes(fq)));
             const s = salesRankSort;
             list.sort((a, b) => s.key === 'name' ? salesCmpStr(a.name, b.name, s.dir) : salesCmpNum(a[s.key], b[s.key], s.dir));
             { const c = document.getElementById('sales-rank-count'); if (c) c.textContent = list.length + '개 상품'; }
-            if (list.length === 0){ rtbody.innerHTML = `<tr><td colspan="5" style="padding:16px; text-align:center; color:var(--text-sub);">${(F.cat !== 'all' || F.m !== 'all' || fq) ? '조건에 맞는 상품이 없습니다.' : '해당 기간 판매 내역이 없습니다.'}</td></tr>`; return; }
+            if (list.length === 0){ rtbody.innerHTML = `<tr><td colspan="8" style="padding:16px; text-align:center; color:var(--text-sub);">${(F.cat !== 'all' || F.m !== 'all' || fq) ? '조건에 맞는 상품이 없습니다.' : '해당 기간 판매 내역이 없습니다.'}</td></tr>`; return; }
             const E = gEscapeHtml, wonS = n => n >= 10000 ? `${Math.round(n / 10000).toLocaleString()}만` : n.toLocaleString();
             window.__rankKeys = list.map(r => r.k);   // 줄을 누를 때 열쇠를 차례 번호로 찾는다 (이름에 따옴표가 있어도 안 깨지게)
             rtbody.innerHTML = list.slice(0, F.n > 0 ? F.n : list.length).map((r, i) => {
@@ -31792,9 +31828,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <td style="padding:8px;">${open ? '▾ ' : ''}${E(r.name)}${sub}</td>
                     <td style="padding:8px; text-align:right; font-weight:800; white-space:nowrap; vertical-align:top;">${r.qty.toLocaleString()}개</td>
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top;">${r.amount.toLocaleString()}원</td>
+                    <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${r.per ? '#0f172a' : '#cbd5e1'};" title="${r.rounds ? '공구 ' + r.rounds + '번 · 1번에 평균 ' + r.per + '개 (전체 기간)' : '공구 기록 없음'}">${r.per ? r.per + '개' : '-'}${r.rounds ? `<div style="font-size:10.5px; font-weight:700; color:#94a3b8;">${r.rounds}회</div>` : ''}</td>
+                    <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${r.rep ? '#7c3aed' : '#cbd5e1'};" title="이 기간에 이 상품을 다른 날 두 번 이상 산 손님 수">${r.rep ? r.rep + '명' : '-'}</td>
+                    <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${r.sold === null ? '#cbd5e1' : r.sold <= 24 ? '#dc2626' : r.sold <= 72 ? '#d97706' : '#64748b'};" title="마지막 공구가 올라간 뒤 재고가 다 팔리기까지 걸린 시간">${r.sold === null ? '-' : salesSoldTxt(r.sold)}</td>
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${idleCol};" title="${sp ? '마지막 판 날 ' + sp.lastEnd : ''}">${idleTxt}</td>
                 </tr>` + (!open ? '' : `
-                <tr style="background:#f8fafc;"><td></td><td colspan="4" style="padding:0 8px 10px;">
+                <tr style="background:#f8fafc;"><td></td><td colspan="7" style="padding:0 8px 10px;">
                     ${sp ? `<div style="font-size:11.5px; margin-bottom:4px;">${spPoTermChip(r.k)} <span style="color:#94a3b8; font-weight:700;">· 마지막 판 날 ${sp.lastEnd} · 판 날 ${sp.soldDays}일 (최근 ${spMonths}개월)</span></div>${spPoTimeline(r.k)}${spWeeklyChart(sp, (r.cat === 'group' || r.cat === 'sada') && window.__sstPosts ? (window.__sstPosts.get(String(psSafeId(r.k))) || window.__sstPosts.get(String(r.k)) || []) : [])}`
                           : `<div style="padding:8px 0; font-size:12px; color:#94a3b8; font-weight:700;">식별번호가 없는 상품이라 주별 그래프와 발주 텀을 못 셉니다.</div>`}
                 </td></tr>`);
