@@ -24799,6 +24799,7 @@
            재고를 '무제한'으로 둔 상품은 품절이 되지 않는다. */
         function gIsProductSoldOut(prod) {
             if (!prod) return false;
+            { const of = gOptFollowStock(prod); if (of !== null) return of <= 0; }   // [신규 2026-11-16] 옵션 재고를 따르는 상품
             const unl = (prod.stock === "" || prod.stock == null || String(prod.stock).trim() === "무제한");
             const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name, prod.sid)];
             const unlAdj = (adjRaw === "unlimited" || (adjRaw != null && String(adjRaw).startsWith("unlimited")));
@@ -30061,6 +30062,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // 상품 1건의 실재고(기본+조정). 무제한이면 Infinity, 못 찾으면 null.
         function salesRealStock(prod){
             if (!prod) return null;
+            { const of = gOptFollowStock(prod); if (of !== null) return of; }   // [신규 2026-11-16] 옵션 재고를 따르는 상품
             const isUnlimitedStock = (prod.stock === "" || prod.stock === undefined || prod.stock === null || String(prod.stock).trim() === "무제한");
             const adjRaw = uploadGlobalAdjustments[fGetAdjKey(prod.matchKey, prod.name, prod.sid)];
             const isUnlimitedAdj = (adjRaw === "unlimited" || (adjRaw !== undefined && String(adjRaw).startsWith("unlimited")));
@@ -36353,6 +36355,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (base === null) return null;
             const adj = parseInt(optionAdjustments[gOptStockKey(p, groupName, it.name)] || 0) || 0;
             return Math.max(0, base + adj);
+        }
+        /* [신규 2026-11-16] 옵션마다 재고를 적은 상품은 상품 재고 대신 옵션 재고를 따른다 (사장님 요청 · 주문서 gOptFollowStock 과 같은 셈).
+           모든 항목에 재고를 적은 옵션 묶음의 남은 수량 합 (묶음이 여럿이면 가장 적은 것). 없으면 null */
+        function gOptFollowStock(p) {
+            const yes = v => v === true || v === 'true';
+            if (!p || p.useOptions === false || p.useOptions === 'false' || !yes(p.useChoiceOptions) || !Array.isArray(p.options)) return null;
+            let best = null;
+            p.options.forEach(g => {
+                const items = (g && Array.isArray(g.items)) ? g.items.filter(Boolean) : [];
+                if (!items.length || items.some(it => gOptBaseStock(it) === null)) return;
+                const sum = items.reduce((a, it) => a + (gOptRemain(p, g.name, it) || 0), 0);
+                best = best === null ? sum : Math.min(best, sum);
+            });
+            return best;
         }
 
         /* 상품의 옵션 항목을 한 줄씩 볼 수 있게 펴 놓는다.
