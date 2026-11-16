@@ -29207,7 +29207,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         // [신규 2026-10-23] 통계 세 갈래(매출·고객·상품)와 갈래별 기간 · 상품 순위 거르기 — 첫 그리기 전에 있어야 해서 여기 둔다
         let salesStatCat = (() => { try { const v = localStorage.getItem('moket_stat_cat'); return ['sales', 'cust', 'prod'].includes(v) ? v : 'sales'; } catch (e) { return 'sales'; } })();
         const _salesStatPer = {};
-        let salesRankF = { cat: 'all', m: 'all', q: '', n: 50 };
+        let salesRankF = { cat: 'all', m: 'all', q: '', n: 50, r: 0 };   // r: 공구 횟수 (0 전체 · 1 한 번 · 2·3·5·10 그 이상)
         let _salesCustRankCache = [];                           // 재주문 손님 순위 캐시
         let salesCustRankSort = { key: 'count', dir: 'desc' };  // 손님 순위 정렬(기본: 주문횟수 많은 순)
         let salesTrendUnitOverride = null;                      // 매출 추이 단위 직접선택(null=기간 기본)
@@ -31730,6 +31730,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // [수정 2026-10-24] '종류' 단추는 지웠다 — 위 분류 단추(전체·과일·공동구매·사다드림·상시판매)와 겹친다 (사장님 요청). 받기는 그대로
             salesRankF.cat = salesCategoryFilter || 'all';   // 순위 표는 위 분류를 따른다
             if (chips) chips.innerHTML = lab('받기') + chipW('m', 'all', '전체') + chipW('m', 'pickup', '🏠 픽업') + chipW('m', 'delivery', '🛵 배달');
+            /* [신규 2026-11-16] 공구 횟수 거르기 (사장님 요청) — 1회당 칸 밑의 'n회'(전체 기간 공구 횟수)로 거른다 */
+            if (salesRankF.r == null) salesRankF.r = 0;
+            let rc = document.getElementById('sales-rank-rchips');
+            if (!rc && chips) { rc = document.createElement('div'); rc.id = 'sales-rank-rchips'; rc.style.cssText = 'display:flex; align-items:center; gap:4px; flex-wrap:nowrap; margin-bottom:8px;'; chips.after(rc); }
+            if (rc) rc.innerHTML = lab('공구') + chipW('r', 0, '전체') + chipW('r', 1, '1회') + chipW('r', 2, '2회 이상') + chipW('r', 3, '3회 이상') + chipW('r', 5, '5회 이상') + chipW('r', 10, '10회 이상');
             const nc = document.getElementById('sales-rank-nchips');
             if (nc) nc.innerHTML = chip('n', 10, '10개') + chip('n', 30, '30개') + chip('n', 50, '50개') + chip('n', 0, '전체');
         }
@@ -31862,11 +31867,12 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     per: (XR.get(String(psSafeId(k))) || {}).per ?? null, rounds: (XR.get(String(psSafeId(k))) || {}).rounds || 0,
                     sold: (XR.get(String(psSafeId(k))) || {}).soldH ?? null,
                     rate: (XR.get(String(psSafeId(k))) || {}).rate ?? null }; })
-                .filter(r => (F.cat === 'all' || r.cat === F.cat) && (F.m === 'all' || r.qty > 0 || r.amount !== 0) && (!fq || (String(r.name) + String(r.k)).replace(/\s/g, '').toLowerCase().includes(fq)));
+                .filter(r => (F.cat === 'all' || r.cat === F.cat) && (F.m === 'all' || r.qty > 0 || r.amount !== 0)
+                    && (!F.r || (F.r === 1 ? r.rounds === 1 : r.rounds >= F.r))   // [신규 2026-11-16] 공구 횟수 && (!fq || (String(r.name) + String(r.k)).replace(/\s/g, '').toLowerCase().includes(fq)));
             const s = salesRankSort;
             list.sort((a, b) => s.key === 'name' ? salesCmpStr(a.name, b.name, s.dir) : (salesCmpNum(a[s.key], b[s.key], s.dir) || (s.key === 'rate' ? salesCmpNum(a.sold, b.sold, 'asc') : 0)));   // [수정 2026-11-16] 소진율이 같으면 빨리 품절된 것이 위
             { const c = document.getElementById('sales-rank-count'); if (c) c.textContent = list.length + '개 상품'; }
-            if (list.length === 0){ rtbody.innerHTML = `<tr><td colspan="8" style="padding:16px; text-align:center; color:var(--text-sub);">${(F.cat !== 'all' || F.m !== 'all' || fq) ? '조건에 맞는 상품이 없습니다.' : '해당 기간 판매 내역이 없습니다.'}</td></tr>`; return; }
+            if (list.length === 0){ rtbody.innerHTML = `<tr><td colspan="8" style="padding:16px; text-align:center; color:var(--text-sub);">${(F.cat !== 'all' || F.m !== 'all' || F.r || fq) ? '조건에 맞는 상품이 없습니다.' : '해당 기간 판매 내역이 없습니다.'}</td></tr>`; return; }
             const E = gEscapeHtml, wonS = n => n >= 10000 ? `${Math.round(n / 10000).toLocaleString()}만` : n.toLocaleString();
             window.__rankKeys = list.map(r => r.k);   // 줄을 누를 때 열쇠를 차례 번호로 찾는다 (이름에 따옴표가 있어도 안 깨지게)
             rtbody.innerHTML = list.slice(0, F.n > 0 ? F.n : list.length).map((r, i) => {
