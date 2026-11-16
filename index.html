@@ -40480,7 +40480,25 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         }
 
         /* 점검표 한 줄 만들기 — 상품 하나 + 그 상품의 발주 회차들 */
+        // [신규 2026-11-16] 식별번호 → 마지막으로 팔린 날(주문일). scBuildRows 가 그릴 때마다 새로 센다
+        let scLastSaleMap = new Map();
+        function scBuildLastSale() {
+            const m = new Map(), codeOf = new Map();
+            (uploadProducts || []).forEach(p => { const c = String((p && p.productCode) || '').trim(); if (c && p.name) { const k = fTightName(p.name); if (k && !codeOf.has(k)) codeOf.set(k, c); } });
+            const src = (typeof getSalesSourceOrders === 'function') ? getSalesSourceOrders() : (rawOrders || []);
+            src.forEach(o => {
+                if (!o || gIsFeeRow(o) || isSalesCanceled(o)) return;
+                const c = String(o.productCode || '').trim() || codeOf.get(fTightName(String(o.item || ''))) || '';
+                if (!c) return;
+                const t = parseTimestampToDate(o.timestamp);
+                if (!t || isNaN(t.getTime())) return;
+                const d = fMsToDateKey(t.getTime());
+                if (!m.has(c) || d > m.get(c)) m.set(c, d);
+            });
+            return m;
+        }
         function scBuildRows() {
+            scLastSaleMap = scBuildLastSale();
             const rounds = scRoundsByCode();
             const prods = Array.isArray(uploadProducts) ? uploadProducts : [];
             const rows = [];
@@ -40542,13 +40560,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const emptyDays = soUsable ? scDaysSince(soDate) : null;  // 비어 있은 지 며칠
 
                 let speed = null, leftDays = null, soldDays = null;
-                if (!mismatch && inUnits > 0) {
-                    if (stock > 0) {
-                        if (days >= 2) speed = (inUnits - stock) / days;
-                    } else if (soUsable) {
-                        soldDays = Math.max(1, days - emptyDays);          // 발주일 ~ 품절된 날
-                        if (soldDays >= 2) speed = inUnits / soldDays;
-                    }
+                /* [수정 2026-11-16] 소진 속도는 '발주일 ~ 마지막으로 팔린 날'로 잰다 (사장님 요청).
+                   예전엔 오늘(재고 있음) 또는 품절된 날까지로 나눠, 안 팔린 날까지 더해져 느리게 나왔다.
+                   마지막 판매일 = 이 발주일 뒤에 들어온 주문 중 가장 늦은 주문일. 발주 뒤 판 게 없으면 모름 */
+                const lastSale = (scLastSaleMap.get(code) || '');
+                const saleEnd = lastSale && lastSale >= last.date ? lastSale : '';
+                if (!mismatch && inUnits > 0 && saleEnd) {
+                    soldDays = Math.max(1, days - scDaysSince(saleEnd));   // 발주일 ~ 마지막 판매일
+                    const sold = stock > 0 ? (inUnits - stock) : inUnits;
+                    if (sold > 0) speed = sold / soldDays;
                 }
                 if (speed !== null && speed <= 0) speed = null;
                 if (speed !== null && stock > 0) leftDays = Math.ceil(stock / speed);
@@ -40557,7 +40577,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     code, name: p.name, prod: p, stock,
                     lastDate: last.date, days, cycle, lag, level, dead,
                     inUnits, inRaw, pack, soldRate, mismatch, rounds: hist,
-                    speed, leftDays, soldDays, soDate, emptyDays,
+                    speed, leftDays, soldDays, soDate, emptyDays, lastSale: saleEnd,
                     supplier: last.supplier || '', unitPrice: last.unitPrice || 0
                 });
             });
@@ -40576,9 +40596,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                       : sp >= 1 ? { t: '🙂 보통', c: '#0369a1' }
                       : { t: '🐢 느림', c: '#64748b' };
             const 숫자 = sp >= 1 ? `하루 ${sp.toFixed(1)}개` : `${Math.round(1 / sp)}일에 1개`;
+            const _md = d => d ? `${Number(d.slice(5, 7))}/${Number(d.slice(8))}` : '';
             const 뒷말 = (r.stock > 0)
-                ? (r.leftDays !== null ? ` · ${r.leftDays}일 뒤 바닥` : '')
-                : ` · ${r.soldDays}일 만에 다 나감${r.emptyDays ? ` · ${r.emptyDays}일째 비어 있음` : ''}`;
+                ? (r.leftDays !== null ? ` · ${r.leftDays}일 뒤 바닥` : '') + (r.lastSale ? ` · 마지막 판매 ${_md(r.lastSale)}` : '')   // [신규 2026-11-16]
+                : ` · ${r.soldDays}일 만에 다 나감${r.lastSale ? ` (마지막 판매 ${_md(r.lastSale)})` : ''}${r.emptyDays ? ` · ${r.emptyDays}일째 비어 있음` : ''}`;
             return `<div style="margin-top:5px; display:flex; gap:6px; align-items:baseline; flex-wrap:wrap; font-size:11px; font-weight:800;">
                 <span style="color:${등급.c};">${등급.t}</span>
                 <span style="color:#94a3b8; font-weight:700;">${숫자}${뒷말}</span>
