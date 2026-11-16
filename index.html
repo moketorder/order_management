@@ -36813,7 +36813,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const _pinF = uploadManageTab === 'inv-all' ? 'pinAll' : 'pinCat';
             const _pinOf = p => isInventoryView ? (Number(p && p[_pinF]) || 0) : 0;
             filteredProducts.forEach(({ prod, index }) => {
-                const mKey = _pinOf(prod) > 0 ? '__pin' : isInventoryView ? String(prod.shelf || '')
+                // [수정 2026-11-16] 상시판매 '전체'에서는 선반으로 나누지 않고 한 묶음으로 (맨 위만 따로) — 고른 정렬이 전체에 걸린다 (사장님 요청)
+                const mKey = _pinOf(prod) > 0 ? '__pin' : (isInventoryView && uploadManageTab === 'inv-all') ? '__all' : isInventoryView ? String(prod.shelf || '')
                     : isReserveView ? (getReserveGroupDate(prod) || '날짜미정')
                     : (prod.matchKey || "기타");
                 if (!grouped[mKey]) {
@@ -36853,6 +36854,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 
                 let displayTitle = mKey;
                 if (mKey === '__pin') displayTitle = '📌 맨 위 (손님 화면에서도 맨 위)';
+                else if (mKey === '__all') displayTitle = `📦 전체 상품 (${grouped[mKey].length})`;
                 else if (isInventoryView) {
                     displayTitle = gShelfLabel(mKey);
                 }
