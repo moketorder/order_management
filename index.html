@@ -36524,7 +36524,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function gGbHistMap() {
             // 상품마다 불리므로, 주문·보관함·상품 수가 그대로면 지난번 셈을 그대로 쓴다
             const sig = `${(rawOrders || []).length}|${(salesArchiveOrders || []).length}|${(uploadProducts || []).length}`;
-            if (_gGbHist.n === sig && _gGbHist.m) return _gGbHist.m;
+            if (_gGbHist.n === sig + '|' + (typeof psRoundLog !== 'undefined' && psRoundLog ? 'r' : '') && _gGbHist.m) return _gGbHist.m;
             const src = (typeof getSalesSourceOrders === 'function') ? getSalesSourceOrders() : (rawOrders || []);
             const codeOf = new Map();
             (Array.isArray(uploadProducts) ? uploadProducts : []).forEach(p => {
@@ -36551,7 +36551,20 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (!m.has(k)) m.set(k, new Set());
                 m.get(k).add(d);
             });
-            _gGbHist = { n: sig, m };
+            /* [신규 2026-11-16] 주문이 0건이어도 노출일정으로 연 공구는 센다 (사장님 요청 — 소소담 꿀떡 11/11 공구가 9/18로 보였다).
+               공구 회차 기록(sched_history)에서 이미 연(openAt ≤ 지금) 차례의 픽업일을 더한다. 상시판매 월 기록(m…)은 뺀다 */
+            if (typeof psRoundLog !== 'undefined' && psRoundLog) {
+                const now = Date.now();
+                Object.entries(psRoundLog).forEach(([code, rounds]) => Object.entries(rounds || {}).forEach(([rid, r]) => {
+                    if (!r || rid[0] === 'm' || !r.pickups || (Number(r.openAt) || 0) > now) return;
+                    const k = 'c:' + code;
+                    Object.keys(r.pickups).forEach(d => { if (/^\d{4}-\d{2}-\d{2}$/.test(d)) { if (!m.has(k)) m.set(k, new Set()); m.get(k).add(d); } });
+                }));
+            } else if (typeof psRoundLogLoad === 'function' && !_gGbHist.asked) {
+                _gGbHist.asked = true;   // 한 번 받아 오고 다시 그린다
+                psRoundLogLoad().then(ok => { if (ok) { _gGbHist.n = ''; if (typeof renderProductsList === 'function') renderProductsList(); } });
+            }
+            _gGbHist = { n: sig + '|' + (typeof psRoundLog !== 'undefined' && psRoundLog ? 'r' : ''), m, asked: _gGbHist.asked };
             return m;
         }
         function gGbHistBadge(prod) {
