@@ -29273,7 +29273,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 b.classList.toggle('active', salesUpcomingCats.has(b.dataset.salesUpcat));
             });
         }
-        function sortSalesRanking(key){ toggleSalesSort(salesRankSort, key, (key === 'name' || key === 'sold') ? 'asc' : 'desc'); renderSalesRanking(); }   // [수정 2026-11-16] 소진은 빠른 것(짧은 시간)부터
+        function sortSalesRanking(key){
+            toggleSalesSort(salesRankSort, key, key === 'name' ? 'asc' : 'desc');
+            // [신규 2026-11-16] 소진율이 같으면(특히 100% 품절끼리) 빨리 품절된 것이 위
+            renderSalesRanking();
+        }
         /* [신규 2026-11-16] 상품 순위 인기 기준 (사장님 요청)
            · per/rounds — 공구 기록(📊 상품별 기록 psHistBuild)의 회차 수와 1회당 평균 판매량 (전체 기간, 0개 회차 포함)
            · soldH — 같은 식별번호 상품 줄 중 품절 기록(stock_soldout)이 올라간 시각 뒤에 있는 것의 '올라가고 품절까지 걸린 시간'(가장 짧은 것). 기록은 마지막 품절만 남는다 */
@@ -29283,7 +29287,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const m = new Map();
             try {
                 const H = window.__psHist || (typeof psHistBuild === 'function' ? psHistBuild() : []);
-                (H || []).forEach(h => { const n = (h.rounds || []).length; if (n) m.set(String(h.code), { rounds: n, per: Math.round((h.total || 0) / n) }); });
+                (H || []).forEach(h => { const n = (h.rounds || []).length; if (n) m.set(String(h.code), { rounds: n, per: Math.round((h.total || 0) / n), lastQty: Number((h.rounds[0] && h.rounds[0].stats && h.rounds[0].stats.qty) || 0) }); });
             } catch (e) { console.warn('공구 기록을 못 셌어요:', e); }
             try {
                 if (!Object.keys(gSoldOutAt || {}).length && !window.__srxSoLoading) { window.__srxSoLoading = true; gLoadSoldOut().then(() => { window.__srx = null; if (salesRankTab === 'product') renderSalesRanking(); }); }
@@ -29296,6 +29300,24 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     const o = m.get(c) || {}; if (o.soldH == null || h < o.soldH) o.soldH = h; m.set(c, o);
                 });
             } catch (e) { console.warn('품절 시간을 못 셌어요:', e); }
+            /* [수정 2026-11-16] 소진율 (사장님 요청 — 처음 재고가 상품마다 달라 품절 시간만으로는 비교가 어렵다)
+               마지막 공구에서 판 개수 ÷ (판 개수 + 지금 남은 재고). 품절 기록이 그 공구 뒤에 있으면 100%. 무제한 재고는 못 센다 */
+            try {
+                const left = new Map();
+                (uploadProducts || []).forEach(p => {
+                    if (!p) return;
+                    const c = String(psSafeId(String(p.productCode || '').trim())); if (!c) return;
+                    const s = typeof salesRealStock === 'function' ? salesRealStock(p) : null;
+                    const cur = left.has(c) ? left.get(c) : 0;
+                    left.set(c, (s === Infinity || cur === Infinity) ? Infinity : cur + Math.max(0, Number(s) || 0));
+                });
+                m.forEach((o, c) => {
+                    if (o.soldH != null) { o.rate = 100; return; }
+                    const q = Number(o.lastQty) || 0, l = left.has(c) ? left.get(c) : null;
+                    if (!q || l === null || l === Infinity) return;
+                    o.rate = Math.round(q / (q + l) * 100);
+                });
+            } catch (e) { console.warn('소진율을 못 셌어요:', e); }
             window.__srx = m; window.__srxSt = st;
             return m;
         }
@@ -31794,7 +31816,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 // [신규 2026-11-16] 인기 기준 (사장님 요청) — 공구 1회당 판매량 · 재구매 손님 수 · 빨리 소진(올라가고 품절까지 걸린 시간)
                 { key:'per', label:'1회당', align:'right' },
                 { key:'rep', label:'재구매', align:'right' },
-                { key:'sold', label:'소진', align:'right' },
+                { key:'rate', label:'소진율', align:'right' },
                 { key:'idle', label:'쉰 날', align:'right' }
             ];
             const XR = salesRankExtra();
@@ -31808,10 +31830,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     idle: sp ? sp.idle : null,
                     rep: v.buy ? [...v.buy.values()].filter(s => s.size >= 2).length : 0,
                     per: (XR.get(String(psSafeId(k))) || {}).per ?? null, rounds: (XR.get(String(psSafeId(k))) || {}).rounds || 0,
-                    sold: (XR.get(String(psSafeId(k))) || {}).soldH ?? null }; })
+                    sold: (XR.get(String(psSafeId(k))) || {}).soldH ?? null,
+                    rate: (XR.get(String(psSafeId(k))) || {}).rate ?? null }; })
                 .filter(r => (F.cat === 'all' || r.cat === F.cat) && (F.m === 'all' || r.qty > 0 || r.amount !== 0) && (!fq || String(r.name).replace(/\s/g, '').toLowerCase().includes(fq)));
             const s = salesRankSort;
-            list.sort((a, b) => s.key === 'name' ? salesCmpStr(a.name, b.name, s.dir) : salesCmpNum(a[s.key], b[s.key], s.dir));
+            list.sort((a, b) => s.key === 'name' ? salesCmpStr(a.name, b.name, s.dir) : (salesCmpNum(a[s.key], b[s.key], s.dir) || (s.key === 'rate' ? salesCmpNum(a.sold, b.sold, 'asc') : 0)));   // [수정 2026-11-16] 소진율이 같으면 빨리 품절된 것이 위
             { const c = document.getElementById('sales-rank-count'); if (c) c.textContent = list.length + '개 상품'; }
             if (list.length === 0){ rtbody.innerHTML = `<tr><td colspan="8" style="padding:16px; text-align:center; color:var(--text-sub);">${(F.cat !== 'all' || F.m !== 'all' || fq) ? '조건에 맞는 상품이 없습니다.' : '해당 기간 판매 내역이 없습니다.'}</td></tr>`; return; }
             const E = gEscapeHtml, wonS = n => n >= 10000 ? `${Math.round(n / 10000).toLocaleString()}만` : n.toLocaleString();
@@ -31830,7 +31853,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top;">${r.amount.toLocaleString()}원</td>
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${r.per ? '#0f172a' : '#cbd5e1'};" title="${r.rounds ? '공구 ' + r.rounds + '번 · 1번에 평균 ' + r.per + '개 (전체 기간)' : '공구 기록 없음'}">${r.per ? r.per + '개' : '-'}${r.rounds ? `<div style="font-size:10.5px; font-weight:700; color:#94a3b8;">${r.rounds}회</div>` : ''}</td>
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${r.rep ? '#7c3aed' : '#cbd5e1'};" title="이 기간에 이 상품을 다른 날 두 번 이상 산 손님 수">${r.rep ? r.rep + '명' : '-'}</td>
-                    <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${r.sold === null ? '#cbd5e1' : r.sold <= 24 ? '#dc2626' : r.sold <= 72 ? '#d97706' : '#64748b'};" title="마지막 공구가 올라간 뒤 재고가 다 팔리기까지 걸린 시간">${r.sold === null ? '-' : salesSoldTxt(r.sold)}</td>
+                    <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${r.rate === null ? '#cbd5e1' : r.rate >= 100 ? '#dc2626' : r.rate >= 70 ? '#d97706' : '#64748b'};" title="마지막 공구에서 준비한 재고 중 팔린 비율 (판 개수 ÷ (판 개수 + 남은 재고))${r.sold !== null ? ' · 올라가고 ' + salesSoldTxt(r.sold) + ' 만에 품절' : ''}">${r.rate === null ? '-' : r.rate + '%'}${r.sold !== null ? `<div style="font-size:10.5px; font-weight:700; color:#94a3b8;">${salesSoldTxt(r.sold)} 만에 품절</div>` : ''}</td>
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${idleCol};" title="${sp ? '마지막 판 날 ' + sp.lastEnd : ''}">${idleTxt}</td>
                 </tr>` + (!open ? '' : `
                 <tr style="background:#f8fafc;"><td></td><td colspan="7" style="padding:0 8px 10px;">
