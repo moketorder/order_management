@@ -29045,7 +29045,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 (typeof uploadProducts !== 'undefined' ? uploadProducts : []).length,
                 (typeof purchaseOrders !== 'undefined' ? purchaseOrders : []).length,
                 (typeof purchaseArchive !== 'undefined' ? purchaseArchive : []).length,
-                Object.keys((typeof gCodeLabels !== 'undefined' ? gCodeLabels : {}) || {}).length
+                Object.keys((typeof gCodeLabels !== 'undefined' ? gCodeLabels : {}) || {}).length,
+                // [신규 2026-11-16] 주문 줄에 적힌 번호로도 배운다 — 주문이 늘면 다시 만든다
+                (typeof rawOrders !== 'undefined' ? rawOrders : []).length,
+                (typeof salesArchiveOrders !== 'undefined' ? salesArchiveOrders : []).length
             ].join('|');
             if (_gItemKeyMaps && _gItemKeyStamp === stamp) return _gItemKeyMaps;
 
@@ -29070,17 +29073,29 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 if (k && !codeOf.has(k)) codeOf.set(k, c);
                 if (!nameOf.has(c)) nameOf.set(c, po.itemName);
             });
+            /* [신규 2026-11-16] 번호가 적힌 주문 줄로도 이름 → 번호를 배운다 (사장님 요청 — 통계를 코드로).
+               예: 옛 '[사다드림]가메골 왕만두' 3건은 번호가 비어 이름으로 따로 셌는데, 같은 이름의 다른 주문엔 S0008이 적혀 있다.
+               앞 꼬리표([사다드림]·[취소]·[○/○ 마감])를 뗀 이름으로도 넣는다. */
+            ((typeof rawOrders !== 'undefined' ? rawOrders : []) || [])
+                .concat((typeof salesArchiveOrders !== 'undefined' ? salesArchiveOrders : []) || []).forEach(o => {
+                const c = String((o && o.productCode) || '').trim();
+                if (!c || !o.item) return;
+                [fTightName(o.item), fTightName(gItemTagless(o.item))].forEach(k => { if (k && !codeOf.has(k)) codeOf.set(k, c); });
+            });
             _gItemKeyMaps = { codeOf, nameOf };
             _gItemKeyStamp = stamp;
             return _gItemKeyMaps;
         }
+
+        // [신규 2026-11-16] 이름 앞 꼬리표를 뗀다 — '[취소] [사다드림][4/26 마감]가메골 왕만두' → '가메골 왕만두'
+        function gItemTagless(s) { return String(s || '').replace(/^(\s*\[[^\]]*\]\s*)+/, '').trim(); }
 
         // 주문 한 줄을 어느 품목으로 셀지 — { key: 묶는 열쇠, name: 보여 줄 이름 }
         function gItemGroup(o) {
             const nm = String((o && o.item) || '상품명 없음').trim() || '상품명 없음';
             try {
                 const { codeOf, nameOf } = gItemKeyMaps();
-                const code = String((o && o.productCode) || '').trim() || codeOf.get(fTightName(nm)) || '';
+                const code = String((o && o.productCode) || '').trim() || codeOf.get(fTightName(nm)) || codeOf.get(fTightName(gItemTagless(nm))) || '';
                 if (code) return { key: code, name: nameOf.get(code) || nm };
             } catch (e) { /* 번호를 못 찾으면 이름으로 */ }
             return { key: nm, name: nm };
@@ -31858,7 +31873,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 return `
                 <tr onclick="salesRankToggle(window.__rankKeys[${i}])" style="cursor:pointer; ${open ? 'background:#f8fafc;' : ''}" title="눌러서 발주 텀·주별 매출 보기">
                     <td style="padding:8px; font-weight:800; color:${i < 3 ? '#d97706' : '#94a3b8'}; vertical-align:top;">${i + 1}</td>
-                    <td style="padding:8px;">${open ? '▾ ' : ''}${E(r.name)}${sub}</td>
+                    <td style="padding:8px;">${open ? '▾ ' : ''}${E(r.name)}${(r.k !== r.name && /^[A-Za-z]+\d+$/.test(String(r.k))) ? `<span style="margin-left:6px; font-size:11px; font-weight:800; color:#94a3b8;" title="상품 코드 — 이 코드로 묶어 셉니다">${E(r.k)}</span>` : ''}${sub}</td>
                     <td style="padding:8px; text-align:right; font-weight:800; white-space:nowrap; vertical-align:top;">${r.qty.toLocaleString()}개</td>
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top;">${r.amount.toLocaleString()}원</td>
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${r.per ? '#0f172a' : '#cbd5e1'};" title="${r.rounds ? '공구 ' + r.rounds + '번 · 1번에 평균 ' + r.per + '개 (전체 기간)' : '공구 기록 없음'}">${r.per ? r.per + '개' : '-'}${r.rounds ? `<div style="font-size:10.5px; font-weight:700; color:#94a3b8;">${r.rounds}회</div>` : ''}</td>
