@@ -31734,7 +31734,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (salesRankF.r == null) salesRankF.r = 0;
             let rc = document.getElementById('sales-rank-rchips');
             if (!rc && chips) { rc = document.createElement('div'); rc.id = 'sales-rank-rchips'; rc.style.cssText = 'display:flex; align-items:center; gap:4px; flex-wrap:nowrap; margin-bottom:8px;'; chips.after(rc); }
-            if (rc) rc.innerHTML = lab('공구') + chipW('r', 0, '전체') + chipW('r', 1, '1회') + chipW('r', 2, '2회 이상') + chipW('r', 3, '3회 이상') + chipW('r', 5, '5회 이상') + chipW('r', 10, '10회 이상');
+            if (rc) rc.innerHTML = lab('공구') + chipW('r', 0, '전체') + chipW('r', 1, '1회') + chipW('r', 2, '2회 이하') + chipW('r', 3, '3회 이하') + chipW('r', 5, '5회 이하') + chipW('r', 10, '10회 이하');   // [수정 2026-11-16] 이상 → 이하 (사장님 요청 — 이상이면 늘 같은 상품이 보였다)
             const nc = document.getElementById('sales-rank-nchips');
             if (nc) nc.innerHTML = chip('n', 10, '10개') + chip('n', 30, '30개') + chip('n', 50, '50개') + chip('n', 0, '전체');
         }
@@ -31868,7 +31868,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     sold: (XR.get(String(psSafeId(k))) || {}).soldH ?? null,
                     rate: (XR.get(String(psSafeId(k))) || {}).rate ?? null }; })
                 .filter(r => (F.cat === 'all' || r.cat === F.cat) && (F.m === 'all' || r.qty > 0 || r.amount !== 0)
-                    && (!F.r || (F.r === 1 ? r.rounds === 1 : r.rounds >= F.r))
+                    && (!F.r || (r.rounds >= 1 && r.rounds <= F.r))
                     /* [신규 2026-11-16] 공구 횟수 */ && (!fq || (String(r.name) + String(r.k) + String(r.pname || '')).replace(/\s/g, '').toLowerCase().includes(fq)));
             const s = salesRankSort;
             list.sort((a, b) => s.key === 'name' ? salesCmpStr(a.name, b.name, s.dir) : (salesCmpNum(a[s.key], b[s.key], s.dir) || (s.key === 'rate' ? salesCmpNum(a.sold, b.sold, 'asc') : 0)));   // [수정 2026-11-16] 소진율이 같으면 빨리 품절된 것이 위
