@@ -29321,6 +29321,16 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             window.__srx = m; window.__srxSt = st;
             return m;
         }
+        /* [신규 2026-11-16] 상품 순위 줄에서 그 상품을 상품 목록으로 열어 본다 (사장님 요청 — 성심당 재고가 왜 남았나).
+           상품 목록 찾기 칸에 식별번호를 넣는다 — 공동구매·상시판매 둘 다에서 찾아 보여 준다 */
+        function salesRankOpenProd(code) {
+            const c = String(code || '').trim(); if (!c) return;
+            switchAdminTab('product-list');
+            const inp = document.getElementById('product-search-input');
+            if (inp) inp.value = c;
+            onProductSearchInput(c);
+            setTimeout(() => { const box = document.getElementById('products-list-container'); if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 150);
+        }
         function salesSoldTxt(h) { return h < 24 ? h + '시간' : Math.round(h / 24 * 10) / 10 + '일'; }
 
         function isSalesCanceled(o){ return (o && (o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE")); }
@@ -31857,6 +31867,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${idleCol};" title="${sp ? '마지막 판 날 ' + sp.lastEnd : ''}">${idleTxt}</td>
                 </tr>` + (!open ? '' : `
                 <tr style="background:#f8fafc;"><td></td><td colspan="7" style="padding:0 8px 10px;">
+                    ${/^[PFS]\d+$/.test(String(r.k)) ? `<div style="margin:2px 0 6px;"><button type="button" onclick="event.stopPropagation(); salesRankOpenProd(window.__rankKeys[${i}])" style="padding:4px 10px; border:1.5px solid #c7d2fe; background:#eef2ff; color:#4338ca; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">🔍 상품 목록에서 보기 (${E(r.k)})</button></div>` : ''}
                     ${sp ? `<div style="font-size:11.5px; margin-bottom:4px;">${spPoTermChip(r.k)} <span style="color:#94a3b8; font-weight:700;">· 마지막 판 날 ${sp.lastEnd} · 판 날 ${sp.soldDays}일 (최근 ${spMonths}개월)</span></div>${spPoTimeline(r.k)}${spWeeklyChart(sp, (r.cat === 'group' || r.cat === 'sada') && window.__sstPosts ? (window.__sstPosts.get(String(psSafeId(r.k))) || window.__sstPosts.get(String(r.k)) || []) : [])}`
                           : `<div style="padding:8px 0; font-size:12px; color:#94a3b8; font-weight:700;">식별번호가 없는 상품이라 주별 그래프와 발주 텀을 못 셉니다.</div>`}
                 </td></tr>`);
