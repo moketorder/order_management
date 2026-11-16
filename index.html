@@ -31859,7 +31859,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const _lbls = (typeof gCodeLabels !== 'undefined' && gCodeLabels) || {};
             const list = (_salesRankingCache || []).map(([k, v]) => { const sp = SP.get(k) || null;
                 const isCode = /^[A-Za-z]+\d+$/.test(String(k)), lbl = isCode ? String(_lbls[k] || '').trim() : '';
-                return { k, sp, isCode, lbl, name: isCode ? (lbl || String(k)) : (v.name || k), cat: v.cat || 'other',
+                return { k, sp, isCode, lbl, pname: String(v.name || ''), name: isCode ? (lbl || String(k)) : (v.name || k), cat: v.cat || 'other',
                     qty: F.m === 'pickup' ? (v.pq || 0) : F.m === 'delivery' ? (v.dq || 0) : v.qty,
                     amount: F.m === 'pickup' ? (v.pa || 0) : F.m === 'delivery' ? (v.da || 0) : v.amount,
                     idle: sp ? sp.idle : null,
@@ -31868,7 +31868,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     sold: (XR.get(String(psSafeId(k))) || {}).soldH ?? null,
                     rate: (XR.get(String(psSafeId(k))) || {}).rate ?? null }; })
                 .filter(r => (F.cat === 'all' || r.cat === F.cat) && (F.m === 'all' || r.qty > 0 || r.amount !== 0)
-                    && (!F.r || (F.r === 1 ? r.rounds === 1 : r.rounds >= F.r))   // [신규 2026-11-16] 공구 횟수 && (!fq || (String(r.name) + String(r.k)).replace(/\s/g, '').toLowerCase().includes(fq)));
+                    && (!F.r || (F.r === 1 ? r.rounds === 1 : r.rounds >= F.r))   // [신규 2026-11-16] 공구 횟수 && (!fq || (String(r.name) + String(r.k) + String(r.pname || '')).replace(/\s/g, '').toLowerCase().includes(fq)));
             const s = salesRankSort;
             list.sort((a, b) => s.key === 'name' ? salesCmpStr(a.name, b.name, s.dir) : (salesCmpNum(a[s.key], b[s.key], s.dir) || (s.key === 'rate' ? salesCmpNum(a.sold, b.sold, 'asc') : 0)));   // [수정 2026-11-16] 소진율이 같으면 빨리 품절된 것이 위
             { const c = document.getElementById('sales-rank-count'); if (c) c.textContent = list.length + '개 상품'; }
@@ -31884,7 +31884,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 return `
                 <tr onclick="salesRankToggle(window.__rankKeys[${i}])" style="cursor:pointer; ${open ? 'background:#f8fafc;' : ''}" title="눌러서 발주 텀·주별 매출 보기">
                     <td style="padding:8px; font-weight:800; color:${i < 3 ? '#d97706' : '#94a3b8'}; vertical-align:top;">${i + 1}</td>
-                    <td style="padding:8px;">${open ? '▾ ' : ''}${!r.isCode ? E(r.name) : r.lbl ? `${E(r.lbl)}<span style="margin-left:6px; font-size:12px; font-weight:800; color:#64748b;" title="상품 코드 — 이 코드로 묶어 셉니다">${E(r.k)}</span>` : `<span style="font-weight:800;" title="상품 코드 — 이름표가 없어요">${E(r.k)}</span>`}${sub}</td>
+                    <td style="padding:8px;">${open ? '▾ ' : ''}${!r.isCode ? E(r.name) : r.lbl ? `${E(r.lbl)}<span style="margin-left:6px; font-size:12px; font-weight:800; color:#64748b;" title="상품 코드 — 이 코드로 묶어 셉니다">${E(r.k)}</span>` : `<span style="font-weight:800;" title="상품 코드 — 이름표가 없어요">${E(r.k)}</span>${(r.pname && r.pname !== String(r.k)) ? `<span style="margin-left:6px; font-size:12px; font-weight:600; color:#94a3b8;" title="이름표가 없어 상품명을 대신 보여 줍니다">${E(r.pname)}</span>` : ''}`}${sub}</td>
                     <td style="padding:8px; text-align:right; font-weight:800; white-space:nowrap; vertical-align:top;">${r.qty.toLocaleString()}개</td>
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top;">${r.amount.toLocaleString()}원</td>
                     <td style="padding:8px; text-align:right; white-space:nowrap; vertical-align:top; font-weight:800; color:${r.per ? '#0f172a' : '#cbd5e1'};" title="${r.rounds ? '공구 ' + r.rounds + '번 · 1번에 평균 ' + r.per + '개 (전체 기간)' : '공구 기록 없음'}">${r.per ? r.per + '개' : '-'}${r.rounds ? `<div style="font-size:10.5px; font-weight:700; color:#94a3b8;">${r.rounds}회</div>` : ''}</td>
