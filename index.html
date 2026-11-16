@@ -3311,7 +3311,10 @@
                         <select id="inv-sort-sel" onchange="gSetInvSort(this.value)" title="정렬" style="display:none; flex:0 0 auto; height:42px; padding:0 8px; border:1.5px solid var(--border); border-radius:var(--radius-sm); background:#fff; font-size:13px; font-weight:800; color:var(--text-main); cursor:pointer;">
                             <option value="name">이름순</option>
                             <option value="stock">재고순</option>
+                            <option value="gb">공구순</option>
                         </select>
+                        <!-- [신규 2026-11-16] 오름차순·내림차순 (사장님 요청) -->
+                        <button type="button" id="inv-sort-dir" onclick="gToggleInvSortDir()" title="오름차순·내림차순 바꾸기" style="display:none; flex:0 0 auto; height:42px; padding:0 10px; border:1.5px solid var(--border); border-radius:var(--radius-sm); background:#fff; font-size:13px; font-weight:800; color:var(--text-main); cursor:pointer; white-space:nowrap;">↓ 내림</button>
                         <button type="button" onclick="exportProductsToCSV()" title="상품 목록을 CSV로 내려받기" style="flex:0 0 auto; width:42px; height:42px; padding:0; display:flex; align-items:center; justify-content:center; border:1.5px solid #0284c7; background:#f0f9ff; color:#0284c7; border-radius:var(--radius-sm); font-size:16px; cursor:pointer;">📤</button>
                         <button type="button" onclick="document.getElementById('product-csv-file').click()" title="CSV로 상품 목록 올리기" style="flex:0 0 auto; width:42px; height:42px; padding:0; display:flex; align-items:center; justify-content:center; border:1.5px solid #059669; background:#ecfdf5; color:#059669; border-radius:var(--radius-sm); font-size:16px; cursor:pointer;">📥</button>
                         <input type="file" id="product-csv-file" accept=".csv,text/csv" style="display:none;" onchange="importProductsFromCSV(this)">
@@ -36586,11 +36589,34 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             el.after(box);
         }
         // [신규 2026-10-12] 상시판매 정렬 (이름순 · 재고순) — 이 기기에 기억
-        let gInvSort = (() => { try { return localStorage.getItem('moket_inv_sort') === 'stock' ? 'stock' : 'name'; } catch (e) { return 'name'; } })();
+        // [수정 2026-11-16] 공구순(마지막 공구 픽업일) 더함 · 오름/내림 고르기 (사장님 요청)
+        const INV_SORTS = ['name', 'stock', 'gb'];
+        let gInvSort = (() => { try { const v = localStorage.getItem('moket_inv_sort'); return INV_SORTS.includes(v) ? v : 'name'; } catch (e) { return 'name'; } })();
+        // 방향 — 'asc' 오름차순 · 'desc' 내림차순. 처음엔 이름순은 가나다(오름), 재고순·공구순은 많은·최근 것부터(내림)
+        let gInvSortDir = (() => { try { const v = localStorage.getItem('moket_inv_sort_dir'); return (v === 'asc' || v === 'desc') ? v : ''; } catch (e) { return ''; } })();
+        function gInvDirNow() { return gInvSortDir || (gInvSort === 'name' ? 'asc' : 'desc'); }
         function gSetInvSort(v) {
-            gInvSort = v === 'stock' ? 'stock' : 'name';
-            try { localStorage.setItem('moket_inv_sort', gInvSort); } catch (e) { }
+            gInvSort = INV_SORTS.includes(v) ? v : 'name';
+            gInvSortDir = '';   // 기준을 바꾸면 그 기준의 처음 방향으로
+            try { localStorage.setItem('moket_inv_sort', gInvSort); localStorage.removeItem('moket_inv_sort_dir'); } catch (e) { }
             renderProductsList();
+        }
+        function gToggleInvSortDir() {
+            gInvSortDir = gInvDirNow() === 'asc' ? 'desc' : 'asc';
+            try { localStorage.setItem('moket_inv_sort_dir', gInvSortDir); } catch (e) { }
+            renderProductsList();
+        }
+        function gPaintInvSortDir() {
+            const b = document.getElementById('inv-sort-dir'); if (!b) return;
+            b.style.display = uploadManageDeliveryType === 'inventory' ? '' : 'none';
+            b.textContent = gInvDirNow() === 'asc' ? '↑ 오름' : '↓ 내림';
+        }
+        // 마지막 공구 픽업일 (카드의 🛒 표시와 같은 자료) — 없으면 ''
+        function gGbLastOf(prod) {
+            if (!prod) return '';
+            const c = String(prod.productCode || '').trim();
+            const s = gGbHistMap().get(c ? 'c:' + c : 'n:' + fTightName(prod.name || ''));
+            return (s && s.size) ? [...s].sort().pop() : '';
         }
         /* [신규 2026-11-10] 상품 목록에 후기 수 (사장님 요청) — review_stats/<번호> = { n, sum } 를 한 번 받아 두고,
            카드에 '⭐ 4.8 · 후기 12'. 누르면 그 상품 후기(product_reviews/<번호>)를 창으로 */
@@ -36661,11 +36687,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 } finally {
                     uploadManageDeliveryType = sv.t; uploadManageTab = sv.tab; uploadSubTab = sv.sub; uploadManageKind = sv.kind;
                 }
-                { const s = document.getElementById('inv-sort-sel'); if (s) { s.style.display = uploadManageDeliveryType === 'inventory' ? '' : 'none'; s.value = gInvSort; } }
+                { const s = document.getElementById('inv-sort-sel'); if (s) { s.style.display = uploadManageDeliveryType === 'inventory' ? '' : 'none'; s.value = gInvSort; } gPaintInvSortDir(); }
                 try { refreshManageTabCounts(); } catch (e) { }
                 return;
             }
-            { const s = document.getElementById('inv-sort-sel'); if (s) { s.style.display = uploadManageDeliveryType === 'inventory' ? '' : 'none'; s.value = gInvSort; } }
+            { const s = document.getElementById('inv-sort-sel'); if (s) { s.style.display = uploadManageDeliveryType === 'inventory' ? '' : 'none'; s.value = gInvSort; } gPaintInvSortDir(); }
             try { psRoundTick(); } catch (e) { }   // [신규 2026-10-05] 상품 목록이 바뀌면 공동구매 회차(노출·숨김·바뀜)를 맞춘다
             try { gAutoTidySoldOut(); } catch (e) { }   // [신규 2026-10-27] 품절된 상시판매 상품은 저절로 품절 칸으로, 재고가 들어오면 원래 칸으로 (사장님 요청)
             const container = _plDualTarget || document.getElementById('products-list-container');
@@ -36863,11 +36889,19 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     if (flagA !== flagB) return flagA ? -1 : 1;
 
                     // [신규 2026-10-12] 상시판매 재고순 — 많은 것부터 (무제한이 맨 위), 같으면 이름순
+                    // [수정 2026-11-16] 오름/내림 고르기 · 공구순(마지막 공구일, 공구한 적 없는 것은 늘 맨 아래)
+                    const _sg = (isInventoryView && gInvDirNow() === 'asc') ? 1 : -1;
                     if (isInventoryView && gInvSort === 'stock') {
                         const sa = salesRealStock(a.prod), sb = salesRealStock(b.prod);
                         const va = sa === Infinity ? 1e12 : (Number(sa) || 0), vb = sb === Infinity ? 1e12 : (Number(sb) || 0);
-                        if (va !== vb) return vb - va;
+                        if (va !== vb) return (va - vb) * _sg;
                     }
+                    if (isInventoryView && gInvSort === 'gb') {
+                        const ga = gGbLastOf(a.prod), gb = gGbLastOf(b.prod);
+                        if (!ga !== !gb) return ga ? -1 : 1;
+                        if (ga !== gb) return ga.localeCompare(gb) * _sg;
+                    }
+                    if (isInventoryView && gInvSort === 'name' && gInvDirNow() === 'desc') return String(b.prod.name || "").localeCompare(String(a.prod.name || ""), 'ko');
                     return String(a.prod.name || "").localeCompare(String(b.prod.name || ""), 'ko');
                 });
 
@@ -37181,8 +37215,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <button type="button" onclick="psBatchToNew()" style="width:100%; height:38px; border:none; background:#2563eb; color:#fff; border-radius:8px; font-size:12.5px; font-weight:800; cursor:pointer;">만들기</button>
                 </div>
                 <div style="font-size:11.5px; font-weight:800; color:#475569; margin-bottom:4px;">있는 일정에 담기</div>
-                <div style="display:flex; flex-direction:column; gap:5px;">
-                    ${units.length ? units.map(u => { const it = psItem(u[0]); return `<div onclick="psBatchToUnit('${gEscapeHtml(u[0])}')" style="padding:8px 10px; border:1px solid #dbeafe; border-radius:8px; cursor:pointer; background:#f8fbff;">
+                ${/* [신규 2026-11-16] 있는 일정 찾기 (사장님 요청) — 일정 이름·그 안의 상품 이름으로 거른다. 칸은 그대로 두고 줄만 숨겨 한글 입력이 안 끊긴다 */''}
+                ${units.length ? `<input type="search" id="bsp-q" placeholder="🔍 일정·상품 검색" autocomplete="off" oninput="psBatchFilterUnits(this.value)" style="width:100%; height:36px; margin-bottom:6px; padding:0 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:700; box-sizing:border-box;">` : ''}
+                <div id="bsp-units" style="display:flex; flex-direction:column; gap:5px;">
+                    ${units.length ? units.map(u => { const it = psItem(u[0]); const _q = [psGroupName(u[0])].concat(u.map(k => { const x = psItem(k); return x && uploadProducts[x.idx] ? uploadProducts[x.idx].name : ''; })).join(' '); return `<div data-q="${gEscapeHtml(_q)}" onclick="psBatchToUnit('${gEscapeHtml(u[0])}')" style="padding:8px 10px; border:1px solid #dbeafe; border-radius:8px; cursor:pointer; background:#f8fbff;">
                         <div style="font-size:12.5px; font-weight:800;">${gEscapeHtml(psGroupName(u[0]))}</div>
                         <div style="font-size:11px; font-weight:700; color:#64748b;">${psItemSummary(it)} · 상품 ${u.length}개</div></div>`; }).join('')
                         : `<div style="font-size:11.5px; color:#94a3b8;">앞으로 올라갈 일정이 없어요</div>`}
@@ -37190,6 +37226,18 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 <button type="button" onclick="document.getElementById('batch-sched-pick').remove()" style="margin-top:12px; width:100%; height:36px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">닫기</button>
             </div>`;
             psBatchFillDefaults();
+        }
+        function psBatchFilterUnits(v) {
+            const q = String(v || '').toLowerCase().replace(/\s+/g, '');
+            const box = document.getElementById('bsp-units'); if (!box) return;
+            let n = 0;
+            box.querySelectorAll('[data-q]').forEach(el => {
+                const on = !q || String(el.dataset.q || '').toLowerCase().replace(/\s+/g, '').includes(q);
+                el.style.display = on ? '' : 'none'; if (on) n++;
+            });
+            let none = document.getElementById('bsp-none');
+            if (!n && q) { if (!none) { none = document.createElement('div'); none.id = 'bsp-none'; none.style.cssText = 'font-size:11.5px; color:#94a3b8; padding:6px 2px;'; none.textContent = '찾는 일정이 없어요'; box.appendChild(none); } }
+            else if (none) none.remove();
         }
         // [신규 2026-10-03] 일정에 담기 창 — 올라감 시각
         function psBatchRelMs() {
