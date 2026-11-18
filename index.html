@@ -5399,6 +5399,14 @@
                     const expVal = day0 + fMsToScheduleInputValue(def0.expireAt).slice(10);
                     const pick0 = day0, linked0 = true;
                     const fld = (t, inner) => '<div style="display:flex;flex-direction:column;gap:3px;"><span style="font-size:12px;font-weight:800;color:#475569;">' + t + '</span><div class="line" style="align-items:center;">' + inner + '</div></div>';
+                    // [신규 2026-11-18] 있는 일정 (앞으로 올라갈 것) — 담기 목록용
+                    let _units = [];
+                    try {
+                        if (typeof psSchedLoaded !== 'undefined' && !psSchedLoaded && typeof psLoadSchedules === 'function') await psLoadSchedules();
+                        const _now = Date.now();
+                        _units = psUnitsOf(psAllItems().filter(it => psOpenAt(it.releaseAt) > _now).map(it => it.key));
+                        _units.sort((a, b) => Number(psItem(a[0]).releaseAt) - Number(psItem(b[0]).releaseAt));
+                    } catch (e) { _units = []; }
                     const box = document.createElement('div'); box.id = 'src-day';
                     box.innerHTML = '<div class="in"><div class="t">노출일정에 일정 추가<small>' + (many ? rows.length + '개를 한 묶음으로 걸어요' : '이 상품에 일정을 걸어요') + '</small></div>' +
                         (many ? '<label style="display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:800;color:#475569;">일정 이름<input type="text" id="src-sch-name" placeholder="예: 추석 선물세트" value="' + srcEsc(refs.length === 1 ? rows[0].p.name : '') + '"></label>' : '') +
@@ -5413,8 +5421,20 @@
                                 // [신규 2026-11-10] 일정이 끝나면(픽업일 지난 자정) 남은 재고로 상시판매 전환 — 노출일정 카드의 '✓ 상시'와 같은 모양 (사장님 요청, 떼기·빼기는 뺌)
                                 : '<button type="button" class="ps-mbtn onsite" data-ons="' + i + '" title="픽업일이 지난 자정부터, 재고가 남았으면 상시판매로 돌려 계속 팔아요">✓ 상시</button></div>' + srcOnsBoxHtml(i, x.idx))).join('') + '</div>' +
                         (miss.length ? '<div style="font-size:12px;font-weight:800;color:#dc2626;">' + (miss.some(x => x.idx === null) ? '상품 목록을 아직 못 받았어요 — 잠시 뒤 다시 열어 주세요' : '상품 등록이 안 된 것이 ' + miss.length + '개 있어요 — 모두 등록해야 일정을 걸 수 있어요') + '</div>' : '') +
-                        '<div class="row"><button type="button" data-act="close">닫기</button><button type="button" class="ok" data-act="go"' + (miss.length ? ' disabled style="opacity:.4;cursor:default"' : '') + '>일정 추가</button></div></div>';
+                        '<div class="row"><button type="button" data-act="close">닫기</button><button type="button" class="ok" data-act="go"' + (miss.length ? ' disabled style="opacity:.4;cursor:default"' : '') + '>일정 추가</button></div>' +
+                        /* [신규 2026-11-18] 있는 일정에 담기 + 검색 (사장님 요청 — 상품목록의 '일정에 담기' 창과 같게). 앞으로 올라갈 일정만 */
+                        (!miss.length && _units.length ? '<div style="border-top:1px solid #e2e8f0; padding-top:8px; display:flex; flex-direction:column; gap:5px;">' +
+                            '<div style="font-size:12px;font-weight:800;color:#475569;">있는 일정에 담기</div>' +
+                            '<input type="search" id="src-sch-q" placeholder="🔍 일정·상품 검색" autocomplete="off" style="width:100%; height:34px; padding:0 10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:700; box-sizing:border-box;">' +
+                            '<div id="src-sch-units" style="display:flex; flex-direction:column; gap:5px; max-height:240px; overflow:auto;">' +
+                            _units.map(u => { const it = psItem(u[0]); const q = [psGroupName(u[0])].concat(u.map(k => { const x = psItem(k); return x && uploadProducts[x.idx] ? uploadProducts[x.idx].name : ''; })).join(' ');
+                                return '<button type="button" data-unit="' + srcEsc(u[0]) + '" data-q="' + srcEsc(q) + '" style="text-align:left; padding:7px 10px; border:1px solid #dbeafe; border-radius:8px; background:#f8fbff; cursor:pointer; font-family:inherit;">' +
+                                    '<div style="font-size:12.5px; font-weight:800; color:#0f172a;">' + srcEsc(psGroupName(u[0])) + '</div><div style="font-size:11px; font-weight:700; color:#64748b;">' + (psItemSummary(it) || '') + ' · 상품 ' + u.length + '개</div></button>'; }).join('') +
+                            '</div></div>' : '') +
+                        '</div>';
                     document.body.appendChild(box);
+                    { const q = document.getElementById('src-sch-q');
+                      if (q) q.oninput = () => { const v = String(q.value || '').toLowerCase().replace(/\s+/g, ''); box.querySelectorAll('#src-sch-units [data-q]').forEach(el => { el.style.display = (!v || String(el.dataset.q || '').toLowerCase().replace(/\s+/g, '').includes(v)) ? '' : 'none'; }); }; }
                     // 마감일과 같게 — 켜면 픽업/배달일 칸을 잠그고 마감 날짜를 따라간다
                     { const ex = document.getElementById('src-sch-exp'), pk = document.getElementById('src-sch-pick'), lk = document.getElementById('src-sch-link');
                       // [수정 2026-11-06] 체크를 풀면 픽업/배달일을 일정(달력 이름표) 날짜로 되돌린다 (사장님 요청 — 상품등록 창과 같게)
@@ -5432,6 +5452,21 @@
                         if (e.target === box) return box.remove();
                         const b = e.target.closest('button'); if (!b || b.disabled) return;
                         if (b.dataset.act === 'close') return box.remove();
+                        if (b.dataset.unit) {   // [신규 2026-11-18] 있는 일정에 담기
+                            if (miss.length) return;
+                            const key = b.dataset.unit, have = new Set(psGroupMembers(key).map(k => (psItem(k) || {}).sid));
+                            b.disabled = true;
+                            try {
+                                if (typeof psUndoMark === 'function') psUndoMark('소싱 — 있는 일정에 담기');
+                                let n = 0;
+                                for (const x of rows) { const pp = uploadProducts[x.idx]; if (!pp || have.has(pp.sid)) continue; await psGroupAddTo(key, x.idx); have.add(pp.sid); n++; }
+                                box.remove();
+                                showToast(n ? `📅 '${psGroupName(key)}' 일정에 ${n}개 담았어요` : '이미 그 일정에 들어 있어요');
+                                if (typeof renderProductScheduleCalendar === 'function') renderProductScheduleCalendar();
+                                if (typeof renderProductsList === 'function') renderProductsList();
+                            } catch (err) { b.disabled = false; showToast('못 담았어요: ' + err.message); }
+                            return;
+                        }
                         if (b.dataset.ons != null) { const i = +b.dataset.ons; onsOn[i] = !onsOn[i]; paintOns(i); return; }
                         if (b.dataset.onsall != null) { const all = rows.every((x, i) => !(x.idx >= 0) || onsOn[i]); rows.forEach((x, i) => { if (x.idx >= 0) { onsOn[i] = !all; paintOns(i); } }); return; }
                         if (b.dataset.link != null) {
