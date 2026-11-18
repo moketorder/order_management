@@ -23873,7 +23873,7 @@
             }
             // [수정 2026-10-05] '상세옵션 사용' 칸 대신 — 아래 항목 중 하나라도 켜져 있으면 켠 것으로 본다 (사장님 요청)
             const d0 = optionModalDraft;
-            d0.useOptions = !!(d0.useChoiceOptions || d0.usePersonLimit || d0.useAmountLimit || d0.useAgencyFee || d0.useDiscount);
+            d0.useOptions = !!(d0.useChoiceOptions || d0.usePersonLimit || d0.useAmountLimit || d0.useAgencyFee || d0.useDiscount || d0.saleBadge === true);   // [수정 2026-11-18] 섬네일 문구만 켜도
 
             // 이름이 비어 있는 항목은 버리고, 이름·항목이 모두 빈 옵션은 저장하지 않음
             const groups = optionModalDraft.groups.map(g => ({
@@ -24179,6 +24179,12 @@
             renderDetailOptionBody();
         }
 
+        function toggleDraftThumbText() {   // [신규 2026-11-18] 섬네일 문구 켜고 끄기
+            syncDetailOptionDraft();
+            if (!optionModalDraft) return;
+            optionModalDraft.saleBadge = !(optionModalDraft.saleBadge === true);
+            renderDetailOptionBody();
+        }
         function toggleDraftPersonLimit() {
             syncDetailOptionDraft();
             if (!optionModalDraft) return;
@@ -24499,20 +24505,29 @@
                             <div style="font-size: 11px; font-weight: 800; color: #dc2626; margin-bottom: 6px;">예상 가격</div>
                             <div id="discount-preview">${gDiscountPreviewHtml(optionModalDraft.discountRate, optionModalDraft.discountType, optionModalDraft.discountAmount, optionModalDraft.discountNewPrice)}</div>
                         </div>
-                        <!-- [신규] 할인할 때 함께 할 것 (고를 수 있다) -->
-                        <div style="margin-top: 10px; display:flex; flex-direction:column; gap:6px; background:#fff; border:1.5px solid var(--border); border-radius: var(--radius-sub); padding: 10px 12px;">
-                            <!-- [삭제 2026-10-02] '당일 상품에 넣기' 체크 — 사장님 요청으로 뺐다. 저장은 늘 꺼짐(saleToToday:false) -->
-                            <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-main); cursor:pointer;">
-                                <input type="checkbox" data-discount-role="badge" ${optionModalDraft.saleBadge === true ? 'checked' : ''} style="width:17px !important; height:17px !important; position:static !important; opacity:1 !important; margin:0 !important; accent-color:#dc2626; cursor:pointer;"> 섬네일 문구</label>
-                            <!-- [신규 2026-10-02] 섬네일 띠에 쓸 문구를 직접 쓴다. 비우면 띠에는 'n원 할인!'. 쓰면 위 체크가 저절로 켜진다.
-                                 사진이 좁아(폰에서 120px 남짓) 12자까지만 받는다 -->
-                            <input type="text" data-discount-role="badge-text" maxlength="20" value="${gEscapeHtml(optionModalDraft.saleBadgeText || '')}" placeholder=""
-                                oninput="if (this.value.trim()) { const c = document.querySelector('#product-option-modal-body [data-discount-role=badge]'); if (c) c.checked = true; }"
-                                style="margin-left:25px; width:calc(100% - 25px); box-sizing:border-box; height:34px; padding:0 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-weight:700; font-family:inherit; color:#e11d48;">
-                        </div>
+                        <!-- [수정 2026-11-18] 섬네일 문구는 할인과 떼어 아래 따로인 칸으로 옮겼다 (사장님 요청 — 할인 여부와 관계없이 켜고 끈다) -->
                         <div style="font-size: 11px; font-weight: 600; color: var(--text-sub); margin-top: 8px; line-height: 1.5;">${optionModalDraft.discountType === 'amount' ? '판매가에서 적은 금액을 그대로 뺍니다.' : '할인가는 100원 단위로 버립니다. (예: 9,537원 → 9,500원)'}</div>
                     </div>
                 </div>
+                </div>`;
+
+            /* [신규 2026-11-18] 섬네일 문구 — 할인과 따로 켜고 끈다 (사장님 요청). 켜고 문구를 적으면 주문서 사진 띠에 그 문구가 나온다 (할인 없어도).
+               끄면 할인 상품은 예전처럼 'n원 할인!' 띠. 저장 자리는 그대로 saleBadge(켜짐) · saleBadgeText(문구) */
+            const thumbOn = optionModalDraft.saleBadge === true;
+            html += `
+                <div style="border: 1.5px solid ${thumbOn ? '#e11d48' : 'var(--border)'}; background: ${thumbOn ? '#fff1f2' : '#fff'}; border-radius: var(--radius-sub); padding: 14px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <div style="min-width: 0;">
+                            <div style="font-size: 13px; font-weight: 800; color: var(--text-main);">섬네일 문구</div>
+                            <div style="font-size: 12px; font-weight: 600; color: var(--text-sub); margin-top: 4px; line-height: 1.5;">주문서 상품 사진 위 띠에 적은 문구가 나옵니다. 할인과 관계없이 쓸 수 있어요.</div>
+                        </div>
+                        <button type="button" onclick="toggleDraftThumbText()" style="flex: 0 0 auto; padding: 9px 16px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; border: 1.5px solid ${thumbOn ? '#e11d48' : 'var(--border)'}; background: ${thumbOn ? '#e11d48' : '#fff'}; color: ${thumbOn ? '#fff' : 'var(--text-sub)'};">${thumbOn ? 'ON' : 'OFF'}</button>
+                    </div>
+                    <div style="display: ${thumbOn ? 'block' : 'none'}; margin-top: 12px;">
+                        <input type="text" data-discount-role="badge-text" maxlength="20" value="${gEscapeHtml(optionModalDraft.saleBadgeText || '')}" placeholder="예: 소진시 주문마감!!"
+                            style="width:100%; box-sizing:border-box; height:38px; padding:0 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; font-weight:800; font-family:inherit; color:#e11d48; background:#fff;">
+                        <div style="font-size: 11px; font-weight: 600; color: #94a3b8; margin-top: 5px;">20자까지 · 길면 띠가 두 줄로 나와요</div>
+                    </div>
                 </div>`;
 
             // 5) 사람당 주문 개수 제한 (헤더 + 개수 입력이 한 틀 안에)
