@@ -42181,6 +42181,9 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const drop = codes.filter(c => c !== keep);
             const dropSet = new Set(drop);
 
+            /* [신규 2026-11-18] 발주 보관함을 아직 안 받았으면 먼저 받는다 (사장님 지적 — 김칩스: 보관함에 있는 발주가 안 옮겨져 연결이 안 된 채 남았다) */
+            try { if (typeof loadPurchaseArchiveIfNeeded === 'function') await loadPurchaseArchiveIfNeeded(); } catch (e) { }
+            if ((!purchaseOrders || !purchaseOrders.length) && typeof loadPurchaseOrders === 'function') { try { await loadPurchaseOrders(); } catch (e) { } }
             // 바뀔 것들을 미리 세어 보여 준다
             const prodHits = (uploadProducts || []).map((p, i) => ({ p, i }))
                 .filter(({ p }) => p && dropSet.has(String(p.productCode || '').trim()));
