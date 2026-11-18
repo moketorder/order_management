@@ -18759,7 +18759,13 @@
             let n = v === '' ? null : Math.max(0, parseInt(v, 10) || 0);
             if (n !== null) { const it0 = psItem(key); n = it0 ? await gAskPendingDeduct(it0.idx, n) : n; if (n === null) { renderProductScheduleCalendar(); return; } }
             psUndoMark('이번 차례 재고');
-            if (await psItemSave(key, { stock: n, stockApplied: null, stockManual: true })) showToast(n === null ? '📦 재고를 이어가요' : n === 999 ? '♾️ 이번 차례가 시작하면 재고를 무제한으로 해요' : `📦 이번 차례가 시작하면 재고를 ${n}개로 맞춰요`);
+            /* [신규 2026-11-18] 지금 팔고 있는 차례면 상품 재고도 바로 바꾼다 (사장님 요청 — 일정 창에서 고친 수량이 상품 수정에도 보이게).
+               앞으로 올라갈 차례는 예전처럼 그 차례가 시작할 때 맞춘다 */
+            const _it = psItem(key), _live = n !== null && _it && psIsActive(_it);
+            if (await psItemSave(key, _live ? { stock: n, stockApplied: true, stockManual: true } : { stock: n, stockApplied: null, stockManual: true })) {
+                if (_live) { await updateProductStock(_it.idx, String(n), true); showToast(n === 999 ? '♾️ 상품 재고도 무제한으로 바꿨어요' : `📦 상품 재고도 ${n}개로 바꿨어요`); }
+                else showToast(n === null ? '📦 재고를 이어가요' : n === 999 ? '♾️ 이번 차례가 시작하면 재고를 무제한으로 해요' : `📦 이번 차례가 시작하면 재고를 ${n}개로 맞춰요`);
+            }
             renderProductScheduleCalendar();
         }
         // 올라갈 시각이 된 다음 차례를 지금 차례로 올린다 (앞 차례가 끝났거나 없을 때만). 마감까지 지나 버린 차례는 건너뛴다.
@@ -39265,7 +39271,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!v || v === orig) { el.value = orig; return; }
             updateProductStock(index, v);
         }
-        async function updateProductStock(index, value) {
+        async function updateProductStock(index, value, noAsk) {   // [수정 2026-11-18] noAsk — 이미 앞에서 물어본 경우 (일정 창 재고)
             const prod = uploadProducts[index];
             if (!prod) { showToast("상품을 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요."); renderProductsList(); return; }
             const raw = String(value == null ? '' : value).trim();
@@ -39281,7 +39287,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 else newStock = n;
             }
             // [신규 2026-10-12] 오늘부터 나갈 주문이 있으면 빼서 넣을지 묻는다 (사장님 요청 — 재고 고치는 곳 모두)
-            if (!wantUnlimited && newStock > 0) {
+            if (!noAsk && !wantUnlimited && newStock > 0) {
                 const r = await gAskPendingDeduct(index, newStock);
                 if (r === null) { renderProductsList(); if (typeof renderSalesUpcoming === 'function') renderSalesUpcoming(); return; }
                 newStock = r;
