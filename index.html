@@ -6367,6 +6367,13 @@
                                     c.fillStyle = '#fff'; c.fillText(it.sec, x + 10 + lf * .6, y + 10 + lh * .7);
                                 }
                             }
+                            if (it.band && !it.closed) {   // [신규 2026-11-20] 섬네일 문구 — 사진 아래쪽 빨간 띠 (주문서 사진 띠와 같은 모양)
+                                let bf = Math.max(14, Math.round(nf * .9)); c.font = '900 ' + bf + 'px ' + F;
+                                while (bf > 11 && c.measureText(it.band).width > cw - 16) { bf--; c.font = '900 ' + bf + 'px ' + F; }
+                                const bh = Math.round(bf * 1.7);
+                                c.save(); srcThRR(c, x, y, cw, rowH, 22); c.clip(); c.fillStyle = 'rgba(225,29,72,.92)'; c.fillRect(x, y + phH - bh, cw, bh); c.restore();
+                                c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(srcThFit(c, it.band, cw - 12), x + cw / 2, y + phH - bh / 2 + bf * .36); c.textAlign = 'left';
+                            }
                             if (it.closed) {
                                 c.font = '900 ' + Math.round(pf * 1.05) + 'px ' + F; const t = '주문마감', tw = c.measureText(t).width, ph = pf * 1.05 * 1.5, pw = tw + pf * 1.6;
                                 srcThPill(c, x + (cw - pw) / 2, y + phH / 2 - ph / 2, pw, ph, 'rgba(40,40,40,.72)');
@@ -34462,7 +34469,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
         function gThumbRowOf(p) {
             const name = String(p.name || '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
             return { k: gListKind(p), name, mod: String(p.nameLead || '').replace(/\s+/g, ' ').trim(), price: gFvPrice(p),
-                imgs: (Array.isArray(p.images) ? p.images : []).filter(Boolean), imgAt: 0, closed: gIsProductSoldOut(p), sun: '', vendor: isSadaListProduct(p) ? '사다드림' : '', ...gThumbSaleOf(p) };
+                imgs: (Array.isArray(p.images) ? p.images : []).filter(Boolean), imgAt: 0, closed: gIsProductSoldOut(p), sun: '', vendor: isSadaListProduct(p) ? '사다드림' : '', ...gThumbSaleOf(p),
+                band: gThumbBandOf(p) };
+        }
+        /* [신규 2026-11-20] 상세옵션의 '섬네일 문구' (예: 소량 재고할인) — 카톡용 섬네일 사진 아래 띠에도 (사장님 요청).
+           주문서와 같은 잣대: 켜짐(saleBadge true)이면 할인 없어도, 값이 없는 예전 상품은 할인 중일 때만 */
+        function gThumbBandOf(p) {
+            if (!p) return '';
+            const t = String(p.saleBadgeText || '').trim(); if (!t) return '';
+            if (p.saleBadge === true || p.saleBadge === 'true') return t;
+            if (p.saleBadge === false || p.saleBadge === 'false') return '';
+            return gThumbSale(p) ? t : '';
         }
         /* [신규 2026-10-30] 공동구매 목록에서 여러 개 고르고 '🖼 섬네일' (사장님 요청) — 고른 상품으로 단톡방 섬네일과 같은 그림.
            픽업일이 하나면 그 날짜, 여럿이면 첫날~끝날. 글도 같이 (날짜마다 상품명·가격) */
