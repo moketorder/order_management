@@ -23736,9 +23736,19 @@
         // [신규 2026-10-13] 상시판매로 등록하면서 상시가를 적었으면 공구가 칸은 비워도 된다
         function gPriceReqSync() {
             const pe = document.getElementById('productPrice'), on = document.getElementById('productPriceOnsite');
+            const st = document.getElementById('productStock');
+            const opt = gFormHasOpts();   // [신규 2026-11-18] 고를 옵션이 있으면 공구가·재고를 안 적어도 된다 (옵션 가격·재고를 따른다)
+            if (st) st.required = !opt;
             if (!pe || pe.type !== 'number' || pe.readOnly) return;
-            pe.required = !(typeof uploadCurrentTab !== 'undefined' && uploadCurrentTab === 'onsite' && on && (parseInt(on.value) || 0) > 0);
+            pe.required = !opt && !(typeof uploadCurrentTab !== 'undefined' && uploadCurrentTab === 'onsite' && on && (parseInt(on.value) || 0) > 0);
         }
+        // [신규 2026-11-18] 상품 등록 칸에 고를 옵션(항목 하나 이상)이 켜져 있나
+        function gFormHasOpts() {
+            return !!(typeof uploadUseOptions !== 'undefined' && uploadUseOptions !== false && uploadUseChoiceOptions && Array.isArray(uploadProductOptions)
+                && uploadProductOptions.some(g => g && (g.items || []).some(it => it && String(it.name || '').trim())));
+        }
+        // 저장 단추를 누르는 순간(브라우저가 빈칸을 막기 전에) 한 번 더 맞춘다
+        document.addEventListener('click', e => { if (e.target && e.target.closest && e.target.closest('#btn-submit-form')) { try { gPriceReqSync(); } catch (er) { } } }, true);
         // 가격칸을 잠금 해제된 빈 숫자칸으로 되돌린다 (이전 상품에서 잠겨 있던 흔적 제거)
         function resetPriceField() {
             const input = document.getElementById('productPrice');
@@ -37987,6 +37997,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 || parseInt(document.getElementById('productStock').value, 10) === 999;
             let stock = isUnlimited ? "" : parseInt(document.getElementById('productStock').value);
             if (isUnlimited) stock = "";
+            if (stock !== "" && isNaN(stock)) stock = "";   // [신규 2026-11-18] 옵션 상품이라 재고를 비워 뒀으면 무제한 — 옵션 재고를 따른다
 
             const catVal = document.getElementById('categoryValue').value;
             let matchKey = catVal;
@@ -38082,7 +38093,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             {
                 const _onEl = document.getElementById('productPriceOnsite');
                 const _skipOnsite = uploadCurrentTab === 'reserve' && (['fruit', 'veg', 'sada'].includes(uploadKind) || !!(document.getElementById('productIsSada') || {}).checked);
-                const _pEmpty = !!_onEl && String(_onEl.value).trim() === '';   // [수정 2026-10-21] 0원도 적은 것으로 — 비어 있을 때만
+                const _pEmpty = !!_onEl && String(_onEl.value).trim() === '' && !gFormHasOpts();   // [수정 2026-10-21] 0원도 적은 것으로 — 비어 있을 때만 · [2026-11-18] 옵션 상품은 상품 상시가를 안 묻는다 (옵션 상시가만)
                 const _optUse = !!uploadUseChoiceOptions && Array.isArray(uploadProductOptions);
                 const _optMiss = _optUse ? uploadProductOptions.reduce((n, g) => n + ((g && g.items) || []).filter(it => it && String(it.name || '').trim() && !(Number(it.priceOnsite) > 0)).length, 0) : 0;
                 if (!_skipOnsite && (_pEmpty || _optMiss)) {
