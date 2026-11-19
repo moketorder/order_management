@@ -17912,6 +17912,12 @@
                             <div class="card-header">
                                 <div class="customer-info">
                                     <div class="shipping-type ${badgeClass}">${displayMethod}</div>
+                                    ${(() => {
+                                        /* [신규 2026-11-19] 영수증에 픽업·배달 날짜 (사장님 요청) — 한 장에 날짜가 여럿이면 모두 */
+                                        const W = ['일', '월', '화', '수', '목', '금', '토'];
+                                        const ds = [...new Set((customer.items || []).filter(it => !gIsFeeRow(it)).map(it => String((getOrderDateInfo(it) || {}).dateStr || '')).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
+                                        return ds.length ? `<div class="shipping-type" style="margin-left:4px;">${ds.map(d => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}(${W[new Date(d + 'T12:00:00').getDay()]})`).join(' · ')}</div>` : '';
+                                    })()}
                                     ${customer.taxLabel ? `<div class="shipping-type" style="margin-left:4px;">${customer.taxLabel}</div>` : ''}
                                     ${(() => {
                                         /* [신규] 챙길 것 안내 — 과세·면세로 나뉜 짝 종이, 지난 미픽업을 두 줄로 알린다 */
