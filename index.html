@@ -3215,6 +3215,12 @@
                                     <textarea id="productDesc" rows="3" placeholder="상품에 대한 맛, 크기, 원산지 등의 상세 설명을 입력하세요..." oninput="autoResizeTextarea(this); gLeadFromDesc()"></textarea>
                                 </div>
                             </div>
+                            <!-- [신규 2026-11-20] 카톡용 짧은 설명 (사장님 요청) — 카톡 공유 때 짧은/긴 설명을 골라 보낸다. 주문서에는 위 상세설명이 보인다.
+                                 따로 product_desc_kakao/<이름열쇠> 에 저장한다 -->
+                            <div class="form-group">
+                                <label>카톡용 짧은 설명 <span style="font-weight:600; color:#94a3b8; font-size:11.5px;">— 카톡 공유 때 고를 수 있어요 · 주문서에는 안 보여요</span></label>
+                                <textarea id="productDescKakao" rows="3" placeholder="🍹 상품명&#10;&#10;짧은 소개 두 줄&#10;&#10;✅ 포인트 제목&#10;설명 한 줄 (×3)&#10;&#10;☀️ 보관" oninput="autoResizeTextarea(this)"></textarea>
+                            </div>
 
                             <!-- 상품 사진 업로드 -->
                             <div class="form-group">
@@ -4741,6 +4747,7 @@
                         if (priceEl && price) { priceEl.value = price; fire(priceEl); }
                         const ds = String((band && band.ds) || '').trim();
                         if (descEl && ds) { descEl.value = ds; fire(descEl); if (typeof setDescBoxOpen === 'function') setDescBoxOpen(true); if (typeof autoResizeTextarea === 'function') autoResizeTextarea(descEl); }
+                        { const ds2 = String((band && band.ds2) || '').trim(), kEl = document.getElementById('productDescKakao'); if (kEl && ds2) { kEl.value = ds2; if (typeof autoResizeTextarea === 'function') autoResizeTextarea(kEl); } }   // [신규 2026-11-20] 카톡용 짧은 설명
                         /* [신규 2026-10-11] 밴드 사진(im — imgbb에 미리 올려 둔 주소)이 있으면 사진 칸에 넣어 둔다 (사장님 요청).
                            이미 올라간 사진이라 '기존 사진'처럼 넣는다 — 등록 완료 때 다시 올리지 않는다. 첫 장이 대표 사진 */
                         const bandIm = (band && Array.isArray(band.im)) ? band.im.filter(u => /^https?:\/\//.test(String(u || ''))) : [];
@@ -22926,11 +22933,31 @@
                 return (typeof v === 'string') ? v.trim() : '';
             } catch (e) { return ''; }
         }
+        /* [신규 2026-11-20] 카톡용 짧은 설명 (product_desc_kakao/<이름열쇠>) — 카톡 공유 때 긴 설명 대신 고를 수 있다 (사장님 요청) */
+        let gProductDescKakaoCache = null;
+        async function gGetProductDescKakao(p) {
+            try {
+                if (!gProductDescKakaoCache) {
+                    const r = await fetch(`${FIREBASE_DB_URL}product_desc_kakao.json?t=${Date.now()}`);
+                    gProductDescKakaoCache = r.ok ? ((await r.json()) || {}) : {};
+                }
+                const v = gProductDescKakaoCache[fSafeKey(p && p.name)];
+                return (typeof v === 'string') ? v.trim() : '';
+            } catch (e) { return ''; }
+        }
+        /* 카톡 공유 전에 짧은/긴 설명을 고른다. 공지문구를 따로 적어 뒀거나 짧은 설명이 없으면 묻지 않는다. null = 그만두기 */
+        async function gAskDescMode(p) {
+            if (p && p.announceText && String(p.announceText).trim()) return 'long';
+            if (!(await gGetProductDescKakao(p))) return 'long';
+            const v = await gPtAskDialog('카톡에 어떤 설명을 보낼까요?', [{ v: 'short', label: '✂️ 짧은 설명 (카톡용)', primary: true }, { v: 'long', label: '📄 긴 설명 (주문서와 같은 것)' }, { v: 'no', label: '그만두기', quiet: true }]);
+            return v === 'no' ? null : v;
+        }
         // [수정 2026-09-30] 공지문구를 안 적어 뒀으면 상세설명을 대신 보낸다. 상세설명도 없을 때만 상품명·가격으로 대신한다.
-        async function gAnnounceText(p) {
+        async function gAnnounceText(p, mode) {
             // [수정 2026-10-01] 카톡으로 가는 글이라 제목 다음 줄에 상품 날짜(픽업/배달)를 넣는다 — 공유&복사와 같다
             const custom = p.announceText && String(p.announceText).trim();
             if (custom) return gDescWithDate(custom, p);
+            if (mode === 'short') { const sh = await gGetProductDescKakao(p); if (sh) return gDescWithDate(sh, p); }   // [신규 2026-11-20]
             const desc = await gGetProductDesc(p);
             if (desc) return gDescWithDate(desc, p);
             const parts = [p.name || ''];
@@ -22942,12 +22969,13 @@
             const idx = gFindProductIdxByKey(key);
             const p = uploadProducts[idx];
             if (!p) return;
+            const _mode = await gAskDescMode(p); if (!_mode) return;   // [신규 2026-11-20] 짧은/긴 설명 고르기
             if (!p.images || !p.images.length) {   // [수정 2026-10-01] 사진 없는 상품도 같은 단추 — 문구만 복사한다
-                try { await navigator.clipboard.writeText(await gAnnounceText(p)); announceTextCopied.add(key); showToast('📋 문구 복사됨 · 사진 없음'); }
+                try { await navigator.clipboard.writeText(await gAnnounceText(p, _mode)); announceTextCopied.add(key); showToast('📋 문구 복사됨 · 사진 없음'); }
                 catch (e) { console.error('문구 복사 실패:', e); showToast('복사 실패'); }
                 return;
             }
-            const text = await gAnnounceText(p);
+            const text = await gAnnounceText(p, _mode);
             try { navigator.clipboard.writeText(text).then(() => { announceTextCopied.add(key); }).catch(() => {}); } catch (e) { }
             try {
                 // [수정 2026-11-04] 못 받은 사진은 빼고, 공유 허락이 풀렸으면 단추로 한 번 더 (gShareFilesSafe)
@@ -37637,10 +37665,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const p = uploadProducts[idx];
             if (!p) return;
             // [신규 2026-10-01] 폰(손가락 화면)에서만 공유 창으로 보낸다. PC 는 사진 복사·받기 창을 띄운다
-            if (!gIsPhoneUI()) { gOpenPcShareCopy(idx); return; }
+            const _mode = await gAskDescMode(p); if (!_mode) return;   // [신규 2026-11-20] 짧은/긴 설명 고르기 (사장님 요청)
+            if (!gIsPhoneUI()) { gOpenPcShareCopy(idx, _mode); return; }
 
             // 1) 문구 복사 — 공지문구가 있으면 그것, 없으면 상품 설명 (날짜 줄 포함, 배너와 같다)
-            const desc = await gAnnounceText(p);
+            const desc = await gAnnounceText(p, _mode);
             let copied = false;
             if (desc) {
                 try { await navigator.clipboard.writeText(desc); copied = true; }
@@ -37675,13 +37704,14 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
              · 여러 장은 '사진 받기'로 한꺼번에 내려받아 카톡 창에 끌어다 놓기
            창은 로딩(9999)·알림(10200)보다 아래(9990)에 둔다. */
         let _pcShareDesc = '';
-        async function gOpenPcShareCopy(idx) {
+        async function gOpenPcShareCopy(idx, mode) {
             const p = uploadProducts[idx];
             if (!p) return;
+            if (!mode) { mode = await gAskDescMode(p); if (!mode) return; }   // [신규 2026-11-20]
             const key = gStableKeyOf(p);
             const k = gEscapeHtml(key).replace(/'/g, "\\'");
             const images = Array.isArray(p.images) ? p.images.slice(0, 10) : [];
-            _pcShareDesc = await gAnnounceText(p);   // 공지문구가 있으면 그것, 없으면 상품 설명 — 날짜 줄 포함 (배너와 같다)
+            _pcShareDesc = await gAnnounceText(p, mode);   // 공지문구가 있으면 그것, 없으면 상품 설명 — 날짜 줄 포함 (배너와 같다)
             let box = document.getElementById('pc-sharecopy');
             if (!box) { box = document.createElement('div'); box.id = 'pc-sharecopy'; document.body.appendChild(box); }
             box.style.cssText = 'position:fixed; inset:0; z-index:9990; background:rgba(15,23,42,0.45); display:flex; align-items:center; justify-content:center; padding:16px;';
@@ -38636,6 +38666,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     if (_oldKey && _oldKey !== _dk) {
                         await fetch(`${FIREBASE_DB_URL}product_desc/${encodeURIComponent(_oldKey)}.json`, { method: 'DELETE' });
                     }
+                    // [신규 2026-11-20] 카톡용 짧은 설명 — 비우면 지운다. 이름을 바꿨으면 옛 열쇠 것은 지운다
+                    const _kd = String((document.getElementById('productDescKakao') || {}).value || '').trim();
+                    if (_dk) {
+                        await fetch(`${FIREBASE_DB_URL}product_desc_kakao/${encodeURIComponent(_dk)}.json`, _kd
+                            ? { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_kd) }
+                            : { method: 'DELETE' });
+                        if (gProductDescKakaoCache) { if (_kd) gProductDescKakaoCache[_dk] = _kd; else delete gProductDescKakaoCache[_dk]; }
+                    }
+                    if (_oldKey && _oldKey !== _dk) await fetch(`${FIREBASE_DB_URL}product_desc_kakao/${encodeURIComponent(_oldKey)}.json`, { method: 'DELETE' });
                 } catch (e) { console.error('상품 설명 저장 실패:', e); }
 
                 updatePublishedProductsTimestamp();
@@ -39570,6 +39609,17 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                상품 목록에 아직 남아 있으면 그것을 쓰고, 없으면 서랍에서 받아 채운다.
                (이 대비가 없으면 서랍으로 옮긴 뒤 수정 화면이 빈 칸으로 열리고,
                 그대로 저장하면 설명이 지워진다) */
+            {   // [신규 2026-11-20] 카톡용 짧은 설명 칸 채우기
+                const _kt = document.getElementById('productDescKakao');
+                if (_kt) {
+                    _kt.value = ''; autoResizeTextarea(_kt);
+                    const _kk = fSafeKey(prod.name);
+                    if (_kk) fetch(`${FIREBASE_DB_URL}product_desc_kakao/${encodeURIComponent(_kk)}.json?t=${Date.now()}`).then(r => r.ok ? r.json() : null).then(v => {
+                        if (typeof v !== 'string' || !v || _kt.value.trim() || uploadEditProductKey !== index) return;
+                        _kt.value = v; autoResizeTextarea(_kt);
+                    }).catch(() => { });
+                }
+            }
             {
                 const _d = document.getElementById('productDesc');
                 _d.value = prod.desc || "";
