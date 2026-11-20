@@ -5401,7 +5401,18 @@
                     try { const fp = rows.find(x => x.idx !== null && x.idx >= 0); if (fp) def0 = psDefaultSchedule(uploadProducts[fp.idx], rel0); } catch (e) { }
                     if (!def0 || !def0.expireAt) { const pk = srcAddDays(day0, 2); def0 = { pickup: pk, expireAt: new Date(pk + 'T15:00').getTime() }; }
                     // [수정 2026-10-09] 노출일 기본 = 일정 짜는 날(오늘) 06시 (사장님 요청 — 다른 일정 창과 같게). 마감·픽업/배달일은 그대로 이름표 날짜 기준
-                    const relVal = fMsToScheduleInputValue(new Date(srcToday() + 'T' + pad2(PS_DEFAULT_SLOT) + ':00').getTime());
+                    /* [수정 2026-11-20] 지금 팔고 있는 일정과 겹치면 노출일을 그 마감 뒤로 (사장님 지적 — 깐굴: 지금 차례가 오늘 15시까지라 오늘 0시로 걸면 겹쳐서 안 걸렸다) */
+                    let _relMs = new Date(srcToday() + 'T' + pad2(PS_DEFAULT_SLOT) + ':00').getTime();
+                    try {
+                        if (typeof psSchedLoaded !== 'undefined' && !psSchedLoaded && typeof psLoadSchedules === 'function') await psLoadSchedules();
+                        const _its = rows.flatMap(x => { const pp = uploadProducts[x.idx]; return (pp && pp.sid) ? psItemsOfSid(pp.sid) : []; });
+                        for (let k = 0; k < 10; k++) {
+                            const cov = _its.find(it => (Number(it.releaseAt) || 0) <= _relMs && (Number(it.expireAt) || 0) > _relMs);
+                            if (!cov) break;
+                            _relMs = Number(cov.expireAt);
+                        }
+                    } catch (e) { }
+                    const relVal = fMsToScheduleInputValue(_relMs);
                     // [수정 2026-10-09] 마감일 기본 = 공구일(이름표 날짜), 시각은 그대로 (사장님 요청) — 픽업/배달일도 '마감일과 같게'로 공구일
                     const expVal = day0 + fMsToScheduleInputValue(def0.expireAt).slice(10);
                     const pick0 = day0, linked0 = true;
@@ -5516,8 +5527,15 @@
                                         toOnsiteShelf: sh !== String(pp.shelf || '') ? (sh || '-') : null, toOnsitePrice: pr > 0 ? pr : null }, true);   // 냉장고 분류·금액은 바꾼 것만 (노출일정 카드와 같다)
                                 }
                             }
+                            /* [수정 2026-11-20] 하나도 못 걸었으면 창을 닫지 않고 왜 안 됐는지(겹치는 일정)를 알려 준다 (사장님 지적 — 이유가 안 보였다) */
+                            if (!ok) {
+                                b.disabled = false;
+                                const x0 = rows[0], p0 = uploadProducts[x0.idx], ov = p0 && p0.sid ? psItemOverlap(p0.sid, rel, exp, null) : null;
+                                showToast(ov ? `⚠️ 지금 걸린 일정(${fFmtSchedTime(ov.releaseAt)} ~ ${fFmtSchedTime(ov.expireAt)})과 겹쳐서 못 걸었어요 — 노출일을 그 마감 뒤로 해 주세요` : '⚠️ 일정을 못 걸었어요 — 노출일·마감을 다시 봐 주세요');
+                                return;
+                            }
                             box.remove();
-                            showToast(ok === rows.length ? '📅 노출일정에 ' + ok + '개 ' + (many ? '"' + label + '" 묶음으로 ' : '') + '걸었어요' : '📅 ' + ok + '/' + rows.length + '개만 걸었어요 — 나머지는 겹치거나 걸 수 없는 상품이에요');
+                            showToast(ok === rows.length ? '📅 노출일정에 ' + ok + '개 ' + (many ? '"' + label + '" 묶음으로 ' : '') + '걸었어요' : '📅 ' + ok + '/' + rows.length + '개만 걸었어요 — 나머지는 다른 일정과 겹쳐서 못 걸었어요');
                             if (typeof renderProductScheduleCalendar === 'function') renderProductScheduleCalendar();
                             if (typeof renderProductsList === 'function') renderProductsList();
                         } catch (err) { b.disabled = false; showToast('일정을 못 걸었어요: ' + err.message); }
