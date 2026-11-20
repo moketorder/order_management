@@ -22963,6 +22963,20 @@
                 return (typeof v === 'string') ? v.trim() : '';
             } catch (e) { return ''; }
         }
+        /* [신규 2026-11-21] 짧은 설명 맨 위 상품명 줄 앞에, 긴 설명처럼 후킹 문구 한 줄 (사장님 요청).
+           긴 설명의 첫 줄(후킹 문구 — 그다음 줄이 상품명)을 가져와 짧은 설명 첫 줄(이모지+상품명) 위에 얹고, 상품명 줄의 이모지는 뗀다.
+           긴 설명이 없거나 첫 줄이 이미 같으면 그대로. 저장된 글은 안 바꾼다 (보낼 때만) */
+        async function gShortWithHook(p, sh) {
+            try {
+                const long = String(await gGetProductDesc(p) || '').replace(/\r/g, '');
+                const L = long.split('\n'), hook = (L[0] || '').trim(), nameLine = (L[1] || '').trim();
+                if (!hook || !nameLine) return sh;                     // 첫 줄 다음이 빈 줄이면 후킹 줄이 아니다
+                const S = String(sh).replace(/\r/g, '').split('\n');
+                if ((S[0] || '').trim() === hook) return sh;            // 이미 들어 있다
+                S[0] = String(S[0] || '').replace(/^[^\p{L}\p{N}\[(]+/u, '').trim() || S[0];
+                return [hook].concat(S).join('\n');
+            } catch (e) { return sh; }
+        }
         /* 카톡 공유 전에 짧은/긴 설명을 고른다. 공지문구를 따로 적어 뒀거나 짧은 설명이 없으면 묻지 않는다. null = 그만두기 */
         async function gAskDescMode(p) {
             if (p && p.announceText && String(p.announceText).trim()) return 'long';
@@ -22981,7 +22995,7 @@
             // [수정 2026-10-01] 카톡으로 가는 글이라 제목 다음 줄에 상품 날짜(픽업/배달)를 넣는다 — 공유&복사와 같다
             const custom = p.announceText && String(p.announceText).trim();
             if (custom) return gDescWithDate(custom, p);
-            if (mode === 'short') { const sh = await gGetProductDescKakao(p); if (sh) return gDescWithDate(sh, p); }   // [신규 2026-11-20]
+            if (mode === 'short') { const sh = await gGetProductDescKakao(p); if (sh) return gDescWithDate(await gShortWithHook(p, sh), p); }   // [신규 2026-11-20] · [2026-11-21] 후킹 문구
             const desc = await gGetProductDesc(p);
             if (desc) return gDescWithDate(desc, p);
             const parts = [p.name || ''];
