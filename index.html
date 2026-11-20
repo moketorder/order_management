@@ -22953,7 +22953,13 @@
             return v === 'no' ? null : v;
         }
         // [수정 2026-09-30] 공지문구를 안 적어 뒀으면 상세설명을 대신 보낸다. 상세설명도 없을 때만 상품명·가격으로 대신한다.
+        // [신규 2026-11-20] 카톡 공유 글 맨 끝에 주문서 주소 (사장님 요청)
+        const G_ORDER_LINK = '🛒 주문하기 👉 https://moket.store/';
         async function gAnnounceText(p, mode) {
+            const t = String(await gAnnounceTextBody(p, mode) || '').replace(/\s+$/, '');
+            return (!t || t.includes('moket.store')) ? t : t + '\n\n' + G_ORDER_LINK;
+        }
+        async function gAnnounceTextBody(p, mode) {
             // [수정 2026-10-01] 카톡으로 가는 글이라 제목 다음 줄에 상품 날짜(픽업/배달)를 넣는다 — 공유&복사와 같다
             const custom = p.announceText && String(p.announceText).trim();
             if (custom) return gDescWithDate(custom, p);
