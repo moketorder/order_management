@@ -37668,16 +37668,19 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             if (!s) return s;
             const W = '일월화수목금토';
             const lines = [];
+            let _pkKey = '';
             const m = String((p && (p.matchKey || p.date)) || '').trim().replace(/[.\/]/g, '-').match(/^(\d{2,4})-(\d{1,2})-(\d{1,2})$/);
             if (m) {
                 const y = +m[1] < 100 ? 2000 + (+m[1]) : +m[1];
                 const d = new Date(y, +m[2] - 1, +m[3]);
-                if (!isNaN(d.getTime())) lines.push(`📦 픽업/배달 : ${d.getMonth() + 1}월 ${d.getDate()}일 (${W[d.getDay()]})`);
+                if (!isNaN(d.getTime())) { lines.push(`📦 픽업/배달 : ${d.getMonth() + 1}월 ${d.getDate()}일 (${W[d.getDay()]})`); _pkKey = fMsToDateKey(d.getTime()); }
             }
             /* [신규 2026-10-05] 마감 시각을 정해 둔 상품이면 픽업/배달 밑에 주문마감 줄을 넣는다 (사장님 요청).
                이미 지난 마감은 넣지 않는다 (지난 차례의 마감이 남아 있을 수 있다) */
             // [수정 2026-11-20] 카톡 공유 글에는 주문마감 줄을 넣지 않는다 — 픽업/배달일만 (사장님 요청)
-            const ex = 0;
+            // [수정 2026-11-21] 단, 주문마감 날짜가 픽업/배달일과 다른 상품은 넣는다 (사장님 요청 — 미리 마감하는 상품)
+            const _ex0 = Number(p && p.expireAt) || 0;
+            const ex = (_ex0 && _pkKey && fMsToDateKey(_ex0) !== _pkKey) ? _ex0 : 0;
             if (ex && ex > Date.now()) {
                 const e = new Date(ex), h = e.getHours(), mi = e.getMinutes();
                 const h12 = h % 12 === 0 ? 12 : h % 12;
