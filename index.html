@@ -29401,11 +29401,15 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const d = new Date(+p[0], +p[1]-1, +p[2]);
                 if (d >= today) dateSet.add(info.dateStr);
             });
-            const dates = [...dateSet].sort(); // 오름차순 (오늘 → 미래)
             const cur = salesUpcomingRange;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(cur)) dateSet.add(cur);   // [신규 2026-11-21] 고른 지난 날짜도 단추로 보이게
+            const dates = [...dateSet].sort(); // 오름차순 (오늘 → 미래)
             const tab = (v, label) => `<button type="button" data-sales-uprange="${v}" onclick="setSalesUpcomingRange('${v}')" class="sales-toggle-btn${cur === v ? ' active' : ''}" style="flex-shrink:0;">${label}</button>`;
-            let html = ''; // [변경] '전체' 버튼 제거 — 날짜 토글로 대체(아무 날짜도 선택 안 하면 오늘 이후 전체)
-            dates.forEach(ds => { html += tab(ds, fmtMD(ds)); });
+            /* [신규 2026-11-21] 지난 날짜 주문 집계도 보기 (사장님 요청) — '◀ 이전' 을 누르면 날짜를 고르는 창, 고르면 그 날짜 단추가 생긴다 */
+            const yd = new Date(today); yd.setDate(yd.getDate() - 1);
+            const ydStr = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
+            let html = `<label class="sales-toggle-btn" title="지난 날짜 주문 집계 보기" style="flex-shrink:0; position:relative; cursor:pointer;">◀ 이전<input type="date" max="${ydStr}" value="${/^\d{4}-\d{2}-\d{2}$/.test(cur) && cur < todayStr ? cur : ydStr}" onclick="try{this.showPicker()}catch(e){}" onchange="if(this.value) setSalesUpcomingRange(this.value)" style="position:absolute; inset:0; opacity:0; cursor:pointer;"></label>`; // [변경] '전체' 버튼 제거 — 날짜 토글로 대체(아무 날짜도 선택 안 하면 오늘 이후 전체)
+            dates.forEach(ds => { html += tab(ds, ds < todayStr ? '🕘 ' + fmtMD(ds) : fmtMD(ds)); });
             bar.innerHTML = html;
         }
 
@@ -30501,6 +30505,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 const _rp = salesUpcomingRange.split('-');
                 refDate = new Date(+_rp[0], +_rp[1]-1, +_rp[2]);
             }
+            const _pastSel = isDateSel && refDate < today;   // [신규 2026-11-21] 지난 날짜를 골랐나
             const map = new Map();
             const doneMap = new Map(); // [신규] 완료(픽업완료+배달완료) 수량 집계 (범위·카테고리 필터 동일 적용)
             const todayAfterMap = new Map(); // [신규] 보유분용: (전체=오늘이후 누적 / 날짜선택=해당 날짜만) 주문 수량, 취소 제외
@@ -30536,7 +30541,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 else { if (d < today) return; } // 전체(오늘 포함 이후)
                 const _q = (parseInt(o.qty || 0) || 0);
                 const _odt = parseTimestampToDate(o.timestamp), _od = _odt ? `${_odt.getFullYear()}-${String(_odt.getMonth() + 1).padStart(2, '0')}-${String(_odt.getDate()).padStart(2, '0')}` : '';   // [신규 2026-10-15] 손님이 주문한 날 — 사다드림 손님별 보기에 쓴다
-                if (_done) { doneMap.set(key, (doneMap.get(key) || 0) + _q); return; } // 완료 수량은 별도 집계(발주 목록엔 미포함)
+                if (_done) { doneMap.set(key, (doneMap.get(key) || 0) + _q); if (!_pastSel) return; } // 완료 수량은 별도 집계(발주 목록엔 미포함) — [수정 2026-11-21] 지난 날짜를 고르면 끝난 주문도 목록에 넣는다
                 // [수정] ocat — 주문에 적힌 분류. 상품을 못 찾아도 이걸로 묶음(공동구매·상시판매…)을 정한다
                 if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, ocat: String(o.category || ''), qty: 0, amount: 0, dates: new Set(), dateQty: new Map(), optionQty: new Map(), optionItemQty: new Map() });
                 const g = map.get(key);
