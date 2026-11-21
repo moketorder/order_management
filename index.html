@@ -38008,7 +38008,10 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             // [신규 2026-11-11] 후기가 있는 상품이 끼어 있으면 한 번 더 묻는다 (사장님 요청)
             try {
                 const _rs = await (await fetch(`${FIREBASE_DB_URL}review_stats.json?t=${Date.now()}`)).json() || {};
-                const _rv = [...uploadSelectedProductIndices].map(i => uploadProducts[i]).filter(p => p && Number((_rs[String(p.productCode || '').trim()] || {}).n) > 0)
+                /* [수정 2026-11-21] 같은 식별번호 상품이 지우지 않고 남으면 묻지 않는다 — 후기는 번호에 붙어 남은 상품에 그대로 보인다 (사장님 요청).
+                   그 번호의 마지막 상품을 지울 때만 묻는다 */
+                const _left = new Set((uploadProducts || []).filter((p, i) => p && !uploadSelectedProductIndices.has(i)).map(p => String(p.productCode || '').trim()).filter(Boolean));
+                const _rv = [...uploadSelectedProductIndices].map(i => uploadProducts[i]).filter(p => p && Number((_rs[String(p.productCode || '').trim()] || {}).n) > 0 && !_left.has(String(p.productCode || '').trim()))
                     .map(p => `· ${p.name} — 후기 ${Number(_rs[String(p.productCode).trim()].n)}개`);
                 if (_rv.length && !await uiConfirm(`⚠️ 후기가 있는 상품이 ${_rv.length}개 있어요.\n\n${_rv.slice(0, 5).join('\n')}${_rv.length > 5 ? `\n… 외 ${_rv.length - 5}개` : ''}\n\n정말 삭제할까요?\n(후기는 식별번호에 그대로 남아요)`, '정말 삭제')) return;
             } catch (e) { console.warn('후기 수를 못 읽었어요:', e); }
