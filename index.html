@@ -5422,7 +5422,7 @@
                     try {
                         if (typeof psSchedLoaded !== 'undefined' && !psSchedLoaded && typeof psLoadSchedules === 'function') await psLoadSchedules();
                         const _now = Date.now();
-                        _units = psUnitsOf(psAllItems().filter(it => psOpenAt(it.releaseAt) > _now).map(it => it.key));
+                        _units = psUnitsOf(psAllItems().filter(it => psOpenAt(it.releaseAt) > _now || (Number(it.expireAt) || 0) > _now).map(it => it.key));   // [수정 2026-11-21] 지금 올라가 있는(마감 전) 일정도 (사장님 요청)
                         _units.sort((a, b) => Number(psItem(a[0]).releaseAt) - Number(psItem(b[0]).releaseAt));
                     } catch (e) { _units = []; }
                     const box = document.createElement('div'); box.id = 'src-day';
@@ -37478,7 +37478,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const picked = [...uploadSelectedProductIndices].filter(i => uploadProducts[i]);
             if (!picked.length) return;
             const now = Date.now();
-            const units = psUnitsOf(psAllItems().filter(it => psOpenAt(it.releaseAt) > now).map(it => it.key));
+            const units = psUnitsOf(psAllItems().filter(it => psOpenAt(it.releaseAt) > now || (Number(it.expireAt) || 0) > now).map(it => it.key));   // [수정 2026-11-21] 지금 올라가 있는(마감 전) 일정도 (사장님 요청)
             units.sort((a, b) => Number(psItem(a[0]).releaseAt) - Number(psItem(b[0]).releaseAt));
             let box = document.getElementById('batch-sched-pick');
             if (!box) { box = document.createElement('div'); box.id = 'batch-sched-pick'; document.body.appendChild(box); }
