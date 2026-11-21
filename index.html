@@ -37691,11 +37691,13 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const L = s.split('\n');
             const fb = L.findIndex(l => !l.trim());
             const at = (fb === 1 || fb === 2) ? fb : 1;
-            /* [수정 2026-11-20] 픽업/배달 줄 위아래 막대(━)를 빼고 빈 줄로만 나눈다 (사장님 요청) —
-               제목 줄 · 빈 줄 · 날짜 줄 · 빈 줄 · 본문 */
-            const head = L.slice(0, at), rest = L.slice(at);
-            while (rest.length && !rest[0].trim()) rest.shift();
-            return [...head, '', ...lines, '', ...rest].join('\n');
+            /* [수정 2026-11-21] 픽업/배달·주문마감 줄 위아래 막대(━)를 다시 넣는다 (사장님 요청 — 11/20에 뺐던 것을 되돌림).
+               제목 줄 · 막대 · 날짜 줄 · 막대 · 본문 (막대 밑 빈 줄은 두지 않는다 — 2026-10-09 사장님 요청과 같게) */
+            if (gIsDescBar(L[at])) L.splice(at + 1, 0, ...lines);       // '📦 택배가능'처럼 남은 막대 칸이 있으면 그 안 맨 위에
+            else L.splice(at, 0, DESC_DATE_BAR, ...lines, DESC_DATE_BAR);
+            const end = L.findIndex((l, i) => i > at && gIsDescBar(l));
+            if (end > 0) while (end + 1 < L.length && !L[end + 1].trim()) L.splice(end + 1, 1);
+            return L.join('\n');
         }
 
         /* [수정 2026-10-01] 사진 공유와 설명 복사를 한 단추로 합쳤다 (사장님 요청).
