@@ -5824,7 +5824,9 @@
                     if (!gSrc.band) { try { gSrc.band = (await srcGet('band')) || {}; } catch (e) { } }
                     const list = Array.isArray(pp) ? pp.filter(Boolean) : Object.values(pp || {}).filter(Boolean);
                     const byCode = {}, bySid = {}, byName = {};
-                    list.forEach(p => { if (p.productCode && !byCode[p.productCode]) byCode[p.productCode] = p; if (p.sid && !bySid[p.sid]) bySid[p.sid] = p; const n = srcNormName(p.name); if (n && !byName[n]) byName[n] = p; });
+                    /* [수정 2026-11-22] 같은 식별번호 상품이 여럿이면 노출 중인 것 → 최근에 고친 것을 쓴다 (사장님 지적 — 1++ 한우 사진이 안 나오고 1등급 한돈에 옛 상품 가격이 나왔다) */
+                    const _better = (a, b) => { const sa = a.hide === true || a.hide === 'true' ? 0 : 1, sb = b.hide === true || b.hide === 'true' ? 0 : 1; return sa !== sb ? sa > sb : (Number(a.updatedAt) || 0) > (Number(b.updatedAt) || 0); };
+                    list.forEach(p => { if (p.productCode && (!byCode[p.productCode] || _better(p, byCode[p.productCode]))) byCode[p.productCode] = p; if (p.sid && !bySid[p.sid]) bySid[p.sid] = p; const n = srcNormName(p.name); if (n && !byName[n]) byName[n] = p; });
                     const bandRows = srcBandRows(), nk = s => String(s || '').replace(/\s/g, '');
                     const inWk = d => days.includes(d);
                     const refs = [];
