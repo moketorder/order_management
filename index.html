@@ -7323,14 +7323,21 @@
                 function srcProdChipsHtml() {
                     const q = String((gSrc.uniQ && gSrc.uniQ.q) || '').trim().replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
                     if (!q) return '';
-                    const seen = new Set(), list = [];
+                    /* [수정 2026-11-22] 같은 식별번호 상품이 여럿이면 처음 만난(숨긴 옛) 상품 이름만 나와 지금 상품이 안 찾아졌다 (사장님 지적 — 1++ 한우·1등급 한돈).
+                       번호마다 모든 상품 이름으로 찾고, 보여 줄 이름은 노출 중인 것 → 최근에 고친 것 */
+                    const byCode = new Map(), list = [];
                     (uploadProducts || []).forEach(p => {
                         if (!p || p.name === '배달비') return;
-                        const code = psSafeId(String(p.productCode || '').trim()); if (!/^[PFS]\d+$/.test(code) || seen.has(code)) return;
-                        const nm = String(p.name || '').replace(/^\[[^\]]*\]\s*/, '');
-                        const hay = (nm + ' ' + code).replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
+                        const code = psSafeId(String(p.productCode || '').trim()); if (!/^[PFS]\d+$/.test(code)) return;
+                        if (!byCode.has(code)) byCode.set(code, []);
+                        byCode.get(code).push(p);
+                    });
+                    const _shown = p => { try { return typeof gIsProductShown === 'function' && gIsProductShown(p) ? 1 : 0; } catch (e) { return 0; } };
+                    byCode.forEach((ps, code) => {
+                        const hay = (ps.map(p => String(p.name || '').replace(/^\[[^\]]*\]\s*/, '')).join(' ') + ' ' + code).replace(/\s/g, '').toLowerCase().replace(/[가-힣]/g, srcSiot);
                         if (!hay.includes(q)) return;
-                        seen.add(code); list.push({ code, nm, p });
+                        const p = ps.slice().sort((a, b) => (_shown(b) - _shown(a)) || ((Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0)))[0];
+                        list.push({ code, nm: String(p.name || '').replace(/^\[[^\]]*\]\s*/, ''), p });
                     });
                     if (!list.length) return '<span class="k">상품 목록에 없어요</span>';
                     return list.slice(0, 40).map(x => {
