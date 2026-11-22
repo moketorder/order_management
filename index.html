@@ -6289,7 +6289,12 @@
                 }
                 async function srcThDrawDay(items, d, di, opt) {   // [신규 2026-10-30] opt = { title, pill } — 머리말 글을 바꿀 때 (카톡용 과일·야채)
                     // [신규 2026-11-15] 요일별 섬네일은 사다드림을 맨 앞에 (사장님 요청). 나머지 차례는 그대로 (카톡용 과일·야채는 손대지 않는다)
-                    if (!opt) items = items.map((it, i) => [it, i]).sort((a, b) => ((b[0].vendor === '사다드림') - (a[0].vendor === '사다드림')) || a[1] - b[1]).map(x => x[0]);
+                    /* [수정 2026-11-22] 일요일 마감 묶음을 맨 앞, 그다음 사다드림, 나머지 (사장님 지적 — 사다드림을 맨 앞에 두니 사다드림·일요일 마감·나머지가
+                       세 묶음으로 갈라져 줄마다 빈칸이 생겼다). 이러면 묶음이 '일요일 마감 + 나머지' 둘이 되어 마감 판 옆 빈칸에 사다드림이 이어 들어간다 */
+                    if (!opt) {
+                        const _sun = it => (!it.closed && it.sun && it.sunOn) ? 0 : 1;
+                        items = items.map((it, i) => [it, i]).sort((a, b) => (_sun(a[0]) - _sun(b[0])) || ((b[0].vendor === '사다드림') - (a[0].vendor === '사다드림')) || a[1] - b[1]).map(x => x[0]);
+                    }
                     const F = await srcThFonts(), cv = document.createElement('canvas'); cv.width = cv.height = 1080;
                     const c = cv.getContext('2d'), [col, colD] = SRC_TH_DAYC[di];
                     c.fillStyle = '#fff7ea'; c.fillRect(0, 0, 1080, 1080);
