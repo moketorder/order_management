@@ -34496,7 +34496,8 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             let price = parseInt(p && p.price) || 0, from = false;
             if (!price) { (p.options || []).forEach(g => (g && g.items || []).forEach(it => { const v = parseInt(it && it.price) || 0; if (v > 0 && (!price || v < price)) price = v; })); from = price > 0; }
             const type = p.discountType === 'amount' ? 'amount' : 'rate';
-            if (price && !from && (p.useOptions == null || yes(p.useOptions)) && yes(p.useDiscount) && gDiscHas(type, p.discountRate, p.discountAmount)) price = gDiscApply(price, type, p.discountRate, p.discountAmount);
+            // [수정 2026-11-25] 정상가 방식이면 가격 칸이 이미 손님이 내는 값 — 할인을 또 빼지 않는다 (샤인머스켓 9,900이 7,800으로 나오던 것)
+            if (price && !from && !gProdListPrice(p) && (p.useOptions == null || yes(p.useOptions)) && yes(p.useDiscount) && gDiscHas(type, p.discountRate, p.discountAmount)) price = gDiscApply(price, type, p.discountRate, p.discountAmount);
             return price ? price.toLocaleString() + (from ? '~' : '') : '';
         }
         /* [신규 2026-11-06] 섬네일 할인 표시 (사장님 요청) — 할인 중인 상품이면 { pct, orig, now } (orig = 할인 전, now = 손님이 내는 값), 아니면 null
@@ -46346,7 +46347,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
             const on = p && (p.useOptions == null || yes(p.useOptions)) && yes(p.useDiscount);
             const type = (p && p.discountType === 'amount') ? 'amount' : 'rate';
             const sale = on && price > 0 && gDiscHas(type, p.discountRate, p.discountAmount);
-            const now = sale ? gDiscApply(price, type, p.discountRate, p.discountAmount) : price;
+            const now = sale ? (gProdListPrice(p) ? (parseInt(p.price) || 0) : gDiscApply(price, type, p.discountRate, p.discountAmount)) : price;   // [수정 2026-11-25] 정상가 방식은 가격 칸이 할인가 (예전 할인금액으로 다시 계산하지 않는다)
             const st = String((p && p.storage) || '');
             const storage = st.includes('냉동') ? '🧊 냉동' : st.includes('냉장') ? '❄️ 냉장' : (st.includes('상온') || st.includes('실온')) ? '🌡️ 상온' : '';
             // [신규 2026-10-13] 가격표는 정상가 (사장님 요청) — 할인 중이면 예전대로 정상가를 긋고 할인가, 아니면 정상가를 적어 둔 상품은 정상가
