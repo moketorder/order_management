@@ -4664,7 +4664,7 @@
                     if (o && o.ref) { const i = srcRegIdx(o.ref, ix); return (i != null && i >= 0) ? i : -1; }
                     const link = (gSrc.reg || {})[srcNameKey(tg.vendor, tg.name)];
                     if (link && link.none) return -1;   // [신규 2026-10-08] 끊어 둔 것
-                    if (link) { if (link.sid && link.sid in ix.bySid) return ix.bySid[link.sid]; if (link.code && link.code in ix.byCode) return ix.byCode[link.code]; }
+                    if (link) { if (link.sid && link.sid in ix.bySid) return srcPreferShown(ix, ix.bySid[link.sid]); if (link.code && link.code in ix.byCode) return ix.byCode[link.code]; }   // [수정 2026-11-22] 숨긴 상품에 이어져 있으면 같은 번호의 노출 상품으로
                     const n = srcNormName(tg.name);
                     return srcNameIdxVendorOk(ix, (n && n in ix.byName) ? ix.byName[n] : -1, tg.vendor);   // [수정 2026-11-14] 업체 다르면 잇지 않음
                 }
@@ -4814,13 +4814,25 @@
                 const srcNormName = s => String(s || '').replace(/\[[^\]]*\]/g, '').replace(/\s/g, '').toLowerCase();
                 /* [신규 2026-10-22] 찾기에서 ㅅ 받침(사이시옷)은 없는 것으로 본다 — '고춧가루'로 쳐도 '고추가루'가 나오게 (사장님: 고추가루가 왜 검색이 안 돼?) */
                 const srcSiot = c => { const k = c.charCodeAt(0) - 0xAC00; return k >= 0 && k < 11172 && k % 28 === 19 ? String.fromCharCode(c.charCodeAt(0) - 19) : c; };
+                // [신규 2026-11-22] 이어 둔 상품(i)이 숨김이고 같은 식별번호에 노출 중인 상품이 있으면 그 상품 자리를 돌려준다
+                function srcPreferShown(ix, i) {
+                    const hid = q => q && (q.hide === true || q.hide === 'true');
+                    const p = ix.list[i], c = p && p.productCode;
+                    if (!p || !hid(p) || !c || !(c in ix.byCode)) return i;
+                    const j = ix.byCode[c];
+                    return (j !== i && !hid(ix.list[j])) ? j : i;
+                }
                 function srcProdIndex() {
                     const list = (typeof uploadProducts !== 'undefined' && uploadProducts) || [];
                     const ix = { list, byName: {}, byCode: {}, bySid: {} };
+                    /* [수정 2026-11-22] 같은 식별번호 상품이 여럿이면 노출 중인 것 → 최근에 고친 것으로 잇는다 (사장님 지적 —
+                       달력 '1++ 한우' 이름표가 숨긴 옛 '[리뷰이벤트] 1++ 한우육회'로 이어져 있었다) */
+                    const hid = p => p && (p.hide === true || p.hide === 'true');
+                    const better = (a, b) => hid(a) !== hid(b) ? !hid(a) : (Number(a.updatedAt) || 0) > (Number(b.updatedAt) || 0);
                     list.forEach((p, i) => {
                         if (!p) return;
                         const n = srcNormName(p.name); if (n && !(n in ix.byName)) ix.byName[n] = i;
-                        if (p.productCode && !(p.productCode in ix.byCode)) ix.byCode[p.productCode] = i;
+                        if (p.productCode && (!(p.productCode in ix.byCode) || better(p, list[ix.byCode[p.productCode]]))) ix.byCode[p.productCode] = i;
                         if (p.sid && !(p.sid in ix.bySid)) ix.bySid[p.sid] = i;
                     });
                     return ix;
@@ -4834,7 +4846,7 @@
                     const link = (gSrc.reg || {})[srcNameKey(srcVendorOf(r, p), p.name)];
                     if (link && link.none) return -1;   // [신규 2026-10-08] '연결 끊기'로 끊어 둔 것
                     if (r[0] === 'onsite') { const c = p.code || String(r[1]).split('~')[0]; if (c in ix.byCode) return ix.byCode[c]; }
-                    if (link) { if (link.sid && link.sid in ix.bySid) return ix.bySid[link.sid]; if (link.code && link.code in ix.byCode) return ix.byCode[link.code]; }
+                    if (link) { if (link.sid && link.sid in ix.bySid) return srcPreferShown(ix, ix.bySid[link.sid]); if (link.code && link.code in ix.byCode) return ix.byCode[link.code]; }   // [수정 2026-11-22] 숨긴 상품에 이어져 있으면 같은 번호의 노출 상품으로
                     // [신규 2026-10-22] 공동구매 했던 상품을 끌어다 놓은 이름표는 상품코드를 갖고 있다 — 이름이 그 뒤 바뀌어도 코드로 잇는다 (사장님: 공구한 상품인데 왜 상품등록이 연결 안 돼?)
                     if (p.code && p.code in ix.byCode) return ix.byCode[p.code];
                     const n = srcNormName(p.name);
