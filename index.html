@@ -4845,6 +4845,7 @@
                     if (!p) return null;
                     const link = (gSrc.reg || {})[srcNameKey(srcVendorOf(r, p), p.name)];
                     if (link && link.none) return -1;   // [신규 2026-10-08] '연결 끊기'로 끊어 둔 것
+                    if (p.psid && !link) { const j = ix.list.findIndex(q => q && String(q.sid) === String(p.psid) && !(q.hide === true || q.hide === 'true')); if (j >= 0) return j; if (p.psid in ix.bySid) return ix.bySid[p.psid]; }   // [신규 2026-11-25] 놓을 때 고른 상품 (같은 번호에 상품 여럿)
                     if (r[0] === 'onsite') { const c = p.code || String(r[1]).split('~')[0]; if (c in ix.byCode) return ix.byCode[c]; }
                     if (link) { if (link.sid && link.sid in ix.bySid) return srcPreferShown(ix, ix.bySid[link.sid]); if (link.code && link.code in ix.byCode) return ix.byCode[link.code]; }   // [수정 2026-11-22] 숨긴 상품에 이어져 있으면 같은 번호의 노출 상품으로
                     // [신규 2026-10-22] 공동구매 했던 상품을 끌어다 놓은 이름표는 상품코드를 갖고 있다 — 이름이 그 뒤 바뀌어도 코드로 잇는다 (사장님: 공구한 상품인데 왜 상품등록이 연결 안 돼?)
@@ -6628,20 +6629,50 @@
                     });
                     return best ? best.nm : '';
                 }
-                async function srcHistSave(code, date) {
+                /* [신규 2026-11-25] 한 식별번호에 상품이 둘 이상이면 달력에 놓을 때 어느 상품인지 고른다 (사장님 요청 — 코드로만 놓여 구분이 안 됐다).
+                   이름이 같은 숨긴 옛 복사본은 하나로 친다. 고른 상품의 노출번호(sid)를 이름표에 psid 로 적어 두고, 등록 상품 잇기(srcRegIdx)는 그것을 먼저 본다 */
+                function srcCodeProds(code) {
+                    const hid = p => p && (p.hide === true || p.hide === 'true');
+                    const ps = (uploadProducts || []).filter(x => x && x.name !== '배달비' && psSafeId(String(x.productCode || '').trim()) === code)
+                        .sort((a, b) => (hid(a) - hid(b)) || ((Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0)));
+                    const seen = new Set();
+                    return ps.filter(p => { const k = srcNormName(String(p.name || '').replace(/^\[[^\]]*\]\s*/, '')); if (!k || seen.has(k)) return false; seen.add(k); return true; });
+                }
+                function srcPickProd(code, date, cb) {
+                    const ps = srcCodeProds(code);
+                    if (ps.length < 2) return cb(null);
+                    const hid = p => p && (p.hide === true || p.hide === 'true');
+                    const old = document.getElementById('src-day'); if (old) old.remove();
+                    const box = document.createElement('div'); box.id = 'src-day';
+                    box.innerHTML = '<div class="in"><div class="t">어느 상품을 ' + date.slice(5).replace('-', '/') + '에 넣을까요?<small>' + srcEsc(code) + ' 번호에 상품이 ' + ps.length + '개 있어요</small></div>' +
+                        ps.map((p, i) => { const pr = Number(p.price) || 0;
+                            return '<div class="sl"><span class="n">' + srcEsc(String(p.name || '').replace(/^\[[^\]]*\]\s*/, '')) + '<small style="display:block; font-size:11px; color:#64748b; font-weight:700;">' +
+                                (pr ? pr.toLocaleString() + '원 · ' : '') + (hid(p) ? '숨김' : '노출') + (p.updatedAt ? ' · ' + fMsToDateKey(Number(p.updatedAt)).slice(5).replace('-', '/') + ' 고침' : '') + '</small></span>' +
+                                '<button type="button" data-i="' + i + '">넣기</button></div>'; }).join('') +
+                        '<div class="row"><button type="button" data-act="close">닫기</button></div></div>';
+                    document.body.appendChild(box);
+                    box.onclick = e => {
+                        if (e.target === box) return box.remove();
+                        const b = e.target.closest('button'); if (!b) return;
+                        box.remove(); if (b.dataset.act === 'close') return;
+                        const p = ps[+b.dataset.i]; if (p) cb(p);
+                    };
+                }
+                async function srcHistSave(code, date, prod) {
                     let h = srcHistByCode(code);
                     // [신규 2026-11-11] 공구 기록이 없는 상품(🛒 상품 목록에서 끌어온 것)은 등록 상품 이름으로
                     if (!h) { const p = (uploadProducts || []).find(x => x && psSafeId(String(x.productCode || '').trim()) === code); if (!p) return; h = { code, name: String(p.name || '').replace(/^\[[^\]]*\]\s*/, '') }; }
                     const id = 'm' + Date.now().toString(36);
-                    const nm = srcHistTagName(h.code) || h.name;   // [수정 2026-11-08] 고친 이름으로 놓는다
-                    const val = { date, name: nm, memo: '공구', code: h.code, kw: srcKw(nm), at: new Date().toISOString() };
+                    const nm = prod ? String(prod.name || '').replace(/^\[[^\]]*\]\s*/, '') : (srcHistTagName(h.code) || h.name);   // [수정 2026-11-08] 고친 이름으로 놓는다 · [2026-11-25] 고른 상품이 있으면 그 이름
+                    const val = { date, name: nm, memo: '공구', code: h.code, ...(prod && prod.sid ? { psid: String(prod.sid) } : {}), kw: srcKw(nm), at: new Date().toISOString() };
                     try { await srcPut('manual/' + id, val); gSrc.manual[id] = val; showToast(date.slice(5).replace('-', '/') + '에 넣었어요: ' + nm); }
                     catch (e) { showToast('저장 못 했어요: ' + e.message); }
                     srcRender();
                 }
-                async function srcOnsiteSave(code, date) {
+                async function srcOnsiteSave(code, date, prod) {
                     const p = (gSrc.onsiteProducts || []).find(x => x.code === code); if (!p) return;
-                    const val = { date, code, name: p.name, price: p.price || '', tab: p.tab, kw: srcKw(p.name), at: new Date().toISOString() };
+                    const pn = prod ? String(prod.name || '').replace(/^\[[^\]]*\]\s*/, '') : p.name;   // [신규 2026-11-25] 고른 상품이 있으면 그 이름·가격
+                    const val = { date, code, name: pn, price: (prod ? prod.price : p.price) || '', tab: p.tab, ...(prod && prod.sid ? { psid: String(prod.sid) } : {}), kw: srcKw(pn), at: new Date().toISOString() };
                     try { await srcPut('onsite/' + code, val); gSrc.onsite[code] = val; showToast(date.slice(5).replace('-', '/') + ' 상시판매로 저장: ' + p.name); }
                     catch (e) { showToast('저장 못 했어요: ' + e.message); }
                     srcRender();
@@ -6699,11 +6730,11 @@
                             return;
                         }
                         if (s.hist) {   // [신규 2026-10-08] 공동구매 했던 상품 — 끌어다 놓으면 그날 판매로 (손으로 쓴 것 ✍ 과 같은 자리에 저장)
-                            if (c) srcHistSave(s.hist, c.dataset.date); else if (!s.drag) { if (s.b.closest('.src-plan-cat')) srcPlanMenu('공구', (srcHistByCode(s.hist) || {}).name, s.b); else showToast('달력 날짜 칸에 끌어다 놓으면 저장돼요'); }
+                            if (c) { const d = c.dataset.date; srcPickProd(s.hist, d, pp => srcHistSave(s.hist, d, pp)); } else if (!s.drag) { if (s.b.closest('.src-plan-cat')) srcPlanMenu('공구', (srcHistByCode(s.hist) || {}).name, s.b); else showToast('달력 날짜 칸에 끌어다 놓으면 저장돼요'); }
                             return;
                         }
                         if (s.code) {   // 상시판매 이름표는 끌어다 놓아야만 저장한다
-                            if (c) srcOnsiteSave(s.code, c.dataset.date); else if (!s.drag) { if (s.b.closest('.src-plan-cat')) srcPlanMenu('상시판매', ((gSrc.onsiteProducts || []).find(x => x.code === s.code) || {}).name, s.b); else showToast('달력 날짜 칸에 끌어다 놓으면 저장돼요'); }
+                            if (c) { const d = c.dataset.date; srcPickProd(s.code, d, pp => srcOnsiteSave(s.code, d, pp)); } else if (!s.drag) { if (s.b.closest('.src-plan-cat')) srcPlanMenu('상시판매', ((gSrc.onsiteProducts || []).find(x => x.code === s.code) || {}).name, s.b); else showToast('달력 날짜 칸에 끌어다 놓으면 저장돼요'); }
                             return;
                         }
                         if (!s.drag) { srcMenu(s.key, s.lab, s.b); return; }   // 누르면 발주·건너뜀·추천제외 창
