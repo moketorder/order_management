@@ -5486,11 +5486,27 @@
                         if (b.dataset.unit) {   // [신규 2026-11-18] 있는 일정에 담기
                             if (miss.length) return;
                             const key = b.dataset.unit, have = new Set(psGroupMembers(key).map(k => (psItem(k) || {}).sid));
+                            /* [수정 2026-11-25] 담기에서도 '✓ 상시'를 지킨다 (사장님 지적 — 상시를 켜고 담았는데 무시됐다) */
+                            { const k = rows.findIndex((x, i) => onsOn[i] && !String((box.querySelector('[data-ontab="' + i + '"]') || {}).value || '')); if (k >= 0) { showToast('🏪 상시판매 분류탭을 골라 주세요'); const s = box.querySelector('[data-ontab="' + k + '"]'); if (s) s.focus(); return; } }
                             b.disabled = true;
                             try {
                                 if (typeof psUndoMark === 'function') psUndoMark('소싱 — 있는 일정에 담기');
                                 let n = 0;
-                                for (const x of rows) { const pp = uploadProducts[x.idx]; if (!pp || have.has(pp.sid)) continue; await psGroupAddTo(key, x.idx); have.add(pp.sid); n++; }
+                                for (const [i, x] of rows.entries()) {
+                                    const pp = uploadProducts[x.idx]; if (!pp) continue;
+                                    if (!have.has(pp.sid)) { await psGroupAddTo(key, x.idx); have.add(pp.sid); n++; }
+                                    if (onsOn[i]) {   // 담긴(또는 이미 들어 있던) 그 상품의 이 일정 칸에 상시판매 전환을 적는다
+                                        const g = (psItem(key) || {}).group, src = psItem(key) || {};
+                                        const it = psItemsOfSid(pp.sid).find(y => (g && y.group === g) || (Number(y.releaseAt || 0) === Number(src.releaseAt || 0) && Number(y.expireAt || 0) === Number(src.expireAt || 0)));
+                                        if (it) {
+                                            const t = String((box.querySelector('[data-ontab="' + i + '"]') || {}).value || '');
+                                            const sh = String((box.querySelector('[data-onshelf="' + i + '"]') || {}).value || ''), pr = parseInt((box.querySelector('[data-onprice="' + i + '"]') || {}).value, 10) || 0;
+                                            await psItemSave(it.key, { toOnsite: true, toOnsiteDone: null, toOnsiteTab: (t && t !== psPrevOnsiteTab(pp)) ? t : null,
+                                                toOnsiteShelf: sh !== String(pp.shelf || '') ? (sh || '-') : null, toOnsitePrice: pr > 0 ? pr : null }, true);
+                                            n = n || 1;
+                                        }
+                                    }
+                                }
                                 box.remove();
                                 showToast(n ? `📅 '${psGroupName(key)}' 일정에 ${n}개 담았어요` : '이미 그 일정에 들어 있어요');
                                 if (typeof renderProductScheduleCalendar === 'function') renderProductScheduleCalendar();
