@@ -4822,6 +4822,22 @@
                     const j = ix.byCode[c];
                     return (j !== i && !hid(ix.list[j])) ? j : i;
                 }
+                /* [신규 2026-11-25] 한 식별번호에 상품이 여럿이면 이름표 이름과 똑같은 상품 → 이름표 날짜의 요일이 이름에 든 상품 → 예전처럼(노출·최근) 순으로 잇는다
+                   (사장님 지적 — '1++ 한우 (금요일)' 이름표가 같은 번호의 '(수요일)' 상품으로 이어져 수요일 일정과 겹친다며 안 걸렸다) */
+                function srcCodeIdxForTag(ix, tag) {
+                    const c = tag.code, def = ix.byCode[c];
+                    const cand = []; ix.list.forEach((q, i) => { if (q && q.productCode === c && q.name !== '배달비') cand.push(i); });
+                    if (cand.length < 2) return def;
+                    const hid = q => q && (q.hide === true || q.hide === 'true');
+                    const pickOf = is => is.length ? (is.find(i => !hid(ix.list[i])) ?? is[0]) : null;
+                    const nm = s => srcNormName(String(s || '').replace(/^\[[^\]]*\]\s*/, ''));
+                    const me = nm(tag.disp || tag.name);
+                    let j = pickOf(cand.filter(i => me && nm(ix.list[i].name) === me));
+                    if (j != null) return j;
+                    const d = /^\d{4}-\d{2}-\d{2}$/.test(String(tag.date || '')) ? new Date(tag.date + 'T00:00:00').getDay() : -1;
+                    if (d >= 0) { const wd = '일월화수목금토'[d]; j = pickOf(cand.filter(i => new RegExp('\\(\\s*' + wd + '(요일)?\\s*\\)|' + wd + '요일').test(String(ix.list[i].name || '')))); if (j != null) return j; }
+                    return def;
+                }
                 function srcProdIndex() {
                     const list = (typeof uploadProducts !== 'undefined' && uploadProducts) || [];
                     const ix = { list, byName: {}, byCode: {}, bySid: {} };
@@ -4849,7 +4865,7 @@
                     if (r[0] === 'onsite') { const c = p.code || String(r[1]).split('~')[0]; if (c in ix.byCode) return ix.byCode[c]; }
                     if (link) { if (link.sid && link.sid in ix.bySid) return srcPreferShown(ix, ix.bySid[link.sid]); if (link.code && link.code in ix.byCode) return ix.byCode[link.code]; }   // [수정 2026-11-22] 숨긴 상품에 이어져 있으면 같은 번호의 노출 상품으로
                     // [신규 2026-10-22] 공동구매 했던 상품을 끌어다 놓은 이름표는 상품코드를 갖고 있다 — 이름이 그 뒤 바뀌어도 코드로 잇는다 (사장님: 공구한 상품인데 왜 상품등록이 연결 안 돼?)
-                    if (p.code && p.code in ix.byCode) return ix.byCode[p.code];
+                    if (p.code && p.code in ix.byCode) return srcCodeIdxForTag(ix, p);
                     const n = srcNormName(p.name);
                     return srcNameIdxVendorOk(ix, (n && n in ix.byName) ? ix.byName[n] : -1, r[0] === 'manual' ? '' : srcVendorOf(r, p));
                 }
