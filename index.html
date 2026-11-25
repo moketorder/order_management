@@ -5446,6 +5446,9 @@
                         fld('픽업/배달일', '<input type="date" id="src-sch-pick" value="' + pick0 + '"' + (linked0 ? ' disabled style="background:#f1f5f9;color:#64748b;"' : '') + '>' +
                             '<label title="켜 두면 마감 날짜를 바꿀 때 픽업/배달일도 같이 바뀌어요" style="flex:0 0 auto;display:flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;color:#475569;white-space:nowrap;cursor:pointer;">' +
                             '<input type="checkbox" id="src-sch-link"' + (linked0 ? ' checked' : '') + ' style="width:16px !important;height:16px !important;position:static !important;opacity:1 !important;margin:0 !important;"> 마감일과 같게</label>') +
+                        /* [신규 2026-11-25] 매주 반복 (사장님 요청) — 켜면 걸고 나서 노출일정 카드의 '🔁 반복: 매주'와 같게 건다 */
+                        '<label title="켜면 이 일정이 매주 같은 요일·시각으로 다시 올라가요 (노출일정 카드의 반복: 매주와 같아요)" style="align-self:flex-start;display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#4338ca;cursor:pointer;">' +
+                            '<input type="checkbox" id="src-sch-weekly" style="width:16px !important;height:16px !important;position:static !important;opacity:1 !important;margin:0 !important;"> 🔁 매주</label>' +
                         '<div class="sec">' + (many && rows.some(x => x.idx >= 0) ? '<div style="display:flex;justify-content:flex-end;"><button type="button" class="ps-mbtn onsite" data-onsall="1" style="border-color:#e2e8f0;color:#64748b;background:#f8fafc;">✓ 전부 상시</button></div>' : '') +
                         rows.map((x, i) => '<div class="sl">' + (x.idx === null ? '' : x.idx >= 0 ? '<b class="src-rg o">O</b>' : '<b class="src-rg x">X</b>') + '<span class="n">' + srcEsc(x.pname || x.p.name) + '</span>' +
                             (x.idx === null || x.idx < 0 ? '<button type="button" data-link="' + i + '">연결</button><button type="button" data-reg="' + i + '">상품 등록</button></div>'
@@ -5544,10 +5547,12 @@
                             if (typeof psSchedLoaded !== 'undefined' && !psSchedLoaded) await psLoadSchedules();
                             const gid = many ? psNewGroupId() : null;   // 묶음은 노출·마감·픽업이 모두 같다
                             if (typeof psUndoMark === 'function') psUndoMark('소싱 — 일정 추가');
-                            let ok = 0;
+                            let ok = 0, firstKey = null;
+                            const weekly = !!(document.getElementById('src-sch-weekly') || {}).checked;
+                            if (weekly && exp - rel > 7 * 86400000) { b.disabled = false; showToast('⚠️ 판매 기간이 1주보다 길어서 매주 반복을 걸 수 없어요'); return; }
                             for (const [i, x] of rows.entries()) {
                                 const it = await psItemAdd(x.idx, { releaseAt: rel, expireAt: exp, pickup: pkv, group: gid, groupLabel: label || null });
-                                if (it) ok++;
+                                if (it) { ok++; if (!firstKey) firstKey = it.key; }
                                 // [신규 2026-11-10] 끝나면 상시판매 전환 — 고른 분류탭이 예전 상시판매 탭과 같으면 비워 둔다 (노출일정 카드와 같게)
                                 if (it && onsOn[i]) {
                                     const t = onsTab(i), pp = uploadProducts[x.idx] || {};
@@ -5564,6 +5569,7 @@
                                 return;
                             }
                             box.remove();
+                            if (weekly && firstKey && typeof psSetRepeat === 'function') { await psSetRepeat(firstKey, 1); return; }   // 묶음 전부에 매주 반복 (알림은 반복 쪽이 띄운다)
                             showToast(ok === rows.length ? '📅 노출일정에 ' + ok + '개 ' + (many ? '"' + label + '" 묶음으로 ' : '') + '걸었어요' : '📅 ' + ok + '/' + rows.length + '개만 걸었어요 — 나머지는 다른 일정과 겹쳐서 못 걸었어요');
                             if (typeof renderProductScheduleCalendar === 'function') renderProductScheduleCalendar();
                             if (typeof renderProductsList === 'function') renderProductsList();
