@@ -22189,7 +22189,8 @@
             const timeCh = Number(it.releaseAt || 0) !== rel || Number(it.expireAt || 0) !== exp || (psItemPickup(it) || '') !== (pk || '');
             const live = timeCh ? ms.filter(k => { const x = psItem(k); return psIsActive(x) && !psIsUpcoming(uploadProducts[x.idx]); }) : [];
             if (live.length && !(await psConfirm(`판매 중인 일정${ms.length > 1 ? ' ' + live.length + '개' : ''}의 시각이 바뀌어요.\n손님 화면의 마감 시각·픽업일도 바뀔 수 있어요. 바꿀까요?`))) return;
-            const scope = timeCh ? await psAskRepeatScope(ms) : null;   // [신규 2026-10-27] 반복 일정이면 이 일정만/앞으로 다 묻기
+            const labelCh = !part && String(it.groupLabel || '') !== String(label || '');   // [신규 2026-11-25] 일정 이름만 바꿔도 반복 일정이면 묻는다 (사장님 요청)
+            const scope = (timeCh || labelCh) ? await psAskRepeatScope(ms) : null;   // [신규 2026-10-27] 반복 일정이면 이 일정만/앞으로 다 묻기
             if (scope === false) return;
             psUndoMark('일정 고치기');
             let n = 0; const bad = [];
@@ -22202,6 +22203,9 @@
             });
             const okSet = await psSaveRounds(moves, scope);
             ms.forEach(k => { if (okSet.has(k)) n++; else bad.push((uploadProducts[(psItem(k) || {}).idx] || {}).name || ''); });
+            if (labelCh && scope && scope.later.length) {   // 뒤 차례들 이름도 같이
+                for (const k of scope.later) { const x = psItem(k); if (x && String(x.groupLabel || '') !== String(label || '') && await psItemSave(k, { groupLabel: label }, true)) okSet.add(k); }
+            }
             const moreN = [...okSet].filter(k => !ms.includes(k)).length;
             const moreTxt = moreN ? ` · 앞으로 반복 일정 ${moreN}개도 같이` : '';
             if (part) { const rest = all.filter(k => !ms.includes(k) && psItem(k)); if (rest.length === 1) await psItemSave(rest[0], { group: null }); }
