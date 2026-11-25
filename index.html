@@ -21675,9 +21675,105 @@
             const it = psItem(key);
             if (!it || !(await psConfirm(`이 일정에서 빼요.\n\n${uploadProducts[it.idx].name}`))) return;
             psUndoMark('상품 빼기');
+            const live = psLiveSnap(key);
             await psItemDelete(key);
+            await psAfterLiveRemoved(live);
             renderProductScheduleCalendar();
             if (typeof renderProductsList === 'function') renderProductsList();
+        }
+        /* [신규 2026-11-25] 판매 중인(손님 화면에 올라간) 일정을 빼면 상품이 마감 없이 계속 보였다 (사장님 지적 — 별미집 동태탕).
+           빼기 전에 모양을 적어 두고(psLiveSnap), 뺀 뒤 남은 판매 중 일정이 없으면 숨길지·상시판매로 돌릴지 묻는다.
+           상시판매로 돌릴 때 예전 상시 설정(그 일정의 ✓ 상시 또는 예전 분류탭)이 있으면 그걸로 할지 새로 정할지 묻는다 */
+        function psLiveSnap(key) {
+            const it = psItem(key); if (!it) return null;
+            const p = uploadProducts[it.idx];
+            if (!p || !psIsActive(it) || psIsUpcoming(p)) return null;
+            return { idx: it.idx, sid: p.sid, raw: Object.assign({}, it) };
+        }
+        async function psAfterLiveRemoved(snap) {
+            if (!snap) return;
+            const p = uploadProducts[snap.idx];
+            if (!p || p.sid !== snap.sid || p.hide === true || p.hide === 'true') return;
+            if (psItemsOfSid(p.sid).some(x => psIsActive(x))) return;   // 다른 판매 중 일정이 있으면 그대로
+            const pick = await psChoose(`'${p.name}'\n판매 중인 일정을 뺐어요. 손님 화면에 아직 보여요.\n어떻게 할까요?`,
+                [{ label: '숨기기', value: 'hide', main: true }, { label: '상시판매로', value: 'onsite' }, { label: '그대로', value: null }]);
+            if (pick === 'hide') {
+                const now = Date.now();
+                if (!(await fbPatchProducts({ [`${snap.idx}/hide`]: true, [`${snap.idx}/updatedAt`]: now }))) return;
+                p.hide = true; p.updatedAt = now;
+                gLogProductChange({ idx: snap.idx, name: p.name, what: '노출', from: '노출', to: '숨김', how: '일정 빼기' });
+                updatePublishedProductsTimestamp();
+                showToast('🙈 숨겼어요: ' + String(p.name).slice(0, 16));
+                return;
+            }
+            if (pick !== 'onsite') return;
+            const raw = snap.raw || {}, valid = new Set(ONSITE_CATS.map(c => c.key));
+            const oldTab = valid.has(String(raw.toOnsiteTab || '')) ? raw.toOnsiteTab : psPrevOnsiteTab(p);
+            let set = null;
+            if (oldTab) {
+                const lab = (ONSITE_CATS.find(c => c.key === oldTab) || {}).label || oldTab;
+                const pr = parseInt(raw.toOnsitePrice, 10) || parseInt(p.priceOnsite, 10) || 0;
+                const how = await psChoose(`예전 상시판매 설정이 있어요.\n분류탭: ${lab}${pr ? '\n금액: ' + pr.toLocaleString() + '원' : ''}${(raw.toOnsiteShelf != null) ? '\n냉장고 분류: ' + (raw.toOnsiteShelf === '-' ? '없음' : raw.toOnsiteShelf) : ''}`,
+                    [{ label: '그 설정으로', value: 'old', main: true }, { label: '새로 정하기', value: 'new' }]);
+                if (!how) return;
+                if (how === 'old') set = { tab: oldTab, price: pr, shelf: raw.toOnsiteShelf != null ? raw.toOnsiteShelf : null };
+            }
+            if (!set) set = await psOnsiteSetDialog(p);
+            if (!set) return;
+            await psApplyOnsiteNow(snap.idx, set);
+        }
+        // 상시판매로 돌릴 분류탭·냉장고 분류·금액을 새로 고르는 창 — 고르면 {tab, shelf, price}, 닫으면 null
+        function psOnsiteSetDialog(p) {
+            return new Promise(resolve => {
+                let box = document.getElementById('ps-confirm-box'); if (box) box.remove();
+                box = document.createElement('div'); box.id = 'ps-confirm-box';
+                box.style.cssText = 'position:fixed; inset:0; z-index:10050; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px;';
+                const tab0 = psPrevOnsiteTab(p), shelf0 = String(p.shelf || '');
+                const gb = Number(p.priceGb) > 0 ? Number(p.priceGb) : (Number(p.price) || 0), on0 = Number(p.priceOnsite) || 0;
+                const sel = 'width:100%; height:38px; border:1.5px solid var(--border); border-radius:8px; padding:0 8px; font-size:13px; font-weight:700; box-sizing:border-box;';
+                const lab = t => `<div style="font-size:11.5px; font-weight:800; color:#475569; margin:8px 0 3px;">${t}</div>`;
+                box.innerHTML = `<div style="background:#fff; border-radius:14px; padding:18px; max-width:360px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                    <div style="font-size:13.5px; font-weight:900; color:#0f172a;">🏪 상시판매로 돌리기</div>
+                    <div style="font-size:11.5px; font-weight:700; color:#64748b; margin-top:2px;">${gEscapeHtml(p.name || '')}</div>
+                    ${lab('분류탭')}<select id="ps-os-tab" style="${sel}">${(tab0 ? '' : '<option value="">분류탭 고르기</option>') + ONSITE_CATS.map(c => `<option value="${c.key}"${tab0 === c.key ? ' selected' : ''}>${gEscapeHtml(c.label)}</option>`).join('')}</select>
+                    ${lab('냉장고 분류')}<select id="ps-os-shelf" style="${sel}">${(typeof gShelfOptsAll === 'function' ? gShelfOptsAll() : []).filter(([k]) => typeof SHELF_SOLDOUT === 'undefined' || k !== SHELF_SOLDOUT).map(([k, l]) => `<option value="${gEscapeHtml(k)}"${shelf0 === String(k) ? ' selected' : ''}>${gEscapeHtml(l)}</option>`).join('')}</select>
+                    ${lab('상시판매 금액' + (gb ? ` <span style="color:#2563eb;">· 공구가 ${gb.toLocaleString()}원</span>` : ''))}<input type="number" min="0" inputmode="numeric" id="ps-os-price" placeholder="${on0 > 0 ? on0.toLocaleString() + '원 (상시가)' : gb.toLocaleString() + '원 그대로'}" style="${sel}">
+                    <div style="display:flex; gap:6px; margin-top:14px;"><button type="button" data-v="0" style="flex:1; height:42px; border:1.5px solid var(--border); background:#f8fafc; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">닫기</button><button type="button" data-v="1" style="flex:1.4; height:42px; border:none; background:#2563eb; color:#fff; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">상시판매로</button></div></div>`;
+                const done = v => { box.remove(); resolve(v); };
+                box.addEventListener('click', e => {
+                    if (e.target === box) return done(null);
+                    const b = e.target.closest('button[data-v]'); if (!b) return;
+                    if (b.dataset.v === '0') return done(null);
+                    const tab = document.getElementById('ps-os-tab').value;
+                    if (!tab) { showToast('🏪 분류탭을 골라 주세요'); return; }
+                    const sh = String(document.getElementById('ps-os-shelf').value || '');
+                    done({ tab, shelf: sh !== shelf0 ? (sh || '-') : null, price: parseInt(document.getElementById('ps-os-price').value, 10) || 0 });
+                });
+                document.body.appendChild(box);
+            });
+        }
+        // 지금 바로 상시판매로 — 픽업일 지난 뒤 자동 전환(psConvertEndedToOnsite)과 같은 칸을 쓴다
+        async function psApplyOnsiteNow(idx, set) {
+            const p = uploadProducts[idx]; if (!p) return;
+            const stg = String(p.storage || '');
+            const price = (parseInt(set.price, 10) || 0) || parseInt(p.priceOnsite, 10) || 0;
+            const now = Date.now();
+            const f = { matchKey: ['냉동', '냉장', '상온'].includes(stg) ? stg : '상시판매', date: '', kind: null, displayTab: set.tab, nextDate: null,
+                releaseAt: null, expireAt: null, releaseApplied: null, expireApplied: null, announced: null,
+                schedRid: null, schedGroup: null, schedGroupLabel: null, onsiteTabPrev: null,
+                hide: false, showToday: true, showReserve: true, updatedAt: now };
+            if (price > 0) f.price = price;
+            { const _o = gOptsPriced(p.options, true); if (_o) f.options = _o; }
+            if (set.shelf !== undefined && set.shelf !== null) f.shelf = set.shelf === '-' ? '' : String(set.shelf);
+            const patch = {}; Object.keys(f).forEach(k => { patch[`${idx}/${k}`] = f[k]; });
+            if (!(await fbPatchProducts(patch))) { showToast('저장 못 했어요 — 다시 해 주세요'); return; }
+            Object.assign(p, f);
+            const ck = fGetAdjKey(p.matchKey, p.name, p.sid);
+            if (uploadClosedMap[ck] === true || uploadClosedMap[encodeURIComponent(ck)] === true) {
+                try { const r = await fetch(`${FIREBASE_DB_URL}product_closed/${encodeURIComponent(ck)}.json`, { method: 'DELETE' }); if (r.ok) { delete uploadClosedMap[ck]; delete uploadClosedMap[encodeURIComponent(ck)]; } } catch (e) { }
+            }
+            updatePublishedProductsTimestamp();
+            showToast('🏪 상시판매로 돌렸어요: ' + String(p.name).slice(0, 16));
         }
 
         /* ===== [신규 2026-10-02] 일정 합치기·나누기 (사장님 요청) =====
@@ -22381,7 +22477,9 @@
         async function psClearSchedules(keys) {
             psUndoMark('일정 지우기');
             let n = 0;
-            for (const k of [...new Set(keys)]) if (await psItemDelete(k)) n++;
+            const lives = [];   // [신규 2026-11-25] 판매 중이던 일정 — 다 지운 뒤 숨길지·상시로 돌릴지 묻는다
+            for (const k of [...new Set(keys)]) { const s = psLiveSnap(k); if (await psItemDelete(k)) { n++; if (s) lives.push(s); } }
+            for (const s of lives) await psAfterLiveRemoved(s);
             psSelectedIdxs.clear();
             if (n) showToast(`🗑️ 일정 ${n}개를 지웠어요 · 상품은 그대로예요`);
             renderProductScheduleCalendar();
