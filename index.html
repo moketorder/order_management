@@ -30739,11 +30739,11 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 else { if (d < today) return; } // 전체(오늘 포함 이후)
                 const _q = (parseInt(o.qty || 0) || 0);
                 const _odt = parseTimestampToDate(o.timestamp), _od = _odt ? `${_odt.getFullYear()}-${String(_odt.getMonth() + 1).padStart(2, '0')}-${String(_odt.getDate()).padStart(2, '0')}` : '';   // [신규 2026-10-15] 손님이 주문한 날 — 사다드림 손님별 보기에 쓴다
-                if (_done) { doneMap.set(key, (doneMap.get(key) || 0) + _q); if (!_pastSel) return; } // 완료 수량은 별도 집계(발주 목록엔 미포함) — [수정 2026-11-21] 지난 날짜를 고르면 끝난 주문도 목록에 넣는다
+                if (_done) doneMap.set(key, (doneMap.get(key) || 0) + _q); /* [수정 2026-11-27] 완료도 총 수량에 넣는다 (사장님 요청 — 총 들어온 숫자). 부족분은 아래 qtyLeft(안 나간 것)로 */ // 완료 수량은 별도 집계(발주 목록엔 미포함) — [수정 2026-11-21] 지난 날짜를 고르면 끝난 주문도 목록에 넣는다
                 // [수정] ocat — 주문에 적힌 분류. 상품을 못 찾아도 이걸로 묶음(공동구매·상시판매…)을 정한다
                 if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, ocat: String(o.category || ''), qty: 0, amount: 0, dates: new Set(), dateQty: new Map(), optionQty: new Map(), optionItemQty: new Map() });
                 const g = map.get(key);
-                g.qty += _q;
+                g.qty += _q; if (!_done) g.qtyLeft = (g.qtyLeft || 0) + _q;
                 g.amount += (parseInt(o.total || 0) || 0);
                 g.fee = (g.fee || 0) + (parseInt(o.agencyFee || 0) || 0);   // [신규 2026-10-19] 사다드림 대행료 합계 (주문액에 들어 있다 — 본금액·수수료로 나눠 보여 준다)
                 g.dates.add(info.dateStr);
@@ -30787,7 +30787,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                 let shortage; // 부족분 = 보유분 - 주문수량 (음수=부족, 양수=여유)
                 if (onHand === null) shortage = null;
                 else if (onHand === Infinity) shortage = Infinity; // 무제한 보유 → 부족 없음
-                else shortage = onHand - g.qty;
+                else shortage = onHand - (g.qtyLeft || 0);   // [수정 2026-11-27] 부족분은 아직 안 나간 수량으로
                 return Object.assign(g, { stock, onHand, shortage, doneQty: doneMap.get(g.key) || 0 });
             });
             // [신규] 상품명 검색 필터
@@ -30915,7 +30915,7 @@ ${oneDay ? '' : ((!vs.visitDays && vs.days && vs.days[0] < VISIT_START)
                     <div style="font-size:10px; color:var(--text-sub); margin:2px 0 5px;">${dateHint}</div>
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                         <div style="display:flex; gap:12px; font-size:12px; flex-wrap:wrap;">
-                            <span style="color:var(--text-sub);" title="완료된 것은 빼고 앞으로 나갈 수량">총 주문수량 <b style="color:#2563eb; font-weight:900;">${r.qty}개</b></span>${/* [수정 2026-11-20] 완료는 빼고 나갈 것만 · 완료수량 줄도 뺌 (사장님 요청, 11-11의 전체 셈을 되돌림) */''}
+                            <span style="color:var(--text-sub);" title="완료된 것까지 들어온 주문 전체 수량">총 주문수량 <b style="color:#2563eb; font-weight:900;">${r.qty}개</b></span>${/* [수정 2026-11-20] 완료는 빼고 나갈 것만 · 완료수량 줄도 뺌 (사장님 요청, 11-11의 전체 셈을 되돌림) */''}
                             ${/* 완료수량은 보이지 않는다 (2026-11-20) */''}
                         </div>
                         ${/* [신규 2026-11-11] 마감된 상품은 재고 칸에 '마감', 변경 대신 '풀기' (사장님 요청 — 수량이 보여 열린 줄 착각) */''}
