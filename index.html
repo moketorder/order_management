@@ -5513,7 +5513,11 @@
                                 let n = 0;
                                 for (const [i, x] of rows.entries()) {
                                     const pp = uploadProducts[x.idx]; if (!pp) continue;
-                                    if (!have.has(pp.sid)) { await psGroupAddTo(key, x.idx); have.add(pp.sid); n++; }
+                                    if (!have.has(pp.sid)) {
+                                        /* [수정 2026-11-28] 못 담으면(같은 상품의 다른 일정과 겹침) 창을 닫지 않고 겹치는 일정을 알려 준다 (사장님 지적 — 달래반찬) */
+                                        if (!(await psGroupAddTo(key, x.idx))) { const s0 = psItem(key) || {}, ov = psItemOverlap(pp.sid, Number(s0.releaseAt) || null, Number(s0.expireAt) || null, null); b.disabled = false; showToast(ov ? `⚠️ ${String(pp.name).slice(0, 14)} — 이미 걸린 일정(${psGroupName(ov.key)} · ${fFmtSchedTime(ov.releaseAt)} ~ ${fFmtSchedTime(ov.expireAt)})과 겹쳐서 못 담았어요` : `⚠️ ${String(pp.name).slice(0, 14)} 못 담았어요`); return; }
+                                        have.add(pp.sid); n++;
+                                    }
                                     if (onsOn[i]) {   // 담긴(또는 이미 들어 있던) 그 상품의 이 일정 칸에 상시판매 전환을 적는다
                                         const g = (psItem(key) || {}).group, src = psItem(key) || {};
                                         const it = psItemsOfSid(pp.sid).find(y => (g && y.group === g) || (Number(y.releaseAt || 0) === Number(src.releaseAt || 0) && Number(y.expireAt || 0) === Number(src.expireAt || 0)));
@@ -21759,6 +21763,7 @@
             const ok = same ? await psItemSave(same.key, { group: gid, groupLabel: src.groupLabel || null })
                 : await psItemAdd(pIdx, { releaseAt: src.releaseAt, expireAt: src.expireAt, pickup: psItemPickup(src) || null, group: gid, groupLabel: src.groupLabel || null });
             if (ok) showToast(`📅 ${String(p.name).slice(0, 14)} 담았어요`);
+            return !!ok;   // [신규 2026-11-28] 담겼는지 알려 준다 — 겹쳐서 못 담았는데 담았어요로 나오던 것 (소싱 창)
             psAddToFor = null; psPickQuery = '';
             renderProductScheduleCalendar();
             if (typeof renderProductsList === 'function') renderProductsList();
