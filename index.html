@@ -19309,7 +19309,78 @@
             //  공동구매로 팔 물건을 상시판매로 먼저 팔지 않게. 올라가는 시각이 되면 autoApplyScheduledVisibility 가 공동구매로 바꿔 다시 보인다.
             if (await psPromoteDue()) autoApplyScheduledVisibility();
             await psSyncOnsiteHold(idx);
+            if (it && !data.autoRepeat) psStartIssueQueue(it.key);   // [신규 2026-11-28] 재고 0·마감이면 알려 준다
             return it;
+        }
+        /* [신규 2026-11-28] 노출일정을 걸 때 그 상품이 재고 0이거나 마감(손으로 마감)이면 알려 주고 그 자리에서 풀게 한다 (사장님 요청).
+           재고: 이 차례에 재고를 적어 뒀으면 그 숫자, 비워 뒀으면 지금 상품 재고를 이어받으므로 지금 재고(옵션 재고 따르는 상품은 옵션 합)를 본다.
+           반복 상품이 반복 수량(무제한·고정)으로 시작하면 문제없음. 여러 개를 한꺼번에 걸면 한 창에 모아 보여 준다 */
+        let _psStartQ = [], _psStartT = null;
+        function psStartIssueQueue(key) { _psStartQ.push(key); clearTimeout(_psStartT); _psStartT = setTimeout(psStartIssueShow, 500); }
+        function psStartIssuesOf(key) {
+            const it = psItem(key); if (!it) return null;
+            const p = uploadProducts[it.idx]; if (!p) return null;
+            const ck = fGetAdjKey(p.matchKey, p.name, p.sid);
+            const closed = uploadClosedMap[ck] === true || uploadClosedMap[encodeURIComponent(ck)] === true;
+            const raw = psSched[p.sid] && psSched[p.sid][it.rid];
+            const st = raw && raw.stock;
+            let zero = false;
+            if (st !== undefined && st !== null && st !== '') zero = Number(st) === 0;
+            else {
+                const rep = Number(p.repeatWeeks) > 0 && p.showWeekly !== true;
+                const tg = rep && typeof psRepStockTarget === 'function' ? psRepStockTarget(p) : null;
+                zero = (tg === null || tg === undefined) ? gIsProductSoldOut(p) : Number(tg) === 0;
+            }
+            return (closed || zero) ? { key, idx: it.idx, p, ck, closed, zero } : null;
+        }
+        function psStartIssueShow() {
+            const keys = [...new Set(_psStartQ)]; _psStartQ = [];
+            const seen = new Set();
+            const list = keys.map(psStartIssuesOf).filter(x => x && !seen.has(x.idx) && seen.add(x.idx));
+            if (!list.length) return;
+            let box = document.getElementById('ps-start-issue'); if (box) box.remove();
+            box = document.createElement('div'); box.id = 'ps-start-issue';
+            box.style.cssText = 'position:fixed; inset:0; z-index:10040; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px;';
+            const paint = () => {
+                box.innerHTML = `<div style="background:#fff; border-radius:14px; padding:16px; max-width:420px; width:100%; max-height:80vh; overflow:auto; box-shadow:0 20px 50px rgba(0,0,0,.25);">
+                    <div style="font-size:14px; font-weight:900; color:#0f172a;">⚠️ 이대로 올라가면 손님이 못 사요</div>
+                    <div style="font-size:11.5px; font-weight:700; color:#64748b; margin:2px 0 10px;">재고가 0이거나 마감된 상품이에요. 여기서 풀 수 있어요.</div>
+                    ${list.map((x, i) => `<div style="border:1px solid #fde68a; background:#fffbeb; border-radius:10px; padding:9px 10px; margin-bottom:7px;">
+                        <div style="font-size:12.5px; font-weight:800; color:#0f172a; margin-bottom:6px;">${gEscapeHtml(x.p.name || '')}</div>
+                        ${x.closed ? `<div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;"><span style="flex:1; font-size:12px; font-weight:800; color:#b91c1c;">🔒 마감돼 있어요</span><button type="button" data-open="${i}" style="height:30px; padding:0 10px; border:1.5px solid #dc2626; background:#fff; color:#dc2626; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">마감 풀기</button></div>` : ''}
+                        ${x.zero ? `<div style="display:flex; align-items:center; gap:6px;"><span style="flex:1; font-size:12px; font-weight:800; color:#b45309;">📦 재고 0개로 시작해요</span><input type="number" min="0" inputmode="numeric" data-stk="${i}" placeholder="이번 차례 재고" style="width:110px; height:30px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 8px; font-size:12.5px; font-weight:800; box-sizing:border-box;"><button type="button" data-set="${i}" style="height:30px; padding:0 10px; border:none; background:#2563eb; color:#fff; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">넣기</button></div>
+                            <div style="font-size:10.5px; font-weight:700; color:#94a3b8; margin-top:3px;">999 = 무제한</div>` : ''}
+                    </div>`).join('')}
+                    <button type="button" data-close="1" style="margin-top:4px; width:100%; height:40px; border:1.5px solid #cbd5e1; background:#f8fafc; border-radius:9px; font-size:13px; font-weight:800; cursor:pointer;">닫기</button></div>`;
+            };
+            paint();
+            box.addEventListener('click', async e => {
+                if (e.target === box || e.target.closest('[data-close]')) { box.remove(); return; }
+                const bo = e.target.closest('[data-open]'), bs = e.target.closest('[data-set]');
+                if (bo) {
+                    const x = list[+bo.dataset.open];
+                    bo.disabled = true;
+                    try {
+                        const r = await fetch(`${FIREBASE_DB_URL}product_closed/${encodeURIComponent(x.ck)}.json`, { method: 'DELETE' });
+                        if (!r.ok) throw new Error('서버 응답 ' + r.status);
+                        delete uploadClosedMap[x.ck]; delete uploadClosedMap[encodeURIComponent(x.ck)];
+                        updatePublishedProductsTimestamp();
+                        x.closed = false; showToast('🔓 마감을 풀었어요');
+                    } catch (err) { bo.disabled = false; showToast('못 풀었어요: ' + gErrKo(err)); return; }
+                }
+                if (bs) {
+                    const i = +bs.dataset.set, x = list[i], inp = box.querySelector(`[data-stk="${i}"]`);
+                    const v = String((inp && inp.value) || '').trim();
+                    if (!v || !(parseInt(v, 10) > 0)) { showToast('재고 숫자를 적어 주세요'); if (inp) inp.focus(); return; }
+                    bs.disabled = true;
+                    await psItemSetStock(x.key, v);
+                    x.zero = false;
+                }
+                if (list.every(x => !x.closed && !x.zero)) { box.remove(); return; }
+                paint();
+                if (typeof renderProductsList === 'function') renderProductsList();
+            });
+            document.body.appendChild(box);
         }
         /* [신규 2026-10-03] 상시판매 상품의 '공동구매 기다림' 숨김을 일정에 맞춘다 (사장님 요청 — 일정을 고치면 새로 올린 것처럼).
            일정을 걸거나·옮기거나·지우거나·바꾸고 나면 늘 부른다.
